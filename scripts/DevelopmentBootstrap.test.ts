@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   createDesktopEnvironment,
   createDevelopmentCommands,
-  readDopplerTarget,
   runDevelopmentBootstrap,
 } from './DevelopmentBootstrap.js';
+import { readDevelopmentEnv } from './DevelopmentEnv.js';
 import { type CommandRequest, type ExecuteCommand } from './RunCommand.js';
 
 const SafeEnvironment = {
@@ -148,13 +148,31 @@ describe('local development bootstrap', () => {
     });
   });
 
-  it('keeps Doppler config selection in the development namespace', () => {
-    expect(readDopplerTarget({})).toEqual({ project: 'tro', config: 'dev_local' });
-    expect(() => readDopplerTarget({ TRO_DOPPLER_CONFIG: 'prd' })).toThrow(
-      'dedicated development config',
+  it('preserves Windows environment-key casing while matching standard names', () => {
+    expect(
+      createDesktopEnvironment({
+        Path: 'C:\\tools',
+        SystemRoot: 'C:\\Windows',
+        ComSpec: 'C:\\Windows\\System32\\cmd.exe',
+        DATABASE_URL: SafeEnvironment.DATABASE_URL,
+      }),
+    ).toEqual({
+      Path: 'C:\\tools',
+      SystemRoot: 'C:\\Windows',
+      ComSpec: 'C:\\Windows\\System32\\cmd.exe',
+    });
+  });
+
+  it('validates Doppler settings through the development environment boundary', () => {
+    expect(readDevelopmentEnv({})).toEqual({
+      TRO_DOPPLER_PROJECT: 'tro',
+      TRO_DOPPLER_CONFIG: 'dev_local',
+    });
+    expect(() => readDevelopmentEnv({ TRO_DOPPLER_CONFIG: 'prd' })).toThrow(
+      'Development bootstrap configuration is invalid',
     );
-    expect(() => readDopplerTarget({ TRO_DOPPLER_PROJECT: 'tro; echo unsafe' })).toThrow(
-      'only letters',
+    expect(() => readDevelopmentEnv({ TRO_DOPPLER_PROJECT: 'tro; echo unsafe' })).toThrow(
+      'Development bootstrap configuration is invalid',
     );
   });
 
@@ -165,7 +183,14 @@ describe('local development bootstrap', () => {
       PROVIDER_API_KEY: 'parent-secret',
       MAIN_VITE_APP_ENV: 'dev',
     };
-    const commands = createDevelopmentCommands(readDopplerTarget(environment), environment);
+    const developmentEnvironment = readDevelopmentEnv(environment);
+    const commands = createDevelopmentCommands(
+      {
+        project: developmentEnvironment.TRO_DOPPLER_PROJECT,
+        config: developmentEnvironment.TRO_DOPPLER_CONFIG,
+      },
+      environment,
+    );
     const apiCommand = commands[0];
     const desktopCommand = commands[1];
 

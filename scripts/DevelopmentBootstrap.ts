@@ -5,13 +5,10 @@ import {
   type ExecuteCommand,
   executeCommand,
 } from './RunCommand.js';
+import { readDevelopmentEnv } from './DevelopmentEnv.js';
 
 const SupportedNodeMajor = 24;
 const SupportedPnpmMajor = 11;
-const DefaultDopplerProject = 'tro';
-const DefaultDopplerConfig = 'dev_local';
-const DopplerNamePattern = /^[a-zA-Z0-9_-]+$/;
-const DevelopmentConfigPattern = /^dev(?:[_-].+)?$/;
 
 const SharedRuntimeEnvironmentNames = new Set([
   'APPDATA',
@@ -81,12 +78,13 @@ function copyAllowedEnvironment(
 ): NodeJS.ProcessEnv {
   return Object.fromEntries(
     Object.entries(source).filter(([name, value]) => {
-      const isLocale = name.startsWith('LC_');
+      const normalizedName = name.toUpperCase();
+      const isLocale = normalizedName.startsWith('LC_');
       const isDesktopPublic = name.startsWith('MAIN_VITE_') && allowedNames.has(name);
 
       return (
         value !== undefined &&
-        (SharedRuntimeEnvironmentNames.has(name) || isLocale || isDesktopPublic)
+        (SharedRuntimeEnvironmentNames.has(normalizedName) || isLocale || isDesktopPublic)
       );
     }),
   );
@@ -108,23 +106,6 @@ export function createDopplerEnvironment(source: NodeJS.ProcessEnv): NodeJS.Proc
   }
 
   return environment;
-}
-
-export function readDopplerTarget(environment: NodeJS.ProcessEnv): DopplerTarget {
-  const project = environment['TRO_DOPPLER_PROJECT'] ?? DefaultDopplerProject;
-  const config = environment['TRO_DOPPLER_CONFIG'] ?? DefaultDopplerConfig;
-
-  if (!DopplerNamePattern.test(project) || !DopplerNamePattern.test(config)) {
-    throw new Error('Doppler project and config names may contain only letters, numbers, _ and -.');
-  }
-
-  if (!DevelopmentConfigPattern.test(config)) {
-    throw new Error(
-      'TRO_DOPPLER_CONFIG must name a dedicated development config (dev, dev_*, or dev-*).',
-    );
-  }
-
-  return { project, config };
 }
 
 function createDopplerRequest(
@@ -187,7 +168,11 @@ export async function startDevelopmentProcesses(
 export async function runDevelopmentBootstrap(options: DevelopmentBootstrapOptions): Promise<void> {
   const run = options.execute ?? executeCommand;
   const startProcesses = options.startProcesses ?? startDevelopmentProcesses;
-  const target = readDopplerTarget(options.environment);
+  const developmentEnvironment = readDevelopmentEnv(options.environment);
+  const target = {
+    project: developmentEnvironment.TRO_DOPPLER_PROJECT,
+    config: developmentEnvironment.TRO_DOPPLER_CONFIG,
+  };
 
   validateSupportedVersion('Node.js', options.nodeVersion, SupportedNodeMajor);
 
