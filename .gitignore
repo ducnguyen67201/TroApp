@@ -4,6 +4,8 @@ dist/
 release/
 coverage/
 src/server/generated/
+.cloudplan
+.claude/
 .env
 .env.*
 !.env.example
