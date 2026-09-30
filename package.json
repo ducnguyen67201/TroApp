@@ -16,7 +16,8 @@
   },
   "scripts": {
     "postinstall": "prisma generate",
-    "dev": "tsx scripts/StartDevelopment.ts",
+    "dev:setup": "doppler setup",
+    "dev": "concurrently --kill-others -n api,desktop \"doppler run -- pnpm dev:api\" \"pnpm dev:desktop\"",
     "dev:api": "node --conditions=development --watch --import tsx src/server/StartApi.ts",
     "dev:desktop": "electron-vite dev",
     "start": "node dist/server/StartApi.js",
@@ -24,7 +25,7 @@
     "db:start": "docker compose up -d postgres",
     "db:stop": "docker compose stop postgres",
     "db:generate": "prisma generate",
-    "db:migrate": "tsx scripts/MigrateDevelopmentDatabase.ts",
+    "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "build": "pnpm db:generate && pnpm build:api && pnpm build:desktop",
     "build:api": "tsc -p tsconfig.server.json",
