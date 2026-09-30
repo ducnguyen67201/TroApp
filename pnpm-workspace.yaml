@@ -1,0 +1,10 @@
+packages:
+  - '.'
+allowBuilds:
+  '@prisma/engines': true
+  electron: true
+  electron-winstaller: false
+  esbuild: true
+  prisma: true
+minimumReleaseAgeExclude:
+  - electron@44.5.1

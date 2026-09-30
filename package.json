@@ -1,0 +1,95 @@
+{
+  "name": "tro",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "out/main/Main.js",
+  "imports": {
+    "#contracts/*.js": {
+      "development": "./src/contracts/*.ts",
+      "default": "./dist/contracts/*.js"
+    }
+  },
+  "packageManager": "pnpm@11.16.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "postinstall": "prisma generate",
+    "dev": "concurrently --kill-others -n api,desktop \"pnpm dev:api\" \"pnpm dev:desktop\"",
+    "dev:api": "node --conditions=development --watch --env-file-if-exists=.env --import tsx src/server/StartApi.ts",
+    "dev:desktop": "electron-vite dev",
+    "start": "node dist/server/StartApi.js",
+    "start:desktop": "electron-vite preview",
+    "db:start": "docker compose up -d postgres",
+    "db:stop": "docker compose stop postgres",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "build": "pnpm db:generate && pnpm build:api && pnpm build:desktop",
+    "build:api": "tsc -p tsconfig.server.json",
+    "build:desktop": "electron-vite build && tsx scripts/PrepareDesktopPackage.ts",
+    "package:desktop": "pnpm build:desktop && electron-builder --publish never",
+    "lint": "eslint . && tsx scripts/CheckBoundaries.ts",
+    "format": "prettier --write . && eslint . --fix",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
+    "test": "vitest run",
+    "test:integration": "tsx scripts/RunIntegration.ts"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "@t3-oss/env-core": "^0.13.10",
+    "dotenv": "^17.2.3",
+    "fastify": "^5.12.5",
+    "pg": "^8.16.3",
+    "pino": "^10.3.1",
+    "prisma": "7.10.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/node": "^24.10.0",
+    "@types/pg": "^8.15.6",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "concurrently": "^9.2.1",
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3",
+    "electron-vite": "5.0.0",
+    "eslint": "^10.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.7.4",
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.71.0",
+    "vite": "^7.3.1",
+    "vitest": "^4.0.16"
+  },
+  "build": {
+    "appId": "app.tro.desktop",
+    "productName": "Tro",
+    "files": [
+      "main/**/*",
+      "preload/**/*",
+      "renderer/**/*",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "directories": {
+      "app": "out",
+      "output": "release"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    }
+  }
+}
