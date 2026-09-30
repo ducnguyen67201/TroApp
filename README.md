@@ -8,19 +8,25 @@ Read [Architecture](docs/Architecture.md) for the local/cloud split, [Developmen
 
 ## Quick start
 
-Use Node.js 24 LTS and pnpm 11. Install Docker Desktop to run the optional local database.
+Use Node.js 24 LTS and pnpm 11. Install Docker Desktop and the Doppler CLI. Ask a Tro
+workspace administrator for access to the `tro` project and its dedicated `dev_local`
+configuration, then authenticate once with `doppler login`.
 
 ```sh
 pnpm install
-cp .env.example .env
-pnpm db:start
-pnpm db:migrate
 pnpm dev
 ```
 
-`pnpm dev` starts the API and desktop application together. Without PostgreSQL, the API still starts and the desktop shows that the database is unavailable. No real accounts, photographs, or AI credentials are required.
+`pnpm dev` verifies the toolchain and Doppler access, starts and health-checks PostgreSQL,
+refuses any non-local migration target, applies migrations, generates Prisma, and starts the API
+and desktop together. Re-running it is safe when the database and migrations already exist.
+Ctrl-C stops the application processes but preserves the local database volume.
 
-For local development, `.env` needs only the PostgreSQL `DATABASE_URL`; optional `APP_ENV` accepts `dev`, `stage`, or `prod`. The API and desktop use matching local defaults. When packaging an installer, set the public `MAIN_VITE_API_BASE_URL` at build time; see [Development](docs/Development.md).
+The Doppler config must set `APP_ENV=dev` and its `DATABASE_URL` must target the Compose
+database at `127.0.0.1:54329/tro`. Backend secrets are never passed to the desktop. The only
+browser-visible settings are the allowlisted `MAIN_VITE_API_BASE_URL` and
+`MAIN_VITE_APP_ENV`. See [Development](docs/Development.md) for first-time setup, recovery,
+configuration overrides, and the manual startup sequence.
 
 ## Ownership
 
