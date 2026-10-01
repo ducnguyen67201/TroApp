@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
 import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
+import { prepareCuaSdk } from './PrepareCuaSdk.js';
 
 const metadata: unknown = JSON.parse(await readFile('package.json', 'utf8'));
 const packageMetadata = z
@@ -29,6 +30,7 @@ await cp(nativeLoaderDirectory, 'out/node_modules/node-gyp-build', {
   recursive: true,
   dereference: true,
 });
+await prepareCuaSdk('out/cua-sdk');
 
 /* The worker bundles its TypeScript dependencies. PackageDesktop.ts adds a
  * verified Cua Driver release as an executable resource outside ASAR. The app

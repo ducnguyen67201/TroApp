@@ -50,6 +50,7 @@
     "@prisma/client": "7.10.0",
     "@t3-oss/env-core": "^0.13.10",
     "@tabler/icons-react": "3.48.0",
+    "@trycua/cua-driver": "0.30.4",
     "better-auth": "^1.7.6",
     "dotenv": "^17.2.3",
     "fastify": "^5.12.5",
@@ -110,6 +111,10 @@
       "!node_modules/.cache/**/*"
     ],
     "extraResources": [
+      {
+        "from": "cua-sdk/node_modules",
+        "to": "cua-sdk/node_modules"
+      },
       {
         "from": "driver",
         "to": "cua-driver"

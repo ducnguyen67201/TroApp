@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 
 const runFile = promisify(execFile);
 const driverVersion = '0.30.4';
+const driverLayout = 'embedded-v1';
 const releaseBaseUrl = `https://github.com/trycua/cua/releases/download/cua-driver-rs-v${driverVersion}`;
 
 interface DriverRelease {
@@ -48,13 +49,12 @@ function selectDriverRelease(platform: NodeJS.Platform, architecture: string): D
 
 async function hasPreparedDriver(destination: string, platform: NodeJS.Platform): Promise<boolean> {
   const executable =
-    platform === 'darwin'
-      ? join(destination, 'CuaDriver.app', 'Contents', 'MacOS', 'cua-driver')
-      : join(destination, 'cua-driver.exe');
+    platform === 'darwin' ? join(destination, 'cua-driver') : join(destination, 'cua-driver.exe');
   try {
     const version = await readFile(join(destination, 'DriverVersion.txt'), 'utf8');
+    const layout = await readFile(join(destination, 'DriverLayout.txt'), 'utf8');
     await access(executable);
-    return version.trim() === driverVersion;
+    return version.trim() === driverVersion && layout.trim() === driverLayout;
   } catch {
     return false;
   }
@@ -91,7 +91,7 @@ export async function prepareCuaDriver(destination: string): Promise<void> {
     await rm(destination, { recursive: true, force: true });
     await mkdir(destination, { recursive: true });
     if (process.platform === 'darwin') {
-      await cp(join(extractedDirectory, 'CuaDriver.app'), join(destination, 'CuaDriver.app'), {
+      await cp(join(extractedDirectory, 'CuaDriver.app', 'Contents', 'MacOS'), destination, {
         recursive: true,
         preserveTimestamps: true,
       });
@@ -100,6 +100,7 @@ export async function prepareCuaDriver(destination: string): Promise<void> {
       await cp(extractedDirectory, destination, { recursive: true, force: true });
     }
     await writeFile(join(destination, 'DriverVersion.txt'), `${driverVersion}\n`);
+    await writeFile(join(destination, 'DriverLayout.txt'), `${driverLayout}\n`);
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
   }

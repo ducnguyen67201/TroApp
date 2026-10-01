@@ -16,7 +16,7 @@ function grantLabel(grant: string, messages: TranslationCatalog): string {
   return messages.permissionUnknown;
 }
 
-/** Real onboarding uses driver status; the HTML prototype's Settings window
+/** Real onboarding uses Tro’s host permission status; the HTML prototype's Settings window
  * is only a visual example and never appears inside the shipped application. */
 export function PermissionsOnboardingPage({
   controller,

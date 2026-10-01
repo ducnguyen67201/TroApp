@@ -80,6 +80,11 @@ describe('agent IPC contract', () => {
           gatewayToken: 'scoped-test-token',
           gatewayBaseUrl: 'https://api.example.test/api/v1/model',
           debugEnabled: true,
+          desktopDriver: {
+            command: '/tro/cua-driver',
+            args: ['mcp', '--socket', '/private/tro.sock'],
+            env: { CUA_DRIVER_EMBEDDED: '1' },
+          },
           history: [{ role: 'user', text: 'Previous task' }],
         },
       }).success,
@@ -93,6 +98,11 @@ describe('agent IPC contract', () => {
       gatewayToken: 'scoped-test-token',
       gatewayBaseUrl: 'https://api.example.test/api/v1/model',
       debugEnabled: true,
+      desktopDriver: {
+        command: '/tro/cua-driver',
+        args: ['mcp', '--socket', '/private/tro.sock'],
+        env: { CUA_DRIVER_EMBEDDED: '1' },
+      },
     };
     expect(AgentWorkerRequestSchema.safeParse({ requestId: sessionId, command }).success).toBe(
       true,

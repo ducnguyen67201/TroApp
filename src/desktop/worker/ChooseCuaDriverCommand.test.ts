@@ -24,16 +24,15 @@ it('uses the bundled macOS driver before the development cache', async () => {
   temporaryDirectories.push(root);
   const resourcesPath = join(root, 'resources');
   const homeDirectory = join(root, 'home');
-  const packagedApp = join(resourcesPath, 'cua-driver', 'CuaDriver.app');
-  const cachedApp = join(homeDirectory, '.cache', 'tro', 'cua-driver', 'CuaDriver.app');
-  await createExecutable(join(packagedApp, 'Contents', 'MacOS', 'cua-driver'));
-  await createExecutable(join(cachedApp, 'Contents', 'MacOS', 'cua-driver'));
+  const packagedApp = join(resourcesPath, 'cua-driver');
+  const cachedApp = join(homeDirectory, '.cache', 'tro', 'cua-driver');
+  await createExecutable(join(packagedApp, 'cua-driver'));
+  await createExecutable(join(cachedApp, 'cua-driver'));
 
   await expect(
     chooseCuaDriverCommand({ resourcesPath, homeDirectory, platform: 'darwin' }),
   ).resolves.toEqual({
-    command: join(packagedApp, 'Contents', 'MacOS', 'cua-driver'),
-    macAppPath: packagedApp,
+    command: join(packagedApp, 'cua-driver'),
   });
 });
 
@@ -48,4 +47,18 @@ it('uses the cached Windows driver when no packaged executable exists', async ()
   await expect(
     chooseCuaDriverCommand({ resourcesPath, homeDirectory, platform: 'win32' }),
   ).resolves.toEqual({ command });
+});
+
+it('does not use an independent macOS app when Tro has no prepared driver', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'tro-driver-choice-'));
+  temporaryDirectories.push(root);
+  const homeDirectory = join(root, 'home');
+  await createExecutable(join(homeDirectory, '.local', 'bin', 'cua-driver'));
+  await expect(
+    chooseCuaDriverCommand({
+      resourcesPath: join(root, 'resources'),
+      homeDirectory,
+      platform: 'darwin',
+    }),
+  ).rejects.toThrow('bundled Tro desktop driver');
 });

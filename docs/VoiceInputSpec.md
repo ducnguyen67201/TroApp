@@ -48,7 +48,7 @@ flowchart LR
 
 Main owns capture identity, account rechecks, deadlines, cancellation, and final submission. React never submits the final transcript again. It receives validated task events and displays them in memory. The existing agent controller still checks sign-in and desktop control permissions and owns the worker. Text submission accepts an explicit instruction rather than depending on a preceding React state update.
 
-The native listener owns physical key state, auto-repeat suppression, first-release stop, and both-release rearming. It is loaded during authenticated voice startup after OS permission checks. Mac requires Tro's own Accessibility permission; CuaDriver's grant is separate. Missing hook access leaves the Talk button available. Packaged permissions, Input Monitoring requirements, background recording and Windows AltGr behavior must be tested on each supported OS.
+The native listener owns physical key state, auto-repeat suppression, first-release stop, and both-release rearming. It is loaded during authenticated voice startup after OS permission checks. Mac requires Tro's Accessibility permission, shared with its embedded computer-use driver. Missing hook access leaves the Talk button available. Packaged permissions, Input Monitoring requirements, background recording and Windows AltGr behavior must be tested on each supported OS.
 
 The sandboxed renderer owns microphone resources. Electron's permission check and request handlers allow audio only for the trusted main frame during an active capture. Cameras, other permissions, and unrelated frames are denied. macOS packaging includes `NSMicrophoneUsageDescription` and the audio-input entitlement. Microphone tracks stop on release/cancel even if device setup completes late.
 

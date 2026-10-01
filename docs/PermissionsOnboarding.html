@@ -709,8 +709,8 @@
                 <div class="eyebrow">One-time setup</div>
                 <h1>Let Tro see and guide your desktop.</h1>
                 <p class="lead">
-                  To help inside your apps, Tro uses CuaDriver. macOS asks you to allow it to see
-                  the screen and interact with windows. You stay in control of both permissions.
+                  To help inside your apps, macOS asks you to allow Tro to see the screen and
+                  interact with windows. You stay in control of both permissions.
                 </p>
               </div>
               <div class="hero-visual" aria-hidden="true">
@@ -721,7 +721,7 @@
 
             <section class="setup-card" aria-labelledby="permission-heading">
               <div class="card-title">
-                <h2 id="permission-heading">Allow CuaDriver in macOS Settings</h2>
+                <h2 id="permission-heading">Allow Tro in macOS Settings</h2>
                 <span class="small-note">Both are needed for desktop help</span>
               </div>
               <div class="permission-row">
@@ -751,8 +751,8 @@
 
             <p class="feedback" id="feedback" role="status" aria-live="polite"></p>
             <p class="hint">
-              When macOS opens Settings, turn on <strong>CuaDriver</strong> in each section. If
-              macOS asks to quit and reopen CuaDriver, accept it, then return here and check again.
+              When macOS opens Settings, turn on <strong>Tro</strong> in each section. If macOS asks
+              to quit and reopen Tro, accept it, then return here and check again.
             </p>
             <div class="below">
               <span
@@ -799,18 +799,18 @@
           <div class="settings-content">
             <h3 id="settings-heading">Accessibility</h3>
             <p id="settings-description">
-              Allow CuaDriver to control your Mac so Tro can guide you across apps.
+              Allow Tro to control your Mac so Tro can guide you across apps.
             </p>
             <div class="settings-app">
               <span class="settings-app-icon" aria-hidden="true">✧</span
-              ><span class="settings-app-name">CuaDriver</span
+              ><span class="settings-app-name">Tro</span
               ><button
                 class="switch"
                 id="settings-switch"
                 type="button"
                 role="switch"
                 aria-checked="false"
-                aria-label="Allow CuaDriver Accessibility"
+                aria-label="Allow Tro Accessibility"
               ></button>
             </div>
             <div class="settings-bottom">
@@ -857,14 +857,14 @@
           ? 'Accessibility'
           : 'Screen & System Audio Recording';
         document.querySelector('#settings-description').textContent = isAccessibility
-          ? 'Allow CuaDriver to control your Mac so Tro can guide you across apps.'
-          : 'Allow CuaDriver to see the screen so Tro can understand what is in front of you.';
+          ? 'Allow Tro to control your Mac so Tro can guide you across apps.'
+          : 'Allow Tro to see the screen so Tro can understand what is in front of you.';
         document.querySelector('#accessibility-tab').classList.toggle('selected', isAccessibility);
         document.querySelector('#recording-tab').classList.toggle('selected', !isAccessibility);
         switchButton.setAttribute('aria-checked', String(permissions[permission]));
         switchButton.setAttribute(
           'aria-label',
-          `Allow CuaDriver ${isAccessibility ? 'Accessibility' : 'Screen Recording'}`,
+          `Allow Tro ${isAccessibility ? 'Accessibility' : 'Screen Recording'}`,
         );
         document.querySelector('#next-settings').textContent = isAccessibility
           ? 'Next permission →'
@@ -933,9 +933,7 @@
           const missing = !permissions.accessibility
             ? 'Accessibility'
             : 'Screen & System Audio Recording';
-          showFeedback(
-            `${missing} is still off. Open Settings and turn on CuaDriver, then check again.`,
-          );
+          showFeedback(`${missing} is still off. Open Settings and turn on Tro, then check again.`);
         }
       });
       document.querySelector('#later-button').addEventListener('click', () => {
