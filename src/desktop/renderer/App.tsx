@@ -20,12 +20,14 @@ import { useState, type ReactElement } from 'react';
 import { ComputerUsePage } from './ComputerUsePage.js';
 import { SettingsPage } from './SettingsPage.js';
 import { useComputerUse } from './UseComputerUse.js';
+import { useLocale } from './localization/UseLocale.js';
 
 const DesktopPage = { WORKSPACE: 'workspace', SETTINGS: 'settings' } as const;
 
 type DesktopPage = (typeof DesktopPage)[keyof typeof DesktopPage];
 
 export function App(): ReactElement {
+  const { messages } = useLocale();
   const [page, setPage] = useState<DesktopPage>(DesktopPage.WORKSPACE);
   const controller = useComputerUse();
   const { user } = controller;
@@ -41,7 +43,7 @@ export function App(): ReactElement {
             Tro
           </Text>
         </Group>
-        <nav aria-label="Main navigation" className="sidebar-navigation">
+        <nav aria-label={messages.navigation} className="sidebar-navigation">
           <UnstyledButton
             className="sidebar-link"
             data-active={page === DesktopPage.WORKSPACE || undefined}
@@ -51,7 +53,7 @@ export function App(): ReactElement {
             }}
           >
             <IconLayoutSidebar size={19} stroke={1.6} />
-            <span>Workspace</span>
+            <span>{messages.workspace}</span>
           </UnstyledButton>
         </nav>
         <div className="sidebar-bottom">
@@ -64,14 +66,14 @@ export function App(): ReactElement {
             }}
           >
             <IconSettings size={19} stroke={1.6} />
-            <span>Settings</span>
+            <span>{messages.settings}</span>
           </UnstyledButton>
-          <section className="sidebar-account" aria-label="Your account">
+          <section className="sidebar-account" aria-label={messages.yourAccount}>
             {controller.isLoading ? (
               <Group gap="sm">
                 <Loader size="xs" />
                 <Text size="xs" c="dimmed">
-                  Checking sign-in…
+                  {messages.checkingSignIn}
                 </Text>
               </Group>
             ) : user ? (
@@ -99,16 +101,16 @@ export function App(): ReactElement {
                   onClick={() => void controller.signOut()}
                   className="logout-button"
                 >
-                  Sign out
+                  {messages.signOut}
                 </Button>
               </>
             ) : (
               <>
                 <Text size="sm" fw={500}>
-                  Your own little workspace
+                  {messages.ownWorkspace}
                 </Text>
                 <Text size="xs" c="dimmed" mt={5} mb="sm">
-                  Sign in to make it yours.
+                  {messages.signInInvitation}
                 </Text>
                 <Button
                   fullWidth
@@ -117,7 +119,7 @@ export function App(): ReactElement {
                   loading={controller.isSigning}
                   onClick={() => void controller.signInWithGoogle()}
                 >
-                  Sign in
+                  {messages.signIn}
                 </Button>
               </>
             )}
@@ -128,18 +130,18 @@ export function App(): ReactElement {
         <div className="main-panel">
           <header className="panel-header">
             <Text size="sm" c="dimmed">
-              {page === DesktopPage.WORKSPACE ? 'Workspace' : 'Settings'}
+              {page === DesktopPage.WORKSPACE ? messages.workspace : messages.settings}
             </Text>
             <span className="desktop-label">
               <span className="accent-dot" />
-              YOUR DESKTOP
+              {messages.yourDesktop}
             </span>
           </header>
           <div className="panel-content">
             {controller.message && (
               <Alert
                 role="alert"
-                title="Something needs attention"
+                title={messages.attention}
                 color="charcoal"
                 variant="light"
                 mb="lg"

@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { MantineProvider } from '@mantine/core';
 import { App } from './App.js';
+import { LocaleProvider } from './localization/LocaleProvider.js';
 import { desktopTheme, resolveDesktopCssVariables } from './Theme.js';
 import '@mantine/core/styles.css';
 import './App.css';
@@ -17,6 +18,8 @@ createRoot(rootElement).render(
     cssVariablesResolver={resolveDesktopCssVariables}
     forceColorScheme="light"
   >
-    <App />
+    <LocaleProvider>
+      <App />
+    </LocaleProvider>
   </MantineProvider>,
 );
