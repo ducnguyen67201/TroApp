@@ -1,11 +1,25 @@
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
+import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { ComputerUseInstructions } from './ComputerUseInstructions.js';
 import { createComputerUseAgent } from './CreateComputerUseAgent.js';
 import { LoggedCuaServer } from './LoggedCuaServer.js';
 
 describe('computer-use agent tools', () => {
+  it('combines teaching restrictions with the selected reply language', () => {
+    const server = new LoggedCuaServer(
+      { name: 'Cua agent test', command: 'unused-in-this-test', args: ['mcp'] },
+      pino({ level: 'silent' }),
+    );
+    const agent = createComputerUseAgent(server, DesktopLocale.VIETNAMESE, AgentTaskMode.TEACH);
+    expect(agent.instructions).toContain('Respond to the user in Vietnamese');
+    expect(agent.instructions).toContain('This task is teaching');
+    expect(agent.instructions).not.toContain(ComputerUseInstructions);
+    expect(agent.instructions).toContain('presentation_version: 2');
+    expect(agent.instructions).toContain('never retry or replay');
+  });
+
   it('exposes Cua MCP without duplicating desktop actions as local tools', () => {
     const server = new LoggedCuaServer(
       { name: 'Cua agent test', command: 'unused-in-this-test', args: ['mcp'] },

@@ -1,7 +1,9 @@
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { promisify } from 'node:util';
+import { isAbsolute } from 'node:path';
 import { shell } from 'electron';
 import { z } from 'zod';
+import type { AgentChatPermissions } from './AgentChatPorts.js';
 import {
   DesktopPermissionState,
   PermissionGrant,
@@ -19,7 +21,7 @@ const runFile = promisify(execFile);
 const driverStatusSchema = z.object({
   accessibility: z.boolean().optional(),
   screen_recording: z.boolean().optional(),
-  source: z.object({ attribution: z.string() }).optional(),
+  source: z.object({ attribution: z.string(), executable: z.string().optional() }).optional(),
 });
 
 const macSettingsUrls = {
@@ -42,11 +44,18 @@ function readGrant(granted: boolean | undefined): DesktopPermissionStatus['acces
 }
 
 /** Trust only the CuaDriver daemon's own macOS grant report, not the terminal's. */
-export function parseCuaPermissionStatus(output: string): DesktopPermissionStatus {
+export function parseCuaPermissionStatus(
+  output: string,
+  expectedExecutable?: string,
+): DesktopPermissionStatus {
   try {
     const data: unknown = JSON.parse(output);
     const parsed = driverStatusSchema.safeParse(data);
-    if (!parsed.success || parsed.data.source?.attribution !== 'driver-daemon') {
+    if (
+      !parsed.success ||
+      parsed.data.source?.attribution !== 'driver-daemon' ||
+      (expectedExecutable !== undefined && parsed.data.source.executable !== expectedExecutable)
+    ) {
       return unknownStatus;
     }
     const accessibility = readGrant(parsed.data.accessibility);
@@ -65,7 +74,7 @@ export function parseCuaPermissionStatus(output: string): DesktopPermissionStatu
 
 /** Main owns the fixed driver command and macOS Settings destinations.
  * A renderer can request the action, but cannot supply a command or URL. */
-export class DesktopPermissions {
+export class DesktopPermissions implements AgentChatPermissions {
   private installation: CuaDriverCommand | null = null;
   private launchPromise: Promise<CuaDriverCommand> | null = null;
   private grantProcess: ChildProcess | null = null;
@@ -80,11 +89,23 @@ export class DesktopPermissions {
     }
     try {
       const installation = await this.ensureDriverRunning();
-      const result = await runFile(installation.command, ['permissions', 'status', '--json'], {
-        timeout: 5000,
-        maxBuffer: 64 * 1024,
-      });
-      return parseCuaPermissionStatus(result.stdout);
+      const result = await runFile(
+        installation.command,
+        [
+          'permissions',
+          'status',
+          '--json',
+          ...(installation.socketPath ? ['--socket', installation.socketPath] : []),
+        ],
+        {
+          timeout: 5000,
+          maxBuffer: 64 * 1024,
+        },
+      );
+      return parseCuaPermissionStatus(
+        result.stdout,
+        isAbsolute(installation.command) ? installation.command : undefined,
+      );
     } catch {
       return unknownStatus;
     }
@@ -99,10 +120,18 @@ export class DesktopPermissions {
       if (!this.grantProcess) {
         /* Cua owns the OS prompts. The command can remain active while the
            person enables both switches, so never block the renderer on it. */
-        const child = spawn(installation.command, ['permissions', 'grant'], {
-          stdio: 'ignore',
-          windowsHide: true,
-        });
+        const child = spawn(
+          installation.command,
+          [
+            'permissions',
+            'grant',
+            ...(installation.socketPath ? ['--socket', installation.socketPath] : []),
+          ],
+          {
+            stdio: 'ignore',
+            windowsHide: true,
+          },
+        );
         child.once('exit', () => {
           if (this.grantProcess === child) this.grantProcess = null;
         });

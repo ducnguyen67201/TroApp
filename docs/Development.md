@@ -36,6 +36,12 @@ Pino emits debug records only in `dev`, while operational info and errors remain
 Backend settings and provider keys belong in Doppler, not `.env`. Copy `.env.example` to
 `.env.local` only when overriding the two public desktop settings.
 
+The model gateway has no per-account or daily model request cap. Authenticated requests
+are forwarded regardless of previous request counts, and Tro no longer increments the
+historical `ModelUsage` records. Existing records and applied migrations are preserved.
+Idle cursor following does not make model requests. OpenAI's own provider limits may
+still apply.
+
 Start the database separately when needed. `pnpm dev` applies existing migrations automatically;
 use `db:migrate` when authoring a new migration after editing `schema.prisma`:
 

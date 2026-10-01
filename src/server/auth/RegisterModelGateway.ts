@@ -7,7 +7,6 @@ import type { ServerEnv } from '../Env.js';
 import type { createAuthDatabase } from '../persistence/AuthDatabase.js';
 
 type ReadSignedInUserId = ReturnType<typeof createAuthDatabase>['readSignedInUserId'];
-type CountModelRequest = ReturnType<typeof createAuthDatabase>['countModelRequest'];
 
 const ModelRequestSchema = z.looseObject({
   model: z.literal('gpt-5.4'),
@@ -38,7 +37,6 @@ function waitForDrainOrClose(response: ServerResponse): Promise<void> {
 export function registerModelGateway(
   api: FastifyInstance,
   readSignedInUserId: ReadSignedInUserId,
-  countModelRequest: CountModelRequest,
   environment: ServerEnv,
 ): void {
   const signingKey = createGatewayKey(environment.AUTH_SECRET);
@@ -76,7 +74,6 @@ export function registerModelGateway(
       return reply.code(401).send({ message: 'A model credential is required.' });
     }
 
-    let userId: string;
     try {
       const verified = await jwtVerify(authorization.slice(7), signingKey, {
         issuer: 'tro-api',
@@ -85,7 +82,6 @@ export function registerModelGateway(
       if (verified.payload.scope !== 'model' || !verified.payload.sub) {
         return await reply.code(401).send({ message: 'The model credential is invalid.' });
       }
-      userId = verified.payload.sub;
     } catch {
       return reply.code(401).send({ message: 'The model credential is invalid.' });
     }
@@ -93,15 +89,6 @@ export function registerModelGateway(
     const parsed = ModelRequestSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ message: 'The model request is invalid.' });
-    }
-
-    /* Atomically count attempts before contacting the paid provider. This is a
-       first product limit; entitlement plans can replace the fixed allowance. */
-    const day = new Date();
-    day.setUTCHours(0, 0, 0, 0);
-    const requestCount = await countModelRequest(userId, day);
-    if (requestCount > 100) {
-      return reply.code(429).send({ message: 'Daily model allowance reached.' });
     }
 
     const modelRequest = {

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { createElement, type ReactNode } from 'react';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -62,6 +63,9 @@ function createBridge() {
     openDesktopPermissionSettings: vi
       .fn<DesktopBridge['openDesktopPermissionSettings']>()
       .mockResolvedValue({ kind: 'opened' }),
+    startCursorCompanion: vi
+      .fn<DesktopBridge['startCursorCompanion']>()
+      .mockResolvedValue({ kind: 'started', sessionId: '11111111-1111-4111-8111-111111111111' }),
     startAgentSession: vi
       .fn<DesktopBridge['startAgentSession']>()
       .mockResolvedValue({ kind: 'stopped' }),
@@ -222,12 +226,16 @@ describe('locale-driven voice capture', () => {
     expect(attempts).toBe(2);
   });
 
-  it('uses default Vietnamese, keeps the capture snapshot, and reads English on the next hold without resubscribing', async () => {
+  it('snapshots language and teaching mode, then reads changed settings on the next hold without resubscribing', async () => {
     const bridge = createBridge();
     window.tro = bridge;
-    const { result } = renderHook(
-      () => ({ locale: useLocale(), voice: useVoiceInput('user', () => {}) }),
-      { wrapper },
+    const initialProps: { mode: AgentTaskMode } = { mode: AgentTaskMode.TEACH };
+    const { result, rerender } = renderHook(
+      ({ mode }: { mode: AgentTaskMode }) => ({
+        locale: useLocale(),
+        voice: useVoiceInput('user', () => {}, mode),
+      }),
+      { wrapper, initialProps },
     );
     await waitFor(() => {
       expect(bridge.subscribeVoiceInput).toHaveBeenCalledTimes(1);
@@ -243,9 +251,11 @@ describe('locale-driven voice capture', () => {
       kind: 'prepare',
       captureId: firstId,
       locale: 'vi',
+      mode: AgentTaskMode.TEACH,
     });
     act(() => {
       result.current.locale.changeLocale('en');
+      rerender({ mode: AgentTaskMode.EXECUTE });
     });
     expect(bridge.subscribeVoiceInput).toHaveBeenCalledTimes(1);
     expect(
@@ -261,6 +271,7 @@ describe('locale-driven voice capture', () => {
       kind: 'prepare',
       captureId: nextId,
       locale: 'en',
+      mode: AgentTaskMode.EXECUTE,
     });
     expect(window.localStorage.getItem(localeStorageKey)).toBe('en');
   });

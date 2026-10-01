@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AgentCommandSchema, AgentResultSchema, AgentWorkerRequestSchema } from './AgentSession.js';
 import { DesktopLocale } from './DesktopLocale.js';
+import { AgentTaskMode } from './CursorCompanion.js';
 
 const sessionId = 'cb30eac4-48cb-4ed9-bc0b-8928a4de66b3';
 
@@ -36,10 +37,14 @@ describe('agent IPC contract', () => {
     'carries the existing %s locale through renderer and worker turns',
     (locale) => {
       const command = { kind: 'turn', sessionId, message: 'Open YouTube', locale };
-      expect(AgentCommandSchema.parse(command)).toEqual(command);
-      expect(AgentWorkerRequestSchema.parse({ requestId: sessionId, command }).command).toEqual(
-        command,
-      );
+      expect(AgentCommandSchema.parse(command)).toEqual({
+        ...command,
+        mode: AgentTaskMode.EXECUTE,
+      });
+      expect(AgentWorkerRequestSchema.parse({ requestId: sessionId, command }).command).toEqual({
+        ...command,
+        mode: AgentTaskMode.EXECUTE,
+      });
     },
   );
 
@@ -104,4 +109,61 @@ describe('agent IPC contract', () => {
       }).success,
     ).toBe(false);
   });
+});
+
+// Task modes cross the same validated IPC boundary as the message.
+it.each([AgentTaskMode.TEACH, AgentTaskMode.EXECUTE])(
+  'carries %s mode with locale through both turn boundaries',
+  (mode) => {
+    const command = {
+      kind: 'turn',
+      sessionId,
+      message: 'Show me',
+      locale: DesktopLocale.VIETNAMESE,
+      mode,
+    };
+    expect(AgentCommandSchema.parse(command)).toEqual(command);
+    expect(AgentWorkerRequestSchema.parse({ requestId: sessionId, command }).command).toEqual(
+      command,
+    );
+  },
+);
+
+it('rejects an unrecognized mode and defaults old clients to execution', () => {
+  expect(
+    AgentCommandSchema.safeParse({
+      kind: 'turn',
+      sessionId,
+      message: 'Show me',
+      locale: DesktopLocale.ENGLISH,
+      mode: 'unknown',
+    }).success,
+  ).toBe(false);
+  expect(
+    AgentCommandSchema.parse({
+      kind: 'turn',
+      sessionId,
+      message: 'Help',
+      locale: DesktopLocale.ENGLISH,
+    }),
+  ).toMatchObject({
+    mode: 'execute',
+  });
+});
+
+it('admits only local follow startup without credentials or arbitrary actions', () => {
+  expect(AgentCommandSchema.parse({ kind: 'follow' })).toEqual({ kind: 'follow' });
+  expect(
+    AgentWorkerRequestSchema.safeParse({
+      requestId: sessionId,
+      command: { kind: 'follow', sessionId, debugEnabled: true },
+    }).success,
+  ).toBe(true);
+  expect(AgentCommandSchema.safeParse({ kind: 'follow', action: 'click' }).success).toBe(false);
+  expect(
+    AgentWorkerRequestSchema.safeParse({
+      requestId: sessionId,
+      command: { kind: 'follow', sessionId, debugEnabled: true, gatewayToken: 'unexpected-token' },
+    }).success,
+  ).toBe(false);
 });

@@ -17,6 +17,7 @@ import type { DesktopLocale } from '#contracts/DesktopLocale.js';
 import type { AgentResult } from '#contracts/AgentSession.js';
 import type { AuthResult } from '#contracts/AuthSession.js';
 import type { TranscriptionConnection } from './TranscriptionClient.js';
+import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 
 export interface VoiceDependencies {
   readSession(): Promise<AuthResult>;
@@ -26,7 +27,12 @@ export interface VoiceDependencies {
   isAgentBusy(): boolean;
   areTriggerKeysReleased(): boolean;
   startAgentSession(): Promise<AgentResult>;
-  sendAgentMessage(sessionId: string, message: string, locale: DesktopLocale): Promise<AgentResult>;
+  sendAgentMessage(
+    sessionId: string,
+    message: string,
+    locale: DesktopLocale,
+    mode: AgentTaskMode,
+  ): Promise<AgentResult>;
   emit(event: VoiceEvent): void;
 }
 
@@ -34,6 +40,7 @@ interface ActiveCapture {
   id: string;
   userId: string | null;
   locale: DesktopLocale | null;
+  mode: AgentTaskMode;
   prepared: boolean;
   connection: TranscriptionConnection | null;
   nextSequence: number;
@@ -99,6 +106,7 @@ export class VoiceInputController {
       id,
       userId: null,
       locale: null,
+      mode: AgentTaskMode.EXECUTE,
       prepared: false,
       connection: null,
       nextSequence: 0,
@@ -112,7 +120,11 @@ export class VoiceInputController {
     return this.reply();
   }
 
-  async prepareVoiceCapture(captureId: string, locale: DesktopLocale): Promise<VoiceReply> {
+  async prepareVoiceCapture(
+    captureId: string,
+    locale: DesktopLocale,
+    mode: AgentTaskMode = AgentTaskMode.EXECUTE,
+  ): Promise<VoiceReply> {
     const capture = this.capture;
     if (
       !capture ||
@@ -124,6 +136,7 @@ export class VoiceInputController {
     }
     capture.prepared = true;
     capture.locale = locale;
+    capture.mode = mode;
     try {
       const session = await this.dependencies.readSession();
       if (this.capture !== capture) {
@@ -322,7 +335,12 @@ export class VoiceInputController {
         sessionId: started.sessionId,
         text,
       });
-      const result = await this.dependencies.sendAgentMessage(started.sessionId, text, locale);
+      const result = await this.dependencies.sendAgentMessage(
+        started.sessionId,
+        text,
+        locale,
+        capture.mode,
+      );
       if (generation === this.generation) {
         this.dependencies.emit({
           kind: 'result',

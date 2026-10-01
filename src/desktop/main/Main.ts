@@ -80,8 +80,8 @@ async function startDesktop(): Promise<void> {
       isAgentBusy: () => voiceChat.isBusy(),
       areTriggerKeysReleased: () => voiceKeysReleased,
       startAgentSession: () => voiceChat.startTaskSession(),
-      sendAgentMessage: (sessionId, message, locale) =>
-        voiceChat.sendMessage(sessionId, message, locale),
+      sendAgentMessage: (sessionId, message, locale, mode) =>
+        voiceChat.sendMessage(sessionId, message, locale, mode),
       emit: (event) => {
         sendVoiceEventToWindow(mainWindow, event);
       },
@@ -127,7 +127,11 @@ async function startDesktop(): Promise<void> {
       case 'cancel':
         return controller.cancelVoiceCapture();
       case 'prepare':
-        return controller.prepareVoiceCapture(parsed.data.captureId, parsed.data.locale);
+        return controller.prepareVoiceCapture(
+          parsed.data.captureId,
+          parsed.data.locale,
+          parsed.data.mode,
+        );
       case 'finish':
         return controller.finishVoiceAudio(parsed.data.captureId, parsed.data.lastSequence);
       case 'enable': {
@@ -258,6 +262,8 @@ async function startDesktop(): Promise<void> {
     }
 
     switch (parsed.data.kind) {
+      case 'follow':
+        return process.platform === 'darwin' ? chat.startCursorCompanion() : { kind: 'stopped' };
       case 'start': {
         return chat.startTaskSession();
       }
@@ -270,7 +276,12 @@ async function startDesktop(): Promise<void> {
         ) {
           return { kind: 'failed', message: 'Wait for the current task to finish.' };
         }
-        return chat.sendMessage(parsed.data.sessionId, parsed.data.message, parsed.data.locale);
+        return chat.sendMessage(
+          parsed.data.sessionId,
+          parsed.data.message,
+          parsed.data.locale,
+          parsed.data.mode,
+        );
       case 'stop':
         voice?.cancelVoiceCapture();
         return chat.stopSession(parsed.data.sessionId);

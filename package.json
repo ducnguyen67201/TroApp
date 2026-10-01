@@ -38,7 +38,8 @@
     "test": "vitest run",
     "test:worker": "tsx scripts/CheckWorkerBundle.ts",
     "inspect:cua:mcp": "tsx scripts/InspectCuaMcpSchema.ts",
-    "test:integration": "tsx scripts/RunIntegration.ts"
+    "test:integration": "tsx scripts/RunIntegration.ts",
+    "build:cua": "tsx scripts/BuildCuaCompanion.ts"
   },
   "dependencies": {
     "@better-auth/electron": "1.7.6",

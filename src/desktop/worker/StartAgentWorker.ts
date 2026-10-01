@@ -13,6 +13,7 @@ const parentPort = process.parentPort;
 
 let runner: ComputerUseTaskRunner | null = null;
 let sessionId: string | null = null;
+let hasModelCredential = false;
 let activeRun: ReturnType<ComputerUseTaskRunner['runTask']> | null = null;
 let activeAbort: AbortController | null = null;
 
@@ -25,6 +26,7 @@ function sendResult(requestId: string, result: AgentResult): void {
 
 async function runCommand(command: AgentWorkerCommand): Promise<AgentResult> {
   switch (command.kind) {
+    case 'follow':
     case 'start': {
       if (runner !== null) {
         return { kind: 'failed', message: 'An agent session is already active.' };
@@ -33,15 +35,17 @@ async function runCommand(command: AgentWorkerCommand): Promise<AgentResult> {
       /* This short-lived token authorizes only Tro's model gateway. The
          product's OpenAI provider key stays on the backend. */
       const log = createAgentDebugLogger(command.debugEnabled);
-      setDefaultOpenAIClient(
-        new OpenAI({
-          apiKey: command.gatewayToken,
-          baseURL: command.gatewayBaseUrl,
-          ...(command.debugEnabled ? { fetch: createLoggedModelFetch(log) } : {}),
-        }),
-      );
+      if (command.kind === 'start') {
+        setDefaultOpenAIClient(
+          new OpenAI({
+            apiKey: command.gatewayToken,
+            baseURL: command.gatewayBaseUrl,
+            ...(command.debugEnabled ? { fetch: createLoggedModelFetch(log) } : {}),
+          }),
+        );
+      }
       try {
-        runner = await ComputerUseTaskRunner.connect(log);
+        runner = await ComputerUseTaskRunner.connect(log, command.kind === 'follow');
       } catch {
         return {
           kind: 'failed',
@@ -51,11 +55,12 @@ async function runCommand(command: AgentWorkerCommand): Promise<AgentResult> {
               : 'Desktop control could not start. Restart Tro or reinstall the desktop app, then try again.',
         };
       }
+      hasModelCredential = command.kind === 'start';
       sessionId = command.sessionId;
       return { kind: 'started', sessionId };
     }
     case 'turn': {
-      if (runner === null || sessionId !== command.sessionId) {
+      if (runner === null || sessionId !== command.sessionId || !hasModelCredential) {
         return { kind: 'failed', message: 'Start an agent session first.' };
       }
       if (activeRun !== null) {
@@ -63,7 +68,7 @@ async function runCommand(command: AgentWorkerCommand): Promise<AgentResult> {
       }
 
       activeAbort = new AbortController();
-      const run = runner.runTask(command.message, command.locale, activeAbort.signal);
+      const run = runner.runTask(command.message, command.locale, activeAbort.signal, command.mode);
       activeRun = run;
       try {
         return await run;
@@ -91,6 +96,7 @@ async function runCommand(command: AgentWorkerCommand): Promise<AgentResult> {
       await runner.close();
       runner = null;
       sessionId = null;
+      hasModelCredential = false;
       return { kind: 'stopped' };
     }
   }

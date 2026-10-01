@@ -1,3 +1,4 @@
+import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { VoiceShortcut, type VoiceEvent } from '#contracts/VoiceInput.js';
 import { TranscriptionEventKind, type TranscriptionEvent } from '#contracts/Transcription.js';
@@ -57,13 +58,16 @@ function createHarness() {
     receive(event);
   }
 
-  async function startCapture(locale: DesktopLocale = DesktopLocale.VIETNAMESE): Promise<string> {
+  async function startCapture(
+    locale: DesktopLocale = DesktopLocale.VIETNAMESE,
+    mode: AgentTaskMode = AgentTaskMode.EXECUTE,
+  ): Promise<string> {
     controller.startVoiceCapture();
     const prepared = [...events].reverse().find((event) => event.kind === 'prepare');
     if (!prepared) {
       throw new Error('No preparation request.');
     }
-    await controller.prepareVoiceCapture(prepared.captureId, locale);
+    await controller.prepareVoiceCapture(prepared.captureId, locale, mode);
     emit({ kind: TranscriptionEventKind.READY });
     return prepared.captureId;
   }
@@ -142,29 +146,34 @@ describe('voice instruction admission', () => {
       sessionId,
       'Mở Chrome, đừng gửi email.',
       DesktopLocale.VIETNAMESE,
+      AgentTaskMode.EXECUTE,
     );
     expect(harness.events.filter((event) => event.kind === 'submitted')).toHaveLength(1);
     expect(harness.events.filter((event) => event.kind === 'result')).toHaveLength(1);
   });
 
-  it('uses each capture locale for both transcription and the agent', async () => {
-    const harness = createHarness();
-    for (const locale of [DesktopLocale.VIETNAMESE, DesktopLocale.ENGLISH]) {
-      const captureId = await harness.startCapture(locale);
-      expect(harness.dependencies.fetchCredential).toHaveBeenLastCalledWith(captureId, locale);
-      harness.controller.releaseVoiceCapture();
-      harness.controller.finishVoiceAudio(captureId, -1);
-      harness.emit({ kind: TranscriptionEventKind.FINAL, text: 'YouTube' });
-      await vi.waitFor(() => {
-        expect(harness.controller.readStatus().state).toBe('idle');
-      });
-      expect(harness.dependencies.sendAgentMessage).toHaveBeenLastCalledWith(
-        sessionId,
-        'YouTube',
-        locale,
-      );
-    }
-  });
+  it.each([AgentTaskMode.EXECUTE, AgentTaskMode.TEACH])(
+    'preserves capture locale and %s mode for the agent',
+    async (mode) => {
+      const harness = createHarness();
+      for (const locale of [DesktopLocale.VIETNAMESE, DesktopLocale.ENGLISH]) {
+        const captureId = await harness.startCapture(locale, mode);
+        expect(harness.dependencies.fetchCredential).toHaveBeenLastCalledWith(captureId, locale);
+        harness.controller.releaseVoiceCapture();
+        harness.controller.finishVoiceAudio(captureId, -1);
+        harness.emit({ kind: TranscriptionEventKind.FINAL, text: 'YouTube' });
+        await vi.waitFor(() => {
+          expect(harness.controller.readStatus().state).toBe('idle');
+        });
+        expect(harness.dependencies.sendAgentMessage).toHaveBeenLastCalledWith(
+          sessionId,
+          'YouTube',
+          locale,
+          mode,
+        );
+      }
+    },
+  );
 
   it('waits for the remaining modifier to release before starting the agent', async () => {
     const harness = createHarness();
@@ -265,6 +274,7 @@ it('finalizes captured speech when release happens before the relay is ready', a
       sessionId,
       'Open Chrome',
       DesktopLocale.ENGLISH,
+      AgentTaskMode.EXECUTE,
     );
   });
 });

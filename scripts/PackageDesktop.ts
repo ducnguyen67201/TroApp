@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { build } from 'electron-builder';
 import { z } from 'zod';
-import { prepareCuaDriver } from './PrepareCuaDriver.js';
+import { prepareCuaCompanion } from './PrepareCuaCompanion.js';
 
 /* electron-builder discovers this repository's pnpm workspace when out/ is
    inside the root. Stage the already-built app outside that workspace so its
@@ -14,7 +14,7 @@ const appDirectory = join(stageRoot, 'app');
 
 try {
   await cp('out', appDirectory, { recursive: true });
-  await prepareCuaDriver(join(appDirectory, 'driver'));
+  await prepareCuaCompanion(join(appDirectory, 'driver'));
   const rawPackage: unknown = JSON.parse(
     await readFile(join(appDirectory, 'package.json'), 'utf8'),
   );

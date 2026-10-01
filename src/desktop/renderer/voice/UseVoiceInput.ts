@@ -7,6 +7,7 @@ import {
   type VoiceAudioFrame,
 } from '#contracts/VoiceInput.js';
 import { useLocale } from '../localization/UseLocale.js';
+import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { VoiceAudioCapture } from './VoiceAudioCapture.js';
 
 export interface VoiceInputView {
@@ -37,10 +38,11 @@ interface CaptureQueue {
 export function useVoiceInput(
   userId: string | null,
   receiveTaskEvent: (event: VoiceEvent) => void,
+  taskMode: AgentTaskMode = AgentTaskMode.EXECUTE,
 ): VoiceInputView {
   const { locale } = useLocale();
-  const latest = useRef({ locale, receiveTaskEvent });
-  latest.current = { locale, receiveTaskEvent };
+  const latest = useRef({ locale, taskMode, receiveTaskEvent });
+  latest.current = { locale, taskMode, receiveTaskEvent };
   const capture = useRef<CaptureQueue | null>(null);
   const generation = useRef(0);
   const [status, setStatus] = useState<VoiceStatus>({
@@ -167,12 +169,13 @@ export function useVoiceInput(
               failCapture();
             }
           });
-          // Snapshot locale now. A change during this capture affects only the next capture.
+          // Snapshot locale and mode now; changes affect only the next capture.
           void window.tro
             .controlVoiceInput({
               kind: 'prepare',
               captureId: event.captureId,
               locale: latest.current.locale,
+              mode: latest.current.taskMode,
             })
             .then((reply) => {
               if (reply.kind !== 'ok' && capture.current === current) {

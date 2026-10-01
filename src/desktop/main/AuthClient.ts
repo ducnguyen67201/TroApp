@@ -10,6 +10,7 @@ import type { BrowserWindow } from 'electron';
 import { createAuthClient, type BetterAuthClientPlugin } from 'better-auth/client';
 import { electronClient } from '@better-auth/electron/client';
 import { z } from 'zod';
+import type { AgentChatAuth } from './AgentChatPorts.js';
 import {
   ModelCredentialSchema,
   type AuthResult,
@@ -34,7 +35,7 @@ interface ElectronActions {
 }
 
 /** Better Auth owns the OAuth exchange; main stores only its OS-encrypted session data. */
-export class AuthClient {
+export class AuthClient implements AgentChatAuth {
   private readonly client: ElectronActions;
 
   constructor(

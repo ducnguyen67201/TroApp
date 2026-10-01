@@ -1,14 +1,28 @@
-import { access, constants } from 'node:fs/promises';
+import { access, constants, readFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
+import { CuaCompanionBuildSchema } from '#contracts/CuaCompanionBuild.js';
+
 const runFile = promisify(execFile);
+
+async function findCompanionBuild(directory: string): Promise<boolean> {
+  try {
+    const metadata: unknown = JSON.parse(
+      await readFile(join(directory, 'CompanionBuild.json'), 'utf8'),
+    );
+    return CuaCompanionBuildSchema.safeParse(metadata).success;
+  } catch {
+    return false;
+  }
+}
 
 export interface CuaDriverCommand {
   command: string;
   macAppPath?: string;
+  socketPath?: string;
 }
 
 interface DriverLocations {
@@ -37,6 +51,9 @@ export async function chooseCuaDriverCommand(
 ): Promise<CuaDriverCommand> {
   const directories = [
     join(locations.resourcesPath, 'cua-driver'),
+    ...(locations.platform === 'darwin'
+      ? [join(locations.homeDirectory, '.cache', 'tro', 'cua-companion')]
+      : []),
     join(locations.homeDirectory, '.cache', 'tro', 'cua-driver'),
   ];
   for (const directory of directories) {
@@ -44,7 +61,14 @@ export async function chooseCuaDriverCommand(
       const macAppPath = join(directory, 'CuaDriver.app');
       const command = join(macAppPath, 'Contents', 'MacOS', 'cua-driver');
       if (await findExecutable(command)) {
-        return { command, macAppPath };
+        const hasCompanion = await findCompanionBuild(directory);
+        return {
+          command,
+          macAppPath,
+          ...(hasCompanion
+            ? { socketPath: join(locations.homeDirectory, '.cache', 'tro', 'CursorCompanion.sock') }
+            : {}),
+        };
       }
     } else if (locations.platform === 'win32') {
       const command = join(directory, 'cua-driver.exe');
@@ -71,8 +95,11 @@ export async function startCuaDriverApp(installation: CuaDriverCommand): Promise
     return;
   }
 
+  const socketArgs = installation.socketPath ? ['--socket', installation.socketPath] : [];
   try {
-    const status = await runFile(installation.command, ['status'], { timeout: 3000 });
+    const status = await runFile(installation.command, ['status', ...socketArgs], {
+      timeout: 3000,
+    });
     if (status.stdout.includes('daemon is running')) {
       return;
     }
@@ -80,12 +107,27 @@ export async function startCuaDriverApp(installation: CuaDriverCommand): Promise
     /* A missing daemon is expected on the first task. */
   }
 
-  await runFile('/usr/bin/open', ['-n', '-g', '-a', installation.macAppPath, '--args', 'serve'], {
-    timeout: 5000,
-  });
+  await runFile(
+    '/usr/bin/open',
+    [
+      '-n',
+      '-g',
+      '-a',
+      installation.macAppPath,
+      '--args',
+      'serve',
+      ...socketArgs,
+      ...(installation.socketPath ? ['--pid-file', `${installation.socketPath}.pid`] : []),
+    ],
+    {
+      timeout: 5000,
+    },
+  );
   for (let attempt = 0; attempt < 20; attempt += 1) {
     try {
-      const status = await runFile(installation.command, ['status'], { timeout: 3000 });
+      const status = await runFile(installation.command, ['status', ...socketArgs], {
+        timeout: 3000,
+      });
       if (status.stdout.includes('daemon is running')) {
         return;
       }
