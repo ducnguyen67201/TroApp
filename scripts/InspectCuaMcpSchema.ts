@@ -2,6 +2,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { MCPServerStdio, mcpToFunctionTool } from '@openai/agents';
 import { chooseCuaDriverCommand } from '../src/desktop/worker/ChooseCuaDriverCommand.js';
+import { prepareCuaToolForAgent } from '../src/desktop/worker/LoggedCuaServer.js';
 
 /** Print the MCP tool schema and the actual Agents SDK conversion locally.
  * This inspects tool definitions only; it never calls a desktop action. */
@@ -33,9 +34,9 @@ async function inspectCuaMcpSchema(): Promise<void> {
       throw new Error(`Cua did not publish "${toolName}". Run with --list to see tool names.`);
     }
 
-    /* Use the same public SDK converter as the agent, with its default
-       non-strict setting. The SDK may emit its own fallback warning here. */
-    const agentTool = mcpToFunctionTool(mcpTool, server, false);
+    /* Inspect the raw Cua schema and the schema the running agent presents
+       after Tro's SDK compatibility adjustment. */
+    const agentTool = mcpToFunctionTool(prepareCuaToolForAgent(mcpTool), server, false);
     const mcpInputSchema: unknown = mcpTool.inputSchema;
     const agentParameters: unknown = agentTool.parameters;
     console.log(

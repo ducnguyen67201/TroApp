@@ -66,6 +66,36 @@ export const english = {
     'Desktop control could not start. Restart Tro or reinstall the desktop app, then try again.',
   errorInvalidRequest: 'This request is invalid. Please try again.',
   errorWindowAccess: 'This window cannot access this action. Restart Tro and try again.',
+  permissionSetup: 'Desktop permission setup',
+  permissionProgress: 'Setup step 2 of 3',
+  permissionMacAccess: '2 Mac access',
+  permissionReady: '3 Ready',
+  permissionOneTimeSetup: 'ONE-TIME SETUP',
+  permissionHeading: 'Give Tro access to your desktop.',
+  permissionIntroduction:
+    'CuaDriver needs two macOS permissions to see your screen and help in apps. You control these in System Settings.',
+  permissionTitle: 'Desktop permissions',
+  permissionBothNeeded: 'Both are needed for desktop help',
+  permissionAccessibility: 'Accessibility',
+  permissionAccessibilityDescription: 'Lets CuaDriver interact with the app you are using.',
+  permissionScreenRecording: 'Screen Recording',
+  permissionScreenRecordingDescription: 'Lets CuaDriver see what is on your screen.',
+  permissionEnabled: 'Enabled',
+  permissionMissing: 'Not enabled',
+  permissionUnknown: 'Not verified',
+  permissionOpenSettings: 'Open Settings',
+  permissionRequest: 'Ask for permission',
+  permissionCheckAgain: 'Check again',
+  permissionChecking: 'Checking CuaDriver…',
+  permissionReturnHint:
+    'After enabling both switches, return to Tro and it will check again automatically.',
+  permissionRestartHint:
+    'You may need to quit and reopen CuaDriver after changing Screen Recording. Tro will wait to start the agent until access is verified.',
+  permissionVerifyError: 'Could not verify CuaDriver permissions. Try again.',
+  permissionSettingsHint:
+    'In System Settings, enable CuaDriver for both permissions, then return to Tro.',
+  permissionRequestError: 'Could not open macOS permission setup. Open System Settings manually.',
+  permissionOpenError: 'Could not open System Settings. Open Privacy & Security manually.',
 };
 
 export type TranslationCatalog = {

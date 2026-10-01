@@ -59,6 +59,7 @@ describe('local agent debug summaries', () => {
         { type: 'image', data: 'private-screenshot' },
       ],
       isError: false,
+      structuredContent: { code: 'bring_to_front_exact_window_verified', status: 'satisfied' },
     });
 
     expect(request).toEqual({
@@ -70,7 +71,9 @@ describe('local agent debug summaries', () => {
       isError: false,
       contentTypes: ['text', 'image'],
       textChars: 20,
-      hasStructuredContent: false,
+      hasStructuredContent: true,
+      code: 'bring_to_front_exact_window_verified',
+      status: 'satisfied',
     });
     expect(JSON.stringify({ request, response })).not.toMatch(/private|screenshot/);
   });

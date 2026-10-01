@@ -16,11 +16,13 @@ import {
   IconSettings,
   IconSparkles,
 } from '@tabler/icons-react';
-import { useState, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { ComputerUsePage } from './ComputerUsePage.js';
+import { PermissionsOnboardingPage } from './PermissionsOnboardingPage.js';
 import { SettingsPage } from './SettingsPage.js';
 import { useComputerUse } from './UseComputerUse.js';
 import { useLocale } from './localization/UseLocale.js';
+import { useDesktopPermissions } from './UseDesktopPermissions.js';
 
 const DesktopPage = { WORKSPACE: 'workspace', SETTINGS: 'settings' } as const;
 
@@ -31,6 +33,15 @@ export function App(): ReactElement {
   const [page, setPage] = useState<DesktopPage>(DesktopPage.WORKSPACE);
   const controller = useComputerUse();
   const { user } = controller;
+  const permissions = useDesktopPermissions(user?.id ?? null);
+  const previousPermissionKind = useRef(permissions.status?.kind);
+
+  useEffect(() => {
+    if (permissions.status?.kind === 'ready' && previousPermissionKind.current !== 'ready') {
+      setPage(DesktopPage.WORKSPACE);
+    }
+    previousPermissionKind.current = permissions.status?.kind;
+  }, [permissions.status?.kind]);
 
   return (
     <AppShell navbar={{ width: 232, breakpoint: 0 }} padding={0} className="desktop-shell">
@@ -149,10 +160,12 @@ export function App(): ReactElement {
                 {controller.message}
               </Alert>
             )}
-            {page === DesktopPage.WORKSPACE ? (
-              <ComputerUsePage controller={controller} />
-            ) : (
+            {page === DesktopPage.SETTINGS ? (
               <SettingsPage user={user} />
+            ) : user && permissions.status?.kind !== 'ready' ? (
+              <PermissionsOnboardingPage controller={permissions} />
+            ) : (
+              <ComputerUsePage controller={controller} />
             )}
           </div>
         </div>

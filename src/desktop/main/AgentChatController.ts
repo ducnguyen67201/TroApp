@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { AgentResult } from '#contracts/AgentSession.js';
 import type { AuthResult } from '#contracts/AuthSession.js';
+import { DesktopPermissionState } from '#contracts/DesktopPermissions.js';
 import { AgentWorkerClient } from './AgentWorkerClient.js';
 import { AuthClient } from './AuthClient.js';
+import { DesktopPermissions } from './DesktopPermissions.js';
 
 const idleMs = 15 * 60_000;
 const credentialBufferMs = 60_000;
@@ -18,6 +20,7 @@ export class AgentChatController {
     private readonly auth: AuthClient,
     private readonly worker: AgentWorkerClient,
     private readonly gatewayBaseUrl: string,
+    private readonly permissions: DesktopPermissions,
   ) {}
 
   async readAuthSession(): Promise<AuthResult> {
@@ -35,9 +38,9 @@ export class AgentChatController {
   }
 
   async startTaskSession(): Promise<AgentResult> {
-    if (!(await this.isSignedIn())) {
-      return { kind: 'failed', message: 'Sign in to use Tro.' };
-    }
+    const accessFailure = await this.checkTaskAccess();
+    if (accessFailure) return accessFailure;
+
     return { kind: 'started', sessionId: randomUUID() };
   }
 
@@ -48,9 +51,8 @@ export class AgentChatController {
     this.turnInProgress = true;
     this.clearIdleTimer();
     try {
-      if (!(await this.isSignedIn())) {
-        return { kind: 'failed', message: 'Sign in to use Tro.' };
-      }
+      const accessFailure = await this.checkTaskAccess();
+      if (accessFailure) return accessFailure;
 
       if (
         this.activeSessionId !== sessionId ||
@@ -89,6 +91,18 @@ export class AgentChatController {
   private async isSignedIn(): Promise<boolean> {
     const session = await this.auth.readSession();
     return session.kind === 'signed-in';
+  }
+
+  /** Check on both session creation and each turn so a revoked grant cannot
+   * reach the worker or trigger a model-credential request. */
+  private async checkTaskAccess(): Promise<Extract<AgentResult, { kind: 'failed' }> | null> {
+    if (!(await this.isSignedIn())) {
+      return { kind: 'failed', message: 'Sign in to use Tro.' };
+    }
+    if ((await this.permissions.readStatus()).kind !== DesktopPermissionState.READY) {
+      return { kind: 'failed', message: 'Finish desktop permission setup before starting a task.' };
+    }
+    return null;
   }
 
   private scheduleIdleStop(): void {
