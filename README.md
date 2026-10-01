@@ -8,22 +8,28 @@ Read [Architecture](docs/Architecture.md) for the local/cloud split, [Developmen
 
 ## Quick start
 
-Use Node.js 24 LTS and pnpm 11. Install Docker Desktop to run the optional local database.
+Use Node.js 24 LTS and pnpm 11. Install the Doppler CLI and make sure the shared development
+PostgreSQL container is already running.
 
 ```sh
 pnpm install
-doppler setup
-# Select tro-api and your development config; set AUTH_SECRET in Doppler.
-pnpm db:start
-doppler run -- pnpm db:migrate
-doppler run -- pnpm dev
+doppler login
+pnpm select
+pnpm dev
 ```
 
-`pnpm dev` starts the API and desktop application together. Google sign-in needs backend-only `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` plus the redirect URI in [Development](docs/Development.md). The API can start without an OpenAI key, but chat requires a server-side `OPENAI_API_KEY`.
+`pnpm select` delegates selection to Doppler: choose the `tro-api` project, then the appropriate
+development environment/config (`dev` or `dev_personal`). Doppler saves that choice for this
+checkout. Run it again whenever you need to change the selection. `pnpm dev` then starts the API
+with Doppler's injected environment and starts the desktop without backend secrets.
 
-To use the computer-use chat, install Tro's desktop build, which includes a pinned Cua Driver release. The development launcher downloads and verifies that release once before starting Electron. On macOS, grant Screen Recording and Accessibility to `CuaDriver.app` in System Settings. Set a unique backend `AUTH_SECRET`, `OPENAI_API_KEY`, and Google OAuth credentials in Doppler, apply migrations, sign in with Google, and send a message. Tro starts a local agent worker on the first task and keeps it warm for 15 minutes after a completed task. Each message has fresh agent context; only the current app window displays its messages, and they disappear when it closes. Model calls and screenshots the agent sends to OpenAI require network access and may incur charges. See [ComputerUseSpec.md](docs/ComputerUseSpec.md) for details and validation limits. To keep backend credentials out of the desktop process environment, use the separate Doppler commands in [Development](docs/Development.md).
+The selected development config owns `APP_ENV`, `DATABASE_URL`, and any provider settings. The
+only browser-visible settings are the public `MAIN_VITE_API_BASE_URL` and `MAIN_VITE_APP_ENV`.
+See [Development](docs/Development.md) for setup and database commands.
 
-For local development, Doppler supplies `DATABASE_URL` and a unique `AUTH_SECRET`; chat also needs backend `OPENAI_API_KEY`. Generate the secret with `openssl rand -base64 32` and save it in Doppler. The API dev command does not load `.env`. Optional `APP_ENV` accepts `dev`, `stage`, or `prod`. The API and desktop use matching local defaults. When packaging an installer, set the public `MAIN_VITE_API_BASE_URL` at build time; see [Development](docs/Development.md).
+Google sign-in needs backend-only `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` plus the redirect URI in [Development](docs/Development.md). Give the backend a unique `AUTH_SECRET` and apply the authentication migration before signing in. Chat also needs a backend-only `OPENAI_API_KEY`; the API can start without it.
+
+The desktop build includes a pinned Cua Driver release. The development launcher downloads and verifies that release once before starting Electron. On macOS, grant Screen Recording and Accessibility to `CuaDriver.app` in System Settings. Tro starts a local agent worker on the first task and keeps it warm for 15 minutes after a completed task. Each message has fresh agent context; only the current app window displays its messages, and they disappear when it closes. Model calls and screenshots sent to OpenAI require network access and may incur charges. See [ComputerUseSpec.md](docs/ComputerUseSpec.md) for details and validation limits.
 
 ## Ownership
 
