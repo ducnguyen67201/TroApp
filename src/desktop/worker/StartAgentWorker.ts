@@ -41,13 +41,13 @@ async function runCommand(command: AgentWorkerCommand): Promise<AgentResult> {
         }),
       );
       try {
-        runner = await ComputerUseTaskRunner.connect(log);
+        runner = await ComputerUseTaskRunner.connect(log, command.desktopDriver);
       } catch {
         return {
           kind: 'failed',
           message:
             process.platform === 'darwin'
-              ? 'Desktop control could not start. Allow CuaDriver Screen Recording and Accessibility in System Settings, then try again.'
+              ? 'Desktop control could not start. Allow Tro Screen Recording and Accessibility in System Settings, then try again.'
               : 'Desktop control could not start. Restart Tro or reinstall the desktop app, then try again.',
         };
       }

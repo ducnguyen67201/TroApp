@@ -1,4 +1,4 @@
-import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { build } from 'electron-builder';
@@ -39,6 +39,22 @@ try {
     projectDir: appDirectory,
     dir: process.argv.includes('--dir'),
     publish: 'never',
+    config: {
+      afterPack: async (context) => {
+        const resourcesPath = context.packager.getResourcesDir(context.appOutDir);
+        /* electron-builder skips a node_modules directory at a resource
+           matcher's root. Verify the physical SDK survived resource copying
+           before this app can be signed or handed to a user. */
+        for (const entry of [
+          join('cua-sdk', 'node_modules', '@trycua', 'cua-driver', 'dist', 'index.js'),
+          join('cua-sdk', 'node_modules', '@ubjs', 'core', 'dist', 'esm', 'index.js'),
+          join('cua-sdk', 'node_modules', '@ubjs', 'node', 'typescript', 'dist', 'resolve-lib.js'),
+          join('cua-driver', process.platform === 'darwin' ? 'cua-driver' : 'cua-driver.exe'),
+        ]) {
+          await access(join(resourcesPath, entry));
+        }
+      },
+    },
   });
 } finally {
   await rm(stageRoot, { recursive: true, force: true });

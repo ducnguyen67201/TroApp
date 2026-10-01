@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DesktopLocaleSchema } from './DesktopLocale.js';
+import { DesktopDriverConnectionSchema } from './DesktopDriver.js';
 
 /** Lifecycle and chat messages crossing renderer, main, and the local agent worker. */
 export const AgentCommandSchema = z.discriminatedUnion('kind', [
@@ -23,6 +24,7 @@ export const AgentWorkerCommandSchema = z.discriminatedUnion('kind', [
     gatewayToken: z.string().min(1),
     gatewayBaseUrl: z.url(),
     debugEnabled: z.boolean(),
+    desktopDriver: DesktopDriverConnectionSchema,
   }),
   z.strictObject({
     kind: z.literal('turn'),

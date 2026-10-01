@@ -25,6 +25,7 @@ import { AgentWorkerClient } from './AgentWorkerClient.js';
 import { AgentChatController } from './AgentChatController.js';
 import { AuthClient } from './AuthClient.js';
 import { DesktopPermissions } from './DesktopPermissions.js';
+import { EmbeddedDesktopDriver } from './EmbeddedDesktopDriver.js';
 import { isTrustedFrameUrl } from './TrustedFrame.js';
 
 const mainDirectory = dirname(fileURLToPath(import.meta.url));
@@ -35,6 +36,8 @@ const voiceShortcut = new GlobalVoiceShortcut();
 let voiceEnableGeneration = 0;
 let voiceKeysReleased = true;
 const permissions = new DesktopPermissions();
+const desktopDriver = new EmbeddedDesktopDriver();
+let isQuitting = false;
 
 async function startDesktop(): Promise<void> {
   /* Vite embeds this public URL when packaging the desktop app. The validator
@@ -48,6 +51,7 @@ async function startDesktop(): Promise<void> {
   const agentWorker = new AgentWorkerClient(
     join(mainDirectory, 'StartAgentWorker.js'),
     environment.APP_ENV === AppEnvironment.DEV,
+    desktopDriver,
   );
   const rendererFile = join(mainDirectory, '../renderer/index.html');
   const developmentUrl = app.isPackaged ? undefined : environment.RENDERER_URL;
@@ -356,12 +360,22 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  if (isQuitting) {
+    return;
+  }
+  event.preventDefault();
+  isQuitting = true;
   voiceEnableGeneration += 1;
   voiceShortcut.disableShortcut();
   voice?.invalidateVoiceInput();
   chat?.dispose();
-  permissions.dispose();
+  void desktopDriver
+    .stop()
+    .catch(() => {})
+    .finally(() => {
+      app.quit();
+    });
 });
 
 void startDesktop().catch((error: unknown) => {

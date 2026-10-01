@@ -18,7 +18,7 @@ export interface DesktopPermissionsController {
   openSettings: (area: PermissionArea) => Promise<void>;
 }
 
-/** A signed-in window reads daemon-owned grants and rechecks on return from
+/** A signed-in window reads host-owned grants and rechecks on return from
  * System Settings. Only a button click can raise an OS permission prompt. */
 export function useDesktopPermissions(userId: string | null): DesktopPermissionsController {
   const { messages } = useLocale();
