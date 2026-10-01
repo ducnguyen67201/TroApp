@@ -16,7 +16,7 @@ Updated September 30, 2026. Current direction: Electron + React on Windows/macOS
 | Images, planned                 | Private object storage            | Photos, garments, generated previews                  |
 | Try-on worker/provider, planned | Backend/provider                  | Durable generation and retries                        |
 
-The starter implements only the renderer → preload → main → HTTP API → application service → Prisma adapter → PostgreSQL readiness path. Agent orchestration, identity, storage, and job execution are future work.
+The application implements renderer → preload → main → HTTP API → application service → Prisma adapter → PostgreSQL paths for readiness, authentication, and workspace onboarding. Agent orchestration, image storage, and job execution are future work.
 
 The desktop and API share the `dev | stage | prod` application environment vocabulary. The backend uses Pino for structured logs: database-readiness failures log an error category at debug level only in `dev`, without exposing Prisma messages through logs or HTTP responses.
 
@@ -45,15 +45,21 @@ flowchart LR
 
 ## Following one request
 
-1. `App.tsx` requests service status through `window.tro.readServiceStatus()`.
+1. `App.tsx` requests service status and authentication operations through named `window.tro` methods.
 2. `Preload.ts` exposes only that named operation and validates its IPC result.
 3. `Main.ts` verifies the sending frame and calls `BackendClient.ts`.
 4. `BackendClient.ts` fetches a fixed versioned endpoint, retries one transient read failure, and validates the response with the canonical Zod schema. Invalid response data and client errors are not retried.
-5. `CreateApi.ts` routes HTTP to `ReadServiceStatus.ts`.
+5. `CreateApi.ts` routes HTTP to readiness and authentication application workflows.
 6. The application service depends on a `DatabaseStatus` port, not Prisma or Fastify.
 7. `PrismaDatabaseStatus.ts` checks a mapped model and returns a boolean. Failures become unavailable status; database messages and credentials are not exposed.
 
 A future `createTryOnJob` follows the same path: validated contract → authorized route → application service → Prisma repository/provider port. Ownership checks belong on the backend even when the desktop already validated input.
+
+## Identity and workspace boundary
+
+Google authorization runs in the system browser. The backend stores a hashed OAuth state, nonce, and PKCE verifier, validates Google's signed ID token, requires a verified email, and keys identities by immutable Google `sub`. The browser receives only a short-lived, single-use handoff code and redirects to the allowlisted `tro://auth/callback` desktop protocol.
+
+Electron main exchanges the handoff for a random server session and encrypts it with Electron `safeStorage`; the renderer never receives the credential or a generic network/credential IPC method. Sessions are hashed in PostgreSQL and can be revoked on logout. A new identity has an `AuthIdentity` and session but is not an active `User`; protected workspace APIs reject it. Workspace creation inserts the `Workspace` and required owner `User.workspaceId` and activates the session in one transaction. Existing users route directly to their stored workspace.
 
 ## Code organization
 
@@ -84,7 +90,7 @@ For a prototype, backend-hosted orchestration with specifically authorized local
 
 Prisma is the ORM. PostgreSQL is the database. Zod validates boundaries; application services enforce ownership and product rules. Keep Prisma-generated types in persistence adapters.
 
-The starter schema includes `OutfitDraft` for a future user-owned feature. No draft endpoints exist. Readiness performs a small model query to confirm the database and migration are available.
+The schema includes `Workspace`, active `User`, authentication flow/session records, and `OutfitDraft` for a future user-owned feature. No draft endpoints exist. Readiness performs a small model query to confirm the database and migration are available.
 
 Implement durable try-on job records and one worker with the feature. Record provider request IDs and retry state. Schedule work durably with the job transaction; use an outbox if a separate queue is introduced. Queue delivery does not guarantee an external paid action occurs exactly once. Reconcile ambiguous provider responses before resubmitting.
 
@@ -101,9 +107,8 @@ The Dockerfile and Railway configuration are a deployment starting point, not a 
 ## Next steps
 
 1. Run and package the desktop on both target operating systems.
-2. Select identity and add authenticated user-owned records.
-3. Complete upload → durable try-on job → result → history.
-4. Add a local worker with one typed agent tool and a tested credential path.
-5. Add one browser workflow, then desktop adapters as needed.
+2. Complete upload → durable try-on job → result → history.
+3. Add a local worker with one typed agent tool and a tested credential path.
+4. Add one browser workflow, then desktop adapters as needed.
 
 The earlier exploratory options remain in [ArchitecturePrevious.md](ArchitecturePrevious.md). This document is the current source of truth.

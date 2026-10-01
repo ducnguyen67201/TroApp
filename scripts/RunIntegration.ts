@@ -65,6 +65,9 @@ async function runIntegration(): Promise<void> {
     NODE_ENV: 'test',
     APP_ENV: 'stage',
     DATABASE_URL: `postgresql://tro:synthetic_test_only@127.0.0.1:${String(port)}/tro_test`,
+    GOOGLE_CLIENT_ID: 'integration-client-id.example.test',
+    GOOGLE_CLIENT_SECRET: 'synthetic-integration-secret',
+    GOOGLE_REDIRECT_URI: 'http://127.0.0.1:3000/api/v1/auth/google/callback',
   };
 
   await executeFile(process.execPath, [packageCli, 'exec', 'prisma', 'migrate', 'deploy'], {

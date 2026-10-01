@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { DesktopAuthBridge } from './Auth.js';
 
 export const DatabaseAvailability = { READY: 'ready', UNAVAILABLE: 'unavailable' } as const;
 
@@ -17,6 +18,6 @@ export const SystemStatusResultSchema = z.discriminatedUnion('success', [
 export type SystemStatusResult = z.infer<typeof SystemStatusResultSchema>;
 
 /** Public desktop capabilities; generic IPC and network access are deliberately absent. */
-export interface DesktopBridge {
+export interface DesktopBridge extends DesktopAuthBridge {
   readServiceStatus(): Promise<SystemStatusResult>;
 }

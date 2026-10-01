@@ -10,6 +10,90 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserRole {
+  OWNER
+  MEMBER
+}
+
+model Workspace {
+  id          String   @id @default(uuid()) @db.Uuid
+  displayName String   @db.VarChar(80)
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model User {
+  id            String     @id @default(uuid()) @db.Uuid
+  googleSubject String     @unique @db.VarChar(255)
+  email         String     @db.VarChar(320)
+  emailVerified Boolean
+  displayName   String?    @db.VarChar(120)
+  avatarUrl     String?    @db.VarChar(2048)
+  role          UserRole   @default(MEMBER)
+  workspaceId   String     @db.Uuid
+  workspace     Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  sessions      Session[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([workspaceId])
+}
+
+model AuthIdentity {
+  id            String        @id @default(uuid()) @db.Uuid
+  googleSubject String        @unique @db.VarChar(255)
+  email         String        @db.VarChar(320)
+  emailVerified Boolean
+  displayName   String?       @db.VarChar(120)
+  avatarUrl     String?       @db.VarChar(2048)
+  handoffs      AuthHandoff[]
+  sessions      Session[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model OAuthFlow {
+  id           String    @id @default(uuid()) @db.Uuid
+  stateHash    String    @unique @db.Char(64)
+  codeVerifier String    @db.VarChar(128)
+  nonce        String    @db.VarChar(128)
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([expiresAt])
+}
+
+model AuthHandoff {
+  id         String       @id @default(uuid()) @db.Uuid
+  codeHash   String       @unique @db.Char(64)
+  identityId String       @db.Uuid
+  identity   AuthIdentity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime     @default(now())
+
+  @@index([expiresAt])
+}
+
+model Session {
+  id         String       @id @default(uuid()) @db.Uuid
+  tokenHash  String       @unique @db.Char(64)
+  identityId String       @db.Uuid
+  identity   AuthIdentity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  userId     String?      @db.Uuid
+  user       User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([identityId])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
 model OutfitDraft {
   id        String   @id @default(uuid()) @db.Uuid
   ownerId   String

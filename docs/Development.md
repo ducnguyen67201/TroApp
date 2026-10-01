@@ -14,9 +14,9 @@ pnpm dev
 
 The API binds to `127.0.0.1:3000` locally. PostgreSQL binds to `127.0.0.1:54329`. The desktop main process calls the API; the React renderer has no generic network or database bridge. Development reload is handled by electron-vite and Node's watch mode with tsx.
 
-The local `.env` needs only `DATABASE_URL`. Optional `APP_ENV=dev|stage|prod` selects the backend application mode; it defaults to `dev`. Pino emits debug records only in `dev`, while operational info and errors remain available in all modes. The API defaults to the local host and port, and the desktop defaults to the local API. `ELECTRON_RENDERER_URL` is supplied by electron-vite during development; you do not set it yourself.
+The backend requires `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI`. Prefer `doppler run -- pnpm dev`; a private local `.env` also works. Optional `APP_ENV=dev|stage|prod` selects the backend application mode. The API defaults to the local host and port, and the desktop defaults to the local API. `ELECTRON_RENDERER_URL` is supplied by electron-vite during development; you do not set it yourself. See [GoogleSignIn.md](GoogleSignIn.md) for Google Cloud and Doppler setup.
 
-The database can be unavailable without preventing the app from starting. Click **Check connection** to see backend and database status. This does not exercise authentication, paid AI, images, or automation.
+The database can be unavailable without preventing the API process from starting, but sign-in and workspace operations require it. The desktop opens Google authentication in the system browser and returns through the `tro://auth/callback` protocol. No paid AI, images, or automation are exercised.
 
 ## Make one feature easy to follow
 

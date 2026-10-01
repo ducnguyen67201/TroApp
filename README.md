@@ -1,8 +1,8 @@
 # Tro
 
-An Electron + React desktop foundation with a strict TypeScript API and Prisma/PostgreSQL persistence boundary. Railway is the first backend deployment target; AWS remains a later option.
+An Electron + React desktop application with Google sign-in, required workspace onboarding, a strict TypeScript API, and Prisma/PostgreSQL persistence. Railway is the first backend deployment target; AWS remains a later option.
 
-The working slice reports backend and database readiness in the desktop window. Authentication, try-on, agent execution, and computer control are planned capabilities, not implemented features.
+The working slice authenticates through the system browser, stores the desktop session through OS-protected Electron storage, and creates the first workspace owner transactionally. Try-on, agent execution, and computer control remain planned capabilities.
 
 Read [Architecture](docs/Architecture.md) for the local/cloud split, [Development](docs/Development.md) for commands, and [repository instructions](AGENTS.md) for naming and formatting.
 
@@ -20,7 +20,7 @@ pnpm dev
 
 `pnpm dev` starts the API and desktop application together. Without PostgreSQL, the API still starts and the desktop shows that the database is unavailable. No real accounts, photographs, or AI credentials are required.
 
-For local development, `.env` needs only the PostgreSQL `DATABASE_URL`; optional `APP_ENV` accepts `dev`, `stage`, or `prod`. The API and desktop use matching local defaults. When packaging an installer, set the public `MAIN_VITE_API_BASE_URL` at build time; see [Development](docs/Development.md).
+For local development, configure PostgreSQL and a Google OAuth web client through Doppler or `.env`; optional `APP_ENV` accepts `dev`, `stage`, or `prod`. The API and desktop use matching local defaults. See [Google sign-in](docs/GoogleSignIn.md) and [Development](docs/Development.md).
 
 ## Ownership
 

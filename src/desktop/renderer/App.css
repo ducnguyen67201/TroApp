@@ -8,11 +8,35 @@
 }
 body {
   margin: 0;
+  min-width: 320px;
 }
 main {
   max-width: 900px;
   padding: 64px 56px;
   margin: 0 auto;
+}
+.centered {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+.auth-card {
+  width: min(100%, 620px);
+  background: #fffef9;
+  border: 1px solid #dadfd5;
+  border-radius: 20px;
+  padding: 42px;
+  box-shadow: 0 22px 60px rgba(40, 79, 61, 0.1);
+}
+.auth-card h1,
+.workspace-header h1 {
+  font-size: clamp(34px, 6vw, 56px);
+}
+.workspace-header {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  justify-content: space-between;
 }
 .eyebrow {
   font-size: 12px;
@@ -64,6 +88,41 @@ button:disabled {
 button:focus-visible {
   outline: 3px solid #d99547;
   outline-offset: 4px;
+}
+button.secondary {
+  background: transparent;
+  color: #284f3d;
+  border: 1px solid #93a399;
+  white-space: nowrap;
+}
+.setup-logout {
+  margin-top: 12px;
+}
+form {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+}
+label {
+  font-size: 14px;
+  font-weight: 650;
+}
+input {
+  border: 1px solid #aab5ae;
+  border-radius: 8px;
+  padding: 13px 14px;
+  font: inherit;
+  color: inherit;
+  background: white;
+}
+input:focus-visible {
+  outline: 3px solid #d99547;
+  outline-offset: 2px;
+}
+.status-message {
+  min-height: 24px;
+  margin-top: 16px;
+  color: #59635d;
 }
 footer {
   font-size: 13px;
