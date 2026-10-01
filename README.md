@@ -14,13 +14,14 @@ PostgreSQL container is already running.
 ```sh
 pnpm install
 doppler login
-pnpm dev:setup
+pnpm select
 pnpm dev
 ```
 
-`pnpm dev:setup` delegates project and development-config selection to Doppler and saves that
-choice for this checkout. Run it again whenever you need to change the selection. `pnpm dev` then
-starts the API with Doppler's injected environment and starts the desktop without backend secrets.
+`pnpm select` delegates selection to Doppler: choose the `tro-api` project, then the appropriate
+development environment/config (`dev` or `dev_personal`). Doppler saves that choice for this
+checkout. Run it again whenever you need to change the selection. `pnpm dev` then starts the API
+with Doppler's injected environment and starts the desktop without backend secrets.
 
 The selected development config owns `APP_ENV`, `DATABASE_URL`, and any provider settings. The
 only browser-visible settings are the public `MAIN_VITE_API_BASE_URL` and `MAIN_VITE_APP_ENV`.

@@ -16,7 +16,7 @@
   },
   "scripts": {
     "postinstall": "prisma generate",
-    "dev:setup": "doppler setup",
+    "select": "doppler setup",
     "dev": "concurrently --kill-others -n api,desktop \"doppler run -- pnpm dev:api\" \"pnpm dev:desktop\"",
     "dev:api": "node --conditions=development --watch --import tsx src/server/StartApi.ts",
     "dev:desktop": "electron-vite dev",

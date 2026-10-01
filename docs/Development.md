@@ -11,14 +11,14 @@ For first-time setup, authenticate and let Doppler select the project and develo
 ```sh
 pnpm install
 doppler login
-pnpm dev:setup
+pnpm select
 pnpm dev
 ```
 
-`pnpm dev:setup` is only a thin alias for `doppler setup`; Doppler owns the interactive project and
-config selection and stores it for this checkout. Run the command again whenever you want to
-change environments. The selected development config supplies `APP_ENV`, `DATABASE_URL`, and any
-backend provider settings.
+`pnpm select` is only a thin alias for `doppler setup`. At Doppler's prompts, select the `tro-api`
+project and then the appropriate development environment/config (`dev` or `dev_personal`). Doppler
+stores the selection for this checkout; run the command again whenever you want to change it. The
+selected development config supplies `APP_ENV`, `DATABASE_URL`, and any backend provider settings.
 
 `pnpm dev` uses the saved Doppler selection for the API and launches the desktop alongside it. The
 desktop process is not wrapped in `doppler run`, so backend configuration is not injected into
