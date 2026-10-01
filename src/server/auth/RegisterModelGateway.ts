@@ -1,13 +1,12 @@
 import { createHash } from 'node:crypto';
 import type { ServerResponse } from 'node:http';
-import { fromNodeHeaders } from 'better-auth/node';
 import type { FastifyInstance } from 'fastify';
 import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
 import type { ServerEnv } from '../Env.js';
 import type { createAuthDatabase } from '../persistence/AuthDatabase.js';
 
-type Auth = ReturnType<typeof createAuthDatabase>['auth'];
+type ReadSignedInUserId = ReturnType<typeof createAuthDatabase>['readSignedInUserId'];
 type CountModelRequest = ReturnType<typeof createAuthDatabase>['countModelRequest'];
 
 const ModelRequestSchema = z.looseObject({
@@ -38,7 +37,7 @@ function waitForDrainOrClose(response: ServerResponse): Promise<void> {
 /** Exchanges a Tro login for a short-lived model-only credential. */
 export function registerModelGateway(
   api: FastifyInstance,
-  auth: Auth,
+  readSignedInUserId: ReadSignedInUserId,
   countModelRequest: CountModelRequest,
   environment: ServerEnv,
 ): void {
@@ -48,15 +47,15 @@ export function registerModelGateway(
     if (!environment.OPENAI_API_KEY) {
       return reply.code(503).send({ message: 'The model service is not configured.' });
     }
-    const session = await auth.api.getSession({ headers: fromNodeHeaders(request.headers) });
-    if (!session) {
+    const userId = await readSignedInUserId(request.headers);
+    if (!userId) {
       return reply.code(401).send({ message: 'Sign in to use the assistant.' });
     }
 
     const expiresAt = new Date(Date.now() + 15 * 60_000);
     const token = await new SignJWT({ scope: 'model' })
       .setProtectedHeader({ alg: 'HS256' })
-      .setSubject(session.user.id)
+      .setSubject(userId)
       .setIssuer('tro-api')
       .setAudience('tro-model')
       .setExpirationTime(expiresAt)

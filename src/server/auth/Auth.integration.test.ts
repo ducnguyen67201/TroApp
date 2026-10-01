@@ -1,7 +1,5 @@
-import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:net';
-import { describe, expect, it, vi } from 'vitest';
-import { ModelCredentialSchema } from '#contracts/AuthSession.js';
+import { describe, expect, it } from 'vitest';
 import { createApi } from '../CreateApi.js';
 import { readServerEnv } from '../Env.js';
 import { createPrismaDatabaseStatus } from '../persistence/PrismaDatabaseStatus.js';
@@ -54,7 +52,7 @@ describe('Tro account and scoped model credential', () => {
     }
   });
 
-  it('signs up, restores the cookie, and rejects a credential without login', async () => {
+  it('rejects public password signup and credentials without a Google session', async () => {
     const environment = readServerEnv({
       ...process.env,
       OPENAI_API_KEY: 'synthetic-test-provider-key-0000',
@@ -65,7 +63,12 @@ describe('Tro account and scoped model credential', () => {
     const authentication = createAuthDatabase(environment);
     const api = createApi(database);
     registerAuthRoutes(api, authentication.auth, environment.AUTH_BASE_URL, true);
-    registerModelGateway(api, authentication.auth, authentication.countModelRequest, environment);
+    registerModelGateway(
+      api,
+      authentication.readSignedInUserId,
+      authentication.countModelRequest,
+      environment,
+    );
 
     try {
       const google = await api.inject('/api/v1/auth/google');
@@ -76,49 +79,19 @@ describe('Tro account and scoped model credential', () => {
       const denied = await api.inject('/api/v1/model/credential');
       expect(denied.statusCode).toBe(401);
 
-      const signup = await api.inject({
-        method: 'POST',
-        url: '/api/auth/sign-up/email',
-        headers: { origin: environment.AUTH_BASE_URL },
-        payload: {
-          name: 'Integration Student',
-          email: `student-${randomUUID()}@example.test`,
-          password: 'synthetic-password-12345',
-        },
-      });
-      expect(signup.statusCode).toBe(200);
-      const rawCookie = signup.headers['set-cookie'];
-      const cookie = (Array.isArray(rawCookie) ? rawCookie : [rawCookie])
-        .find((value) => value?.includes('session_token'))
-        ?.split(';', 1)[0];
-      expect(cookie).toBeTruthy();
-
-      const credential = await api.inject({
-        method: 'GET',
-        url: '/api/v1/model/credential',
-        headers: { cookie: cookie ?? '' },
-      });
-      expect(credential.statusCode).toBe(200);
-      const credentialBody: unknown = credential.json();
-      const token = ModelCredentialSchema.parse(credentialBody).token;
-      expect(token.length).toBeGreaterThan(20);
-
-      const provider = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(new Response('{"id":"synthetic-response"}', { status: 200 }));
-      try {
-        const proxied = await api.inject({
+      for (const path of ['/api/auth/sign-up/email', '/api/auth/sign-in/email']) {
+        const response = await api.inject({
           method: 'POST',
-          url: '/api/v1/model/responses',
-          headers: { authorization: `Bearer ${token}` },
-          payload: { model: 'gpt-5.4', input: 'Hello', stream: false },
+          url: path,
+          headers: { origin: environment.AUTH_BASE_URL },
+          payload: {
+            name: 'Integration Student',
+            email: 'student@example.test',
+            password: 'synthetic-password-12345',
+          },
         });
-        expect(proxied.statusCode).toBe(200);
-        expect(proxied.body).toContain('synthetic-response');
-        expect(provider).toHaveBeenCalledTimes(1);
-        expect(provider.mock.calls[0]?.[0]).toBe('https://api.openai.com/v1/responses');
-      } finally {
-        provider.mockRestore();
+        expect(response.statusCode).toBe(404);
+        expect(response.headers['set-cookie']).toBeUndefined();
       }
     } finally {
       await api.close();

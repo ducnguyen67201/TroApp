@@ -2,6 +2,8 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { betterAuth } from 'better-auth';
 import { electron } from '@better-auth/electron';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
+import { fromNodeHeaders } from 'better-auth/node';
+import type { IncomingHttpHeaders } from 'node:http';
 import { PrismaClient } from '../generated/prisma/client.js';
 import type { ServerEnv } from '../Env.js';
 
@@ -13,7 +15,10 @@ export function createAuthDatabase(environment: ServerEnv) {
     database: prismaAdapter(client, { provider: 'postgresql' }),
     secret: environment.AUTH_SECRET,
     baseURL: environment.AUTH_BASE_URL,
-    emailAndPassword: { enabled: true },
+    /* Public password signup would allow fresh accounts to reset the model
+       gateway's per-user allowance. The desktop signs in through Google. */
+    emailAndPassword: { enabled: false },
+    disabledPaths: ['/sign-up/email', '/sign-in/email'],
     socialProviders:
       environment.GOOGLE_CLIENT_ID && environment.GOOGLE_CLIENT_SECRET
         ? {
@@ -29,6 +34,10 @@ export function createAuthDatabase(environment: ServerEnv) {
 
   return {
     auth,
+    readSignedInUserId: async (headers: IncomingHttpHeaders): Promise<string | null> => {
+      const session = await auth.api.getSession({ headers: fromNodeHeaders(headers) });
+      return session?.user.id ?? null;
+    },
     countModelRequest: async (userId: string, day: Date): Promise<number> => {
       const usage = await client.modelUsage.upsert({
         where: { userId_day: { userId, day } },
