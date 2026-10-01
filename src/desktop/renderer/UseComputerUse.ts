@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLocale } from './localization/UseLocale.js';
+import { resolveBridgeError } from './localization/BridgeErrors.js';
+import type { TranslationKey } from './localization/English.js';
 import type { AuthUser } from '#contracts/AuthSession.js';
 
 export const MessageRole = { USER: 'user', AGENT: 'agent' } as const;
@@ -30,6 +33,7 @@ export interface ComputerUseController {
  * sent as conversation history or saved to storage.
  */
 export function useComputerUse(): ComputerUseController {
+  const { messages: translations } = useLocale();
   const currentSessionId = useRef<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,7 +41,7 @@ export function useComputerUse(): ComputerUseController {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [messageInput, setMessageInput] = useState('');
   const [messages, setMessages] = useState<TaskMessage[]>([]);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<TranslationKey | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
@@ -52,11 +56,11 @@ export function useComputerUse(): ComputerUseController {
         if (auth.kind === 'signed-in') {
           setUser(auth.user);
         } else if (auth.kind === 'failed') {
-          setMessage(auth.message);
+          setMessage(resolveBridgeError(auth.message, 'errorCheckSignIn'));
         }
       } catch {
         if (effectState.active) {
-          setMessage('Could not check sign-in. Please try signing in again.');
+          setMessage('errorCheckSignIn');
         }
       } finally {
         if (effectState.active) {
@@ -99,7 +103,7 @@ export function useComputerUse(): ComputerUseController {
       }
       if (Date.now() >= deadline) {
         setIsSigning(false);
-        setMessage('Google sign-in did not finish. Please try again.');
+        setMessage('errorSignInTimeout');
         return;
       }
       timer = setTimeout(() => void checkSignIn(), 1000);
@@ -124,11 +128,15 @@ export function useComputerUse(): ComputerUseController {
         setUser(result.user);
         setIsSigning(false);
       } else if (result.kind !== 'pending') {
-        setMessage(result.kind === 'failed' ? result.message : 'Could not open Google sign-in.');
+        setMessage(
+          result.kind === 'failed'
+            ? resolveBridgeError(result.message, 'errorOpenGoogle')
+            : 'errorOpenGoogle',
+        );
         setIsSigning(false);
       }
     } catch {
-      setMessage('Could not open Google sign-in.');
+      setMessage('errorOpenGoogle');
       setIsSigning(false);
     }
   }
@@ -143,7 +151,11 @@ export function useComputerUse(): ComputerUseController {
       if (sessionId) {
         const result = await window.tro.stopAgentSession(sessionId);
         if (result.kind !== 'stopped') {
-          setMessage(result.kind === 'failed' ? result.message : 'Could not clear the task.');
+          setMessage(
+            result.kind === 'failed'
+              ? resolveBridgeError(result.message, 'errorClearTask')
+              : 'errorClearTask',
+          );
           return;
         }
       }
@@ -152,7 +164,7 @@ export function useComputerUse(): ComputerUseController {
       setMessageInput('');
       setMessage(null);
     } catch {
-      setMessage('Could not clear the task. Please try again.');
+      setMessage('errorClearTask');
     } finally {
       setIsResetting(false);
     }
@@ -170,7 +182,11 @@ export function useComputerUse(): ComputerUseController {
       if (!activeId) {
         const started = await window.tro.startAgentSession();
         if (started.kind !== 'started') {
-          setMessage(started.kind === 'failed' ? started.message : 'Could not start a task.');
+          setMessage(
+            started.kind === 'failed'
+              ? resolveBridgeError(started.message, 'errorStartTask')
+              : 'errorStartTask',
+          );
           return;
         }
         activeId = started.sessionId;
@@ -188,11 +204,15 @@ export function useComputerUse(): ComputerUseController {
           { role: MessageRole.AGENT, text: result.answer },
         ]);
       } else {
-        setMessage(result.kind === 'failed' ? result.message : 'Could not complete the task.');
+        setMessage(
+          result.kind === 'failed'
+            ? resolveBridgeError(result.message, 'errorCompleteTask')
+            : 'errorCompleteTask',
+        );
         setMessageInput(submittedMessage);
       }
     } catch {
-      setMessage('Could not contact the local agent. Try sending again.');
+      setMessage('errorContactAgent');
       setMessageInput(submittedMessage);
     } finally {
       setIsSending(false);
@@ -213,10 +233,14 @@ export function useComputerUse(): ComputerUseController {
         setMessageInput('');
         setMessage(null);
       } else {
-        setMessage(result.kind === 'failed' ? result.message : 'Could not sign out.');
+        setMessage(
+          result.kind === 'failed'
+            ? resolveBridgeError(result.message, 'errorSignOut')
+            : 'errorSignOut',
+        );
       }
     } catch {
-      setMessage('Could not sign out. Please try again.');
+      setMessage('errorSignOut');
     } finally {
       setIsSigningOut(false);
     }
@@ -231,7 +255,7 @@ export function useComputerUse(): ComputerUseController {
     isResetting,
     messageInput,
     messages,
-    message,
+    message: message ? translations[message] : null,
     setMessageInput,
     signInWithGoogle,
     signOut,

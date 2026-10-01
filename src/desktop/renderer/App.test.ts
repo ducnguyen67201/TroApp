@@ -7,6 +7,8 @@ import type { DesktopBridge } from '#contracts/DesktopBridge.js';
 import type { AuthUser } from '#contracts/AuthSession.js';
 import type { AgentResult } from '#contracts/AgentSession.js';
 import { App } from './App.js';
+import { DesktopLocale, localeStorageKey } from './localization/Locale.js';
+import { LocaleProvider } from './localization/LocaleProvider.js';
 import { desktopTheme, resolveDesktopCssVariables } from './Theme.js';
 
 const testUser: AuthUser = { id: 'test-user', name: 'Alex Example', email: 'alex@example.test' };
@@ -40,7 +42,7 @@ function renderDesktop(): void {
       cssVariablesResolver: resolveDesktopCssVariables,
       forceColorScheme: 'light',
       env: 'test',
-      children: createElement(App),
+      children: createElement(LocaleProvider, { children: createElement(App) }),
     }),
   );
 }
@@ -56,11 +58,15 @@ afterAll(() => {
 });
 
 beforeEach(() => {
+  window.localStorage.clear();
+  window.localStorage.setItem(localeStorageKey, DesktopLocale.ENGLISH);
   window.tro = createDesktopBridge();
 });
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
+  window.localStorage.clear();
 });
 
 describe('desktop scaffold', () => {
@@ -192,5 +198,154 @@ describe('desktop scaffold', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Continue with Google' }));
     await screen.findByText(testUser.email);
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('desktop language', () => {
+  it('defaults to Vietnamese and exposes the language setting before sign-in', async () => {
+    window.localStorage.clear();
+    const bridge = createDesktopBridge();
+    bridge.readAuthSession.mockResolvedValue({ kind: 'signed-out' });
+    window.tro = bridge;
+    renderDesktop();
+    expect(await screen.findByRole('button', { name: 'Tiếp tục với Google' })).toBeTruthy();
+    expect(document.documentElement.lang).toBe('vi');
+    fireEvent.click(screen.getByRole('button', { name: 'Cài đặt' }));
+    const language = screen.getByRole('combobox', { name: 'Ngôn ngữ' });
+    expect(language).toHaveProperty('value', 'vi');
+    expect(within(language).getByRole('option', { name: 'Tiếng Việt' })).toBeTruthy();
+    expect(within(language).getByRole('option', { name: 'English' })).toBeTruthy();
+    expect(screen.getByText('Đăng nhập ở thanh bên để xem tài khoản của bạn.')).toBeTruthy();
+  });
+
+  it('switches immediately, preserves draft and messages, and restores the saved locale', async () => {
+    window.localStorage.clear();
+    const bridge = createDesktopBridge();
+    window.tro = bridge;
+    renderDesktop();
+    const input = await screen.findByRole('textbox', { name: 'Tin nhắn của bạn' });
+    fireEvent.change(input, { target: { value: 'Một tác vụ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi cho Tro' }));
+    await screen.findByText('Here is your answer.');
+    fireEvent.change(input, { target: { value: 'Bản nháp tiếng Việt' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cài đặt' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Ngôn ngữ' }), {
+      target: { value: 'en' },
+    });
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy();
+    expect(document.documentElement.lang).toBe('en');
+    expect(window.localStorage.getItem(localeStorageKey)).toBe('en');
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }));
+    expect(screen.getByRole('textbox', { name: 'Your message' })).toHaveProperty(
+      'value',
+      'Bản nháp tiếng Việt',
+    );
+    expect(screen.getByText('Here is your answer.')).toBeTruthy();
+    expect(bridge.stopAgentSession).not.toHaveBeenCalled();
+    expect(bridge.readAuthSession).toHaveBeenCalledTimes(1);
+    cleanup();
+    renderDesktop();
+    await screen.findByRole('textbox', { name: 'Your message' });
+    expect(document.documentElement.lang).toBe('en');
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Language' }), {
+      target: { value: 'vi' },
+    });
+    expect(screen.getByRole('heading', { name: 'Cài đặt' })).toBeTruthy();
+    expect(window.localStorage.getItem(localeStorageKey)).toBe('vi');
+    cleanup();
+    renderDesktop();
+    expect(await screen.findByRole('heading', { name: 'Chào mừng trở lại, Alex' })).toBeTruthy();
+  });
+
+  it('keeps an active task running while switching languages in Settings', async () => {
+    const bridge = createDesktopBridge();
+    let completeTask: ((result: AgentResult) => void) | undefined;
+    bridge.sendAgentMessage.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          completeTask = resolve;
+        }),
+    );
+    window.tro = bridge;
+    renderDesktop();
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Your message' }), {
+      target: { value: 'Keep working' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send to Tro' }));
+    await waitFor(() => {
+      expect(bridge.sendAgentMessage).toHaveBeenCalledTimes(1);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Language' }), {
+      target: { value: 'vi' },
+    });
+    expect(screen.getByRole('button', { name: 'Đăng xuất' })).toHaveProperty('disabled', true);
+    expect(bridge.stopAgentSession).not.toHaveBeenCalled();
+    completeTask?.({ kind: 'completed', answer: 'Completed in the original language.' });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Đăng xuất' })).toHaveProperty('disabled', false);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Không gian làm việc' }));
+    expect(screen.getByText('Completed in the original language.')).toBeTruthy();
+    expect(screen.getByText('Keep working')).toBeTruthy();
+    expect(bridge.startAgentSession).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['fr', '', 'toString', '{"locale":"en"}'])(
+    'uses Vietnamese for unsupported saved preference %s',
+    async (value) => {
+      window.localStorage.setItem(localeStorageKey, value);
+      renderDesktop();
+      expect(await screen.findByRole('heading', { name: 'Chào mừng trở lại, Alex' })).toBeTruthy();
+      expect(document.documentElement.lang).toBe('vi');
+    },
+  );
+
+  it('still works when local preferences cannot be read or saved', async () => {
+    vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new Error('Blocked');
+    });
+    renderDesktop();
+    await screen.findByRole('heading', { name: 'Chào mừng trở lại, Alex' });
+    fireEvent.click(screen.getByRole('button', { name: 'Cài đặt' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Ngôn ngữ' }), {
+      target: { value: 'en' },
+    });
+    expect(document.documentElement.lang).toBe('en');
+    expect(screen.getByRole('status').textContent).toContain('could not be saved');
+  });
+
+  it('translates bridge errors and retranslates an existing alert when the language changes', async () => {
+    window.localStorage.clear();
+    const bridge = createDesktopBridge();
+    bridge.readAuthSession.mockResolvedValue({
+      kind: 'failed',
+      message: 'Could not reach the sign-in service.',
+    });
+    window.tro = bridge;
+    renderDesktop();
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Không thể kết nối với dịch vụ đăng nhập.',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Cài đặt' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Ngôn ngữ' }), {
+      target: { value: 'en' },
+    });
+    expect(screen.getByRole('alert').textContent).toContain('Could not reach the sign-in service.');
+    expect(bridge.readAuthSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses a localized fallback for an unknown bridge error', async () => {
+    window.localStorage.clear();
+    const bridge = createDesktopBridge();
+    bridge.signOut.mockResolvedValue({ kind: 'failed', message: 'Unrecognized diagnostic' });
+    window.tro = bridge;
+    renderDesktop();
+    fireEvent.click(await screen.findByRole('button', { name: 'Đăng xuất' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('Không thể đăng xuất. Vui lòng thử lại.');
+    expect(alert.textContent).not.toContain('Unrecognized diagnostic');
+    expect(screen.getByText(testUser.email)).toBeTruthy();
   });
 });
