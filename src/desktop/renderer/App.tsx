@@ -1,3 +1,5 @@
+import { useVoiceInput } from './voice/UseVoiceInput.js';
+import { VoiceInputPanel } from './voice/VoiceInputPanel.js';
 import {
   Alert,
   AppShell,
@@ -33,6 +35,7 @@ export function App(): ReactElement {
   const [page, setPage] = useState<DesktopPage>(DesktopPage.WORKSPACE);
   const controller = useComputerUse();
   const { user } = controller;
+  const voice = useVoiceInput(user?.id ?? null, controller.receiveVoiceEvent);
   const permissions = useDesktopPermissions(user?.id ?? null);
   const previousPermissionKind = useRef(permissions.status?.kind);
 
@@ -165,7 +168,10 @@ export function App(): ReactElement {
             ) : user && permissions.status?.kind !== 'ready' ? (
               <PermissionsOnboardingPage controller={permissions} />
             ) : (
-              <ComputerUsePage controller={controller} />
+              <>
+                {user && <VoiceInputPanel voice={voice} isBusy={controller.isSending} />}
+                <ComputerUsePage controller={controller} />
+              </>
             )}
           </div>
         </div>

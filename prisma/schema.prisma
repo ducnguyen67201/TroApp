@@ -31,6 +31,8 @@ model User {
   sessions      Session[]
   accounts      Account[]
   modelUsage    ModelUsage[]
+  transcriptionUsage TranscriptionUsage[]
+  transcriptionCaptures TranscriptionCapture[]
 
   @@map("user")
 }
@@ -89,4 +91,27 @@ model ModelUsage {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, day])
+}
+
+model TranscriptionUsage {
+  userId  String
+  day     DateTime @db.Date
+  samples Int      @default(0)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, day])
+}
+
+model TranscriptionCapture {
+  id              String   @id @db.Uuid
+  userId          String
+  activeUserId    String?  @unique
+  day             DateTime @db.Date
+  reservedSamples Int
+  claimed         Boolean  @default(false)
+  settled         Boolean  @default(false)
+  expiresAt       DateTime
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
 }

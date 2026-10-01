@@ -22,3 +22,7 @@ The implemented Google login and model gateway are a foundation. Set backend-onl
 ## AWS later
 
 Keep the Docker image, HTTP contracts, application services, and Prisma model stable where practical. A possible AWS target is ECS/Fargate + RDS PostgreSQL + S3 + Secrets Manager. Moving requires a data migration, networking/IAM configuration, secrets, connection settings, and new deployment checks. It is not an automatic hosting toggle.
+
+## Voice transcription
+
+The existing backend-only `OPENAI_API_KEY` also serves `gpt-live-transcribe`. Apply the additive `20261001150000_transcription` migration through the release migration step before releasing the desktop; voice starts automatically for signed-in accounts. The feature’s typed `TranscriptionConfig.ts` defines the daily allowance (3600 audio seconds) and recognition delay (`low`); no additional environment variables are required. The ingress must support WebSocket upgrades on `/api/v1/transcription/stream`, preserve authorization headers, and allow a connection for at least 120 seconds. Desktop production URLs use HTTPS/WSS. Quotas and active captures are shared through PostgreSQL, not instance-local memory. See [VoiceInputSpec.md](VoiceInputSpec.md) for conservative crash billing and packaged OS validation.

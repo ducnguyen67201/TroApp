@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { utilityProcess, type UtilityProcess } from 'electron';
+import type { DesktopLocale } from '#contracts/DesktopLocale.js';
 import {
   AgentWorkerResponseSchema,
   type AgentWorkerCommand,
@@ -89,8 +90,8 @@ export class AgentWorkerClient {
     return result;
   }
 
-  sendMessage(sessionId: string, message: string): Promise<AgentResult> {
-    return this.send({ kind: 'turn', sessionId, message });
+  sendMessage(sessionId: string, message: string, locale: DesktopLocale): Promise<AgentResult> {
+    return this.send({ kind: 'turn', sessionId, message, locale });
   }
 
   async stop(sessionId: string): Promise<AgentResult> {

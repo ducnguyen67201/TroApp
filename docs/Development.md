@@ -20,9 +20,12 @@ project and then the appropriate development environment/config (`dev` or `dev_p
 stores the selection for this checkout; run the command again whenever you want to change it. The
 selected development config supplies `APP_ENV`, `DATABASE_URL`, and any backend provider settings.
 
-`pnpm dev` uses the saved Doppler selection for the API and launches the desktop alongside it. The
-desktop process is not wrapped in `doppler run`, so backend configuration is not injected into
-Electron or Vite. Ctrl-C terminates both development processes.
+`pnpm dev` uses the saved Doppler selection for the API and launches the desktop alongside it.
+Before starting the API watcher, `dev:api` applies committed migrations with `prisma migrate
+deploy` and regenerates the Prisma client. A migration or generation failure stops API startup
+and the combined development command. The desktop process is not wrapped in `doppler run`, so
+backend configuration is not injected into Electron or Vite. Ctrl-C terminates both development
+processes.
 
 The API binds to `127.0.0.1:3000` locally. PostgreSQL binds to `127.0.0.1:54329`. The desktop main process calls the API; the React renderer has no generic network or database bridge. Development reload is handled by electron-vite and Node's watch mode with tsx.
 
@@ -33,8 +36,8 @@ Pino emits debug records only in `dev`, while operational info and errors remain
 Backend settings and provider keys belong in Doppler, not `.env`. Copy `.env.example` to
 `.env.local` only when overriding the two public desktop settings.
 
-Database startup and migration are intentionally separate from `pnpm dev`. When needed, use the
-existing database commands explicitly:
+Start the database separately when needed. `pnpm dev` applies existing migrations automatically;
+use `db:migrate` when authoring a new migration after editing `schema.prisma`:
 
 ```sh
 pnpm db:start
@@ -44,7 +47,7 @@ doppler run -- pnpm db:migrate
 `pnpm db:stop` stops the local database while preserving its volume. Always confirm that the saved
 Doppler selection points to the intended development database before running a migration.
 
-The database can be unavailable without preventing the app from starting. The desktop has no connection-check control; `/health/ready` remains available for operational readiness. `pnpm dev:desktop` downloads a checksum-verified Cua Driver release into Tro's local development cache when needed. On macOS, grant Screen Recording and Accessibility to `CuaDriver.app`; the OS cannot grant those automatically. Sign in with Google in the system browser. Chat requires the database and backend model key. The first message starts a local agent worker and a private `cua-driver mcp` connection. Edit `src/desktop/worker/ComputerUseInstructions.ts` to change the agent's standing instruction.
+The development API requires the database to be reachable for migrations. `pnpm dev:desktop` can still run independently. The desktop has no connection-check control; `/health/ready` remains available for operational readiness. `pnpm dev:desktop` downloads a checksum-verified Cua Driver release into Tro's local development cache when needed. On macOS, grant Screen Recording and Accessibility to `CuaDriver.app`; the OS cannot grant those automatically. Sign in with Google in the system browser. Chat requires the database and backend model key. The first message starts a local agent worker and a private `cua-driver mcp` connection. Edit `src/desktop/worker/ComputerUseInstructions.ts` to change the agent's standing instruction.
 
 To see the exact schema Cua publishes and the tool parameters produced by the
 OpenAI Agents SDK, run `pnpm inspect:cua:mcp browser_click`. Use
@@ -83,10 +86,9 @@ The Featherlane AI Doppler workplace has two Tro projects: `tro-local` and `tro-
 
 Hosted URLs remain unset and appear as missing values in Doppler. Complete them before deploying or packaging a hosted desktop build. `DATABASE_URL` and `AUTH_SECRET` are required backend variables; both Google variables enable sign-in, and `OPENAI_API_KEY` enables chat. The desktop's public API URL must be supplied for hosted builds. Keep the provider credentials in `tro-api` only; never add them to `tro-local`.
 
-With the Doppler CLI installed and signed in, start the local database with `pnpm db:start`, then run migrations and the two processes from this repository in separate terminals:
+With the Doppler CLI installed and signed in, start the local database with `pnpm db:start`, then run the two processes from this repository in separate terminals. The API command applies existing migrations before starting:
 
 ```sh
-doppler run --project tro-api --config dev -- pnpm db:migrate
 doppler run --project tro-api --config dev -- pnpm dev:api
 ```
 

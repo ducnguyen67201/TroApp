@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { AgentResult } from '#contracts/AgentSession.js';
+import type { DesktopLocale } from '#contracts/DesktopLocale.js';
 import type { AuthResult } from '#contracts/AuthSession.js';
 import { DesktopPermissionState } from '#contracts/DesktopPermissions.js';
 import { AgentWorkerClient } from './AgentWorkerClient.js';
@@ -23,6 +24,10 @@ export class AgentChatController {
     private readonly permissions: DesktopPermissions,
   ) {}
 
+  isBusy(): boolean {
+    return this.turnInProgress;
+  }
+
   async readAuthSession(): Promise<AuthResult> {
     return this.auth.readSession();
   }
@@ -44,7 +49,11 @@ export class AgentChatController {
     return { kind: 'started', sessionId: randomUUID() };
   }
 
-  async sendMessage(sessionId: string, message: string): Promise<AgentResult> {
+  async sendMessage(
+    sessionId: string,
+    message: string,
+    locale: DesktopLocale,
+  ): Promise<AgentResult> {
     if (this.turnInProgress) {
       return { kind: 'failed', message: 'Wait for the current task to finish.' };
     }
@@ -67,7 +76,7 @@ export class AgentChatController {
         this.credentialExpiresAt = Date.parse(credential.expiresAt);
       }
 
-      return await this.worker.sendMessage(sessionId, message);
+      return await this.worker.sendMessage(sessionId, message, locale);
     } catch {
       return { kind: 'failed', message: 'Could not complete this task. Try again.' };
     } finally {

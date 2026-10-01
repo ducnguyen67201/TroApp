@@ -1,3 +1,7 @@
+import { TranscriptionConfig } from './features/transcription/TranscriptionConfig.js';
+import { registerTranscriptionRoutes } from './features/transcription/infrastructure/RegisterTranscriptionRoutes.js';
+import { OpenAiLiveTranscriber } from './features/transcription/infrastructure/OpenAiLiveTranscriber.js';
+import { createPrismaTranscriptionAllowance } from './persistence/PrismaTranscriptionAllowance.js';
 import { createApi } from './CreateApi.js';
 import { createAuthDatabase } from './persistence/AuthDatabase.js';
 import { registerAuthRoutes } from './auth/RegisterAuthRoutes.js';
@@ -12,6 +16,21 @@ async function startApi(): Promise<void> {
   const database = createPrismaDatabaseStatus(environment.DATABASE_URL, logger);
   const authentication = createAuthDatabase(environment);
   const api = createApi(database);
+  const transcriptionAllowance = createPrismaTranscriptionAllowance(environment.DATABASE_URL);
+  await registerTranscriptionRoutes(
+    api,
+    authentication.readSignedInUserId,
+    transcriptionAllowance,
+    new OpenAiLiveTranscriber({
+      apiKey: environment.OPENAI_API_KEY ?? '',
+      delay: TranscriptionConfig.RECOGNITION_DELAY,
+    }),
+    {
+      authSecret: environment.AUTH_SECRET,
+      dailySeconds: TranscriptionConfig.DAILY_AUDIO_SECONDS,
+      available: Boolean(environment.OPENAI_API_KEY),
+    },
+  );
   registerAuthRoutes(
     api,
     authentication.auth,
@@ -28,6 +47,7 @@ async function startApi(): Promise<void> {
   api.addHook('onClose', async () => {
     await database.close();
     await authentication.close();
+    await transcriptionAllowance.close();
   });
 
   try {

@@ -1,6 +1,21 @@
+import {
+  VoiceCommandSchema,
+  VoiceAudioFrameSchema,
+  VoiceEventSchema,
+  VoiceReplySchema,
+  type VoiceCommand,
+  type VoiceAudioFrame,
+  type VoiceEvent,
+  type VoiceReply,
+} from '#contracts/VoiceInput.js';
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
-import { AgentResultSchema, type AgentResult } from '#contracts/AgentSession.js';
+import {
+  AgentCommandSchema,
+  AgentResultSchema,
+  type AgentResult,
+} from '#contracts/AgentSession.js';
+import type { DesktopLocale } from '#contracts/DesktopLocale.js';
 import { AuthResultSchema, type AuthResult } from '#contracts/AuthSession.js';
 import {
   DesktopPermissionStatusSchema,
@@ -13,6 +28,36 @@ import {
 /* Expose named session operations, not generic IPC or direct computer tools.
    Validate IPC data before it enters the renderer. */
 const bridge: DesktopBridge = {
+  async controlVoiceInput(command: VoiceCommand): Promise<VoiceReply> {
+    try {
+      return VoiceReplySchema.parse(
+        await ipcRenderer.invoke('tro:voice-command', VoiceCommandSchema.parse(command)),
+      );
+    } catch {
+      return { kind: 'failed' };
+    }
+  },
+  async appendVoiceAudio(frame: VoiceAudioFrame): Promise<VoiceReply> {
+    try {
+      return VoiceReplySchema.parse(
+        await ipcRenderer.invoke('tro:voice-audio', VoiceAudioFrameSchema.parse(frame)),
+      );
+    } catch {
+      return { kind: 'failed' };
+    }
+  },
+  subscribeVoiceInput(listener: (event: VoiceEvent) => void): () => void {
+    const receiveEvent = (_event: Electron.IpcRendererEvent, rawEvent: unknown): void => {
+      const parsed = VoiceEventSchema.safeParse(rawEvent);
+      if (parsed.success) {
+        listener(parsed.data);
+      }
+    };
+    ipcRenderer.on('tro:voice-event', receiveEvent);
+    return () => {
+      ipcRenderer.removeListener('tro:voice-event', receiveEvent);
+    };
+  },
   async readAuthSession(): Promise<AuthResult> {
     try {
       return AuthResultSchema.parse(
@@ -76,10 +121,17 @@ const bridge: DesktopBridge = {
       return { kind: 'failed', message: 'Could not start the agent session.' };
     }
   },
-  async sendAgentMessage(sessionId: string, message: string): Promise<AgentResult> {
+  async sendAgentMessage(
+    sessionId: string,
+    message: string,
+    locale: DesktopLocale,
+  ): Promise<AgentResult> {
     try {
       return AgentResultSchema.parse(
-        await ipcRenderer.invoke('tro:agent-command', { kind: 'turn', sessionId, message }),
+        await ipcRenderer.invoke(
+          'tro:agent-command',
+          AgentCommandSchema.parse({ kind: 'turn', sessionId, message, locale }),
+        ),
       );
     } catch {
       return { kind: 'failed', message: 'Could not send the message to the agent.' };

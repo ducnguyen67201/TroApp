@@ -1,6 +1,7 @@
 import { run, type AgentInputItem } from '@openai/agents';
 import type { Logger } from 'pino';
 import type { AgentResult } from '#contracts/AgentSession.js';
+import { DesktopLocale } from '#contracts/DesktopLocale.js';
 import { createComputerUseAgent } from './CreateComputerUseAgent.js';
 import { chooseCuaDriverCommand, startCuaDriverApp } from './ChooseCuaDriverCommand.js';
 import { TaskIssue } from './CuaTaskEvidence.js';
@@ -28,14 +29,10 @@ function askAgentToFinishTask(): AgentInputItem {
 
 /** Owns the private Cua MCP transport; each message runs as a fresh task. */
 export class ComputerUseTaskRunner {
-  private readonly agent;
-
   private constructor(
     private readonly desktopServer: LoggedCuaServer,
     private readonly log: Logger,
-  ) {
-    this.agent = createComputerUseAgent(desktopServer);
-  }
+  ) {}
 
   static async connect(log: Logger): Promise<ComputerUseTaskRunner> {
     const installation = await chooseCuaDriverCommand();
@@ -65,12 +62,13 @@ export class ComputerUseTaskRunner {
     }
   }
 
-  async runTask(message: string, signal: AbortSignal): Promise<TaskResult> {
+  async runTask(message: string, locale: DesktopLocale, signal: AbortSignal): Promise<TaskResult> {
     const startedAt = performance.now();
+    const agent = createComputerUseAgent(this.desktopServer, locale);
     this.desktopServer.taskEvidence.reset();
     this.log.debug({ messageChars: message.length }, 'agent.task.started');
     try {
-      let result = await run(this.agent, message, {
+      let result = await run(agent, message, {
         signal,
         maxTurns: 15,
       });
@@ -80,7 +78,7 @@ export class ComputerUseTaskRunner {
         /* One bounded continuation gives the same task a chance to recover.
            History is kept only inside this task, never for the next message. */
         this.log.debug({ issue }, 'agent.task.retrying');
-        result = await run(this.agent, [...result.history, askAgentToFinishTask()], {
+        result = await run(agent, [...result.history, askAgentToFinishTask()], {
           signal,
           maxTurns: 5,
         });
@@ -95,7 +93,11 @@ export class ComputerUseTaskRunner {
         return { kind: 'failed', message: describeIncompleteTask(issue) };
       }
 
-      const answer = result.finalOutput ?? 'I could not complete that request.';
+      const answer =
+        result.finalOutput ??
+        (locale === DesktopLocale.VIETNAMESE
+          ? 'Tôi chưa thể hoàn tất yêu cầu này.'
+          : 'I could not complete that request.');
       this.log.debug(
         { answerChars: answer.length, durationMs: Math.round(performance.now() - startedAt) },
         'agent.task.completed',

@@ -1,3 +1,8 @@
+import {
+  TranscriptionCredentialSchema,
+  type TranscriptionCredential,
+} from '#contracts/Transcription.js';
+import type { DesktopLocale } from '#contracts/DesktopLocale.js';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -121,6 +126,40 @@ export class AuthClient {
   readCookie(): string | null {
     const cookie = this.client.getCookie();
     return cookie ? cookie : null;
+  }
+
+  async releaseUnusedTranscription(captureId: string): Promise<void> {
+    const cookie = this.readCookie();
+    if (!cookie) {
+      return;
+    }
+    await this.request(`${this.apiBaseUrl}/api/v1/transcription/cancel`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ captureId }),
+      signal: AbortSignal.timeout(5000),
+    });
+  }
+
+  async fetchTranscriptionCredential(
+    captureId: string,
+    locale: DesktopLocale,
+  ): Promise<TranscriptionCredential> {
+    const cookie = this.readCookie();
+    if (!cookie) {
+      throw new Error('Sign in to use voice.');
+    }
+    const response = await this.request(`${this.apiBaseUrl}/api/v1/transcription/credential`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ captureId, locale }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) {
+      throw new Error('Voice is unavailable.');
+    }
+    const body: unknown = await response.json();
+    return TranscriptionCredentialSchema.parse(body);
   }
 
   async fetchModelCredential(): Promise<ModelCredential> {

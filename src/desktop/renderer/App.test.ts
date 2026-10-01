@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
 import { createElement } from 'react';
 import { MantineProvider } from '@mantine/core';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
 import type { AuthUser } from '#contracts/AuthSession.js';
 import type { AgentResult } from '#contracts/AgentSession.js';
+import type { VoiceReply } from '#contracts/VoiceInput.js';
 import { App } from './App.js';
 import { DesktopLocale, localeStorageKey } from './localization/Locale.js';
 import { LocaleProvider } from './localization/LocaleProvider.js';
@@ -16,6 +17,20 @@ const sessionId = 'a8f6d44a-5c18-4ce3-9237-44624549f63f';
 
 function createDesktopBridge() {
   return {
+    controlVoiceInput: vi.fn<DesktopBridge['controlVoiceInput']>().mockImplementation((command) =>
+      Promise.resolve<VoiceReply>({
+        kind: 'ok',
+        status: {
+          state: command.kind === 'enable' ? 'idle' : 'disabled',
+          shortcut: 'command-control',
+          globalShortcutAvailable: command.kind === 'enable',
+        },
+      }),
+    ),
+    appendVoiceAudio: vi
+      .fn<DesktopBridge['appendVoiceAudio']>()
+      .mockResolvedValue({ kind: 'failed' }),
+    subscribeVoiceInput: vi.fn<DesktopBridge['subscribeVoiceInput']>().mockReturnValue(() => {}),
     readAuthSession: vi
       .fn<DesktopBridge['readAuthSession']>()
       .mockResolvedValue({ kind: 'signed-in', user: testUser }),
@@ -135,7 +150,11 @@ describe('desktop scaffold', () => {
       expect(bridge.sendAgentMessage).toHaveBeenCalledTimes(2);
     });
     expect(bridge.startAgentSession).toHaveBeenCalledTimes(1);
-    expect(bridge.sendAgentMessage).toHaveBeenLastCalledWith(sessionId, 'A draft to keep');
+    expect(bridge.sendAgentMessage).toHaveBeenLastCalledWith(
+      sessionId,
+      'A draft to keep',
+      DesktopLocale.ENGLISH,
+    );
     expect(bridge.stopAgentSession).not.toHaveBeenCalled();
   });
 
@@ -277,7 +296,7 @@ describe('desktop language', () => {
     window.tro = bridge;
     renderDesktop();
     await screen.findByRole('heading', { name: 'Cho phép Tro truy cập máy tính của bạn.' });
-    expect(screen.getByText('Chưa bật')).toBeTruthy();
+    expect(await screen.findByText('Chưa bật')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Cài đặt' }));
     fireEvent.change(screen.getByRole('combobox', { name: 'Ngôn ngữ' }), {
       target: { value: 'en' },
@@ -375,6 +394,25 @@ describe('desktop language', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Không gian làm việc' }));
     expect(screen.getByText('Completed in the original language.')).toBeTruthy();
     expect(screen.getByText('Keep working')).toBeTruthy();
+    expect(bridge.sendAgentMessage).toHaveBeenLastCalledWith(
+      sessionId,
+      'Keep working',
+      DesktopLocale.ENGLISH,
+    );
+    bridge.sendAgentMessage.mockResolvedValue({ kind: 'completed', answer: 'Đã hoàn tất.' });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tin nhắn của bạn' }), {
+      target: { value: 'Mở YouTube' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi cho Tro' }));
+    await waitFor(() => {
+      expect(bridge.sendAgentMessage).toHaveBeenCalledTimes(2);
+    });
+    expect(bridge.sendAgentMessage).toHaveBeenLastCalledWith(
+      sessionId,
+      'Mở YouTube',
+      DesktopLocale.VIETNAMESE,
+    );
+    expect(await screen.findByText('Đã hoàn tất.')).toBeTruthy();
     expect(bridge.startAgentSession).toHaveBeenCalledTimes(1);
   });
 
@@ -434,4 +472,64 @@ describe('desktop language', () => {
     expect(alert.textContent).not.toContain('Unrecognized diagnostic');
     expect(screen.getByText(testUser.email)).toBeTruthy();
   });
+});
+
+it('displays a voice instruction immediately and preserves the separately typed draft', async () => {
+  const bridge = createDesktopBridge();
+  window.tro = bridge;
+  renderDesktop();
+  const input = await screen.findByRole('textbox', { name: 'Your message' });
+  fireEvent.change(input, { target: { value: 'A separate draft' } });
+  const emit = bridge.subscribeVoiceInput.mock.calls.at(-1)?.[0];
+  if (!emit) {
+    throw new Error('Missing voice subscription.');
+  }
+  const captureId = '33333333-3333-4333-8333-333333333333';
+  act(() => {
+    emit({
+      kind: 'status',
+      status: { state: 'running', shortcut: 'command-control', globalShortcutAvailable: true },
+    });
+    emit({ kind: 'submitted', captureId, sessionId, text: 'Mở Chrome' });
+  });
+  expect(screen.getByText('Mở Chrome')).toBeTruthy();
+  expect(input.getAttribute('disabled')).not.toBeNull();
+  act(() => {
+    emit({
+      kind: 'result',
+      captureId,
+      sessionId,
+      result: { kind: 'completed', answer: 'Opened Chrome' },
+    });
+    emit({
+      kind: 'status',
+      status: { state: 'idle', shortcut: 'command-control', globalShortcutAvailable: true },
+    });
+  });
+  expect(screen.getByText('Opened Chrome')).toBeTruthy();
+  expect(screen.getByDisplayValue('A separate draft')).toBeTruthy();
+  expect(bridge.sendAgentMessage).not.toHaveBeenCalled();
+});
+
+it('makes voice available automatically and keeps it active across Settings navigation', async () => {
+  const bridge = createDesktopBridge();
+  window.tro = bridge;
+  renderDesktop();
+  expect(await screen.findByText('Hold to talk; release to send')).toBeTruthy();
+  expect(bridge.controlVoiceInput).toHaveBeenCalledWith({
+    kind: 'enable',
+    shortcut: 'command-control',
+  });
+  const subscriptions = bridge.subscribeVoiceInput.mock.calls.length;
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+  expect(await screen.findByRole('heading', { name: 'Settings' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Enable voice input' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Disable voice input' })).toBeNull();
+  expect(screen.queryByLabelText('Hold-to-talk shortcut')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Workspace' }));
+  expect(await screen.findByText('Hold to talk; release to send')).toBeTruthy();
+  expect(bridge.subscribeVoiceInput).toHaveBeenCalledTimes(subscriptions);
+  expect(
+    bridge.controlVoiceInput.mock.calls.filter(([command]) => command.kind === 'enable'),
+  ).toHaveLength(1);
 });

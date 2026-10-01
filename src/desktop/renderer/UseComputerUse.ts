@@ -1,3 +1,4 @@
+import { VoiceState, type VoiceEvent } from '#contracts/VoiceInput.js';
 import { useEffect, useRef, useState } from 'react';
 import { useLocale } from './localization/UseLocale.js';
 import { resolveBridgeError } from './localization/BridgeErrors.js';
@@ -25,7 +26,8 @@ export interface ComputerUseController {
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   startNewTask: () => Promise<void>;
-  sendMessage: () => Promise<void>;
+  sendMessage: (instruction?: string) => Promise<void>;
+  receiveVoiceEvent: (event: VoiceEvent) => void;
 }
 
 /** App owns this controller so page navigation preserves the current task.
@@ -33,7 +35,7 @@ export interface ComputerUseController {
  * sent as conversation history or saved to storage.
  */
 export function useComputerUse(): ComputerUseController {
-  const { messages: translations } = useLocale();
+  const { messages: translations, locale } = useLocale();
   const currentSessionId = useRef<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,6 +46,8 @@ export function useComputerUse(): ComputerUseController {
   const [message, setMessage] = useState<TranslationKey | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isVoiceBusy, setIsVoiceBusy] = useState(false);
+  const voiceCaptureId = useRef<string | null>(null);
 
   useEffect(() => {
     const effectState = { active: true };
@@ -142,11 +146,12 @@ export function useComputerUse(): ComputerUseController {
   }
 
   async function startNewTask(): Promise<void> {
-    if (isSending || isSigningOut || isResetting) {
+    if (isSending || isVoiceBusy || isSigningOut || isResetting) {
       return;
     }
     setIsResetting(true);
     try {
+      await window.tro.controlVoiceInput({ kind: 'cancel' });
       const sessionId = currentSessionId.current;
       if (sessionId) {
         const result = await window.tro.stopAgentSession(sessionId);
@@ -170,11 +175,11 @@ export function useComputerUse(): ComputerUseController {
     }
   }
 
-  async function sendMessage(): Promise<void> {
-    if (!user || isSending || isSigningOut || isResetting || !messageInput.trim()) {
+  async function sendMessage(instruction: string = messageInput): Promise<void> {
+    if (!user || isSending || isVoiceBusy || isSigningOut || isResetting || !instruction.trim()) {
       return;
     }
-    const submittedMessage = messageInput.trim();
+    const submittedMessage = instruction.trim();
     setIsSending(true);
     setMessage(null);
     try {
@@ -193,7 +198,7 @@ export function useComputerUse(): ComputerUseController {
         currentSessionId.current = activeId;
       }
       setMessageInput('');
-      const result = await window.tro.sendAgentMessage(activeId, submittedMessage);
+      const result = await window.tro.sendAgentMessage(activeId, submittedMessage, locale);
       if (currentSessionId.current !== activeId) {
         return;
       }
@@ -220,7 +225,7 @@ export function useComputerUse(): ComputerUseController {
   }
 
   async function signOut(): Promise<void> {
-    if (isSending || isSigningOut || isResetting) {
+    if (isSending || isVoiceBusy || isSigningOut || isResetting) {
       return;
     }
     setIsSigningOut(true);
@@ -246,12 +251,41 @@ export function useComputerUse(): ComputerUseController {
     }
   }
 
+  function receiveVoiceEvent(event: VoiceEvent): void {
+    if (event.kind === 'status') {
+      const busy =
+        event.status.state !== VoiceState.IDLE && event.status.state !== VoiceState.DISABLED;
+      setIsVoiceBusy(busy);
+    } else if (event.kind === 'submitted') {
+      voiceCaptureId.current = event.captureId;
+      currentSessionId.current = event.sessionId;
+      setMessage(null);
+      setMessages((current) => [...current, { role: MessageRole.USER, text: event.text }]);
+    } else if (
+      event.kind === 'result' &&
+      voiceCaptureId.current === event.captureId &&
+      currentSessionId.current === event.sessionId
+    ) {
+      voiceCaptureId.current = null;
+      if (event.result.kind === 'completed') {
+        const answer = event.result.answer;
+        setMessages((current) => [...current, { role: MessageRole.AGENT, text: answer }]);
+      } else {
+        setMessage(
+          event.result.kind === 'failed'
+            ? resolveBridgeError(event.result.message, 'errorCompleteTask')
+            : 'errorCompleteTask',
+        );
+      }
+    }
+  }
+
   return {
     user,
     isLoading,
     isSigning,
     isSigningOut,
-    isSending,
+    isSending: isSending || isVoiceBusy,
     isResetting,
     messageInput,
     messages,
@@ -261,5 +295,6 @@ export function useComputerUse(): ComputerUseController {
     signOut,
     startNewTask,
     sendMessage,
+    receiveVoiceEvent,
   };
 }
