@@ -8,19 +8,24 @@ Read [Architecture](docs/Architecture.md) for the local/cloud split, [Developmen
 
 ## Quick start
 
-Use Node.js 24 LTS and pnpm 11. Install Docker Desktop to run the optional local database.
+Use Node.js 24 LTS and pnpm 11. Install the Doppler CLI and make sure the shared development
+PostgreSQL container is already running.
 
 ```sh
 pnpm install
-cp .env.example .env
-pnpm db:start
-pnpm db:migrate
+doppler login
+pnpm select
 pnpm dev
 ```
 
-`pnpm dev` starts the API and desktop application together. Without PostgreSQL, the API still starts and the desktop shows that the database is unavailable. No real accounts, photographs, or AI credentials are required.
+`pnpm select` delegates selection to Doppler: choose the `tro-api` project, then the appropriate
+development environment/config (`dev` or `dev_personal`). Doppler saves that choice for this
+checkout. Run it again whenever you need to change the selection. `pnpm dev` then starts the API
+with Doppler's injected environment and starts the desktop without backend secrets.
 
-For local development, `.env` needs only the PostgreSQL `DATABASE_URL`; optional `APP_ENV` accepts `dev`, `stage`, or `prod`. The API and desktop use matching local defaults. When packaging an installer, set the public `MAIN_VITE_API_BASE_URL` at build time; see [Development](docs/Development.md).
+The selected development config owns `APP_ENV`, `DATABASE_URL`, and any provider settings. The
+only browser-visible settings are the public `MAIN_VITE_API_BASE_URL` and `MAIN_VITE_APP_ENV`.
+See [Development](docs/Development.md) for setup and database commands.
 
 ## Ownership
 

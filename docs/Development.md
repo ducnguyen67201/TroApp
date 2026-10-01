@@ -2,19 +2,45 @@
 
 ## Start locally
 
-Use Node.js 24 LTS and pnpm 11. The repository is its own pnpm root and does not consume sibling projects.
+Use Node.js 24 LTS and pnpm 11. The repository is its own pnpm root and does not consume sibling
+projects. Install the Doppler CLI and make sure the shared development PostgreSQL container is
+already running.
+
+For first-time setup, authenticate and let Doppler select the project and development config:
 
 ```sh
 pnpm install
-cp .env.example .env
-pnpm db:start
-pnpm db:migrate
+doppler login
+pnpm select
 pnpm dev
 ```
 
+`pnpm select` is only a thin alias for `doppler setup`. At Doppler's prompts, select the `tro-api`
+project and then the appropriate development environment/config (`dev` or `dev_personal`). Doppler
+stores the selection for this checkout; run the command again whenever you want to change it. The
+selected development config supplies `APP_ENV`, `DATABASE_URL`, and any backend provider settings.
+
+`pnpm dev` uses the saved Doppler selection for the API and launches the desktop alongside it. The
+desktop process is not wrapped in `doppler run`, so backend configuration is not injected into
+Electron or Vite. Ctrl-C terminates both development processes.
+
 The API binds to `127.0.0.1:3000` locally. PostgreSQL binds to `127.0.0.1:54329`. The desktop main process calls the API; the React renderer has no generic network or database bridge. Development reload is handled by electron-vite and Node's watch mode with tsx.
 
-The local `.env` needs only `DATABASE_URL`. Optional `APP_ENV=dev|stage|prod` selects the backend application mode; it defaults to `dev`. Pino emits debug records only in `dev`, while operational info and errors remain available in all modes. The API defaults to the local host and port, and the desktop defaults to the local API. `ELECTRON_RENDERER_URL` is supplied by electron-vite during development; you do not set it yourself.
+Pino emits debug records only in `dev`, while operational info and errors remain available in all modes. The API defaults to the local host and port, and the desktop defaults to the local API. `ELECTRON_RENDERER_URL` is supplied by electron-vite during development; you do not set it yourself.
+
+Backend settings and provider keys belong in Doppler, not `.env`. Copy `.env.example` to
+`.env.local` only when overriding the two public desktop settings.
+
+Database startup and migration are intentionally separate from `pnpm dev`. When needed, use the
+existing database commands explicitly:
+
+```sh
+pnpm db:start
+doppler run -- pnpm db:migrate
+```
+
+`pnpm db:stop` stops the local database while preserving its volume. Always confirm that the saved
+Doppler selection points to the intended development database before running a migration.
 
 The database can be unavailable without preventing the app from starting. Click **Check connection** to see backend and database status. This does not exercise authentication, paid AI, images, or automation.
 
