@@ -11,7 +11,7 @@ export default defineConfig({
       /* ws probes optional native accelerators inside try/catch. Keep those
          requires guarded instead of hoisting Vite's missing-peer error. */
       commonjsOptions: { ignore: ['bufferutil', 'utf-8-validate'] },
-      rollupOptions: { onwarn: reportBuildWarning },
+      rollupOptions: { onwarn: reportBuildWarning, external: ['uiohook-napi'] },
       lib: {
         entry: {
           Main: resolve('src/desktop/main/Main.ts'),

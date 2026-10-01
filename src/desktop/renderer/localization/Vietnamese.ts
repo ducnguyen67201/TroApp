@@ -1,6 +1,22 @@
 import type { TranslationCatalog } from './English.js';
 
 export const vietnamese = {
+  voiceDisclosure:
+    'Khi bạn giữ phím tắt hoặc nút Nói, Tro gửi âm thanh từ micrô đến OpenAI. Thả để tự động gửi chỉ dẫn đã nhận dạng cho trợ lý. Sử dụng ngôn ngữ hiện tại. Nhấn Escape để hủy. Âm thanh và bản chép lời không được lưu trên thiết bị.',
+  voiceStarting: 'Đang chuẩn bị nhập bằng giọng nói…',
+  voiceUnavailable: 'Nhập bằng giọng nói chưa khả dụng. Kiểm tra quyền micrô rồi thử lại.',
+  voiceCheckAgain: 'Kiểm tra lại quyền giọng nói',
+  voiceShortcutUnavailable:
+    'Phím tắt toàn hệ thống chưa khả dụng. Trên Mac, cấp quyền Trợ năng cho Tro trong Cài đặt hệ thống rồi kiểm tra lại quyền giọng nói. Khi phát triển, ứng dụng có tên Electron. Quyền của CuaDriver là riêng biệt. Bạn vẫn có thể dùng nút Nói.',
+  voiceError:
+    'Không thể hoàn tất nhập bằng giọng nói. Kiểm tra quyền micrô, kết nối và hạn mức giọng nói rồi thử lại.',
+  voicePreparing: 'Đang chuẩn bị micrô…',
+  voiceRecording: 'Đang nghe… thả để gửi',
+  voiceFinalizing: 'Đang hoàn tất bản chép lời…',
+  voiceReady: 'Giữ để nói; thả để gửi',
+  voiceTalk: 'Giữ để nói',
+  voiceCancel: 'Hủy ghi âm',
+
   navigation: 'Điều hướng chính',
   workspace: 'Không gian làm việc',
   settings: 'Cài đặt',

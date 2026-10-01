@@ -63,7 +63,7 @@ async function runCommand(command: AgentWorkerCommand): Promise<AgentResult> {
       }
 
       activeAbort = new AbortController();
-      const run = runner.runTask(command.message, activeAbort.signal);
+      const run = runner.runTask(command.message, command.locale, activeAbort.signal);
       activeRun = run;
       try {
         return await run;

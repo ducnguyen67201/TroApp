@@ -8,5 +8,6 @@ allowBuilds:
   electron-winstaller: false
   esbuild: true
   prisma: true
+  uiohook-napi: true
 minimumReleaseAgeExclude:
   - electron@44.5.1

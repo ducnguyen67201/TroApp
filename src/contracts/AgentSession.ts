@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DesktopLocaleSchema } from './DesktopLocale.js';
 
 /** Lifecycle and chat messages crossing renderer, main, and the local agent worker. */
 export const AgentCommandSchema = z.discriminatedUnion('kind', [
@@ -7,6 +8,7 @@ export const AgentCommandSchema = z.discriminatedUnion('kind', [
     kind: z.literal('turn'),
     sessionId: z.uuid(),
     message: z.string().trim().min(1).max(8000),
+    locale: DesktopLocaleSchema,
   }),
   z.strictObject({ kind: z.literal('stop'), sessionId: z.uuid() }),
 ]);
@@ -22,7 +24,12 @@ export const AgentWorkerCommandSchema = z.discriminatedUnion('kind', [
     gatewayBaseUrl: z.url(),
     debugEnabled: z.boolean(),
   }),
-  z.strictObject({ kind: z.literal('turn'), sessionId: z.uuid(), message: z.string().min(1) }),
+  z.strictObject({
+    kind: z.literal('turn'),
+    sessionId: z.uuid(),
+    message: z.string().min(1),
+    locale: DesktopLocaleSchema,
+  }),
   z.strictObject({ kind: z.literal('stop'), sessionId: z.uuid() }),
 ]);
 

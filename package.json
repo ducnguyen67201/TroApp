@@ -18,7 +18,7 @@
     "postinstall": "prisma generate",
     "select": "doppler setup",
     "dev": "concurrently --kill-others -n api,desktop \"doppler run -- pnpm dev:api\" \"pnpm dev:desktop\"",
-    "dev:api": "node --conditions=development --watch --import tsx src/server/StartApi.ts",
+    "dev:api": "pnpm db:deploy && pnpm db:generate && node --conditions=development --watch --import tsx src/server/StartApi.ts",
     "dev:desktop": "tsx scripts/PrepareCuaDriver.ts --development && electron-vite dev",
     "start": "node dist/server/StartApi.js",
     "start:desktop": "electron-vite preview",
@@ -42,6 +42,7 @@
   },
   "dependencies": {
     "@better-auth/electron": "1.7.6",
+    "@fastify/websocket": "^11.3.1",
     "@mantine/core": "9.6.3",
     "@mantine/hooks": "9.6.3",
     "@openai/agents": "0.18.0",
@@ -59,6 +60,8 @@
     "prisma": "7.10.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "uiohook-napi": "^1.5.5",
+    "ws": "^8.22.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -69,6 +72,7 @@
     "@types/pg": "^8.15.6",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "@types/ws": "^8.18.2",
     "@vitejs/plugin-react": "^5.0.0",
     "auth": "1.7.6",
     "concurrently": "^9.2.1",
@@ -116,10 +120,18 @@
       "output": "release"
     },
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Tro listens while you hold the talk shortcut and sends your instruction to the agent."
+      },
+      "entitlements": "DesktopEntitlements.plist",
+      "entitlementsInherit": "DesktopEntitlements.plist"
     },
     "win": {
       "target": "nsis"
-    }
+    },
+    "asarUnpack": [
+      "node_modules/uiohook-napi/prebuilds/**/*"
+    ]
   }
 }

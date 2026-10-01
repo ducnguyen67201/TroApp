@@ -1,9 +1,9 @@
 import { english, type TranslationCatalog } from './English.js';
 import { vietnamese } from './Vietnamese.js';
 
-export const DesktopLocale = { VIETNAMESE: 'vi', ENGLISH: 'en' } as const;
+import { DesktopLocale } from '#contracts/DesktopLocale.js';
 
-export type DesktopLocale = (typeof DesktopLocale)[keyof typeof DesktopLocale];
+export { DesktopLocale } from '#contracts/DesktopLocale.js';
 
 export const defaultLocale = DesktopLocale.VIETNAMESE;
 

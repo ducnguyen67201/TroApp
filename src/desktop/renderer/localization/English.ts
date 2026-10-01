@@ -1,5 +1,20 @@
 /** Canonical desktop copy. Other catalogs must implement every key and parameter. */
 export const english = {
+  voiceDisclosure:
+    'While you hold the shortcut or Talk button, Tro sends your microphone audio to OpenAI. Release to send the recognized instruction to the agent automatically. Uses your current language. Press Escape to cancel. Audio and transcripts are not saved on this device.',
+  voiceStarting: 'Preparing voice input…',
+  voiceUnavailable: 'Voice input is unavailable. Check microphone access and try again.',
+  voiceCheckAgain: 'Check voice permissions again',
+  voiceShortcutUnavailable:
+    'Global shortcut unavailable. On Mac, allow Tro Accessibility access in System Settings, then check voice permissions again. During development, the app is named Electron. CuaDriver access is separate. You can still use the Talk button.',
+  voiceError:
+    'Voice input could not finish. Check microphone access, your connection and your voice allowance, then try again.',
+  voicePreparing: 'Preparing microphone…',
+  voiceRecording: 'Listening… release to send',
+  voiceFinalizing: 'Finishing transcription…',
+  voiceReady: 'Hold to talk; release to send',
+  voiceTalk: 'Hold to talk',
+  voiceCancel: 'Cancel recording',
   navigation: 'Main navigation',
   workspace: 'Workspace',
   settings: 'Settings',
