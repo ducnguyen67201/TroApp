@@ -1,76 +1,11 @@
-import { useEffect, useState, type ReactElement, type SyntheticEvent } from 'react';
-import { AuthStatus, type AuthState } from '#contracts/Auth.js';
+import { useState, type ReactElement, type SyntheticEvent } from 'react';
+import { AuthStatus } from '#contracts/Auth.js';
 import { DatabaseAvailability, type SystemStatusResult } from '#contracts/SystemStatus.js';
-
-const signedOutState: AuthState = { status: AuthStatus.SIGNED_OUT };
+import { useAuthentication } from './UseAuthentication.js';
 
 export function App(): ReactElement {
-  const [authState, setAuthState] = useState<AuthState | null>(null);
-  const [message, setMessage] = useState('');
-  const [isWorking, setIsWorking] = useState(false);
-
-  useEffect(() => {
-    const stopListening = window.tro.onAuthStateChanged((state) => {
-      setAuthState(state);
-      setIsWorking(false);
-      setMessage(
-        state.status === AuthStatus.SIGNED_OUT
-          ? 'Sign-in was not completed. You can safely try again.'
-          : '',
-      );
-    });
-
-    void window.tro.readAuthState().then((result) => {
-      if (result.success) {
-        setAuthState(result.state);
-      } else {
-        setAuthState(signedOutState);
-        setMessage(result.message);
-      }
-    });
-
-    return stopListening;
-  }, []);
-
-  async function beginGoogleSignIn(): Promise<void> {
-    setIsWorking(true);
-    setMessage('');
-    const result = await window.tro.startGoogleSignIn();
-
-    if (!result.success) {
-      setIsWorking(false);
-      setMessage(result.message);
-      return;
-    }
-
-    setMessage('Finish signing in securely in your browser.');
-  }
-
-  async function createWorkspace(displayName: string): Promise<void> {
-    setIsWorking(true);
-    setMessage('');
-    const result = await window.tro.createWorkspace(displayName);
-    setIsWorking(false);
-
-    if (result.success) {
-      setAuthState(result.state);
-    } else {
-      setMessage(result.message);
-    }
-  }
-
-  async function logout(): Promise<void> {
-    setIsWorking(true);
-    setMessage('');
-    const result = await window.tro.logout();
-    setIsWorking(false);
-
-    if (result.success) {
-      setAuthState(result.state);
-    } else {
-      setMessage(result.message);
-    }
-  }
+  const { authState, isWorking, message, authenticateWithGoogle, createWorkspace, logout } =
+    useAuthentication();
 
   if (!authState) {
     return <main className="centered">Loading Tro…</main>;
@@ -85,7 +20,7 @@ export function App(): ReactElement {
           <p className="description">
             Sign in to reach your private workspace. Authentication opens in your system browser.
           </p>
-          <button disabled={isWorking} onClick={() => void beginGoogleSignIn()}>
+          <button disabled={isWorking} onClick={() => void authenticateWithGoogle()}>
             {isWorking ? 'Opening Google…' : 'Continue with Google'}
           </button>
           <StatusMessage message={message} />
