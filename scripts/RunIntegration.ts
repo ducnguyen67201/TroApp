@@ -64,6 +64,8 @@ async function runIntegration(): Promise<void> {
     ...process.env,
     NODE_ENV: 'test',
     APP_ENV: 'stage',
+    AUTH_SECRET: 'synthetic-integration-secret-only-000000000000',
+    AUTH_BASE_URL: 'https://api.example.test',
     DATABASE_URL: `postgresql://tro:synthetic_test_only@127.0.0.1:${String(port)}/tro_test`,
   };
 
@@ -80,10 +82,9 @@ async function runIntegration(): Promise<void> {
 
 try {
   await runIntegration();
-} catch {
-  console.error(
-    'Integration checks failed. Confirm Docker is running and the local dependencies are installed.',
-  );
+} catch (error: unknown) {
+  console.error('Integration checks failed.');
+  if (error instanceof Error) console.error(error.message);
   process.exitCode = 1;
 } finally {
   if (integrationState.didStartContainer) {

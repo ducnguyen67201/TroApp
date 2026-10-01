@@ -1,0 +1,66 @@
+# Local computer-use tasks
+
+Status: text input, Google sign-in in the system browser, the backend model gateway, and an on-demand local agent worker are implemented. Each message is a fresh task. Live Google OAuth requires provider credentials and end-to-end validation; OpenAI/Cua GUI actions, Windows installation, signed macOS behavior, and production operations also need validation.
+
+## Where each part runs
+
+```mermaid
+flowchart LR
+  UI[React task UI] --> PRELOAD[Named preload bridge]
+  PRELOAD --> MAIN[Electron main: login and worker lifetime]
+  MAIN --> WORKER[On-demand utility process]
+  WORKER --> SDK[OpenAI Agents SDK]
+  SDK --> CUA[Cua Driver MCP process]
+  CUA --> DESKTOP[Visible desktop]
+  SDK --> GATEWAY[Tro backend model gateway]
+  GATEWAY --> OPENAI[OpenAI Responses API]
+  MAIN --> AUTH[Tro backend authentication]
+  AUTH --> PG[(PostgreSQL)]
+```
+
+The user signs into Tro with Google in the system browser. Public email/password signup and sign-in are disabled so a client cannot mint new accounts through an unverified password form to reset the per-user model allowance. Better Auth returns a short-lived code to Electron through the registered app protocol; Electron main exchanges it for a session. The backend keeps `OPENAI_API_KEY` and the Google client secret, and issues a 15-minute model-only token to Electron main. Main passes that token to the local utility process, where the Agents SDK calls Tro's model gateway. React receives neither the model token nor the provider keys. The gateway limits the model and output tokens and counts requests per user per UTC day. The model runs remotely; screen observations or tool results sent to it leave the computer.
+
+Cua Driver is included in packaged desktop builds and exposes its current tools over a private MCP connection. During development, Tro downloads the pinned, SHA-256-verified release once. On macOS, Tro opens the bundled `CuaDriver.app` through LaunchServices before connecting MCP so the separate driver's OS grants stay attached to its app identity. The Agents SDK discovers the tool catalog and chooses actions. Tro's standing instruction is [ComputerUseInstructions.ts](../src/desktop/worker/ComputerUseInstructions.ts). Tro does not maintain a wrapper for each Cua action. The agent can take general GUI actions in accessible apps. This prototype has no per-action approval UI, though Cua's runtime permission mode may apply. Voice and class context are not implemented.
+
+## Task and process lifetime
+
+| Event                               | Behavior                                                                                                                                                          |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App opens                           | Better Auth's Electron client restores the Tro login cookie from OS-backed `safeStorage` when available. No agent worker or Cua connection starts.                |
+| First message                       | Main creates an IPC session ID, obtains a scoped gateway token, starts the utility process and Cua MCP, then sends the text to `run(agent, message, …)`.          |
+| Later message                       | The worker may stay warm, but the next `run` receives only that message. It does not receive the previous messages, screenshots, tool calls, or an SDK `Session`. |
+| Completed task                      | React displays the user's text and the answer in memory. Tro does not save a conversation file or send that display history back to the model.                    |
+| 15 minutes idle                     | Main closes Cua MCP and stops the worker. An active task is not stopped by the idle timer.                                                                        |
+| Expired gateway token               | Before another task, main obtains a fresh token and restarts the worker. No history needs restoring.                                                              |
+| New task, sign-out, or window close | New task clears the displayed messages and stops the current worker. Sign-out also clears the login cookie. Closing the app discards the displayed messages.      |
+
+The session ID coordinates IPC and worker shutdown; it is not a persistent conversation ID. Creating an `Agent` configures model, instructions, and Cua tools. Without passing a `Session` to `run`, each call starts with fresh model context. A task can still involve several model/tool steps within its own `run` call. If a task fails or is interrupted, Tro does not replay its computer actions automatically; the user can retry their text manually.
+
+## Code ownership
+
+```text
+src/contracts/AgentSession.ts, AuthSession.ts, DesktopBridge.ts
+src/desktop/renderer/UseComputerUse.ts    # Shared sign-in and in-memory task state
+src/desktop/renderer/ComputerUsePage.tsx  # Workspace input and message display
+src/desktop/preload/Preload.ts              # Named validated IPC operations
+src/desktop/main/AuthClient.ts              # Google browser sign-in, encrypted cookie in main
+src/desktop/main/AgentChatController.ts     # On-demand worker and idle stop
+src/desktop/main/AgentWorkerClient.ts       # Utility process and reply correlation
+src/desktop/worker/StartAgentWorker.ts      # Agents SDK client configuration
+src/desktop/worker/ComputerUseTaskRunner.ts # One-run tasks and Cua MCP lifetime
+src/desktop/worker/ComputerUseInstructions.ts
+src/server/persistence/AuthDatabase.ts      # Better Auth/Prisma adapter and usage
+src/server/auth/RegisterAuthRoutes.ts       # Fastify /api/auth/* adapter
+src/server/auth/RegisterModelGateway.ts     # Scoped token and Responses proxy
+prisma/schema.prisma                         # Accounts, sessions, usage
+```
+
+To try it locally, apply migrations, set a unique `AUTH_SECRET`, backend `OPENAI_API_KEY`, and Google OAuth web client credentials, and start the API and desktop. Register `http://127.0.0.1:3000/api/auth/callback/google` with Google. The development launcher fetches Cua Driver automatically; on macOS, grant Screen Recording and Accessibility to `CuaDriver.app`. Sign in with Google and send a text task. The account flow currently has no MFA or hosted deployment. When OS encryption is unavailable in an unsigned development build, the cookie remains in memory and login is not restored after restart.
+
+Before public release, validate actual Cua MCP startup, screenshot/action calls, cancellation during a tool call, gateway streaming, packaged worker startup, and OS permissions on both platforms. Add account recovery and verification or another identity provider, production abuse controls and billing, and installer signing. Automated checks use a fake provider response and do not execute GUI actions.
+
+## References
+
+- [OpenAI Agents SDK sessions](https://openai.github.io/openai-agents-js/guides/sessions/)
+- [Better Auth Electron integration](https://better-auth.com/docs/integrations/electron)
+- [Cua Driver MCP integration](https://cua.ai/docs/how-to-guides/driver/connect-your-agent)

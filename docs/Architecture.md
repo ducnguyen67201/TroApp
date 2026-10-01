@@ -8,7 +8,8 @@ Updated September 30, 2026. Current direction: Electron + React on Windows/macOS
 | ------------------------------- | --------------------------------- | ----------------------------------------------------- |
 | React interface                 | User's machine, Electron renderer | Screens, input, progress, approval controls           |
 | Electron main and preload       | User's machine                    | Narrow OS/IPC bridge and backend access               |
-| Agents SDK worker, planned      | User's machine                    | Agent loop and authorized local actions               |
+| Agents SDK worker, implemented  | User's machine                    | General computer-use loop and Cua MCP client          |
+| Cua Driver MCP process          | User's machine, bundled with Tro  | Publishes desktop tools and executes local actions    |
 | Model                           | Remote provider by default        | Inference; a local SDK does not make the model local  |
 | TypeScript API                  | Railway initially                 | Accounts, authorization, model gateway, billing, jobs |
 | Prisma                          | Backend process only              | Typed persistence adapter and migrations              |
@@ -16,7 +17,7 @@ Updated September 30, 2026. Current direction: Electron + React on Windows/macOS
 | Images, planned                 | Private object storage            | Photos, garments, generated previews                  |
 | Try-on worker/provider, planned | Backend/provider                  | Durable generation and retries                        |
 
-The starter implements only the renderer → preload → main → HTTP API → application service → Prisma adapter → PostgreSQL readiness path. Agent orchestration, identity, storage, and job execution are future work.
+The starter implements a renderer → preload → main bridge and a backend HTTP API with application services and Prisma adapters. Operational readiness remains an API endpoint, with no desktop check panel. It also implements a separate local computer-use worker that connects to Cua Driver through MCP. Google sign-in through the system browser and a scoped backend model gateway are implemented. Task messages are displayed only in the current React window; no conversation history is persisted. Try-on job execution and image storage remain future work.
 
 The desktop and API share the `dev | stage | prod` application environment vocabulary. The backend uses Pino for structured logs: database-readiness failures log an error category at debug level only in `dev`, without exposing Prisma messages through logs or HTTP responses.
 
@@ -27,31 +28,36 @@ flowchart LR
   subgraph User[User's Windows or Mac]
     UI[React interface] --> PRELOAD[Narrow preload bridge]
     PRELOAD --> MAIN[Electron main]
-    MAIN --> AGENT[Future local Agents SDK worker]
-    AGENT --> TOOLS[Local browser and desktop tools]
+    MAIN --> AGENT[Local Agents SDK worker]
+    AGENT --> MCP[Cua Driver MCP process]
+    MCP --> DESKTOP[Visible desktop]
   end
   subgraph Backend[Railway first; AWS later]
     API[TypeScript API] --> SERVICE[Application services]
     SERVICE --> DB[Prisma adapter] --> PG[(PostgreSQL)]
-    API --> GATEWAY[Future authenticated model gateway]
+    API --> GATEWAY[Authenticated model gateway]
     SERVICE --> JOBS[Future try-on worker]
     SERVICE --> STORAGE[Future private image storage]
   end
   MAIN -->|HTTPS| API
-  AGENT -->|Authenticated model requests| GATEWAY
+  AGENT -->|Short-lived token| GATEWAY
   GATEWAY --> MODEL[OpenAI model API]
   JOBS --> TRYON[Try-on provider]
 ```
 
 ## Following one request
 
-1. `App.tsx` requests service status through `window.tro.readServiceStatus()`.
-2. `Preload.ts` exposes only that named operation and validates its IPC result.
-3. `Main.ts` verifies the sending frame and calls `BackendClient.ts`.
-4. `BackendClient.ts` fetches a fixed versioned endpoint, retries one transient read failure, and validates the response with the canonical Zod schema. Invalid response data and client errors are not retried.
-5. `CreateApi.ts` routes HTTP to `ReadServiceStatus.ts`.
-6. The application service depends on a `DatabaseStatus` port, not Prisma or Fastify.
-7. `PrismaDatabaseStatus.ts` checks a mapped model and returns a boolean. Failures become unavailable status; database messages and credentials are not exposed.
+1. `App.tsx` owns the shared `UseComputerUse.ts` controller, which calls the named `window.tro.signInWithGoogle()` bridge for the sidebar and workspace. Mantine styling is centralized in `Theme.ts`; see [DesktopUi.md](DesktopUi.md).
+2. `Preload.ts` validates the IPC response; `Main.ts` verifies the sending frame.
+3. Electron main asks Better Auth to open Google sign-in in the system browser.
+4. Google returns to the backend OAuth callback. Better Auth creates a short-lived authorization code and the browser hands it to the registered `app.tro.desktop` protocol.
+5. Electron main exchanges that code for its encrypted local session cookie. Later chat requests use that session to obtain a scoped model token.
+
+The desktop explicitly enables Better Auth's protocol registration with `scheme: true`, while leaving the SDK's CSP and IPC bridges disabled in favour of Tro's boundaries. The browser callback uses `app.tro.desktop://auth/callback#token=…`: the installed SDK matches the hostname plus path. Changing this to the single-slash form prevents the callback from matching. Regression tests cover registration and execute the return-page script with a synthetic code; they do not complete a real Google login.
+
+On macOS, validate browser-to-app return in a packaged app with its protocol registered in `Info.plist`. Plain command-line Electron development is not sufficient for OS deep-link registration. Keep the same app instance open throughout sign-in because the SDK holds the pending proof-key verifier in memory. See [Electron's deep-link guidance](https://www.electronjs.org/docs/latest/tutorial/launch-app-from-url-in-another-app). Full Google login and packaged OS dispatch still require an interactive smoke test.
+
+For operational status, `CreateApi.ts` still routes `/health/ready` to `ReadServiceStatus.ts`. That service depends on a `DatabaseStatus` port, not Prisma or Fastify. `PrismaDatabaseStatus.ts` checks a mapped model and reports availability without exposing database diagnostics.
 
 A future `createTryOnJob` follows the same path: validated contract → authorized route → application service → Prisma repository/provider port. Ownership checks belong on the backend even when the desktop already validated input.
 
@@ -67,18 +73,15 @@ Use `#contracts/SystemStatus.js` for shared contract imports across desktop and 
 
 ## Local agent orchestration
 
-The Agents SDK runs in application-owned TypeScript code. The planned location here is a separate local worker so automation does not block the UI. [OpenAI Agents SDK](https://developers.openai.com/api/docs/guides/agents/sdk)
+The Agents SDK runs in a separate Electron utility process on the user's machine so automation does not block the UI. Electron main starts one worker on demand and stops it after 15 idle minutes, sign-out, or window close. [OpenAI Agents SDK](https://developers.openai.com/api/docs/guides/agents/sdk)
 
-The first planned agent feature is a screen-aware teaching assistant, specified in [TeachingAssistantSpec.md](TeachingAssistantSpec.md). It observes the visible desktop during a student-started session and can navigate by opening or focusing an app or an existing VS Code tab. It does not edit student work or execute general computer tasks. This narrower first release does not require a second model-based guardrail agent or per-action human-review prompts.
+The first implemented agent feature is a general computer-use text chat, specified in [ComputerUseSpec.md](ComputerUseSpec.md). The Agents SDK discovers Cua Driver's MCP tools directly; Tro does not copy each action into an OpenAI `Computer` adapter. [ComputerUseInstructions.ts](../src/desktop/worker/ComputerUseInstructions.ts) is the single place to edit the agent's standing instruction. General GUI actions can change content in any accessible app. Tro has no per-action approval UI; Cua's own runtime permission mode still applies. Voice and class context are later integrations.
 
 The worker owns the loop and tool execution. Model requests normally still go over the network. Screenshots or tool outputs sent to the model leave the machine; local orchestration is not an offline or all-local privacy guarantee.
 
-Choose a credential path before implementing paid calls:
+Tro now signs users in with Google through backend Better Auth/Prisma. Better Auth's Electron client stores the Tro cookie with OS `safeStorage` when available, and main obtains a 15-minute model-only token from the backend. The local worker uses that token to call Tro's Responses gateway; the product OpenAI key and Google client secret remain on the backend. The gateway restricts the model and output tokens and meters requests per account. The worker starts on demand and stops after 15 idle minutes. Each message starts a fresh SDK run with no `Session` or previous message history. React displays messages in memory until the window closes; screenshots and tool outputs are not persisted. See [ComputerUseSpec.md](ComputerUseSpec.md) for limits and release work.
 
-- Product-funded usage: build an authenticated backend model gateway. Allow only supported operations, limit models/tokens/runs, meter spending per user, and return the protocol the SDK expects. Test SDK client configuration, streaming, cancellation, and errors. This gateway is application code to build, not an automatic starter feature.
-- User-funded usage: explicitly support a user's API key and OS-protected storage. Never embed the founder's shared key. Review tracing and payload retention before using customer data.
-
-For a prototype, backend-hosted orchestration with specifically authorized local tool requests can be simpler than building a gateway. The selected product direction remains a local worker. Prefer typed application tools before screen automation. Desktop control needs Windows/macOS adapters and permissions; a separate process alone does not safely isolate arbitrary model-generated code.
+The selected product direction remains a local worker. Desktop control needs Windows/macOS validation and permissions; a separate process alone does not make arbitrary model-generated GUI actions harmless.
 
 ## Persistence and jobs
 
@@ -101,9 +104,9 @@ The Dockerfile and Railway configuration are a deployment starting point, not a 
 ## Next steps
 
 1. Run and package the desktop on both target operating systems.
-2. Select identity and add authenticated user-owned records.
+2. Complete account recovery, verification, production abuse controls, and hosted deployment.
 3. Complete upload → durable try-on job → result → history.
-4. Add a local worker with one typed agent tool and a tested credential path.
-5. Add one browser workflow, then desktop adapters as needed.
+4. Smoke-test the agent worker, bundled Cua Driver MCP process, and OS permissions in signed Windows/macOS installers.
+5. Validate the signed-in model gateway and Cua actions end to end before public release.
 
 The earlier exploratory options remain in [ArchitecturePrevious.md](ArchitecturePrevious.md). This document is the current source of truth.
