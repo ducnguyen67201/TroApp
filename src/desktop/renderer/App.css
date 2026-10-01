@@ -251,6 +251,132 @@ textarea:focus-visible {
   overflow-wrap: anywhere;
 }
 
+.permission-page {
+  width: min(100%, 920px);
+  margin: 0 auto;
+}
+
+.permission-progress {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 8px 0 48px;
+  color: var(--tro-muted);
+  font-size: 12px;
+}
+
+.permission-progress-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.permission-progress-step.is-done {
+  color: var(--tro-text);
+}
+
+.permission-progress-step.is-current {
+  color: var(--tro-accent);
+  font-weight: 650;
+}
+
+.permission-progress-line {
+  width: 42px;
+  height: 1px;
+  background: var(--tro-border);
+}
+
+.permission-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  margin-bottom: 34px;
+}
+
+.permission-hero h1 {
+  max-width: 610px;
+  font-size: clamp(30px, 3.5vw, 46px);
+  letter-spacing: -0.045em;
+  line-height: 1.1;
+}
+
+.permission-eyebrow {
+  margin-bottom: 16px;
+  color: var(--tro-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.permission-lead {
+  max-width: 590px;
+  margin-top: 20px;
+  line-height: 1.7;
+}
+
+.permission-hero-icon {
+  display: grid;
+  flex: 0 0 132px;
+  place-items: center;
+  width: 132px;
+  height: 132px;
+  border: 1px solid var(--tro-border);
+  border-radius: 32px;
+  background: var(--tro-muted-surface);
+  color: var(--tro-accent);
+}
+
+.permission-card {
+  padding: 30px;
+  border-color: var(--tro-border);
+  background: var(--tro-surface);
+}
+
+.permission-card h2 {
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.permission-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 90px;
+  border-bottom: 1px solid var(--tro-border);
+}
+
+.permission-row-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.permission-row-copy p + p {
+  margin-top: 5px;
+}
+
+.permission-status {
+  white-space: nowrap;
+  color: var(--tro-accent);
+  font-weight: 600;
+}
+
+.permission-status[data-granted] {
+  color: var(--tro-text);
+}
+
+.permission-feedback {
+  min-height: 24px;
+  margin-top: 18px;
+}
+
+.permission-hint {
+  max-width: 610px;
+  margin-top: 20px;
+  line-height: 1.65;
+}
+
 @media (max-width: 800px) {
   .desktop-shell {
     --app-shell-navbar-width: 200px;
@@ -264,6 +390,24 @@ textarea:focus-visible {
   }
   .panel-content {
     padding: 28px 24px 20px;
+  }
+
+  .permission-progress {
+    margin-bottom: 30px;
+  }
+
+  .permission-hero-icon {
+    display: none;
+  }
+
+  .permission-row {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 16px 0;
+  }
+
+  .permission-row-copy {
+    flex-basis: 100%;
   }
 }
 

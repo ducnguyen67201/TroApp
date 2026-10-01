@@ -13,7 +13,7 @@ const parentPort = process.parentPort;
 
 let runner: ComputerUseTaskRunner | null = null;
 let sessionId: string | null = null;
-let activeRun: Promise<string> | null = null;
+let activeRun: ReturnType<ComputerUseTaskRunner['runTask']> | null = null;
 let activeAbort: AbortController | null = null;
 
 /* Screen content and model turns must not enter application traces. */
@@ -66,7 +66,7 @@ async function runCommand(command: AgentWorkerCommand): Promise<AgentResult> {
       const run = runner.runTask(command.message, activeAbort.signal);
       activeRun = run;
       try {
-        return { kind: 'completed', answer: await run };
+        return await run;
       } catch {
         return {
           kind: 'failed',

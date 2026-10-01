@@ -1,5 +1,36 @@
 import { MCPServerStdio, type CallToolResult, type MCPCallToolOptions } from '@openai/agents';
 import type { Logger } from 'pino';
+import { CuaTaskEvidence } from './CuaTaskEvidence.js';
+
+type CuaTool = Awaited<ReturnType<MCPServerStdio['listTools']>>[number];
+
+function isReadOnlyCuaTool(tool: CuaTool): boolean {
+  const annotations: unknown = 'annotations' in tool ? tool.annotations : undefined;
+  return (
+    typeof annotations === 'object' &&
+    annotations !== null &&
+    'readOnlyHint' in annotations &&
+    annotations.readOnlyHint === true
+  );
+}
+
+/** Keep Cua's open argument schema while avoiding an SDK strict-conversion attempt.
+ * With strict conversion disabled, the Agents SDK emits the same non-strict
+ * schema with additionalProperties: true for this tool either way. Its current
+ * converter otherwise tries strict mode first and warns on every model turn. */
+export function prepareCuaToolForAgent(tool: CuaTool): CuaTool {
+  if (!tool.inputSchema.additionalProperties) {
+    return tool;
+  }
+
+  return {
+    ...tool,
+    inputSchema: {
+      ...tool.inputSchema,
+      additionalProperties: false,
+    },
+  };
+}
 
 function describeArgumentValue(value: unknown): { type: string; length?: number } {
   if (typeof value === 'string') {
@@ -31,9 +62,15 @@ export function describeCuaResult(value: unknown): {
   contentTypes: string[];
   textChars: number;
   hasStructuredContent: boolean;
+  code?: string;
+  status?: string;
 } {
   const result = typeof value === 'object' && value !== null ? value : {};
   const content: unknown = 'content' in result ? result.content : null;
+  const structured: unknown = 'structuredContent' in result ? result.structuredContent : null;
+  const details = typeof structured === 'object' && structured !== null ? structured : {};
+  const code = 'code' in details && typeof details.code === 'string' ? details.code : null;
+  const status = 'status' in details && typeof details.status === 'string' ? details.status : null;
   const items: unknown[] = Array.isArray(content) ? content : [];
   const contentTypes: string[] = [];
   let textChars = 0;
@@ -55,16 +92,31 @@ export function describeCuaResult(value: unknown): {
     contentTypes,
     textChars,
     hasStructuredContent: 'structuredContent' in result && result.structuredContent !== undefined,
+    ...(code !== null && /^[a-z][a-z0-9_]{0,79}$/.test(code) ? { code } : {}),
+    ...(status !== null && /^(satisfied|unsatisfied|unknown|refused)$/.test(status)
+      ? { status }
+      : {}),
   };
 }
 
 /** Trace the real SDK-to-Cua MCP boundary; the SDK calls this method for each tool. */
 export class LoggedCuaServer extends MCPServerStdio {
+  readonly taskEvidence = new CuaTaskEvidence();
+
   constructor(
     options: ConstructorParameters<typeof MCPServerStdio>[0],
     private readonly log: Logger,
   ) {
     super(options);
+  }
+
+  override async listTools(): ReturnType<MCPServerStdio['listTools']> {
+    const tools = await super.listTools();
+    /* Cua owns action classification; a write needs a fresh state observation. */
+    this.taskEvidence.setToolsRequiringObservation(
+      tools.filter((tool) => !isReadOnlyCuaTool(tool)).map((tool) => tool.name),
+    );
+    return tools.map(prepareCuaToolForAgent);
   }
 
   override async callToolResult(
@@ -74,13 +126,16 @@ export class LoggedCuaServer extends MCPServerStdio {
     options?: MCPCallToolOptions,
   ): Promise<CallToolResult> {
     if (!this.log.isLevelEnabled('debug')) {
-      return super.callToolResult(toolName, args, meta, options);
+      const result = await super.callToolResult(toolName, args, meta, options);
+      this.taskEvidence.record(toolName, result);
+      return result;
     }
 
     const startedAt = performance.now();
     this.log.debug({ toolName, arguments: describeCuaArguments(args) }, 'cua.request');
     try {
       const result = await super.callToolResult(toolName, args, meta, options);
+      this.taskEvidence.record(toolName, result);
       this.log.debug(
         {
           toolName,

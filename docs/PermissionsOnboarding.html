@@ -692,14 +692,16 @@
             ><span class="live-indicator">Your desktop</span>
           </div>
           <div class="content">
-            <div class="progress" aria-label="Setup step 2 of 3">
+            <div class="progress" id="setup-progress" aria-label="Setup step 2 of 3">
               <span class="progress-step done"><span class="progress-number">✓</span> Sign in</span>
               <span class="progress-line" aria-hidden="true"></span>
-              <span class="progress-step active"
+              <span class="progress-step active" id="mac-access-step"
                 ><span class="progress-number">2</span> Mac access</span
               >
               <span class="progress-line" aria-hidden="true"></span>
-              <span class="progress-step"><span class="progress-number">3</span> Ready</span>
+              <span class="progress-step" id="ready-step"
+                ><span class="progress-number">3</span> Ready</span
+              >
             </div>
 
             <div class="hero">
@@ -922,6 +924,11 @@
             true,
           );
           document.querySelector('#ask-button').textContent = 'Continue to chat →';
+          document.querySelector('#mac-access-step').classList.remove('active');
+          document.querySelector('#mac-access-step').classList.add('done');
+          document.querySelector('#mac-access-step .progress-number').textContent = '✓';
+          document.querySelector('#ready-step').classList.add('active');
+          document.querySelector('#setup-progress').setAttribute('aria-label', 'Setup step 3 of 3');
         } else {
           const missing = !permissions.accessibility
             ? 'Accessibility'

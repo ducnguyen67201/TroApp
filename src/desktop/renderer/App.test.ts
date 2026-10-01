@@ -23,6 +23,17 @@ function createDesktopBridge() {
       .fn<DesktopBridge['signInWithGoogle']>()
       .mockResolvedValue({ kind: 'signed-in', user: testUser }),
     signOut: vi.fn<DesktopBridge['signOut']>().mockResolvedValue({ kind: 'signed-out' }),
+    readDesktopPermissions: vi.fn<DesktopBridge['readDesktopPermissions']>().mockResolvedValue({
+      kind: 'ready',
+      accessibility: 'granted',
+      screenRecording: 'granted',
+    }),
+    requestDesktopPermissions: vi
+      .fn<DesktopBridge['requestDesktopPermissions']>()
+      .mockResolvedValue({ kind: 'opened' }),
+    openDesktopPermissionSettings: vi
+      .fn<DesktopBridge['openDesktopPermissionSettings']>()
+      .mockResolvedValue({ kind: 'opened' }),
     startAgentSession: vi
       .fn<DesktopBridge['startAgentSession']>()
       .mockResolvedValue({ kind: 'started', sessionId }),
@@ -70,7 +81,7 @@ afterEach(() => {
 });
 
 describe('desktop scaffold', () => {
-  it('updates the sidebar after Google returns, even when Settings is open', async () => {
+  it('updates the sidebar after Google returns and enters the workspace', async () => {
     const bridge = createDesktopBridge();
     bridge.readAuthSession.mockResolvedValueOnce({ kind: 'signed-out' });
     bridge.signInWithGoogle.mockResolvedValue({ kind: 'pending' });
@@ -85,7 +96,7 @@ describe('desktop scaffold', () => {
       },
       { timeout: 2500 },
     );
-    expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy();
+    await screen.findByRole('heading', { name: 'Welcome back, Alex' });
     expect(bridge.signInWithGoogle).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
   });
@@ -100,7 +111,7 @@ describe('desktop scaffold', () => {
       'page',
     );
     expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Welcome back, Alex' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Welcome back, Alex' })).toBeTruthy();
   });
 
   it('preserves the draft, messages and session when switching to Settings and back', async () => {
@@ -199,9 +210,84 @@ describe('desktop scaffold', () => {
     await screen.findByText(testUser.email);
     expect(screen.queryByRole('alert')).toBeNull();
   });
+
+  it('shows setup after sign-in and enters the workspace only after both grants are verified', async () => {
+    const bridge = createDesktopBridge();
+    bridge.readAuthSession.mockResolvedValueOnce({ kind: 'signed-out' });
+    bridge.readDesktopPermissions
+      .mockResolvedValueOnce({
+        kind: 'needs-permission',
+        accessibility: 'missing',
+        screenRecording: 'granted',
+      })
+      .mockResolvedValueOnce({
+        kind: 'ready',
+        accessibility: 'granted',
+        screenRecording: 'granted',
+      });
+    window.tro = bridge;
+    renderDesktop();
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue with Google' }));
+    await screen.findByRole('heading', { name: 'Give Tro access to your desktop.' });
+    expect(screen.queryByRole('textbox', { name: 'Your message' })).toBeNull();
+    expect(bridge.startAgentSession).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Ask for permission' }));
+    await waitFor(() => {
+      expect(bridge.requestDesktopPermissions).toHaveBeenCalledTimes(1);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+    await screen.findByRole('heading', { name: 'Welcome back, Alex' });
+    expect(screen.getByRole('textbox', { name: 'Your message' })).toBeTruthy();
+  });
+
+  it('keeps an unknown permission status in setup and rechecks when Tro regains focus', async () => {
+    const bridge = createDesktopBridge();
+    bridge.readDesktopPermissions.mockResolvedValue({
+      kind: 'unknown',
+      accessibility: 'unknown',
+      screenRecording: 'unknown',
+    });
+    window.tro = bridge;
+    renderDesktop();
+    await screen.findByRole('heading', { name: 'Give Tro access to your desktop.' });
+    expect(screen.getAllByText('Not verified')).toHaveLength(2);
+    const screenRecordingButton = screen.getAllByRole('button', { name: 'Open Settings' })[1];
+    if (!screenRecordingButton) throw new Error('Screen Recording settings button is missing.');
+    fireEvent.click(screenRecordingButton);
+    await waitFor(() => {
+      expect(bridge.openDesktopPermissionSettings).toHaveBeenCalledWith('screen-recording');
+    });
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() => {
+      expect(bridge.readDesktopPermissions).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.queryByRole('textbox', { name: 'Your message' })).toBeNull();
+  });
 });
 
 describe('desktop language', () => {
+  it('translates permission onboarding and keeps its status when the language changes', async () => {
+    window.localStorage.clear();
+    const bridge = createDesktopBridge();
+    bridge.readDesktopPermissions.mockResolvedValue({
+      kind: 'needs-permission',
+      accessibility: 'missing',
+      screenRecording: 'granted',
+    });
+    window.tro = bridge;
+    renderDesktop();
+    await screen.findByRole('heading', { name: 'Cho phép Tro truy cập máy tính của bạn.' });
+    expect(screen.getByText('Chưa bật')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Cài đặt' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Ngôn ngữ' }), {
+      target: { value: 'en' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }));
+    expect(screen.getByRole('heading', { name: 'Give Tro access to your desktop.' })).toBeTruthy();
+    expect(screen.getByText('Not enabled')).toBeTruthy();
+    expect(bridge.readDesktopPermissions).toHaveBeenCalledTimes(1);
+  });
+
   it('defaults to Vietnamese and exposes the language setting before sign-in', async () => {
     window.localStorage.clear();
     const bridge = createDesktopBridge();

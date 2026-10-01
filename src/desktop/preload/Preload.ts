@@ -2,6 +2,13 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
 import { AgentResultSchema, type AgentResult } from '#contracts/AgentSession.js';
 import { AuthResultSchema, type AuthResult } from '#contracts/AuthSession.js';
+import {
+  DesktopPermissionStatusSchema,
+  PermissionActionResultSchema,
+  type DesktopPermissionStatus,
+  type PermissionActionResult,
+  type PermissionArea,
+} from '#contracts/DesktopPermissions.js';
 
 /* Expose named session operations, not generic IPC or direct computer tools.
    Validate IPC data before it enters the renderer. */
@@ -31,6 +38,33 @@ const bridge: DesktopBridge = {
       );
     } catch {
       return { kind: 'failed', message: 'Could not sign out.' };
+    }
+  },
+  async readDesktopPermissions(): Promise<DesktopPermissionStatus> {
+    try {
+      return DesktopPermissionStatusSchema.parse(
+        await ipcRenderer.invoke('tro:permission-command', { kind: 'status' }),
+      );
+    } catch {
+      return { kind: 'unknown', accessibility: 'unknown', screenRecording: 'unknown' };
+    }
+  },
+  async requestDesktopPermissions(): Promise<PermissionActionResult> {
+    try {
+      return PermissionActionResultSchema.parse(
+        await ipcRenderer.invoke('tro:permission-command', { kind: 'request' }),
+      );
+    } catch {
+      return { kind: 'failed', message: 'Could not open macOS permission setup.' };
+    }
+  },
+  async openDesktopPermissionSettings(area: PermissionArea): Promise<PermissionActionResult> {
+    try {
+      return PermissionActionResultSchema.parse(
+        await ipcRenderer.invoke('tro:permission-command', { kind: 'open-settings', area }),
+      );
+    } catch {
+      return { kind: 'failed', message: 'Could not open System Settings.' };
     }
   },
   async startAgentSession(): Promise<AgentResult> {

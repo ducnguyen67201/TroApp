@@ -4,15 +4,22 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { AppEnvironment } from '#contracts/AppEnvironment.js';
 import { AgentCommandSchema, type AgentResult } from '#contracts/AgentSession.js';
 import { AuthCommandSchema, type AuthResult } from '#contracts/AuthSession.js';
+import {
+  PermissionCommandSchema,
+  type DesktopPermissionStatus,
+  type PermissionActionResult,
+} from '#contracts/DesktopPermissions.js';
 import { readDesktopEnv } from './Env.js';
 import { AgentWorkerClient } from './AgentWorkerClient.js';
 import { AgentChatController } from './AgentChatController.js';
 import { AuthClient } from './AuthClient.js';
+import { DesktopPermissions } from './DesktopPermissions.js';
 import { isTrustedFrameUrl } from './TrustedFrame.js';
 
 const mainDirectory = dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | undefined;
 let chat: AgentChatController | undefined;
+const permissions = new DesktopPermissions();
 
 async function startDesktop(): Promise<void> {
   /* Vite embeds this public URL when packaging the desktop app. The validator
@@ -35,7 +42,12 @@ async function startDesktop(): Promise<void> {
   /* The OAuth protocol must be registered before Electron becomes ready. */
   auth.registerDeepLink(() => mainWindow);
   await app.whenReady();
-  chat = new AgentChatController(auth, agentWorker, `${environment.API_BASE_URL}/api/v1/model`);
+  chat = new AgentChatController(
+    auth,
+    agentWorker,
+    `${environment.API_BASE_URL}/api/v1/model`,
+    permissions,
+  );
 
   ipcMain.handle('tro:auth-command', async (event, rawCommand: unknown): Promise<AuthResult> => {
     if (!isTrustedSender(event)) {
@@ -63,6 +75,30 @@ async function startDesktop(): Promise<void> {
       isTrustedFrameUrl(event.senderFrame.url, documentUrl),
     );
   }
+
+  ipcMain.handle(
+    'tro:permission-command',
+    async (
+      event,
+      rawCommand: unknown,
+    ): Promise<DesktopPermissionStatus | PermissionActionResult> => {
+      if (!isTrustedSender(event)) {
+        return { kind: 'failed', message: 'This window cannot manage desktop permissions.' };
+      }
+      const parsed = PermissionCommandSchema.safeParse(rawCommand);
+      if (!parsed.success) {
+        return { kind: 'failed', message: 'The permission request is invalid.' };
+      }
+      switch (parsed.data.kind) {
+        case 'status':
+          return permissions.readStatus();
+        case 'request':
+          return permissions.requestPermissions();
+        case 'open-settings':
+          return permissions.openSettings(parsed.data.area);
+      }
+    },
+  );
 
   ipcMain.handle('tro:agent-command', async (event, rawCommand: unknown): Promise<AgentResult> => {
     if (!isTrustedSender(event) || !chat) {
@@ -139,6 +175,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   chat?.dispose();
+  permissions.dispose();
 });
 
 void startDesktop().catch((error: unknown) => {
