@@ -1,71 +1,284 @@
+/* Colors are supplied by Theme.ts. This file owns layout and component details. */
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: #222e2a;
-  background: #f6f4ee;
+  color-scheme: light;
 }
+
 * {
   box-sizing: border-box;
 }
+
 body {
   margin: 0;
+  background: var(--tro-sidebar);
 }
-main {
-  max-width: 900px;
-  padding: 64px 56px;
-  margin: 0 auto;
-}
-.eyebrow {
-  font-size: 12px;
-  letter-spacing: 0.18em;
-  color: #58675e;
-}
-h1 {
-  font-size: clamp(38px, 6vw, 62px);
-  line-height: 1.08;
-  font-weight: 550;
-  letter-spacing: -0.045em;
-  margin: 28px 0;
-}
-.description {
-  max-width: 580px;
-  font-size: 18px;
-  line-height: 1.6;
-  color: #59635d;
-}
-section {
-  background: #fffef9;
-  border: 1px solid #dadfd5;
-  border-radius: 16px;
-  padding: 26px 30px;
-  margin-top: 32px;
-}
-h2 {
-  font-size: 19px;
-  margin: 0;
-}
-section p,
-footer {
-  color: #59635d;
-  line-height: 1.5;
-}
-button {
-  background: #284f3d;
-  color: white;
-  border: 0;
-  border-radius: 8px;
-  padding: 13px 20px;
-  font: inherit;
-  cursor: pointer;
-}
-button:disabled {
-  opacity: 0.65;
-  cursor: wait;
-}
-button:focus-visible {
-  outline: 3px solid #d99547;
+
+button:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--tro-muted);
   outline-offset: 4px;
 }
-footer {
-  font-size: 13px;
-  margin-top: 24px;
+
+.desktop-shell {
+  --app-shell-border-color: var(--tro-border);
+  background: var(--tro-sidebar);
+}
+
+.desktop-sidebar {
+  padding: 30px 16px 18px;
+  background: var(--tro-sidebar);
+}
+
+.brand {
+  padding: 0 12px;
+  margin-bottom: 36px;
+  letter-spacing: -0.06em;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--tro-text);
+  color: var(--tro-surface);
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: var(--mantine-radius-md);
+  font-size: var(--mantine-font-size-sm);
+  color: var(--tro-muted);
+  transition: background 120ms ease;
+}
+
+.sidebar-link:hover,
+.sidebar-link[data-active] {
+  color: var(--tro-text);
+  background: var(--tro-selection);
+}
+
+.sidebar-link[data-active] {
+  font-weight: 500;
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+  padding-top: 28px;
+}
+
+.sidebar-account {
+  border-top: 1px solid var(--tro-border);
+  margin-top: 16px;
+  padding: 20px 8px 0;
+}
+
+.account-details {
+  min-width: 0;
+  flex: 1;
+}
+
+.logout-button {
+  margin-top: 12px;
+}
+
+.desktop-main {
+  padding-right: 16px;
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+.main-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 32px);
+  border: 1px solid var(--tro-border);
+  border-radius: var(--tro-panel-radius);
+  background: var(--tro-surface);
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 32px;
+  border-bottom: 1px solid var(--tro-border);
+}
+
+.desktop-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: var(--tro-muted);
+}
+
+.accent-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--tro-accent);
+}
+
+.panel-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 36px 40px 24px;
+  min-width: 0;
+}
+
+.workspace-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.page-heading h1 {
+  font-size: clamp(24px, 2.6vw, 32px);
+  letter-spacing: -0.035em;
+  line-height: 1.25;
+}
+
+.page-heading {
+  margin-bottom: 28px;
+}
+
+.workspace-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  flex: 1;
+  gap: 14px;
+  min-height: 230px;
+  padding: 32px 0;
+}
+
+.empty-symbol {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin-bottom: 6px;
+  border: 1px solid var(--tro-border);
+  border-radius: 18px;
+  color: var(--tro-muted);
+  background: var(--tro-muted-surface);
+}
+
+.workspace-empty h2,
+.settings-card h2 {
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.composer-area {
+  margin-top: auto;
+  padding-top: 28px;
+}
+
+.message-composer {
+  padding: 16px 18px;
+  border-color: var(--tro-border);
+  background: var(--tro-muted-surface);
+}
+
+.send-button {
+  background: var(--tro-accent);
+  color: var(--tro-text);
+}
+
+.send-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tro-accent), var(--tro-surface) 12%);
+}
+
+.send-button:disabled,
+.send-button[data-disabled] {
+  background: var(--tro-selection);
+  color: var(--tro-muted);
+}
+
+.task-disclosure {
+  margin-top: 12px;
+  line-height: 1.6;
+  max-width: 660px;
+}
+
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-message {
+  padding: 18px 20px;
+  background: var(--tro-muted-surface);
+}
+
+.chat-message[data-role='user'] {
+  border: 1px solid var(--tro-border);
+  background: var(--tro-surface);
+}
+
+.message-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+}
+
+.settings-card {
+  max-width: 640px;
+  padding: 28px;
+  border-color: var(--tro-border);
+  background: var(--tro-surface);
+}
+
+.account-email {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 800px) {
+  .desktop-shell {
+    --app-shell-navbar-width: 200px;
+    --app-shell-navbar-offset: 200px;
+  }
+  .desktop-sidebar {
+    padding-inline: 10px;
+  }
+  .panel-header {
+    padding: 20px 24px;
+  }
+  .panel-content {
+    padding: 28px 24px 20px;
+  }
+}
+
+@media (max-height: 600px) {
+  .workspace-empty {
+    min-height: 150px;
+    padding-block: 20px;
+  }
+
+  .composer-area {
+    padding-top: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-link {
+    transition: none;
+  }
 }

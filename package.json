@@ -17,8 +17,8 @@
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "concurrently --kill-others -n api,desktop \"pnpm dev:api\" \"pnpm dev:desktop\"",
-    "dev:api": "node --conditions=development --watch --env-file-if-exists=.env --import tsx src/server/StartApi.ts",
-    "dev:desktop": "electron-vite dev",
+    "dev:api": "node --conditions=development --watch --import tsx src/server/StartApi.ts",
+    "dev:desktop": "tsx scripts/PrepareCuaDriver.ts --development && electron-vite dev",
     "start": "node dist/server/StartApi.js",
     "start:desktop": "electron-vite preview",
     "db:start": "docker compose up -d postgres",
@@ -29,20 +29,30 @@
     "build": "pnpm db:generate && pnpm build:api && pnpm build:desktop",
     "build:api": "tsc -p tsconfig.server.json",
     "build:desktop": "electron-vite build && tsx scripts/PrepareDesktopPackage.ts",
-    "package:desktop": "pnpm build:desktop && electron-builder --publish never",
+    "package:desktop": "pnpm build:desktop && tsx scripts/PackageDesktop.ts",
     "lint": "eslint . && tsx scripts/CheckBoundaries.ts",
     "format": "prettier --write . && eslint . --fix",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
     "test": "vitest run",
+    "test:worker": "tsx scripts/CheckWorkerBundle.ts",
+    "inspect:cua:mcp": "tsx scripts/InspectCuaMcpSchema.ts",
     "test:integration": "tsx scripts/RunIntegration.ts"
   },
   "dependencies": {
+    "@better-auth/electron": "1.7.6",
+    "@mantine/core": "9.6.3",
+    "@mantine/hooks": "9.6.3",
+    "@openai/agents": "0.18.0",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "@t3-oss/env-core": "^0.13.10",
+    "@tabler/icons-react": "3.48.0",
+    "better-auth": "^1.7.6",
     "dotenv": "^17.2.3",
     "fastify": "^5.12.5",
+    "jose": "^6.2.12",
+    "openai": "^7.25.0",
     "pg": "^8.16.3",
     "pino": "^10.3.1",
     "prisma": "7.10.0",
@@ -53,17 +63,20 @@
   "devDependencies": {
     "@eslint/js": "^10.0.0",
     "@stylistic/eslint-plugin": "^5.10.0",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^24.10.0",
     "@types/pg": "^8.15.6",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "auth": "1.7.6",
     "concurrently": "^9.2.1",
     "electron": "44.5.1",
     "electron-builder": "26.15.3",
     "electron-vite": "5.0.0",
     "eslint": "^10.0.0",
     "eslint-config-prettier": "^10.1.8",
+    "happy-dom": "^20.14.5",
     "prettier": "^3.7.4",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
@@ -73,13 +86,29 @@
   },
   "build": {
     "appId": "app.tro.desktop",
+    "protocols": [
+      {
+        "name": "Tro",
+        "schemes": [
+          "app.tro.desktop"
+        ]
+      }
+    ],
     "productName": "Tro",
+    "asar": true,
     "files": [
       "main/**/*",
       "preload/**/*",
       "renderer/**/*",
+      "node_modules/**/*",
       "package.json",
-      "!node_modules/**/*"
+      "!node_modules/.cache/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "driver",
+        "to": "cua-driver"
+      }
     ],
     "directories": {
       "app": "out",

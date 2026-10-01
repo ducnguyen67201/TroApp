@@ -1,13 +1,18 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import type { SystemStatusResult } from '#contracts/SystemStatus.js';
-import { fetchServiceStatus } from './BackendClient.js';
+import { AppEnvironment } from '#contracts/AppEnvironment.js';
+import { AgentCommandSchema, type AgentResult } from '#contracts/AgentSession.js';
+import { AuthCommandSchema, type AuthResult } from '#contracts/AuthSession.js';
 import { readDesktopEnv } from './Env.js';
+import { AgentWorkerClient } from './AgentWorkerClient.js';
+import { AgentChatController } from './AgentChatController.js';
+import { AuthClient } from './AuthClient.js';
 import { isTrustedFrameUrl } from './TrustedFrame.js';
 
 const mainDirectory = dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | undefined;
+let chat: AgentChatController | undefined;
 
 async function startDesktop(): Promise<void> {
   /* Vite embeds this public URL when packaging the desktop app. The validator
@@ -18,35 +23,72 @@ async function startDesktop(): Promise<void> {
     bundledAppEnvironment: import.meta.env['MAIN_VITE_APP_ENV'],
     isPackaged: app.isPackaged,
   });
+  const agentWorker = new AgentWorkerClient(
+    join(mainDirectory, 'StartAgentWorker.js'),
+    environment.APP_ENV === AppEnvironment.DEV,
+  );
   const rendererFile = join(mainDirectory, '../renderer/index.html');
   const developmentUrl = app.isPackaged ? undefined : environment.RENDERER_URL;
   const documentUrl = developmentUrl ?? pathToFileURL(rendererFile).href;
 
+  const auth = new AuthClient(environment.API_BASE_URL, app.getPath('userData'));
+  /* The OAuth protocol must be registered before Electron becomes ready. */
+  auth.registerDeepLink(() => mainWindow);
   await app.whenReady();
+  chat = new AgentChatController(auth, agentWorker, `${environment.API_BASE_URL}/api/v1/model`);
 
-  ipcMain.handle('tro:read-service-status', async (event): Promise<SystemStatusResult> => {
-    /* A window can navigate after creation. Check its sender, main frame, and
-       current URL on every call before allowing a backend request. */
-    if (
-      !mainWindow ||
-      event.sender !== mainWindow.webContents ||
-      event.senderFrame !== mainWindow.webContents.mainFrame ||
-      !isTrustedFrameUrl(event.senderFrame.url, documentUrl)
-    ) {
-      return { success: false, message: 'This window cannot request service status.' };
+  ipcMain.handle('tro:auth-command', async (event, rawCommand: unknown): Promise<AuthResult> => {
+    if (!isTrustedSender(event)) {
+      return { kind: 'failed', message: 'This window cannot access sign-in.' };
+    }
+    const parsed = AuthCommandSchema.safeParse(rawCommand);
+    if (!parsed.success || !chat) {
+      return { kind: 'failed', message: 'The sign-in request is invalid.' };
+    }
+    switch (parsed.data.kind) {
+      case 'status':
+        return chat.readAuthSession();
+      case 'sign-in-google':
+        return chat.signInWithGoogle();
+      case 'sign-out':
+        return chat.signOut();
+    }
+  });
+
+  function isTrustedSender(event: Electron.IpcMainInvokeEvent): boolean {
+    return Boolean(
+      mainWindow &&
+      event.sender === mainWindow.webContents &&
+      event.senderFrame === mainWindow.webContents.mainFrame &&
+      isTrustedFrameUrl(event.senderFrame.url, documentUrl),
+    );
+  }
+
+  ipcMain.handle('tro:agent-command', async (event, rawCommand: unknown): Promise<AgentResult> => {
+    if (!isTrustedSender(event) || !chat) {
+      return { kind: 'failed', message: 'This window cannot control an agent session.' };
     }
 
-    try {
-      return { success: true, status: await fetchServiceStatus(environment.API_BASE_URL) };
-    } catch {
-      return { success: false, message: 'Could not connect. Check that the backend is running.' };
+    const parsed = AgentCommandSchema.safeParse(rawCommand);
+    if (!parsed.success) {
+      return { kind: 'failed', message: 'The agent request is invalid.' };
+    }
+
+    switch (parsed.data.kind) {
+      case 'start': {
+        return chat.startTaskSession();
+      }
+      case 'turn':
+        return chat.sendMessage(parsed.data.sessionId, parsed.data.message);
+      case 'stop':
+        return chat.stopSession(parsed.data.sessionId);
     }
   });
 
   async function openWindow(): Promise<void> {
     const window = new BrowserWindow({
-      width: 1000,
-      height: 720,
+      width: 1360,
+      height: 860,
       minWidth: 680,
       minHeight: 520,
       title: 'Tro',
@@ -68,6 +110,7 @@ async function startDesktop(): Promise<void> {
       callback(false);
     });
     window.on('closed', () => {
+      chat?.dispose();
       mainWindow = undefined;
     });
 
@@ -94,7 +137,12 @@ app.on('window-all-closed', () => {
   }
 });
 
-void startDesktop().catch(() => {
-  console.error('Tro could not start. Check desktop configuration.');
+app.on('before-quit', () => {
+  chat?.dispose();
+});
+
+void startDesktop().catch((error: unknown) => {
+  /* Development diagnostics stay local; packaged builds avoid leaking paths. */
+  console.error(app.isPackaged ? 'Tro could not start. Check desktop configuration.' : error);
   app.quit();
 });

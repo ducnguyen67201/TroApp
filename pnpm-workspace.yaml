@@ -1,5 +1,7 @@
 packages:
   - '.'
+overrides:
+  '@better-auth/core': 1.7.6
 allowBuilds:
   '@prisma/engines': true
   electron: true

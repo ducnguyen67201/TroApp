@@ -1,4 +1,7 @@
 import { createApi } from './CreateApi.js';
+import { createAuthDatabase } from './persistence/AuthDatabase.js';
+import { registerAuthRoutes } from './auth/RegisterAuthRoutes.js';
+import { registerModelGateway } from './auth/RegisterModelGateway.js';
 import { readServerEnv } from './Env.js';
 import { createServerLogger } from './Logger.js';
 import { createPrismaDatabaseStatus } from './persistence/PrismaDatabaseStatus.js';
@@ -7,10 +10,19 @@ async function startApi(): Promise<void> {
   const environment = readServerEnv(process.env);
   const logger = createServerLogger(environment.APP_ENV);
   const database = createPrismaDatabaseStatus(environment.DATABASE_URL, logger);
+  const authentication = createAuthDatabase(environment);
   const api = createApi(database);
+  registerAuthRoutes(
+    api,
+    authentication.auth,
+    environment.AUTH_BASE_URL,
+    Boolean(environment.GOOGLE_CLIENT_ID),
+  );
+  registerModelGateway(api, authentication.auth, authentication.countModelRequest, environment);
 
   api.addHook('onClose', async () => {
     await database.close();
+    await authentication.close();
   });
 
   try {

@@ -8,15 +8,3 @@ export const SystemStatusSchema = z.strictObject({
 });
 
 export type SystemStatus = z.infer<typeof SystemStatusSchema>;
-
-export const SystemStatusResultSchema = z.discriminatedUnion('success', [
-  z.strictObject({ success: z.literal(true), status: SystemStatusSchema }),
-  z.strictObject({ success: z.literal(false), message: z.string() }),
-]);
-
-export type SystemStatusResult = z.infer<typeof SystemStatusResultSchema>;
-
-/** Public desktop capabilities; generic IPC and network access are deliberately absent. */
-export interface DesktopBridge {
-  readServiceStatus(): Promise<SystemStatusResult>;
-}

@@ -1,16 +1,24 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'electron-vite';
 import react from '@vitejs/plugin-react';
+import { reportBuildWarning } from './scripts/ReportBuildWarning';
 
 export default defineConfig({
   main: {
     resolve: { alias: { '#contracts': resolve('src/contracts') } },
     build: {
       externalizeDeps: false,
+      /* ws probes optional native accelerators inside try/catch. Keep those
+         requires guarded instead of hoisting Vite's missing-peer error. */
+      commonjsOptions: { ignore: ['bufferutil', 'utf-8-validate'] },
+      rollupOptions: { onwarn: reportBuildWarning },
       lib: {
-        entry: resolve('src/desktop/main/Main.ts'),
+        entry: {
+          Main: resolve('src/desktop/main/Main.ts'),
+          StartAgentWorker: resolve('src/desktop/worker/StartAgentWorker.ts'),
+        },
         formats: ['es'],
-        fileName: () => 'Main.js',
+        fileName: (_format, entryName) => `${entryName}.js`,
       },
     },
   },
@@ -18,6 +26,7 @@ export default defineConfig({
     resolve: { alias: { '#contracts': resolve('src/contracts') } },
     build: {
       externalizeDeps: false,
+      rollupOptions: { onwarn: reportBuildWarning },
       lib: {
         entry: resolve('src/desktop/preload/Preload.ts'),
         formats: ['cjs'],
@@ -30,6 +39,11 @@ export default defineConfig({
     resolve: { alias: { '#contracts': resolve('src/contracts') } },
     plugins: [react()],
     server: { host: '127.0.0.1' },
-    build: { rollupOptions: { input: resolve('src/desktop/renderer/index.html') } },
+    build: {
+      rollupOptions: {
+        input: resolve('src/desktop/renderer/index.html'),
+        onwarn: reportBuildWarning,
+      },
+    },
   },
 });

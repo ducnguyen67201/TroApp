@@ -1,4 +1,4 @@
-import type { DesktopBridge } from '#contracts/SystemStatus.js';
+import type { DesktopBridge } from '#contracts/DesktopBridge.js';
 
 declare global {
   interface Window {
