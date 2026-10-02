@@ -59,13 +59,14 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
          product's OpenAI provider key stays on the backend. */
       const log = createAgentDebugLogger(command.debugEnabled);
       if (command.kind === 'start') {
+        const modelFetch = createLoggedModelFetch(log);
         setDefaultOpenAIClient(
           new OpenAI({
             apiKey: command.gatewayToken,
             baseURL: command.gatewayBaseUrl,
+            maxRetries: 0,
             fetch: async (input, init) => {
               reportThinking();
-              const modelFetch = command.debugEnabled ? createLoggedModelFetch(log) : fetch;
               const response = await modelFetch(input, init);
               if (response.status === 429) {
                 try {

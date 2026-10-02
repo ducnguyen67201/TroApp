@@ -69,6 +69,7 @@ describe('agent IPC contract', () => {
     expect(
       AgentResultSchema.safeParse({
         kind: 'completed',
+        completion: { kind: 'response' },
         answer: 'Look at the selected tab.',
         screenshot: 'data:image/png;base64,...',
       }).success,

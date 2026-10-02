@@ -8,6 +8,7 @@ import type { AuthUser } from '#contracts/AuthSession.js';
 import type { AgentResult } from '#contracts/AgentSession.js';
 import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import type { VoiceReply } from '#contracts/VoiceInput.js';
+import { CompletionMode, TaskOutcomeStatus } from '#contracts/TaskOutcome.js';
 import { App } from './App.js';
 import { DesktopLocale, localeStorageKey } from './localization/Locale.js';
 import { LocaleProvider } from './localization/LocaleProvider.js';
@@ -57,9 +58,11 @@ function createDesktopBridge() {
     startAgentSession: vi
       .fn<DesktopBridge['startAgentSession']>()
       .mockResolvedValue({ kind: 'started', sessionId }),
-    sendAgentMessage: vi
-      .fn<DesktopBridge['sendAgentMessage']>()
-      .mockResolvedValue({ kind: 'completed', answer: 'Here is your answer.' }),
+    sendAgentMessage: vi.fn<DesktopBridge['sendAgentMessage']>().mockResolvedValue({
+      kind: 'completed',
+      completion: { kind: 'response' },
+      answer: 'Here is your answer.',
+    }),
     stopAgentSession: vi
       .fn<DesktopBridge['stopAgentSession']>()
       .mockResolvedValue({ kind: 'stopped' }),
@@ -204,7 +207,11 @@ describe('desktop scaffold', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     expect(screen.getByRole('button', { name: 'Sign out' })).toHaveProperty('disabled', true);
-    completeTask?.({ kind: 'completed', answer: 'Task finished.' });
+    completeTask?.({
+      kind: 'completed',
+      completion: { kind: 'response' },
+      answer: 'Task finished.',
+    });
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Sign out' })).toHaveProperty('disabled', false);
     });
@@ -394,7 +401,11 @@ describe('desktop language', () => {
     });
     expect(screen.getByRole('button', { name: 'Đăng xuất' })).toHaveProperty('disabled', true);
     expect(bridge.stopAgentSession).not.toHaveBeenCalled();
-    completeTask?.({ kind: 'completed', answer: 'Completed in the original language.' });
+    completeTask?.({
+      kind: 'completed',
+      completion: { kind: 'response' },
+      answer: 'Completed in the original language.',
+    });
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Đăng xuất' })).toHaveProperty('disabled', false);
     });
@@ -407,7 +418,11 @@ describe('desktop language', () => {
       DesktopLocale.ENGLISH,
       AgentTaskMode.TEACH,
     );
-    bridge.sendAgentMessage.mockResolvedValue({ kind: 'completed', answer: 'Đã hoàn tất.' });
+    bridge.sendAgentMessage.mockResolvedValue({
+      kind: 'completed',
+      completion: { kind: 'response' },
+      answer: 'Đã hoàn tất.',
+    });
     fireEvent.change(screen.getByRole('textbox', { name: 'Tin nhắn của bạn' }), {
       target: { value: 'Mở YouTube' },
     });
@@ -509,7 +524,11 @@ describe('desktop language', () => {
     await waitFor(() => {
       expect(bridge.stopAgentSession).toHaveBeenCalledWith(sessionId);
     });
-    finishTask?.({ kind: 'completed', answer: 'Late guide answer' });
+    finishTask?.({
+      kind: 'completed',
+      completion: { kind: 'response' },
+      answer: 'Late guide answer',
+    });
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Send to Tro' })).toHaveProperty('disabled', true);
     });
@@ -542,7 +561,7 @@ it('displays a voice instruction immediately and preserves the separately typed 
       kind: 'result',
       captureId,
       sessionId,
-      result: { kind: 'completed', answer: 'Opened Chrome' },
+      result: { kind: 'completed', completion: { kind: 'response' }, answer: 'Opened Chrome' },
     });
     emit({
       kind: 'status',
@@ -552,6 +571,87 @@ it('displays a voice instruction immediately and preserves the separately typed 
   expect(screen.getByText('Opened Chrome')).toBeTruthy();
   expect(screen.getByDisplayValue('A separate draft')).toBeTruthy();
   expect(bridge.sendAgentMessage).not.toHaveBeenCalled();
+});
+
+it.each([TaskOutcomeStatus.PARTIAL, TaskOutcomeStatus.UNVERIFIED, TaskOutcomeStatus.BLOCKED])(
+  'shows the %s outcome for typed instructions instead of a success label',
+  async (status) => {
+    const bridge = createDesktopBridge();
+    const supported = status === TaskOutcomeStatus.PARTIAL ? 1 : 0;
+    bridge.sendAgentMessage.mockResolvedValue({
+      kind: 'completed',
+      answer: 'The page loaded.',
+      completion: {
+        kind: CompletionMode.TASK,
+        outcome: {
+          status,
+          requiredCriteriaCount: 2,
+          supportedCriteriaCount: supported,
+          remainingCriteriaCount: 2 - supported,
+          limitation: 'The requested window visibility is not confirmed.',
+        },
+      },
+    });
+    window.tro = bridge;
+    renderDesktop();
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Your message' }), {
+      target: { value: 'Open YouTube' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send to Tro' }));
+    expect(
+      await screen.findByText('The requested window visibility is not confirmed.'),
+    ).toBeTruthy();
+    expect(document.querySelector(`[data-outcome="${status}"]`)).toBeTruthy();
+    expect(screen.queryByText('Task completed')).toBeNull();
+  },
+);
+
+it('shows a localized voice outcome and discards a late result from another capture', async () => {
+  window.localStorage.setItem(localeStorageKey, DesktopLocale.VIETNAMESE);
+  const bridge = createDesktopBridge();
+  window.tro = bridge;
+  renderDesktop();
+  await screen.findByRole('textbox', { name: 'Tin nhắn của bạn' });
+  const emit = bridge.subscribeVoiceInput.mock.calls.at(-1)?.[0];
+  if (!emit) {
+    throw new Error('Missing voice subscription.');
+  }
+  const captureId = '33333333-3333-4333-8333-333333333333';
+  act(() => {
+    emit({ kind: 'submitted', captureId, sessionId, text: 'Mở YouTube' });
+    emit({
+      kind: 'result',
+      captureId: '44444444-4444-4444-8444-444444444444',
+      sessionId,
+      result: {
+        kind: 'completed',
+        answer: 'Stale answer',
+        completion: { kind: CompletionMode.RESPONSE },
+      },
+    });
+    emit({
+      kind: 'result',
+      captureId,
+      sessionId,
+      result: {
+        kind: 'completed',
+        answer: 'Trang đã tải.',
+        completion: {
+          kind: CompletionMode.TASK,
+          outcome: {
+            status: TaskOutcomeStatus.PARTIAL,
+            requiredCriteriaCount: 2,
+            supportedCriteriaCount: 1,
+            remainingCriteriaCount: 1,
+            limitation: 'Chưa xác nhận cửa sổ đang hiển thị.',
+          },
+        },
+      },
+    });
+  });
+  expect(screen.getByText('Đã hoàn tất một phần')).toBeTruthy();
+  expect(screen.getByText('Chưa xác nhận cửa sổ đang hiển thị.')).toBeTruthy();
+  expect(screen.queryByText('Stale answer')).toBeNull();
 });
 
 it('makes voice available automatically and keeps it active across Settings navigation', async () => {

@@ -15,6 +15,7 @@ import { AgentTaskMode, AgentTaskModeSchema } from '#contracts/CursorCompanion.j
 import { useLocale } from './localization/UseLocale.js';
 import { TeachingOutcomeLabel } from './TeachingResultPresentation.js';
 import { MessageRole, type ComputerUseController } from './UseComputerUse.js';
+import { CompletionMode, TaskOutcomeStatus } from '#contracts/TaskOutcome.js';
 
 interface ComputerUsePageProps {
   controller: ComputerUseController;
@@ -25,6 +26,12 @@ export function ComputerUsePage({ controller }: ComputerUsePageProps): ReactElem
   const { messages: translations } = useLocale();
   const { user, isLoading, isSigning, isSending, isSigningOut, isResetting, messages } = controller;
   const firstName = user?.name.trim().split(/\s+/)[0];
+  const outcomeLabels = {
+    [TaskOutcomeStatus.SUCCEEDED]: translations.taskSucceeded,
+    [TaskOutcomeStatus.PARTIAL]: translations.taskPartial,
+    [TaskOutcomeStatus.BLOCKED]: translations.taskBlocked,
+    [TaskOutcomeStatus.UNVERIFIED]: translations.taskUnverified,
+  };
 
   return (
     <section className="workspace-page" aria-label={translations.assistant}>
@@ -101,6 +108,22 @@ export function ComputerUsePage({ controller }: ComputerUsePageProps): ReactElem
                   <Text size="sm" className="message-text">
                     {item.text}
                   </Text>
+                  {item.completion?.kind === CompletionMode.TASK && (
+                    <Stack
+                      gap={4}
+                      mt="sm"
+                      role="status"
+                      data-outcome={item.completion.outcome.status}
+                    >
+                      <Text size="xs" fw={600}>
+                        {outcomeLabels[item.completion.outcome.status]}
+                      </Text>
+                      {item.completion.outcome.limitation &&
+                        item.completion.outcome.limitation !== item.text && (
+                          <Text size="sm">{item.completion.outcome.limitation}</Text>
+                        )}
+                    </Stack>
+                  )}
                 </Paper>
               ))}
             </ol>

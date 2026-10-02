@@ -62,7 +62,7 @@ describe('companion voice lifecycle', () => {
       kind: 'result',
       captureId,
       sessionId,
-      result: { kind: 'completed', answer: 'Done' },
+      result: { kind: 'completed', completion: { kind: 'response' }, answer: 'Done' },
     });
     expect(latest()?.phase).toBe(CompanionHudPhase.DONE);
     vi.advanceTimersByTime(650);
@@ -110,7 +110,10 @@ describe('companion voice lifecycle', () => {
     expect(latest()?.phase).toBe(CompanionHudPhase.DAILY_LIMIT);
     expect(latest()?.locale).toBe('vi');
     controller.reset();
-    controller.finishTask({ kind: 'completed', answer: 'late' }, sessionId);
+    controller.finishTask(
+      { kind: 'completed', completion: { kind: 'response' }, answer: 'late' },
+      sessionId,
+    );
     controller.receiveProgress({
       kind: 'progress',
       requestId: captureId,
@@ -148,3 +151,36 @@ it.each([
   controller.finishTask(result, sessionId);
   expect(latest()?.phase).toBe(phase);
 });
+
+it.each([
+  ['succeeded', CompanionHudPhase.DONE],
+  ['partial', CompanionHudPhase.ERROR],
+  ['blocked', CompanionHudPhase.NEEDS_INPUT],
+  ['unverified', CompanionHudPhase.ERROR],
+] as const)(
+  'presents execution outcome %s without claiming unsupported completion',
+  (status, phase) => {
+    const { controller, latest } = createHarness();
+    controller.startTask(sessionId, 'vi');
+    controller.finishTask(
+      {
+        kind: 'completed',
+        answer: 'Task result',
+        completion: {
+          kind: 'task',
+          outcome: {
+            status,
+            requiredCriteriaCount: 2,
+            supportedCriteriaCount: status === 'succeeded' ? 2 : status === 'partial' ? 1 : 0,
+            remainingCriteriaCount: status === 'succeeded' ? 0 : status === 'partial' ? 1 : 2,
+            limitation: status === 'succeeded' ? null : 'Not all results are confirmed.',
+          },
+        },
+      },
+      sessionId,
+    );
+    expect(latest()).toMatchObject({ phase, locale: 'vi' });
+    vi.advanceTimersByTime(status === 'succeeded' ? 650 : 1800);
+    expect(latest()?.phase).toBe(CompanionHudPhase.IDLE);
+  },
+);

@@ -1,107 +1,118 @@
 import type { CallToolResult } from '@openai/agents';
 import { describe, expect, it } from 'vitest';
-import { CuaTaskEvidence, TaskIssue } from './CuaTaskEvidence.js';
+import { CuaTaskEvidence } from './CuaTaskEvidence.js';
 
-function result(structuredContent: Record<string, unknown>, isError = false): CallToolResult {
-  return { content: [{ type: 'text', text: '' }], structuredContent, isError };
-}
+const state: CallToolResult = {
+  content: [{ type: 'text', text: 'Synthetic page text' }],
+  structuredContent: { pid: 7, window_id: 12 },
+};
 
-describe('Cua task completion evidence', () => {
-  it('requires a fresh Cua state observation after an accepted desktop action', () => {
+describe('task-local evidence collection', () => {
+  it('keeps diagnostic failures separate from fresh observations', () => {
     const evidence = new CuaTaskEvidence();
-    evidence.setToolsRequiringObservation(['launch_app', 'browser_navigate']);
-
-    evidence.record('launch_app', result({ launch_state: { window_ready: true } }));
-    expect(evidence.readIssue()).toBe(TaskIssue.OBSERVATION_MISSING);
-
-    evidence.record('list_windows', result({ windows: [] }));
-    expect(evidence.readIssue()).toBe(TaskIssue.OBSERVATION_MISSING);
-
-    evidence.record('get_window_state', result({ elements: [] }));
-    expect(evidence.readIssue()).toBeNull();
-
-    evidence.record('browser_navigate', result({ status: 'completed' }));
-    expect(evidence.readIssue()).toBe(TaskIssue.OBSERVATION_MISSING);
-
-    evidence.record('get_browser_state', result({ tabs: [] }));
-    expect(evidence.readIssue()).toBeNull();
-  });
-
-  it('keeps a failed action incomplete until Cua verifies the requested result', () => {
-    const evidence = new CuaTaskEvidence();
-    evidence.setToolsRequiringObservation(['launch_app']);
-    evidence.record('launch_app', result({ code: 'window_not_found' }, true));
-    expect(evidence.readIssue()).toBe(TaskIssue.DESKTOP_ACTION_FAILED);
-
-    evidence.record('list_windows', result({ windows: [] }));
-    expect(evidence.readIssue()).toBe(TaskIssue.DESKTOP_ACTION_FAILED);
-
-    evidence.record('verify_state', result({ status: 'satisfied' }));
-    expect(evidence.readIssue()).toBeNull();
-  });
-
-  it('accepts an observed successful path after an earlier Cua tool fails', () => {
-    const evidence = new CuaTaskEvidence();
-    evidence.setToolsRequiringObservation(['browser_prepare', 'launch_app', 'hotkey']);
-
-    evidence.record('browser_prepare', result({ status: 'refused' }));
-    expect(evidence.readIssue()).toBe(TaskIssue.DESKTOP_ACTION_FAILED);
-
-    evidence.record('launch_app', result({ launch_state: { window_ready: true } }));
-    evidence.record('list_windows', result({ windows: [] }));
-    expect(evidence.readIssue()).toBe(TaskIssue.DESKTOP_ACTION_FAILED);
-
-    evidence.record('get_window_state', result({ elements: [] }));
-    expect(evidence.readIssue()).toBeNull();
-
-    evidence.record('hotkey', result({}));
-    expect(evidence.readIssue()).toBe(TaskIssue.OBSERVATION_MISSING);
-  });
-
-  it('treats unsatisfied and unknown verification as incomplete without an MCP error', () => {
-    const evidence = new CuaTaskEvidence();
-    evidence.record('verify_state', result({ status: 'unsatisfied' }));
-    expect(evidence.readIssue()).toBe(TaskIssue.VERIFICATION_FAILED);
-
-    evidence.record('verify_state', result({ status: 'unknown' }));
-    expect(evidence.readIssue()).toBe(TaskIssue.VERIFICATION_FAILED);
-
-    evidence.record('verify_state', result({ status: 'satisfied' }));
-    expect(evidence.readIssue()).toBeNull();
-  });
-
-  it('treats a refused action as failed and clears task state on reset', () => {
-    const evidence = new CuaTaskEvidence();
-    evidence.setToolsRequiringObservation(['browser_navigate']);
-    evidence.record('browser_navigate', result({ status: 'refused' }));
-    expect(evidence.readIssue()).toBe(TaskIssue.DESKTOP_ACTION_FAILED);
-
-    evidence.reset();
-    expect(evidence.readIssue()).toBeNull();
-  });
-  it('never treats cursor previews or metadata as desktop-action verification', () => {
-    const evidence = new CuaTaskEvidence();
-    evidence.setToolsRequiringObservation(['bring_to_front', 'show_cursor_sequence']);
-    evidence.record('bring_to_front', result({}));
-    for (const name of [
-      'show_cursor_sequence',
-      'get_agent_cursor_state',
-      'get_cursor_companion_state',
-      'get_config',
-      'get_cursor_position',
-    ]) {
-      evidence.record(name, result({ status: 'completed', following: true, active: false }));
-      expect(evidence.readIssue()).toBe(TaskIssue.OBSERVATION_MISSING);
-    }
-    evidence.record('get_desktop_state', result({}));
-    expect(evidence.readIssue()).toBeNull();
-    evidence.record(
-      'show_cursor_sequence',
-      result({ status: 'completed', following: true, active: false }),
+    evidence.setReadOnlyTools(['get_window_state']);
+    evidence.recordToolResult(evidence.beginToolCall('bring_to_front'), null, {
+      isError: true,
+      content: [],
+    });
+    const recorded = evidence.recordToolResult(
+      evidence.beginToolCall('get_window_state'),
+      { pid: 7, window_id: 12 },
+      state,
     );
-    expect(evidence.readIssue()).toBeNull();
+    expect(recorded.observations).toHaveLength(1);
+    expect(evidence.readSnapshot()).toMatchObject({
+      failureCount: 1,
+      mutationCount: 1,
+      revision: 1,
+      inFlight: 0,
+    });
+  });
+
+  it('invalidates old observations even when a later write fails', () => {
+    const evidence = new CuaTaskEvidence();
+    evidence.setReadOnlyTools(['get_window_state']);
+    evidence.recordToolResult(evidence.beginToolCall('get_window_state'), null, state);
+    const pendingRead = evidence.beginToolCall('get_window_state');
+    evidence.recordToolResult(evidence.beginToolCall('hotkey'), null, {
+      isError: true,
+      content: [],
+    });
+    expect(evidence.recordToolResult(pendingRead, null, state).observations).toEqual([]);
+    const snapshot = evidence.readSnapshot();
+    expect(snapshot.observations.filter((item) => item.revision === snapshot.revision)).toEqual([]);
+  });
+
+  it('does not mint evidence for failed tools, config reads or mismatched targets', () => {
+    const evidence = new CuaTaskEvidence();
+    for (const [name, args, result] of [
+      ['get_config', null, state],
+      ['get_window_state', null, { ...state, isError: true }],
+      ['get_window_state', { pid: 9, window_id: 12 }, state],
+      [
+        'get_window_state',
+        { pid: 7, window_id: 12, display_id: 2 },
+        { ...state, structuredContent: { pid: 7, window_id: 12, display_id: 1 } },
+      ],
+      [
+        'get_window_state',
+        null,
+        { ...state, structuredContent: { pid: 7, window_id: 12, is_visible: 'yes' } },
+      ],
+    ] satisfies [string, Record<string, unknown> | null, CallToolResult][]) {
+      expect(
+        evidence.recordToolResult(evidence.beginToolCall(name), args, result).observations,
+      ).toEqual([]);
+    }
+  });
+
+  it('records refusal as diagnostic failure without treating it as observation proof', () => {
+    const evidence = new CuaTaskEvidence();
+    expect(
+      evidence.recordToolResult(evidence.beginToolCall('browser_prepare'), null, {
+        content: [],
+        structuredContent: { status: 'refused' },
+      }).observations,
+    ).toEqual([]);
+    expect(evidence.readSnapshot().failureCount).toBe(1);
+  });
+
+  it('adapts pinned driver window visibility without saving window titles', () => {
+    const evidence = new CuaTaskEvidence();
+    evidence.setReadOnlyTools(['list_windows']);
+    const recorded = evidence.recordToolResult(evidence.beginToolCall('list_windows'), null, {
+      content: [],
+      structuredContent: {
+        current_space_id: null,
+        windows: [
+          {
+            pid: 7,
+            window_id: 12,
+            is_on_screen: true,
+            on_current_space: null,
+            title: 'Private title',
+            bounds: { x: 2000 },
+          },
+          { pid: 7, window_id: 13, is_on_screen: false, on_current_space: false },
+        ],
+      },
+    });
+    expect(recorded.observations.map((item) => item.fields.is_visible)).toEqual([true, false]);
+    expect(JSON.stringify(evidence.readSnapshot())).not.toContain('Private title');
+    evidence.reset();
+    expect(evidence.readSnapshot()).toMatchObject({
+      revision: 0,
+      mutationCount: 0,
+      failureCount: 0,
+      observations: [],
+      inFlight: 0,
+    });
   });
 });
+
+function result(structuredContent: Record<string, unknown>, isError = false): CallToolResult {
+  return { content: [], structuredContent, isError };
+}
 
 const taskEpoch = '11111111-1111-4111-8111-111111111111';
 const sequenceId = '22222222-2222-4222-8222-222222222222';

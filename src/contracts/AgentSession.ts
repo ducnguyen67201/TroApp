@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { DesktopLocaleSchema } from './DesktopLocale.js';
 import { AgentTaskMode, AgentTaskModeSchema, TeachingResultSchema } from './CursorCompanion.js';
 import { DesktopDriverConnectionSchema } from './DesktopDriver.js';
+import { AgentCompletionSchema, TaskOutcomeLimits } from './TaskOutcome.js';
 
 export const AgentFailureCode = { DAILY_LIMIT: 'daily_limit' } as const;
 
@@ -53,7 +54,11 @@ export type AgentWorkerCommand = z.infer<typeof AgentWorkerCommandSchema>;
 
 export const AgentResultSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('started'), sessionId: z.uuid() }),
-  z.strictObject({ kind: z.literal('completed'), answer: z.string() }),
+  z.strictObject({
+    kind: z.literal('completed'),
+    answer: z.string().trim().min(1).max(TaskOutcomeLimits.MAX_ANSWER_CHARACTERS),
+    completion: AgentCompletionSchema,
+  }),
   z.strictObject({ kind: z.literal('teaching'), result: TeachingResultSchema }),
   z.strictObject({ kind: z.literal('stopped') }),
   z.strictObject({

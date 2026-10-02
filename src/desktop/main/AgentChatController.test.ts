@@ -27,7 +27,7 @@ function createController() {
       .mockResolvedValue({ kind: 'started', sessionId: 'teacher' }),
     sendMessage: vi
       .fn<AgentChatWorker['sendMessage']>()
-      .mockResolvedValue({ kind: 'completed', answer: 'Done' }),
+      .mockResolvedValue({ kind: 'completed', completion: { kind: 'response' }, answer: 'Done' }),
     stop: vi.fn<AgentChatWorker['stop']>().mockResolvedValue({ kind: 'stopped' }),
     dispose: vi.fn<AgentChatWorker['dispose']>(),
   };

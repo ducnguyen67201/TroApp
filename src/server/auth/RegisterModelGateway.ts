@@ -1,10 +1,19 @@
 import { createHash } from 'node:crypto';
 import type { ServerResponse } from 'node:http';
 import type { FastifyInstance } from 'fastify';
+import type { Logger } from 'pino';
 import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
 import type { ServerEnv } from '../Env.js';
 import type { createAuthDatabase } from '../persistence/AuthDatabase.js';
+import { fetchModelResponse, ModelGatewayRetry } from './FetchModelResponse.js';
+import {
+  ModelGatewayEvent,
+  ModelGatewayFailure,
+  describeNetworkFailure,
+  readProviderFailure,
+  readProviderRequestId,
+} from './ModelGatewayDiagnostics.js';
 
 type ReadSignedInUserId = ReturnType<typeof createAuthDatabase>['readSignedInUserId'];
 
@@ -38,6 +47,7 @@ export function registerModelGateway(
   api: FastifyInstance,
   readSignedInUserId: ReadSignedInUserId,
   environment: ServerEnv,
+  logger: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'> = api.log,
 ): void {
   const signingKey = createGatewayKey(environment.AUTH_SECRET);
 
@@ -66,12 +76,44 @@ export function registerModelGateway(
   });
 
   api.post('/api/v1/model/responses', { bodyLimit: 8 * 1024 * 1024 }, async (request, reply) => {
+    const startedAt = performance.now();
+    const context = { gatewayRequestId: request.id };
+    reply.header('x-tro-request-id', request.id);
+    logger.debug(
+      { ...context, event: ModelGatewayEvent.REQUEST },
+      'Received an assistant model request.',
+    );
+    const rejectRequest = (
+      status: number,
+      reason: (typeof ModelGatewayFailure)[keyof typeof ModelGatewayFailure],
+      message: string,
+    ) => {
+      logger.warn(
+        {
+          ...context,
+          event: ModelGatewayEvent.REJECTED,
+          status,
+          reason,
+          durationMs: Math.round(performance.now() - startedAt),
+        },
+        'Model gateway rejected the request before contacting OpenAI.',
+      );
+      return reply.code(status).send({ message });
+    };
     if (!environment.OPENAI_API_KEY) {
-      return reply.code(503).send({ message: 'The model service is not configured.' });
+      return rejectRequest(
+        503,
+        ModelGatewayFailure.PROVIDER_NOT_CONFIGURED,
+        'The model service is not configured.',
+      );
     }
     const authorization = request.headers.authorization;
     if (!authorization?.startsWith('Bearer ')) {
-      return reply.code(401).send({ message: 'A model credential is required.' });
+      return rejectRequest(
+        401,
+        ModelGatewayFailure.CREDENTIAL_REQUIRED,
+        'A model credential is required.',
+      );
     }
 
     try {
@@ -80,42 +122,116 @@ export function registerModelGateway(
         audience: 'tro-model',
       });
       if (verified.payload.scope !== 'model' || !verified.payload.sub) {
-        return await reply.code(401).send({ message: 'The model credential is invalid.' });
+        return await rejectRequest(
+          401,
+          ModelGatewayFailure.CREDENTIAL_INVALID,
+          'The model credential is invalid.',
+        );
       }
     } catch {
-      return reply.code(401).send({ message: 'The model credential is invalid.' });
+      return rejectRequest(
+        401,
+        ModelGatewayFailure.CREDENTIAL_INVALID,
+        'The model credential is invalid.',
+      );
     }
 
     const parsed = ModelRequestSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ message: 'The model request is invalid.' });
+      return rejectRequest(
+        400,
+        ModelGatewayFailure.REQUEST_INVALID,
+        'The model request is invalid.',
+      );
     }
 
     const modelRequest = {
       ...parsed.data,
       max_output_tokens: Math.min(parsed.data.max_output_tokens ?? 4096, 4096),
     };
+    const requestBody = JSON.stringify(modelRequest);
     const disconnect = new AbortController();
+    const timeout = AbortSignal.timeout(120_000);
     reply.raw.once('close', () => {
       if (!reply.raw.writableEnded) disconnect.abort();
     });
     let upstream: Response;
+    logger.debug(
+      {
+        ...context,
+        event: ModelGatewayEvent.DISPATCH,
+        model: modelRequest.model,
+        stream: modelRequest.stream ?? false,
+        requestBytes: Buffer.byteLength(requestBody),
+        maxOutputTokens: modelRequest.max_output_tokens,
+      },
+      'Sending the model request to OpenAI.',
+    );
     try {
-      upstream = await fetch('https://api.openai.com/v1/responses', {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${environment.OPENAI_API_KEY}`,
-          'content-type': 'application/json',
+      upstream = await fetchModelResponse(
+        environment.OPENAI_API_KEY,
+        requestBody,
+        AbortSignal.any([disconnect.signal, timeout]),
+        (error) => {
+          logger.warn(
+            {
+              ...context,
+              event: ModelGatewayEvent.RETRY,
+              attemptNumber: ModelGatewayRetry.MAXIMUM_ATTEMPTS,
+              retryDelayMs: ModelGatewayRetry.DELAY_MS,
+              ...describeNetworkFailure(error),
+              durationMs: Math.round(performance.now() - startedAt),
+            },
+            'Retrying the model request after a temporary socket failure.',
+          );
         },
-        body: JSON.stringify(modelRequest),
-        signal: AbortSignal.any([disconnect.signal, AbortSignal.timeout(120_000)]),
-      });
-    } catch {
+      );
+    } catch (error) {
+      logger.error(
+        {
+          ...context,
+          event: ModelGatewayEvent.FAILED,
+          reason: disconnect.signal.aborted
+            ? ModelGatewayFailure.CLIENT_DISCONNECTED
+            : ModelGatewayFailure.NETWORK_FAILED,
+          timedOut: timeout.aborted,
+          ...describeNetworkFailure(error),
+          durationMs: Math.round(performance.now() - startedAt),
+        },
+        'Could not obtain a model response from OpenAI.',
+      );
       return reply.code(502).send({ message: 'The model service could not complete the request.' });
     }
+    const providerContext = {
+      ...context,
+      providerStatus: upstream.status,
+      providerRequestId: readProviderRequestId(upstream.headers),
+    };
     if (!upstream.ok || !upstream.body) {
+      logger.error(
+        {
+          ...providerContext,
+          event: ModelGatewayEvent.FAILED,
+          reason: upstream.ok
+            ? ModelGatewayFailure.BODY_MISSING
+            : ModelGatewayFailure.PROVIDER_REJECTED,
+          ...(await readProviderFailure(upstream)),
+          durationMs: Math.round(performance.now() - startedAt),
+        },
+        upstream.ok
+          ? 'OpenAI returned an empty model response.'
+          : 'OpenAI rejected the model request.',
+      );
       return reply.code(502).send({ message: 'The model service could not complete the request.' });
     }
+    logger.debug(
+      {
+        ...providerContext,
+        event: ModelGatewayEvent.RESPONSE,
+        durationMs: Math.round(performance.now() - startedAt),
+      },
+      'OpenAI accepted the model request; forwarding its response.',
+    );
 
     /* Preserve the Responses stream for the local SDK without logging model
        input, screenshots, tool output, or the provider response. */
@@ -123,16 +239,56 @@ export function registerModelGateway(
     reply.raw.writeHead(upstream.status, {
       'content-type': upstream.headers.get('content-type') ?? 'application/json',
       'cache-control': 'no-store',
+      'x-tro-request-id': request.id,
     });
     const reader = upstream.body.getReader();
+    let responseBytes = 0;
     try {
       let chunk = await reader.read();
       while (!chunk.done && !reply.raw.destroyed) {
+        responseBytes += chunk.value.byteLength;
         if (!reply.raw.write(chunk.value)) await waitForDrainOrClose(reply.raw);
         chunk = await reader.read();
       }
-    } catch {
-      /* The client may have canceled during a model stream. */
+      if (reply.raw.destroyed) {
+        logger.info(
+          {
+            ...providerContext,
+            event: ModelGatewayEvent.FAILED,
+            reason: ModelGatewayFailure.CLIENT_DISCONNECTED,
+            responseBytes,
+            durationMs: Math.round(performance.now() - startedAt),
+          },
+          'The desktop disconnected before the model response finished.',
+        );
+      } else {
+        logger.info(
+          {
+            ...providerContext,
+            event: ModelGatewayEvent.COMPLETED,
+            responseBytes,
+            durationMs: Math.round(performance.now() - startedAt),
+          },
+          'Finished forwarding the model response to the desktop.',
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        {
+          ...providerContext,
+          event: ModelGatewayEvent.FAILED,
+          reason: disconnect.signal.aborted
+            ? ModelGatewayFailure.CLIENT_DISCONNECTED
+            : ModelGatewayFailure.STREAM_FAILED,
+          timedOut: timeout.aborted,
+          responseBytes,
+          ...describeNetworkFailure(error),
+          durationMs: Math.round(performance.now() - startedAt),
+        },
+        'Model response forwarding stopped before completion.',
+      );
+    } finally {
+      reader.releaseLock();
     }
     if (!reply.raw.destroyed) reply.raw.end();
   });
