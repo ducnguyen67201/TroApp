@@ -22,6 +22,8 @@ For desktop styling, `src/desktop/DesktopAppearance.ts` owns the shared palette 
 
 Import shared contracts as `#contracts/SystemStatus.js` from either process. Keep imports within a feature relative; the alias is deliberately limited to contracts.
 
+Desktop updates start in `src/desktop/main/updates/AppUpdateController.ts` and `ElectronAppUpdater.ts`, with public schemas in `src/contracts/AppUpdate.ts`. `src/desktop/renderer/updates` owns the sidebar action. Release feed configuration enters through `Env.ts` in desktop main and scripts; `PrepareDesktopPackage.ts` stages the generic provider. See [AppUpdates.md](AppUpdates.md).
+
 `scripts/CheckBoundaries.ts` checks core ownership and filenames. Describe behavior, contract changes, migrations, and verification in review notes. State what is planned versus implemented. Do not publish, push, deploy, or start paid work without authorization.
 
 [MicrophoneSelection.md](MicrophoneSelection.md) maps microphone selection, recommendations, capture ownership and permission boundaries. Device selection belongs in the desktop voice feature; the server receives only the existing transcription protocol.

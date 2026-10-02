@@ -1,6 +1,22 @@
 import type { TranslationCatalog } from './English.js';
 
 export const vietnamese = {
+  updateTro: 'Cập nhật Tro',
+  updateAvailable: (version: string): string => `Đã có phiên bản ${version}`,
+  updateDownloading: 'Đang tải…',
+  updateKeepUsing: 'Tiếp tục dùng Tro',
+  updateRestart: 'Khởi động lại để cập nhật',
+  updateReady: (version: string): string => `Phiên bản ${version} đã sẵn sàng`,
+  updateRestarting: 'Đang khởi động lại…',
+  updateInstalling: 'Đang cài bản cập nhật',
+  updateRetry: 'Thử cập nhật lại',
+  updateRetryRestart: 'Thử khởi động lại',
+  updateCheckFailed: 'Không thể kiểm tra bản cập nhật.',
+  updateDownloadFailed: 'Tải thất bại. Vui lòng thử lại.',
+  updateInstallFailed: 'Không thể cài đặt. Vui lòng thử lại.',
+  updateProgress: 'Tiến độ tải bản cập nhật',
+  updateBusy: 'Chờ tác vụ hoặc ghi âm hiện tại hoàn tất.',
+  updateUnavailable: 'Không thể bắt đầu cập nhật. Vui lòng thử lại.',
   microphone: 'Micrô',
   microphoneDescription:
     'Chọn micrô Tro dùng cho yêu cầu bằng giọng nói. Thu lệnh khi bạn giữ phím tắt nói; bạn cũng có thể bắt đầu bài thử âm thanh cục bộ bên dưới.',

@@ -34,6 +34,7 @@ import { useDesktopPermissions } from './UseDesktopPermissions.js';
 import { useCursorCompanion } from './UseCursorCompanion.js';
 import { DesktopWindowAppearance } from '../DesktopAppearance.js';
 import { TroIcon } from './TroIcon.js';
+import { AppUpdateButton } from './updates/AppUpdateButton.js';
 
 const DesktopDialog = { SETTINGS: 'settings', MICROPHONE: 'microphone' } as const;
 
@@ -163,6 +164,18 @@ export function App(): ReactElement {
             </UnstyledButton>
           </nav>
           <div className="sidebar-bottom">
+            <AppUpdateButton
+              isBusy={
+                controller.isSending ||
+                controller.isResetting ||
+                controller.isSigning ||
+                controller.isSigningOut ||
+                voice.isStarting ||
+                (voice.status.state !== VoiceState.IDLE &&
+                  voice.status.state !== VoiceState.DISABLED) ||
+                microphoneTests.activeDeviceId !== null
+              }
+            />
             <UnstyledButton
               className="sidebar-link"
               data-active={dialogs.state.settings || undefined}

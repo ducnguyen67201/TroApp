@@ -14,12 +14,18 @@ import type {
   PermissionActionResult,
   PermissionArea,
 } from './DesktopPermissions.js';
+import type { AppUpdateReply, AppUpdateSnapshot } from './AppUpdate.js';
 
 /** Named capabilities available to React through Electron preload.
  * The agent chooses computer actions inside its worker; React only sends chat
  * turns and controls the worker lifecycle.
  */
 export interface DesktopBridge {
+  readAppUpdate(): Promise<AppUpdateSnapshot>;
+  checkAppUpdate(): Promise<AppUpdateReply>;
+  downloadAppUpdate(): Promise<AppUpdateReply>;
+  restartForAppUpdate(): Promise<AppUpdateReply>;
+  subscribeAppUpdate(listener: (snapshot: AppUpdateSnapshot) => void): () => void;
   controlMicrophoneTest(command: MicrophoneTestCommand): Promise<MicrophoneTestReply>;
   subscribeMicrophoneTest(listener: (event: MicrophoneTestEvent) => void): () => void;
   updateVoiceMeter(meter: VoiceMeter): void;

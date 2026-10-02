@@ -41,6 +41,19 @@ vi.mock('./VoiceAudioCapture.js', () => ({
 
 function createBridge() {
   return {
+    readAppUpdate: vi
+      .fn<DesktopBridge['readAppUpdate']>()
+      .mockResolvedValue({ revision: 0, status: { state: 'disabled' } }),
+    checkAppUpdate: vi
+      .fn<DesktopBridge['checkAppUpdate']>()
+      .mockResolvedValue({ kind: 'failed', reason: 'unavailable' }),
+    downloadAppUpdate: vi
+      .fn<DesktopBridge['downloadAppUpdate']>()
+      .mockResolvedValue({ kind: 'failed', reason: 'unavailable' }),
+    restartForAppUpdate: vi
+      .fn<DesktopBridge['restartForAppUpdate']>()
+      .mockResolvedValue({ kind: 'failed', reason: 'unavailable' }),
+    subscribeAppUpdate: vi.fn<DesktopBridge['subscribeAppUpdate']>().mockReturnValue(() => {}),
     controlVoiceInput: vi.fn<DesktopBridge['controlVoiceInput']>().mockResolvedValue({
       kind: 'ok',
       status: { state: 'idle', shortcut: 'command-control', globalShortcutAvailable: true },
