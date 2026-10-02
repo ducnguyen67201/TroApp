@@ -6,7 +6,7 @@ export const english = {
   voiceUnavailable: 'Voice input is unavailable. Check microphone access and try again.',
   voiceCheckAgain: 'Check voice permissions again',
   voiceShortcutUnavailable:
-    'Global shortcut unavailable. On Mac, allow Tro Accessibility access in System Settings, then check voice permissions again. During development, the app is named Electron. CuaDriver access is separate. You can still use the Talk button.',
+    'Global shortcut unavailable. On Mac, allow Tro Accessibility access in System Settings, then check voice permissions again. During development, the app is named Electron. You can still use the Talk button.',
   voiceError:
     'Voice input could not finish. Check microphone access, your connection and your voice allowance, then try again.',
   voicePreparing: 'Preparing microphone…',
@@ -84,8 +84,17 @@ export const english = {
   errorAgentActive: 'An agent session is already active.',
   errorAgentStopped: 'The agent session ended. Start a new task.',
   errorAgentTimeout: 'The agent request timed out. Please try again.',
+  guidanceDemonstrated: 'Guide finished',
+  guidanceExplained: 'Explanation',
+  guidanceNeedsInput: 'Your input is needed',
+  guidanceCanceled: 'Guide stopped',
+  guidanceFailed: 'Guide could not finish',
+  guidanceNeedsInputMessage:
+    'Tro could not show this step. Check that the target is visible on your primary display, then send a new request.',
+  guidanceCanceledMessage: 'The guide stopped. Send a new request when you want to continue.',
+  guidanceFailedMessage: 'Tro could not finish the visual guide. Send a new request to try again.',
   errorDesktopPermissions:
-    'Desktop control could not start. Allow CuaDriver Screen Recording and Accessibility in System Settings, then try again.',
+    'Desktop control could not start. Allow Tro Screen Recording and Accessibility in System Settings, then try again.',
   errorDesktopStart:
     'Desktop control could not start. Restart Tro or reinstall the desktop app, then try again.',
   errorInvalidRequest: 'This request is invalid. Please try again.',
@@ -97,27 +106,27 @@ export const english = {
   permissionOneTimeSetup: 'ONE-TIME SETUP',
   permissionHeading: 'Give Tro access to your desktop.',
   permissionIntroduction:
-    'CuaDriver needs two macOS permissions to see your screen and help in apps. You control these in System Settings.',
+    'Tro needs two macOS permissions to see your screen and help in apps. You control these in System Settings.',
   permissionTitle: 'Desktop permissions',
   permissionBothNeeded: 'Both are needed for desktop help',
   permissionAccessibility: 'Accessibility',
-  permissionAccessibilityDescription: 'Lets CuaDriver interact with the app you are using.',
+  permissionAccessibilityDescription: 'Lets Tro interact with the app you are using.',
   permissionScreenRecording: 'Screen Recording',
-  permissionScreenRecordingDescription: 'Lets CuaDriver see what is on your screen.',
+  permissionScreenRecordingDescription: 'Lets Tro see what is on your screen.',
   permissionEnabled: 'Enabled',
   permissionMissing: 'Not enabled',
   permissionUnknown: 'Not verified',
   permissionOpenSettings: 'Open Settings',
   permissionRequest: 'Ask for permission',
   permissionCheckAgain: 'Check again',
-  permissionChecking: 'Checking CuaDriver…',
+  permissionChecking: 'Checking Tro…',
   permissionReturnHint:
     'After enabling both switches, return to Tro and it will check again automatically.',
   permissionRestartHint:
-    'You may need to quit and reopen CuaDriver after changing Screen Recording. Tro will wait to start the agent until access is verified.',
-  permissionVerifyError: 'Could not verify CuaDriver permissions. Try again.',
+    'You may need to quit and reopen Tro after changing Screen Recording. Tro will wait to start the agent until access is verified.',
+  permissionVerifyError: 'Could not verify Tro permissions. Try again.',
   permissionSettingsHint:
-    'In System Settings, enable CuaDriver for both permissions, then return to Tro.',
+    'In System Settings, enable Tro for both permissions, then return to Tro. Development builds may appear as Electron.',
   permissionRequestError: 'Could not open macOS permission setup. Open System Settings manually.',
   permissionOpenError: 'Could not open System Settings. Open Privacy & Security manually.',
 };

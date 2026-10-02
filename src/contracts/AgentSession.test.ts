@@ -85,6 +85,11 @@ describe('agent IPC contract', () => {
           gatewayToken: 'scoped-test-token',
           gatewayBaseUrl: 'https://api.example.test/api/v1/model',
           debugEnabled: true,
+          desktopDriver: {
+            command: '/tro/cua-driver',
+            args: ['mcp', '--socket', '/private/tro.sock'],
+            env: { CUA_DRIVER_EMBEDDED: '1' },
+          },
           history: [{ role: 'user', text: 'Previous task' }],
         },
       }).success,
@@ -98,6 +103,11 @@ describe('agent IPC contract', () => {
       gatewayToken: 'scoped-test-token',
       gatewayBaseUrl: 'https://api.example.test/api/v1/model',
       debugEnabled: true,
+      desktopDriver: {
+        command: '/tro/cua-driver',
+        args: ['mcp', '--socket', '/private/tro.sock'],
+        env: { CUA_DRIVER_EMBEDDED: '1' },
+      },
     };
     expect(AgentWorkerRequestSchema.safeParse({ requestId: sessionId, command }).success).toBe(
       true,
@@ -156,14 +166,56 @@ it('admits only local follow startup without credentials or arbitrary actions', 
   expect(
     AgentWorkerRequestSchema.safeParse({
       requestId: sessionId,
-      command: { kind: 'follow', sessionId, debugEnabled: true },
+      command: {
+        kind: 'follow',
+        sessionId,
+        debugEnabled: true,
+        desktopDriver: { command: '/tro/cua-driver', args: ['mcp', '--embedded'], env: {} },
+      },
     }).success,
   ).toBe(true);
   expect(AgentCommandSchema.safeParse({ kind: 'follow', action: 'click' }).success).toBe(false);
   expect(
     AgentWorkerRequestSchema.safeParse({
       requestId: sessionId,
-      command: { kind: 'follow', sessionId, debugEnabled: true, gatewayToken: 'unexpected-token' },
+      command: {
+        kind: 'follow',
+        sessionId,
+        debugEnabled: true,
+        gatewayToken: 'unexpected-token',
+        desktopDriver: { command: '/tro/cua-driver', args: ['mcp', '--embedded'], env: {} },
+      },
+    }).success,
+  ).toBe(false);
+});
+
+it('requires the host-owned endpoint for companion startup and hides it from renderer commands', () => {
+  const command = { kind: 'follow', sessionId, debugEnabled: true };
+  expect(AgentWorkerRequestSchema.safeParse({ requestId: sessionId, command }).success).toBe(false);
+  expect(
+    AgentCommandSchema.safeParse({
+      kind: 'follow',
+      desktopDriver: { command: '/driver', args: [], env: {} },
+    }).success,
+  ).toBe(false);
+});
+
+it('keeps the HUD group private while both workers receive the embedded endpoint', () => {
+  const command = {
+    kind: 'follow',
+    sessionId,
+    debugEnabled: false,
+    hudGroup: sessionId,
+    desktopDriver: { command: '/tro/cua-driver', args: ['mcp', '--embedded'], env: {} },
+  };
+  expect(AgentWorkerRequestSchema.parse({ requestId: sessionId, command }).command).toEqual(
+    command,
+  );
+  expect(AgentCommandSchema.safeParse({ kind: 'follow', hudGroup: sessionId }).success).toBe(false);
+  expect(
+    AgentWorkerRequestSchema.safeParse({
+      requestId: sessionId,
+      command: { ...command, hudGroup: 'bad' },
     }).success,
   ).toBe(false);
 });

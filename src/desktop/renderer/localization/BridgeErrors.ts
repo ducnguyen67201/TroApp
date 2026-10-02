@@ -28,7 +28,7 @@ const bridgeErrorKeys: Readonly<Record<string, TranslationKey>> = {
   'Could not complete this task. Try again.': 'errorCompleteTask',
   'Could not complete the task. Check the connection and desktop access.': 'errorCompleteTask',
   'The local agent worker could not complete the request.': 'errorCompleteTask',
-  'Desktop control could not start. Allow CuaDriver Screen Recording and Accessibility in System Settings, then try again.':
+  'Desktop control could not start. Allow Tro Screen Recording and Accessibility in System Settings, then try again.':
     'errorDesktopPermissions',
   'Desktop control could not start. Restart Tro or reinstall the desktop app, then try again.':
     'errorDesktopStart',

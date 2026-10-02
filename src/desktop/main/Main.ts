@@ -28,6 +28,7 @@ import { AgentWorkerClient } from './AgentWorkerClient.js';
 import { AgentChatController } from './AgentChatController.js';
 import { AuthClient } from './AuthClient.js';
 import { DesktopPermissions } from './DesktopPermissions.js';
+import { EmbeddedDesktopDriver } from './EmbeddedDesktopDriver.js';
 import { isTrustedFrameUrl } from './TrustedFrame.js';
 
 const mainDirectory = dirname(fileURLToPath(import.meta.url));
@@ -39,6 +40,8 @@ const voiceShortcut = new GlobalVoiceShortcut();
 let voiceEnableGeneration = 0;
 let voiceKeysReleased = true;
 const permissions = new DesktopPermissions();
+const desktopDriver = new EmbeddedDesktopDriver();
+let isQuitting = false;
 
 async function startDesktop(): Promise<void> {
   /* Vite embeds this public URL when packaging the desktop app. The validator
@@ -49,10 +52,14 @@ async function startDesktop(): Promise<void> {
     bundledAppEnvironment: import.meta.env['MAIN_VITE_APP_ENV'],
     isPackaged: app.isPackaged,
   });
-  const hudClient = new CompanionHudClient(join(mainDirectory, 'StartCompanionHudWorker.js'));
+  const hudClient = new CompanionHudClient(
+    join(mainDirectory, 'StartCompanionHudWorker.js'),
+    desktopDriver,
+  );
   const agentWorker = new AgentWorkerClient(
     join(mainDirectory, 'StartAgentWorker.js'),
     environment.APP_ENV === AppEnvironment.DEV,
+    desktopDriver,
     process.platform === 'darwin' ? hudClient.group : undefined,
     (progress) => {
       desktopCompanion?.hud.receiveProgress(progress);
@@ -424,13 +431,23 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  if (isQuitting) {
+    return;
+  }
+  event.preventDefault();
+  isQuitting = true;
   voiceEnableGeneration += 1;
   voiceShortcut.disableShortcut();
   voice?.invalidateVoiceInput();
   desktopCompanion?.dispose();
   chat?.dispose();
-  permissions.dispose();
+  void desktopDriver
+    .stop()
+    .catch(() => {})
+    .finally(() => {
+      app.quit();
+    });
 });
 
 void startDesktop().catch((error: unknown) => {

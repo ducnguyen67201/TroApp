@@ -1,8 +1,26 @@
-import { CursorCompanionStateSchema, CursorCompanionTool } from '#contracts/CursorCompanion.js';
+import {
+  CursorCompanionStateSchema,
+  CursorCompanionTool,
+  CursorCompanionCapabilitiesSchema,
+  CursorGuidanceTaskSchema,
+  CursorGuidanceResultSchema,
+  GuidanceReason,
+} from '#contracts/CursorCompanion.js';
 import type { CallToolResult } from '@openai/agents';
 
 export interface CompanionTransport {
   callHostTool(toolName: string, args: Record<string, unknown>): Promise<CallToolResult>;
+}
+
+/** A typed native terminal result survives the SDK abort and task cleanup. */
+export class GuidanceTaskError extends Error {
+  constructor(
+    readonly reason: GuidanceReason,
+    readonly canceled = false,
+  ) {
+    super(reason);
+    this.name = 'GuidanceTaskError';
+  }
 }
 
 /** Cua renders and schedules every frame. Tro owns only its transport lease. */
@@ -13,6 +31,52 @@ export class CuaCompanionClient {
   private modeChanges: Promise<void> = Promise.resolve();
 
   constructor(private readonly transport: CompanionTransport) {}
+
+  async beginGuidanceTask(taskEpoch: string): Promise<void> {
+    const capabilities = await this.transport.callHostTool(
+      CursorCompanionTool.READ_CAPABILITIES,
+      {},
+    );
+    const parsed = CursorCompanionCapabilitiesSchema.safeParse(capabilities.structuredContent);
+    if (
+      capabilities.isError ||
+      !parsed.success ||
+      !parsed.data.task_lifecycle ||
+      !parsed.data.presentation_versions.includes(2)
+    ) {
+      throw new GuidanceTaskError(GuidanceReason.UNSUPPORTED_VERSION);
+    }
+    const result = await this.transport.callHostTool(CursorCompanionTool.BEGIN_TASK, {
+      task_epoch: taskEpoch,
+      presentation_version: 2,
+    });
+    const state = CursorGuidanceTaskSchema.parse(result.structuredContent);
+    if (result.isError || state.status !== 'task_ready' || state.task_epoch !== taskEpoch) {
+      throw new Error('Cua did not admit this guidance task.');
+    }
+  }
+
+  async endGuidanceTask(taskEpoch: string): Promise<void> {
+    const result = await this.transport.callHostTool(CursorCompanionTool.END_TASK, {
+      task_epoch: taskEpoch,
+    });
+    const terminal = CursorGuidanceResultSchema.safeParse(result.structuredContent);
+    if (
+      result.isError &&
+      terminal.success &&
+      terminal.data.status !== 'completed' &&
+      terminal.data.task_epoch === taskEpoch
+    ) {
+      throw new GuidanceTaskError(
+        terminal.data.status === 'canceled' ? terminal.data.reason : terminal.data.code,
+        terminal.data.status === 'canceled',
+      );
+    }
+    const state = CursorGuidanceTaskSchema.parse(result.structuredContent);
+    if (result.isError || state.status !== 'task_ended' || state.task_epoch !== taskEpoch) {
+      throw new Error('Cua did not release this guidance task.');
+    }
+  }
 
   async startFollowing(): Promise<void> {
     if (this.closed) {

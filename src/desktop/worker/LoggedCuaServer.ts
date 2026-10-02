@@ -9,9 +9,11 @@ import {
   CursorCompanionStateSchema,
   CursorCompanionTool,
   AgentTaskMode,
+  CursorGuidanceRequestHeaderSchema,
+  GuidanceReason,
 } from '#contracts/CursorCompanion.js';
 import { canCallCuaTool, isCursorPresentationTool } from './CuaTeachingPolicy.js';
-import { CuaTaskEvidence } from './CuaTaskEvidence.js';
+import { CuaTaskEvidence, type GuidanceRequest } from './CuaTaskEvidence.js';
 
 type CuaTool = Awaited<ReturnType<MCPServerStdio['listTools']>>[number];
 
@@ -123,6 +125,20 @@ function validatePreviewResult(toolName: string, result: CallToolResult): CallTo
       };
 }
 
+/** The SDK's default MCP path sends content only. Cua puts targeting IDs and
+ * capture geometry in structuredContent, so include it alongside the image.
+ * The SDK's structured-only option would discard screenshot content.
+ */
+function includeCuaMetadata(result: CallToolResult): CallToolResult {
+  if (result.structuredContent === undefined) {
+    return result;
+  }
+  return {
+    ...result,
+    content: [...result.content, { type: 'text', text: JSON.stringify(result.structuredContent) }],
+  };
+}
+
 /** Trace the real SDK-to-Cua MCP boundary; the SDK calls this method for each tool. */
 export class LoggedCuaServer extends MCPServerStdio {
   readonly taskEvidence = new CuaTaskEvidence();
@@ -132,12 +148,22 @@ export class LoggedCuaServer extends MCPServerStdio {
   setProgressListener(listener: ((phase: ProgressPhase) => void) | null): void {
     this.receiveProgress = listener;
   }
-
   private taskMode: AgentTaskMode = AgentTaskMode.EXECUTE;
   private discoveredTools: Set<string> | null = null;
+  private onTeachingTerminal: (() => void) | null = null;
 
   setTaskMode(mode: AgentTaskMode): void {
     this.taskMode = mode;
+  }
+
+  beginTeachingTask(taskEpoch: string, onTerminal: () => void): void {
+    this.taskMode = AgentTaskMode.TEACH;
+    this.taskEvidence.beginGuidanceTask(taskEpoch);
+    this.onTeachingTerminal = onTerminal;
+  }
+
+  endTeachingTask(): void {
+    this.onTeachingTerminal = null;
   }
 
   hasCompanionTools(): boolean {
@@ -146,6 +172,14 @@ export class LoggedCuaServer extends MCPServerStdio {
       'set_cursor_companion_mode',
       'cancel_cursor_sequence',
       'get_cursor_companion_state',
+    ].every((name) => this.discoveredTools?.has(name));
+  }
+
+  hasGuidanceTools(): boolean {
+    return [
+      CursorCompanionTool.READ_CAPABILITIES,
+      CursorCompanionTool.BEGIN_TASK,
+      CursorCompanionTool.END_TASK,
     ].every((name) => this.discoveredTools?.has(name));
   }
 
@@ -177,12 +211,25 @@ export class LoggedCuaServer extends MCPServerStdio {
         const properties = { ...tool.inputSchema.properties };
         delete properties.session;
         delete properties.cursor_id;
+        delete properties.task_epoch;
+        delete properties.sequence_id;
+        const guided =
+          this.taskMode === AgentTaskMode.TEACH && tool.name === CursorCompanionTool.SHOW_SEQUENCE;
         return prepareCuaToolForAgent({
           ...tool,
           inputSchema: {
             ...tool.inputSchema,
-            properties,
-            required: required.filter((name) => name !== 'session' && name !== 'cursor_id'),
+            properties: guided
+              ? { ...properties, presentation_version: { type: 'integer', const: 2 } }
+              : properties,
+            required: [
+              ...new Set([
+                ...required.filter(
+                  (name) => !['session', 'cursor_id', 'task_epoch', 'sequence_id'].includes(name),
+                ),
+                ...(guided ? ['presentation_version'] : []),
+              ]),
+            ],
           },
         });
       });
@@ -194,11 +241,16 @@ export class LoggedCuaServer extends MCPServerStdio {
     meta?: Record<string, unknown> | null,
     options?: MCPCallToolOptions,
   ): Promise<CallToolResult> {
+    let guidanceRequest: GuidanceRequest | null = null;
     if (
       !canCallCuaTool(toolName, this.taskMode) ||
+      (this.taskMode === AgentTaskMode.TEACH && this.taskEvidence.hasTerminalGuidance()) ||
+      (this.taskMode === AgentTaskMode.TEACH && this.taskEvidence.hasPendingGuidance()) ||
       (args !== null &&
         (Object.hasOwn(args, 'session') ||
           Object.hasOwn(args, 'cursor_id') ||
+          Object.hasOwn(args, 'task_epoch') ||
+          Object.hasOwn(args, 'sequence_id') ||
           Object.keys(args).some((name) => name.startsWith('_'))))
     ) {
       const result: CallToolResult = {
@@ -211,25 +263,63 @@ export class LoggedCuaServer extends MCPServerStdio {
         ],
       };
       this.taskEvidence.record(toolName, result);
-      return result;
+      if (this.taskMode === AgentTaskMode.TEACH) {
+        this.taskEvidence.failGuidance(GuidanceReason.INVALID_REQUEST);
+        this.onTeachingTerminal?.();
+      }
+      return includeCuaMetadata(result);
     }
-    if (!this.log.isLevelEnabled('debug')) {
-      const result = validatePreviewResult(
-        toolName,
-        await this.callTaskTool(toolName, args, meta, options),
-      );
-      this.taskEvidence.record(toolName, result);
-      return result;
+    if (this.taskMode === AgentTaskMode.TEACH && toolName === CursorCompanionTool.SHOW_SEQUENCE) {
+      const parsed = CursorGuidanceRequestHeaderSchema.safeParse(args);
+      if (parsed.success) {
+        guidanceRequest = this.taskEvidence.beginGuidanceRequest(parsed.data.steps.length);
+      }
+      if (!guidanceRequest) {
+        this.taskEvidence.failGuidance(GuidanceReason.INVALID_REQUEST);
+        this.onTeachingTerminal?.();
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'A live V2 guidance task and explicit presentation_version: 2 are required.',
+            },
+          ],
+        };
+      }
     }
 
     const startedAt = performance.now();
     this.log.debug({ toolName, arguments: describeCuaArguments(args) }, 'cua.request');
     try {
-      const result = validatePreviewResult(
-        toolName,
-        await this.callTaskTool(toolName, args, meta, options),
-      );
-      this.taskEvidence.record(toolName, result);
+      const native = await this.callTaskTool(toolName, args, meta, options);
+      let result = guidanceRequest ? native : validatePreviewResult(toolName, native);
+      if (guidanceRequest) {
+        const valid = this.taskEvidence.settleGuidanceRequest(guidanceRequest, result);
+        if (!valid && !result.isError) {
+          result = {
+            isError: true,
+            content: [
+              { type: 'text', text: 'Cua did not acknowledge this task’s completed visual guide.' },
+            ],
+          };
+        }
+      } else {
+        this.taskEvidence.record(toolName, result);
+        if (
+          this.taskMode === AgentTaskMode.TEACH &&
+          toolName === CursorCompanionTool.CANCEL_SEQUENCE &&
+          !result.isError
+        ) {
+          this.taskEvidence.cancelGuidance(GuidanceReason.EXPLICIT_STOP);
+        }
+        if (this.taskMode === AgentTaskMode.TEACH && result.isError) {
+          this.taskEvidence.failGuidance(GuidanceReason.TRANSPORT_FAILED);
+        }
+      }
+      if (this.taskEvidence.hasTerminalGuidance()) {
+        this.onTeachingTerminal?.();
+      }
       this.log.debug(
         {
           toolName,
@@ -238,8 +328,12 @@ export class LoggedCuaServer extends MCPServerStdio {
         },
         'cua.response',
       );
-      return result;
+      return includeCuaMetadata(result);
     } catch (error) {
+      if (this.taskMode === AgentTaskMode.TEACH) {
+        this.taskEvidence.failGuidance(GuidanceReason.TRANSPORT_FAILED);
+        this.onTeachingTerminal?.();
+      }
       this.log.debug(
         {
           toolName,

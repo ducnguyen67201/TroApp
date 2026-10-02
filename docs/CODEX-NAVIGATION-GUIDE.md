@@ -13,7 +13,7 @@ Read README.md, AGENTS.md, and Architecture.md first. Tro is one pnpm root. Use 
 | Hosting            | `Dockerfile`, `railway.json`, `Deployment.md`         | Container/readiness; no automatic deployment |
 | Local agent        | `src/desktop/worker`, `src/contracts/AgentSession.ts` | Worker startup, cancellation, IPC validation |
 
-`src/desktop/main/companion/DesktopCompanion.ts` owns desktop companion composition (`cursor` and `hud`), presentation startup and cleanup. HUD lifecycle state belongs in `CompanionHudController.ts`; transport belongs in `CompanionHudClient.ts`. `AgentChatController.ts` retains the shared cursor/task worker lifecycle.
+`src/desktop/main/companion/DesktopCompanion.ts` owns desktop companion composition (`cursor` and `hud`), presentation startup and cleanup. HUD lifecycle state belongs in `CompanionHudController.ts`; transport belongs in `CompanionHudClient.ts`. `AgentChatController.ts` retains the shared cursor/task worker lifecycle. `EmbeddedDesktopDriver.ts` owns the main-process daemon and supplies both workers with its private endpoint; worker teardown must not stop that shared host.
 
 Renderer/preload cannot import backend or main-process implementation. Contracts cannot import desktop/server implementation. Domain code cannot import frameworks, I/O, or persistence. Prisma belongs in backend persistence adapters and Prisma config. Environment modules are per process.
 

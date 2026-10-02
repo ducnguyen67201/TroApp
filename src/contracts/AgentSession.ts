@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { DesktopLocaleSchema } from './DesktopLocale.js';
-import { AgentTaskMode, AgentTaskModeSchema } from './CursorCompanion.js';
+import { AgentTaskMode, AgentTaskModeSchema, TeachingResultSchema } from './CursorCompanion.js';
+import { DesktopDriverConnectionSchema } from './DesktopDriver.js';
 
 export const AgentFailureCode = { DAILY_LIMIT: 'daily_limit' } as const;
 
@@ -26,6 +27,7 @@ export const AgentWorkerCommandSchema = z.discriminatedUnion('kind', [
     kind: z.literal('follow'),
     sessionId: z.uuid(),
     debugEnabled: z.boolean(),
+    desktopDriver: DesktopDriverConnectionSchema,
     hudGroup: z.uuid().optional(),
   }),
   z.strictObject({
@@ -34,6 +36,7 @@ export const AgentWorkerCommandSchema = z.discriminatedUnion('kind', [
     gatewayToken: z.string().min(1),
     gatewayBaseUrl: z.url(),
     debugEnabled: z.boolean(),
+    desktopDriver: DesktopDriverConnectionSchema,
     hudGroup: z.uuid().optional(),
   }),
   z.strictObject({
@@ -51,6 +54,7 @@ export type AgentWorkerCommand = z.infer<typeof AgentWorkerCommandSchema>;
 export const AgentResultSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('started'), sessionId: z.uuid() }),
   z.strictObject({ kind: z.literal('completed'), answer: z.string() }),
+  z.strictObject({ kind: z.literal('teaching'), result: TeachingResultSchema }),
   z.strictObject({ kind: z.literal('stopped') }),
   z.strictObject({
     kind: z.literal('failed'),

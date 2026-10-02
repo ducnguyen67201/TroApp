@@ -14,6 +14,7 @@ export const CompanionHudPhase = {
   CANCELED: 'canceled',
   ERROR: 'error',
   DAILY_LIMIT: 'daily_limit',
+  NEEDS_INPUT: 'needs_input',
 } as const;
 
 export type CompanionHudPhase = (typeof CompanionHudPhase)[keyof typeof CompanionHudPhase];

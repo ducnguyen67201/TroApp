@@ -7,7 +7,7 @@ export const vietnamese = {
   voiceUnavailable: 'Nhập bằng giọng nói chưa khả dụng. Kiểm tra quyền micrô rồi thử lại.',
   voiceCheckAgain: 'Kiểm tra lại quyền giọng nói',
   voiceShortcutUnavailable:
-    'Phím tắt toàn hệ thống chưa khả dụng. Trên Mac, cấp quyền Trợ năng cho Tro trong Cài đặt hệ thống rồi kiểm tra lại quyền giọng nói. Khi phát triển, ứng dụng có tên Electron. Quyền của CuaDriver là riêng biệt. Bạn vẫn có thể dùng nút Nói.',
+    'Phím tắt toàn hệ thống chưa khả dụng. Trên Mac, cấp quyền Trợ năng cho Tro trong Cài đặt hệ thống rồi kiểm tra lại quyền giọng nói. Khi phát triển, ứng dụng có tên Electron. Bạn vẫn có thể dùng nút Nói.',
   voiceError:
     'Không thể hoàn tất nhập bằng giọng nói. Kiểm tra quyền micrô, kết nối và hạn mức giọng nói rồi thử lại.',
   voicePreparing: 'Đang chuẩn bị micrô…',
@@ -88,8 +88,18 @@ export const vietnamese = {
   errorAgentActive: 'Một phiên trợ lý đang hoạt động.',
   errorAgentStopped: 'Phiên trợ lý đã kết thúc. Hãy bắt đầu tác vụ mới.',
   errorAgentTimeout: 'Yêu cầu gửi đến trợ lý đã hết thời gian chờ. Vui lòng thử lại.',
+  guidanceDemonstrated: 'Đã hiển thị hướng dẫn',
+  guidanceExplained: 'Giải thích',
+  guidanceNeedsInput: 'Cần bạn hỗ trợ',
+  guidanceCanceled: 'Đã dừng hướng dẫn',
+  guidanceFailed: 'Chưa hoàn tất hướng dẫn',
+  guidanceNeedsInputMessage:
+    'Tro chưa thể minh họa bước này. Hãy kiểm tra mục tiêu hiển thị trên màn hình chính, rồi gửi yêu cầu mới.',
+  guidanceCanceledMessage: 'Hướng dẫn đã dừng. Hãy gửi yêu cầu mới khi bạn muốn tiếp tục.',
+  guidanceFailedMessage:
+    'Tro chưa thể hoàn tất hướng dẫn trực quan. Hãy gửi yêu cầu mới để thử lại.',
   errorDesktopPermissions:
-    'Không thể bắt đầu điều khiển máy tính. Hãy cấp quyền Ghi màn hình và Trợ năng cho CuaDriver trong Cài đặt hệ thống, rồi thử lại.',
+    'Không thể bắt đầu điều khiển máy tính. Hãy cấp quyền Ghi màn hình và Trợ năng cho Tro trong Cài đặt hệ thống, rồi thử lại.',
   errorDesktopStart:
     'Không thể bắt đầu điều khiển máy tính. Hãy khởi động lại Tro hoặc cài đặt lại ứng dụng, rồi thử lại.',
   errorInvalidRequest: 'Yêu cầu này không hợp lệ. Vui lòng thử lại.',
@@ -102,27 +112,27 @@ export const vietnamese = {
   permissionOneTimeSetup: 'THIẾT LẬP MỘT LẦN',
   permissionHeading: 'Cho phép Tro truy cập máy tính của bạn.',
   permissionIntroduction:
-    'CuaDriver cần hai quyền trên macOS để xem màn hình và hỗ trợ bạn trong các ứng dụng. Bạn có thể quản lý các quyền này trong Cài đặt hệ thống.',
+    'Tro cần hai quyền trên macOS để xem màn hình và hỗ trợ bạn trong các ứng dụng. Bạn có thể quản lý các quyền này trong Cài đặt hệ thống.',
   permissionTitle: 'Quyền truy cập máy tính',
   permissionBothNeeded: 'Cần cả hai quyền để hỗ trợ trên máy tính',
   permissionAccessibility: 'Trợ năng',
-  permissionAccessibilityDescription: 'Cho phép CuaDriver tương tác với ứng dụng bạn đang dùng.',
+  permissionAccessibilityDescription: 'Cho phép Tro tương tác với ứng dụng bạn đang dùng.',
   permissionScreenRecording: 'Ghi màn hình',
-  permissionScreenRecordingDescription: 'Cho phép CuaDriver xem nội dung trên màn hình.',
+  permissionScreenRecordingDescription: 'Cho phép Tro xem nội dung trên màn hình.',
   permissionEnabled: 'Đã bật',
   permissionMissing: 'Chưa bật',
   permissionUnknown: 'Chưa xác minh',
   permissionOpenSettings: 'Mở Cài đặt',
   permissionRequest: 'Yêu cầu quyền truy cập',
   permissionCheckAgain: 'Kiểm tra lại',
-  permissionChecking: 'Đang kiểm tra CuaDriver…',
+  permissionChecking: 'Đang kiểm tra Tro…',
   permissionReturnHint:
     'Sau khi bật cả hai quyền, hãy quay lại Tro. Ứng dụng sẽ tự động kiểm tra lại.',
   permissionRestartHint:
-    'Bạn có thể cần đóng rồi mở lại CuaDriver sau khi thay đổi quyền Ghi màn hình. Tro sẽ chờ xác minh quyền trước khi khởi chạy trợ lý.',
-  permissionVerifyError: 'Không thể xác minh quyền của CuaDriver. Vui lòng thử lại.',
+    'Bạn có thể cần đóng rồi mở lại Tro sau khi thay đổi quyền Ghi màn hình. Tro sẽ chờ xác minh quyền trước khi khởi chạy trợ lý.',
+  permissionVerifyError: 'Không thể xác minh quyền của Tro. Vui lòng thử lại.',
   permissionSettingsHint:
-    'Trong Cài đặt hệ thống, hãy bật cả hai quyền cho CuaDriver rồi quay lại Tro.',
+    'Trong Cài đặt hệ thống, hãy bật cả hai quyền cho Tro rồi quay lại Tro. Khi phát triển, ứng dụng có thể có tên Electron.',
   permissionRequestError:
     'Không thể mở thiết lập quyền trên macOS. Hãy mở Cài đặt hệ thống theo cách thủ công.',
   permissionOpenError:

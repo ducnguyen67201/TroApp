@@ -15,8 +15,7 @@ export function createAuthDatabase(environment: ServerEnv) {
     database: prismaAdapter(client, { provider: 'postgresql' }),
     secret: environment.AUTH_SECRET,
     baseURL: environment.AUTH_BASE_URL,
-    /* Public password signup would allow fresh accounts to reset the model
-       gateway's per-user allowance. The desktop signs in through Google. */
+    /* The desktop's supported sign-in flow uses Google. */
     emailAndPassword: { enabled: false },
     disabledPaths: ['/sign-up/email', '/sign-in/email'],
     socialProviders:
@@ -37,15 +36,6 @@ export function createAuthDatabase(environment: ServerEnv) {
     readSignedInUserId: async (headers: IncomingHttpHeaders): Promise<string | null> => {
       const session = await auth.api.getSession({ headers: fromNodeHeaders(headers) });
       return session?.user.id ?? null;
-    },
-    countModelRequest: async (userId: string, day: Date): Promise<number> => {
-      const usage = await client.modelUsage.upsert({
-        where: { userId_day: { userId, day } },
-        create: { userId, day, requestCount: 1 },
-        update: { requestCount: { increment: 1 } },
-        select: { requestCount: true },
-      });
-      return usage.requestCount;
     },
     close: () => client.$disconnect(),
   };

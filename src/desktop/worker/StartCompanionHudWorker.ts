@@ -5,7 +5,6 @@ import {
   type CompanionHudSnapshot,
 } from '#contracts/CompanionHud.js';
 import { CompanionHudWorkerCommandSchema } from '#contracts/CompanionHudWorker.js';
-import { chooseCuaDriverCommand, startCuaDriverApp } from './ChooseCuaDriverCommand.js';
 
 const parentPort = process.parentPort;
 let server: MCPServerStdio | null = null;
@@ -58,18 +57,13 @@ parentPort.on('message', (event) => {
   if (group) {
     return;
   }
+  const connection = command.data.desktopDriver;
   group = command.data.group;
   void (async () => {
     try {
-      const installation = await chooseCuaDriverCommand();
-      if (!installation.socketPath) {
-        throw new Error('Companion build unavailable.');
-      }
-      await startCuaDriverApp(installation);
       server = new MCPServerStdio({
         name: 'Tro presentation',
-        command: installation.command,
-        args: ['mcp', '--socket', installation.socketPath],
+        ...connection,
         cacheToolsList: true,
       });
       await server.connect();

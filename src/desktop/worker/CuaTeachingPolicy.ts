@@ -17,10 +17,13 @@ const TeachingTools = new Set<string>([
   CursorCompanionTool.SHOW_SEQUENCE,
   CursorCompanionTool.CANCEL_SEQUENCE,
   CursorCompanionTool.READ_STATE,
+  CursorCompanionTool.READ_CAPABILITIES,
 ]);
 const HostTools = new Set<string>([
   ...Object.values(CompanionHudTool),
   CursorCompanionTool.SET_MODE,
+  CursorCompanionTool.BEGIN_TASK,
+  CursorCompanionTool.END_TASK,
   'start_session',
   'end_session',
   'set_agent_cursor_enabled',

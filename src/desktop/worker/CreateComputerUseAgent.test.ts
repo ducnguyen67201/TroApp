@@ -15,6 +15,9 @@ describe('computer-use agent tools', () => {
     const agent = createComputerUseAgent(server, DesktopLocale.VIETNAMESE, AgentTaskMode.TEACH);
     expect(agent.instructions).toContain('Respond to the user in Vietnamese');
     expect(agent.instructions).toContain('This task is teaching');
+    expect(agent.instructions).not.toContain(ComputerUseInstructions);
+    expect(agent.instructions).toContain('presentation_version: 2');
+    expect(agent.instructions).toContain('never retry or replay');
   });
 
   it('exposes Cua MCP without duplicating desktop actions as local tools', () => {

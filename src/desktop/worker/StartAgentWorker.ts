@@ -85,6 +85,7 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
       try {
         runner = await ComputerUseTaskRunner.connect(
           log,
+          command.desktopDriver,
           command.kind === 'follow',
           command.hudGroup,
         );
@@ -93,7 +94,7 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
           kind: 'failed',
           message:
             process.platform === 'darwin'
-              ? 'Desktop control could not start. Allow CuaDriver Screen Recording and Accessibility in System Settings, then try again.'
+              ? 'Desktop control could not start. Allow Tro Screen Recording and Accessibility in System Settings, then try again.'
               : 'Desktop control could not start. Restart Tro or reinstall the desktop app, then try again.',
         };
       }

@@ -1,16 +1,18 @@
 import { CompanionHudTool, type AgentProgressPhase } from '#contracts/CompanionHud.js';
-import { run, type AgentInputItem } from '@openai/agents';
+import type { AgentInputItem } from '@openai/agents';
+import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
 import type { AgentResult } from '#contracts/AgentSession.js';
+import type { DesktopDriverConnection } from '#contracts/DesktopDriver.js';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
 import { createComputerUseAgent } from './CreateComputerUseAgent.js';
-import { chooseCuaDriverCommand, startCuaDriverApp } from './ChooseCuaDriverCommand.js';
 import { TaskIssue } from './CuaTaskEvidence.js';
 import { LoggedCuaServer } from './LoggedCuaServer.js';
-import { AgentTaskMode } from '#contracts/CursorCompanion.js';
-import { CuaCompanionClient } from './CuaCompanionClient.js';
+import { AgentTaskMode, GuidanceReason, TeachingOutcome } from '#contracts/CursorCompanion.js';
+import { CuaCompanionClient, GuidanceTaskError } from './CuaCompanionClient.js';
+import { runComputerUseAgent } from './RunComputerUseAgent.js';
 
-type TaskResult = Extract<AgentResult, { kind: 'completed' | 'failed' }>;
+type TaskResult = Extract<AgentResult, { kind: 'completed' | 'failed' | 'teaching' }>;
 
 function describeIncompleteTask(issue: TaskIssue): string {
   if (issue === TaskIssue.GUIDANCE_FAILED) {
@@ -37,9 +39,10 @@ function askAgentToFinishTask(): AgentInputItem {
 export class ComputerUseTaskRunner {
   private readonly companion: CuaCompanionClient | null;
 
-  private constructor(
+  constructor(
     private readonly desktopServer: LoggedCuaServer,
     private readonly log: Logger,
+    private readonly runAgent: typeof runComputerUseAgent = runComputerUseAgent,
   ) {
     this.companion = desktopServer.hasCompanionTools()
       ? new CuaCompanionClient(desktopServer)
@@ -48,16 +51,14 @@ export class ComputerUseTaskRunner {
 
   static async connect(
     log: Logger,
+    connection: DesktopDriverConnection,
     requiresCompanion = false,
     hudGroup?: string,
   ): Promise<ComputerUseTaskRunner> {
-    const installation = await chooseCuaDriverCommand();
-    await startCuaDriverApp(installation);
     const desktopServer = new LoggedCuaServer(
       {
         name: 'Cua Driver',
-        command: installation.command,
-        args: ['mcp', ...(installation.socketPath ? ['--socket', installation.socketPath] : [])],
+        ...connection,
         cacheToolsList: true,
       },
       log,
@@ -95,11 +96,13 @@ export class ComputerUseTaskRunner {
     mode: AgentTaskMode = AgentTaskMode.EXECUTE,
     receiveProgress?: (phase: AgentProgressPhase) => void,
   ): Promise<TaskResult> {
-    if (mode === AgentTaskMode.TEACH && !this.companion) {
+    if (
+      mode === AgentTaskMode.TEACH &&
+      (!this.companion || !this.desktopServer.hasGuidanceTools())
+    ) {
       return {
-        kind: 'failed',
-        message:
-          'Cursor companion is unavailable. Install the companion-enabled Cua Driver and restart Tro.',
+        kind: 'teaching',
+        result: { outcome: TeachingOutcome.FAILED, reason: GuidanceReason.UNSUPPORTED_VERSION },
       };
     }
     this.desktopServer.setTaskMode(mode);
@@ -109,33 +112,54 @@ export class ComputerUseTaskRunner {
     };
     signal.addEventListener('abort', cancelGuidance, { once: true });
     const startedAt = performance.now();
+    const taskEpoch = randomUUID();
+    let guidanceStarted = false;
+    let guidanceEnded = false;
+    const teachingAbort = new AbortController();
+    const taskSignal =
+      mode === AgentTaskMode.TEACH ? AbortSignal.any([signal, teachingAbort.signal]) : signal;
     const agent = createComputerUseAgent(this.desktopServer, locale, mode);
     this.desktopServer.taskEvidence.reset();
+    if (mode === AgentTaskMode.TEACH) {
+      this.desktopServer.beginTeachingTask(taskEpoch, () => {
+        teachingAbort.abort();
+      });
+    }
     this.log.debug({ messageChars: message.length }, 'agent.task.started');
     try {
       signal.throwIfAborted();
       if (this.companion) {
         if (mode === AgentTaskMode.TEACH) {
           await this.companion.startFollowing();
+          await this.companion.beginGuidanceTask(taskEpoch);
+          guidanceStarted = true;
         } else {
           await this.companion.pauseFollowing();
         }
       }
       signal.throwIfAborted();
-      let result = await run(agent, message, {
-        signal,
-        maxTurns: 15,
-      });
+      let result = await this.runAgent(agent, message, taskSignal, 15);
       signal.throwIfAborted();
+      if (mode === AgentTaskMode.TEACH) {
+        guidanceEnded = true;
+        await this.companion?.endGuidanceTask(taskEpoch);
+        signal.throwIfAborted();
+        return {
+          kind: 'teaching',
+          result: this.desktopServer.taskEvidence.readTeachingResult(
+            result.answer ??
+              (locale === DesktopLocale.VIETNAMESE
+                ? 'Hướng dẫn trực quan đã hoàn tất.'
+                : 'The visual guide finished.'),
+          ),
+        };
+      }
       let issue = this.desktopServer.taskEvidence.readIssue();
       if (issue !== null) {
         /* One bounded continuation gives the same task a chance to recover.
            History is kept only inside this task, never for the next message. */
         this.log.debug({ issue }, 'agent.task.retrying');
-        result = await run(agent, [...result.history, askAgentToFinishTask()], {
-          signal,
-          maxTurns: 5,
-        });
+        result = await this.runAgent(agent, [...result.history, askAgentToFinishTask()], signal, 5);
         signal.throwIfAborted();
         issue = this.desktopServer.taskEvidence.readIssue();
       }
@@ -148,7 +172,7 @@ export class ComputerUseTaskRunner {
       }
 
       const answer =
-        result.finalOutput ??
+        result.answer ??
         (locale === DesktopLocale.VIETNAMESE
           ? 'Tôi chưa thể hoàn tất yêu cầu này.'
           : 'I could not complete that request.');
@@ -158,6 +182,18 @@ export class ComputerUseTaskRunner {
       );
       return { kind: 'completed', answer };
     } catch (error) {
+      if (mode === AgentTaskMode.TEACH) {
+        if (signal.aborted) {
+          this.desktopServer.taskEvidence.cancelGuidance(GuidanceReason.EXPLICIT_STOP);
+        } else if (error instanceof GuidanceTaskError && error.canceled) {
+          this.desktopServer.taskEvidence.cancelGuidance(error.reason);
+        } else if (!this.desktopServer.taskEvidence.hasTerminalGuidance()) {
+          this.desktopServer.taskEvidence.failGuidance(
+            error instanceof GuidanceTaskError ? error.reason : GuidanceReason.TRANSPORT_FAILED,
+          );
+        }
+        return { kind: 'teaching', result: this.desktopServer.taskEvidence.readTeachingResult('') };
+      }
       this.log.debug(
         {
           errorType: error instanceof Error ? error.name : typeof error,
@@ -169,7 +205,14 @@ export class ComputerUseTaskRunner {
     } finally {
       this.desktopServer.setProgressListener(null);
       signal.removeEventListener('abort', cancelGuidance);
-      await this.companion?.cancelSequence().catch(() => {});
+      if (mode === AgentTaskMode.TEACH) {
+        this.desktopServer.endTeachingTask();
+        if (!signal.aborted && guidanceStarted && !guidanceEnded) {
+          await this.companion?.endGuidanceTask(taskEpoch).catch(() => {});
+        }
+      } else {
+        await this.companion?.cancelSequence().catch(() => {});
+      }
       if (!signal.aborted) {
         await this.companion?.startFollowing().catch(() => {});
       }

@@ -120,3 +120,31 @@ describe('companion voice lifecycle', () => {
     expect(latest()?.phase).toBe(CompanionHudPhase.IDLE);
   });
 });
+
+it.each([
+  [
+    { kind: 'teaching', result: { outcome: 'demonstrated', answer: 'Guide finished' } },
+    CompanionHudPhase.DONE,
+  ],
+  [
+    { kind: 'teaching', result: { outcome: 'explained', answer: 'Here is how' } },
+    CompanionHudPhase.DONE,
+  ],
+  [
+    { kind: 'teaching', result: { outcome: 'needs_input', reason: 'no_demonstration' } },
+    CompanionHudPhase.NEEDS_INPUT,
+  ],
+  [
+    { kind: 'teaching', result: { outcome: 'canceled', reason: 'user_takeover' } },
+    CompanionHudPhase.CANCELED,
+  ],
+  [
+    { kind: 'teaching', result: { outcome: 'failed', reason: 'render_timeout' } },
+    CompanionHudPhase.ERROR,
+  ],
+] as const)('presents the V2 teaching outcome %j truthfully', (result, phase) => {
+  const { controller, latest } = createHarness();
+  controller.startTask(sessionId, 'en');
+  controller.finishTask(result, sessionId);
+  expect(latest()?.phase).toBe(phase);
+});

@@ -11,7 +11,10 @@ export default defineConfig({
       /* ws probes optional native accelerators inside try/catch. Keep those
          requires guarded instead of hoisting Vite's missing-peer error. */
       commonjsOptions: { ignore: ['bufferutil', 'utf-8-validate'] },
-      rollupOptions: { onwarn: reportBuildWarning, external: ['uiohook-napi'] },
+      rollupOptions: {
+        onwarn: reportBuildWarning,
+        external: ['uiohook-napi', '@trycua/cua-driver'],
+      },
       lib: {
         entry: {
           Main: resolve('src/desktop/main/Main.ts'),

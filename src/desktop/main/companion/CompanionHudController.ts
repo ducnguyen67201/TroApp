@@ -1,3 +1,4 @@
+import { TeachingOutcome } from '#contracts/CursorCompanion.js';
 import {
   CompanionHudPhase,
   type CompanionHudSnapshot,
@@ -141,15 +142,34 @@ export class CompanionHudController {
     if (sessionId && sessionId !== this.sessionId) {
       return;
     }
-    const phase =
-      result.kind === 'completed'
-        ? CompanionHudPhase.DONE
-        : result.kind === 'stopped'
-          ? CompanionHudPhase.CANCELED
-          : result.kind === 'failed' && result.code === AgentFailureCode.DAILY_LIMIT
-            ? CompanionHudPhase.DAILY_LIMIT
-            : CompanionHudPhase.ERROR;
+    const phase = this.readResultPhase(result);
     this.finishPresentation(phase, phase === CompanionHudPhase.DONE ? 650 : 1800);
+  }
+
+  private readResultPhase(result: AgentResult): CompanionHudSnapshot['phase'] {
+    if (result.kind === 'teaching') {
+      switch (result.result.outcome) {
+        case TeachingOutcome.DEMONSTRATED:
+        case TeachingOutcome.EXPLAINED:
+          return CompanionHudPhase.DONE;
+        case TeachingOutcome.CANCELED:
+          return CompanionHudPhase.CANCELED;
+        case TeachingOutcome.NEEDS_INPUT:
+          return CompanionHudPhase.NEEDS_INPUT;
+        case TeachingOutcome.FAILED:
+          return CompanionHudPhase.ERROR;
+      }
+    }
+    if (result.kind === 'completed') {
+      return CompanionHudPhase.DONE;
+    }
+    if (result.kind === 'stopped') {
+      return CompanionHudPhase.CANCELED;
+    }
+    if (result.kind === 'failed' && result.code === AgentFailureCode.DAILY_LIMIT) {
+      return CompanionHudPhase.DAILY_LIMIT;
+    }
+    return CompanionHudPhase.ERROR;
   }
 
   reset(): void {

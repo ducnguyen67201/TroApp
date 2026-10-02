@@ -18,6 +18,7 @@ const sessionId = 'a8f6d44a-5c18-4ce3-9237-44624549f63f';
 
 function createDesktopBridge() {
   return {
+    updateVoiceMeter: vi.fn<DesktopBridge['updateVoiceMeter']>(),
     controlVoiceInput: vi.fn<DesktopBridge['controlVoiceInput']>().mockImplementation((command) =>
       Promise.resolve<VoiceReply>({
         kind: 'ok',
@@ -28,7 +29,6 @@ function createDesktopBridge() {
         },
       }),
     ),
-    updateVoiceMeter: vi.fn<DesktopBridge['updateVoiceMeter']>(),
     appendVoiceAudio: vi
       .fn<DesktopBridge['appendVoiceAudio']>()
       .mockResolvedValue({ kind: 'failed' }),
@@ -589,4 +589,64 @@ it('starts the idle companion before any task and keeps it when execution mode i
   expect(bridge.startAgentSession).not.toHaveBeenCalled();
   expect(bridge.sendAgentMessage).not.toHaveBeenCalled();
   expect(bridge.startCursorCompanion).toHaveBeenCalledTimes(1);
+});
+
+describe('typed teaching outcomes', () => {
+  it('shows takeover as a stopped guide without the generic task error', async () => {
+    const bridge = createDesktopBridge();
+    bridge.sendAgentMessage.mockResolvedValue({
+      kind: 'teaching',
+      result: { outcome: 'canceled', reason: 'user_takeover' },
+    });
+    window.tro = bridge;
+    renderDesktop();
+    const input = await screen.findByRole('textbox', { name: 'Your message' });
+    fireEvent.change(input, { target: { value: 'Show the export button' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send to Tro' }));
+    expect(await screen.findByText('Guide stopped')).toBeTruthy();
+    expect(
+      screen.getByText('The guide stopped. Send a new request when you want to continue.'),
+    ).toBeTruthy();
+    expect(screen.queryByText('Something needs attention')).toBeNull();
+  });
+
+  it('labels a demonstrated guide separately from a real desktop action', async () => {
+    const bridge = createDesktopBridge();
+    bridge.sendAgentMessage.mockResolvedValue({
+      kind: 'teaching',
+      result: { outcome: 'demonstrated', answer: 'Now click Export.' },
+    });
+    window.tro = bridge;
+    renderDesktop();
+    const input = await screen.findByRole('textbox', { name: 'Your message' });
+    fireEvent.change(input, { target: { value: 'Show the export button' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send to Tro' }));
+    expect(await screen.findByText('Guide finished')).toBeTruthy();
+    expect(screen.getByText('Now click Export.')).toBeTruthy();
+  });
+});
+
+it('renders a voice takeover with the same typed teaching outcome', async () => {
+  const bridge = createDesktopBridge();
+  window.tro = bridge;
+  renderDesktop();
+  await screen.findByRole('textbox', { name: 'Your message' });
+  const emit = bridge.subscribeVoiceInput.mock.calls.at(-1)?.[0];
+  if (!emit) {
+    throw new Error('Missing voice subscription');
+  }
+  const captureId = '33333333-3333-4333-8333-333333333333';
+  act(() => {
+    emit({ kind: 'submitted', captureId, sessionId, text: 'Show me Export' });
+    emit({
+      kind: 'result',
+      captureId,
+      sessionId,
+      result: { kind: 'teaching', result: { outcome: 'canceled', reason: 'user_takeover' } },
+    });
+  });
+  expect(screen.getByText('Guide stopped')).toBeTruthy();
+  expect(
+    screen.getByText('The guide stopped. Send a new request when you want to continue.'),
+  ).toBeTruthy();
 });

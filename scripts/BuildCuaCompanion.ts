@@ -75,23 +75,10 @@ try {
     { cwd: rustDirectory, maxBuffer: 16 * 1024 * 1024 },
   );
   await prepareCuaDriver(stage);
-  const executablePath = join(stage, 'CuaDriver.app', 'Contents', 'MacOS', 'cua-driver');
+  const executablePath = join(stage, 'cua-driver');
   await cp(join(targetDirectory, 'release', 'cua-driver'), executablePath);
-  const plist = join(stage, 'CuaDriver.app', 'Contents', 'Info.plist');
-  await runFile('/usr/libexec/PlistBuddy', [
-    '-c',
-    'Set :CFBundleIdentifier app.tro.cua-companion',
-    plist,
-  ]);
-  await runFile('/usr/libexec/PlistBuddy', ['-c', 'Set :CFBundleShortVersionString 0.30.4', plist]);
-  // Local ad-hoc signature; no keychain edits or reuse of upstream identity.
-  await runFile('/usr/bin/codesign', [
-    '--force',
-    '--deep',
-    '--sign',
-    '-',
-    join(stage, 'CuaDriver.app'),
-  ]);
+  /* Local ad-hoc signature; Tro's embedded host owns macOS attribution. */
+  await runFile('/usr/bin/codesign', ['--force', '--sign', '-', executablePath]);
   const executable = await readFile(executablePath);
   const metadata = CuaCompanionBuildSchema.parse({
     version: CuaCompanionBuild.VERSION,
@@ -106,7 +93,7 @@ try {
   await rm(destination, { recursive: true, force: true });
   await rename(stage, destination);
   console.log(
-    `Built native companion at ${destination}. Grant desktop permissions to this local CuaDriver app before using guidance.`,
+    `Built native companion at ${destination}. Grant desktop permissions to Tro (Electron in development) before using guidance.`,
   );
 } finally {
   await rm(temporary, { recursive: true, force: true });

@@ -13,6 +13,7 @@ import { IconArrowUp, IconBrandGoogle, IconMessageCircle, IconPlus } from '@tabl
 import type { ReactElement } from 'react';
 import { AgentTaskMode, AgentTaskModeSchema } from '#contracts/CursorCompanion.js';
 import { useLocale } from './localization/UseLocale.js';
+import { TeachingOutcomeLabel } from './TeachingResultPresentation.js';
 import { MessageRole, type ComputerUseController } from './UseComputerUse.js';
 
 interface ComputerUsePageProps {
@@ -92,6 +93,11 @@ export function ComputerUsePage({ controller }: ComputerUsePageProps): ReactElem
                   <Text size="xs" fw={600} mb={8}>
                     {item.role === MessageRole.USER ? translations.you : 'Tro'}
                   </Text>
+                  {item.outcome && (
+                    <Text size="xs" c="dimmed" mb={8}>
+                      {translations[TeachingOutcomeLabel[item.outcome]]}
+                    </Text>
+                  )}
                   <Text size="sm" className="message-text">
                     {item.text}
                   </Text>

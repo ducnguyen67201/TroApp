@@ -1,6 +1,7 @@
 import { VoiceState, type VoiceEvent } from '#contracts/VoiceInput.js';
 import { useEffect, useRef, useState } from 'react';
-import { AgentTaskMode } from '#contracts/CursorCompanion.js';
+import { describeTeachingResult } from './TeachingResultPresentation.js';
+import { AgentTaskMode, type TeachingOutcome } from '#contracts/CursorCompanion.js';
 import { useLocale } from './localization/UseLocale.js';
 import { resolveBridgeError } from './localization/BridgeErrors.js';
 import type { TranslationKey } from './localization/English.js';
@@ -11,6 +12,7 @@ export const MessageRole = { USER: 'user', AGENT: 'agent' } as const;
 interface TaskMessage {
   role: (typeof MessageRole)[keyof typeof MessageRole];
   text: string;
+  outcome?: TeachingOutcome;
 }
 
 export interface ComputerUseController {
@@ -223,6 +225,16 @@ export function useComputerUse(): ComputerUseController {
           { role: MessageRole.USER, text: submittedMessage },
           { role: MessageRole.AGENT, text: result.answer },
         ]);
+      } else if (result.kind === 'teaching') {
+        setMessages((current) => [
+          ...current,
+          { role: MessageRole.USER, text: submittedMessage },
+          {
+            role: MessageRole.AGENT,
+            text: describeTeachingResult(result.result, translations),
+            outcome: result.result.outcome,
+          },
+        ]);
       } else {
         setMessage(
           result.kind === 'failed'
@@ -311,6 +323,16 @@ export function useComputerUse(): ComputerUseController {
       if (event.result.kind === 'completed') {
         const answer = event.result.answer;
         setMessages((current) => [...current, { role: MessageRole.AGENT, text: answer }]);
+      } else if (event.result.kind === 'teaching') {
+        const result = event.result.result;
+        setMessages((current) => [
+          ...current,
+          {
+            role: MessageRole.AGENT,
+            text: describeTeachingResult(result, translations),
+            outcome: result.outcome,
+          },
+        ]);
       } else {
         setMessage(
           event.result.kind === 'failed'

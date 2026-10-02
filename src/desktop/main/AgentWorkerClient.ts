@@ -1,4 +1,3 @@
-import { AgentProgressSchema, type AgentProgress } from '#contracts/CompanionHud.js';
 import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { randomUUID } from 'node:crypto';
 import { utilityProcess, type UtilityProcess } from 'electron';
@@ -9,6 +8,9 @@ import {
   type AgentWorkerCommand,
   type AgentResult,
 } from '#contracts/AgentSession.js';
+import type { DesktopDriverPort } from './DesktopDriverPort.js';
+import { AgentProgressSchema, type AgentProgress } from '#contracts/CompanionHud.js';
+import type { DesktopDriverConnection } from '#contracts/DesktopDriver.js';
 
 interface PendingRequest {
   resolve(result: AgentResult): void;
@@ -22,11 +24,16 @@ const stopTimeoutMs = 10_000;
 /** Owns the one local computer-use process for the active chat session. */
 export class AgentWorkerClient implements AgentChatWorker {
   private worker: UtilityProcess | null = null;
+  private generation = 0;
+  private readonly onDriverExit = (): void => {
+    this.dispose();
+  };
   private readonly pending = new Map<string, PendingRequest>();
 
   constructor(
     private readonly workerEntryPath: string,
     private readonly debugEnabled: boolean,
+    private readonly desktopDriver: DesktopDriverPort,
     private readonly hudGroup?: string,
     private readonly receiveProgress?: (progress: AgentProgress) => void,
   ) {}
@@ -56,17 +63,38 @@ export class AgentWorkerClient implements AgentChatWorker {
   }
 
   private async startWorker(
-    command: Extract<AgentWorkerCommand, { kind: 'start' | 'follow' }>,
+    command:
+      | Omit<Extract<AgentWorkerCommand, { kind: 'start' }>, 'desktopDriver'>
+      | Omit<Extract<AgentWorkerCommand, { kind: 'follow' }>, 'desktopDriver'>,
   ): Promise<AgentResult> {
     if (this.worker !== null) {
       return { kind: 'failed', message: 'An agent session is already active.' };
     }
 
+    const generation = this.generation;
+    let connection: DesktopDriverConnection;
+    try {
+      connection = await this.desktopDriver.start(this.onDriverExit);
+    } catch {
+      this.dispose();
+      return { kind: 'failed', message: 'Could not start Tro desktop control.' };
+    }
+
+    if (generation !== this.generation) {
+      return { kind: 'failed', message: 'The agent session ended.' };
+    }
+
     /* Electron main starts this only after app.whenReady(). The agent and Cua
        MCP client run in the utility child, never in renderer or preload. */
-    const child = utilityProcess.fork(this.workerEntryPath, [], {
-      serviceName: 'Tro computer-use agent',
-    });
+    let child: UtilityProcess;
+    try {
+      child = utilityProcess.fork(this.workerEntryPath, [], {
+        serviceName: 'Tro computer-use agent',
+      });
+    } catch {
+      this.dispose();
+      return { kind: 'failed', message: 'Could not start the local agent worker.' };
+    }
     this.worker = child;
     child.on('message', (message: unknown) => {
       if (this.worker !== child) {
@@ -106,11 +134,12 @@ export class AgentWorkerClient implements AgentChatWorker {
         resolve(false);
       });
     });
-    if (!ready) {
+    if (!ready || generation !== this.generation || this.worker !== child) {
+      this.dispose();
       return { kind: 'failed', message: 'Could not start the local agent worker.' };
     }
 
-    const result = await this.send(command);
+    const result = await this.send({ ...command, desktopDriver: connection });
     if (result.kind !== 'started') {
       this.dispose();
     }
@@ -137,9 +166,11 @@ export class AgentWorkerClient implements AgentChatWorker {
   }
 
   dispose(): void {
+    this.generation += 1;
     this.failPending('The agent session ended.');
     this.worker?.kill();
     this.worker = null;
+    /* Main owns the shared daemon; HUD transport survives task-worker replacement. */
   }
 
   private send(command: AgentWorkerCommand): Promise<AgentResult> {

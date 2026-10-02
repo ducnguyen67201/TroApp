@@ -67,3 +67,62 @@ describe('Cua companion lifecycle', () => {
     expect(callHostTool).toHaveBeenCalledTimes(3);
   });
 });
+
+describe('host-only V2 negotiation', () => {
+  const epoch = '11111111-1111-4111-8111-111111111111';
+  const capabilities = {
+    presentation_versions: [1, 2],
+    task_lifecycle: true,
+    display_scope: 'primary',
+    gestures: ['circle'],
+    max_steps: 8,
+    max_duration_ms: 15000,
+  };
+
+  it('refuses unsupported drivers without beginning a legacy task', async () => {
+    const callHostTool = vi.fn<CompanionTransport['callHostTool']>().mockResolvedValue({
+      content: [],
+      structuredContent: { ...capabilities, presentation_versions: [1] },
+    });
+    const client = new CuaCompanionClient({ callHostTool });
+    await expect(client.beginGuidanceTask(epoch)).rejects.toThrow('unsupported_version');
+    expect(callHostTool).toHaveBeenCalledOnce();
+  });
+
+  it('requires the current epoch and retains native takeover during finalization', async () => {
+    const callHostTool = vi
+      .fn<CompanionTransport['callHostTool']>()
+      .mockResolvedValueOnce({ content: [], structuredContent: capabilities })
+      .mockResolvedValueOnce({
+        content: [],
+        structuredContent: {
+          status: 'task_ready',
+          task_epoch: epoch,
+          following: true,
+          active: false,
+        },
+      })
+      .mockResolvedValueOnce({
+        content: [],
+        isError: true,
+        structuredContent: {
+          status: 'canceled',
+          task_epoch: epoch,
+          sequence_id: null,
+          following: true,
+          active: false,
+          reason: 'user_takeover',
+        },
+      });
+    const client = new CuaCompanionClient({ callHostTool });
+    await client.beginGuidanceTask(epoch);
+    expect(callHostTool).toHaveBeenNthCalledWith(2, 'begin_cursor_guidance_task', {
+      task_epoch: epoch,
+      presentation_version: 2,
+    });
+    await expect(client.endGuidanceTask(epoch)).rejects.toMatchObject({
+      reason: 'user_takeover',
+      canceled: true,
+    });
+  });
+});
