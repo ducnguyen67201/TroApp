@@ -27,7 +27,7 @@ try {
         ...appPackage,
         build: {
           ...appPackage.build,
-          directories: { output: resolve('release') },
+          directories: { output: resolve('release'), buildResources: 'branding' },
         },
       },
       null,

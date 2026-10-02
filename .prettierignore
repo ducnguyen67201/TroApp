@@ -5,3 +5,4 @@ release
 pnpm-lock.yaml
 src/server/generated
 prisma/migrations
+.tro-development

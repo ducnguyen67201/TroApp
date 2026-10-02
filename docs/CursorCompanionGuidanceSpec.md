@@ -7,7 +7,7 @@ explicit explanation-only product mode remain deferred.
 
 The desktop wiring uses Tro’s embedded Cua host from Electron main. Both idle
 following and model-backed tasks receive its validated private MCP endpoint.
-Permission checks and prompts belong to Tro (Electron in development), and the
+Permission checks and prompts belong to Tro, and the
 companion build uses the embedded executable layout rather than a separately
 launched native app.
 

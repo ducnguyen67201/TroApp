@@ -93,7 +93,7 @@ try {
   await rm(destination, { recursive: true, force: true });
   await rename(stage, destination);
   console.log(
-    `Built native companion at ${destination}. Grant desktop permissions to Tro (Electron in development) before using guidance.`,
+    `Built native companion at ${destination}. Grant desktop permissions to Tro before using guidance.`,
   );
 } finally {
   await rm(temporary, { recursive: true, force: true });

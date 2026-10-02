@@ -1,4 +1,5 @@
 import { app } from 'electron';
+import { selectDesktopHostBundleId } from '../DesktopIdentity.js';
 import {
   DesktopDriverConnectionSchema,
   type DesktopDriverConnection,
@@ -93,9 +94,7 @@ export class EmbeddedDesktopDriver implements DesktopDriverPort {
     if (generation !== this.generation) {
       throw new Error('Desktop driver startup was canceled.');
     }
-    /* Development Electron has its own bundle identity. A packaged Tro uses
-       app.tro.desktop; claiming that identity in plain dev would fail closed. */
-    const bundleId = app.isPackaged ? 'app.tro.desktop' : 'com.github.Electron';
+    const bundleId = selectDesktopHostBundleId(app.isPackaged, process.execPath);
     const host = this.host ?? sdk.createHost(installation.command, bundleId);
     this.host = host;
     const connection = await host.start();

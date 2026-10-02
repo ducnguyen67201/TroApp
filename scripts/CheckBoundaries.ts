@@ -19,6 +19,7 @@ const ignoredFolders = new Set([
   'dist',
   'release',
   'migrations',
+  '.tro-development',
 ]);
 
 async function collectFiles(folder: string): Promise<string[]> {

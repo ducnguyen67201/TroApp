@@ -15,6 +15,7 @@ const packageMetadata = z
   .parse(metadata);
 
 await cp('scripts/DesktopEntitlements.plist', 'out/DesktopEntitlements.plist');
+await cp('src/desktop/assets', 'out/branding', { recursive: true });
 await mkdir('out/node_modules', { recursive: true });
 await cp('node_modules/uiohook-napi', 'out/node_modules/uiohook-napi', {
   recursive: true,
@@ -47,7 +48,7 @@ await writeFile(
       build: {
         ...packageMetadata.build,
         electronVersion: packageMetadata.devDependencies.electron,
-        directories: { output: '../release' },
+        directories: { output: '../release', buildResources: 'branding' },
       },
     },
     null,

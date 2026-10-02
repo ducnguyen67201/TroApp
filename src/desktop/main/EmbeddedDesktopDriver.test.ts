@@ -77,7 +77,7 @@ it('never starts automation before the host grants both permissions', async () =
   expect(sdk.createHost).not.toHaveBeenCalled();
 });
 
-it('uses the development Electron identity instead of claiming Tro', async () => {
+it('preserves the identity for a direct Electron launch', async () => {
   if (process.platform !== 'darwin') return;
   vi.spyOn(app, 'isPackaged', 'get').mockReturnValue(false);
   const driver = new EmbeddedDesktopDriver();
