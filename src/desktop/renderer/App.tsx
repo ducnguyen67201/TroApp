@@ -1,3 +1,4 @@
+import { useFocusReturn } from '@mantine/hooks';
 import { useMicrophoneTests } from './voice/UseMicrophoneTests.js';
 import { useMicrophones } from './voice/UseMicrophones.js';
 import { MicrophonePicker } from './voice/MicrophonePicker.js';
@@ -10,6 +11,8 @@ import {
   Button,
   Group,
   Loader,
+  Modal,
+  useModalsStack,
   Stack,
   Text,
   UnstyledButton,
@@ -22,25 +25,33 @@ import {
   IconSettings,
   IconSparkles,
 } from '@tabler/icons-react';
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useRef, type ReactElement } from 'react';
 import { ComputerUsePage } from './ComputerUsePage.js';
 import { PermissionsOnboardingPage } from './PermissionsOnboardingPage.js';
-import { SettingsPage } from './SettingsPage.js';
+import { SettingsDialog } from './SettingsDialog.js';
 import { useComputerUse } from './UseComputerUse.js';
 import { useLocale } from './localization/UseLocale.js';
 import { useDesktopPermissions } from './UseDesktopPermissions.js';
 import { useCursorCompanion } from './UseCursorCompanion.js';
 
-const DesktopPage = { WORKSPACE: 'workspace', SETTINGS: 'settings' } as const;
-
-type DesktopPage = (typeof DesktopPage)[keyof typeof DesktopPage];
+const DesktopDialog = { SETTINGS: 'settings', MICROPHONE: 'microphone' } as const;
 
 export function App(): ReactElement {
   const { messages } = useLocale();
-  const [page, setPage] = useState<DesktopPage>(DesktopPage.WORKSPACE);
+  const dialogs = useModalsStack([DesktopDialog.SETTINGS, DesktopDialog.MICROPHONE]);
+  const { close: closeDialog } = dialogs;
+  /* Modal.Stack changes trapFocus when the top dialog changes. Restore the
+     captured opener after that transition instead of coupling it to the trap. */
+  const returnSettingsFocus = useFocusReturn({
+    opened: dialogs.state.settings,
+    shouldReturnFocus: false,
+  });
+  const returnMicrophoneFocus = useFocusReturn({
+    opened: dialogs.state.microphone,
+    shouldReturnFocus: false,
+  });
   const controller = useComputerUse();
   const { user } = controller;
-  const [isMicrophonePickerOpen, setIsMicrophonePickerOpen] = useState(false);
   const microphones = useMicrophones(Boolean(user));
   const voice = useVoiceInput(
     user?.id ?? null,
@@ -61,20 +72,20 @@ export function App(): ReactElement {
     (voice.status.state === VoiceState.IDLE || voice.status.state === VoiceState.DISABLED);
 
   useEffect(() => {
-    if (!isMicrophonePickerOpen) {
+    if (!dialogs.state.microphone) {
       microphoneTests.cancelTest();
     }
-  }, [isMicrophonePickerOpen, microphoneTests.cancelTest]);
+  }, [dialogs.state.microphone, microphoneTests.cancelTest]);
 
   useEffect(() => {
     if (!user) {
-      setIsMicrophonePickerOpen(false);
+      closeDialog(DesktopDialog.MICROPHONE);
       return;
     }
     if (voice.status.state === VoiceState.IDLE) {
       void microphones.refreshMicrophones();
     }
-  }, [user, voice.status.state, microphones.refreshMicrophones]);
+  }, [user, voice.status.state, microphones.refreshMicrophones, closeDialog]);
   const permissions = useDesktopPermissions(user?.id ?? null);
   const companionMessage = useCursorCompanion(
     user?.id ?? null,
@@ -84,27 +95,45 @@ export function App(): ReactElement {
 
   useEffect(() => {
     if (permissions.status?.kind === 'ready' && previousPermissionKind.current !== 'ready') {
-      setPage(DesktopPage.WORKSPACE);
+      closeDialog(DesktopDialog.SETTINGS);
     }
     previousPermissionKind.current = permissions.status?.kind;
-  }, [permissions.status?.kind]);
+  }, [permissions.status?.kind, closeDialog]);
 
   return (
     <>
-      <MicrophonePicker
-        opened={isMicrophonePickerOpen && Boolean(user)}
-        onClose={() => {
-          microphoneTests.cancelTest();
-          setIsMicrophonePickerOpen(false);
-        }}
-        tests={microphoneTests}
-        canTest={canTestMicrophone}
-        microphones={microphones}
-        isEnabled={Boolean(user)}
-        hasVoiceError={voice.error}
-        retryVoice={() => voice.retryVoice()}
-        isRetryingVoice={voice.isStarting}
-      />
+      <Modal.Stack>
+        <SettingsDialog
+          {...dialogs.register(DesktopDialog.SETTINGS)}
+          onExitTransitionEnd={() => {
+            if (!dialogs.state.microphone) {
+              returnSettingsFocus();
+            }
+          }}
+          user={user}
+          microphones={microphones}
+          voiceStatus={voice.status}
+          onChooseMicrophone={() => {
+            dialogs.open(DesktopDialog.MICROPHONE);
+          }}
+        />
+        <MicrophonePicker
+          stackId={DesktopDialog.MICROPHONE}
+          onExitTransitionEnd={returnMicrophoneFocus}
+          opened={dialogs.state.microphone && Boolean(user)}
+          onClose={() => {
+            microphoneTests.cancelTest();
+            closeDialog(DesktopDialog.MICROPHONE);
+          }}
+          tests={microphoneTests}
+          canTest={canTestMicrophone}
+          microphones={microphones}
+          isEnabled={Boolean(user)}
+          hasVoiceError={voice.error}
+          retryVoice={() => voice.retryVoice()}
+          isRetryingVoice={voice.isStarting}
+        />
+      </Modal.Stack>
       <AppShell navbar={{ width: 232, breakpoint: 0 }} padding={0} className="desktop-shell">
         <AppShell.Navbar className="desktop-sidebar" withBorder={false}>
           <Group gap={10} className="brand">
@@ -118,10 +147,10 @@ export function App(): ReactElement {
           <nav aria-label={messages.navigation} className="sidebar-navigation">
             <UnstyledButton
               className="sidebar-link"
-              data-active={page === DesktopPage.WORKSPACE || undefined}
-              aria-current={page === DesktopPage.WORKSPACE ? 'page' : undefined}
+              data-active={!dialogs.state.settings || undefined}
+              aria-current="page"
               onClick={() => {
-                setPage(DesktopPage.WORKSPACE);
+                closeDialog(DesktopDialog.SETTINGS);
               }}
             >
               <IconLayoutSidebar size={19} stroke={1.6} />
@@ -131,10 +160,11 @@ export function App(): ReactElement {
           <div className="sidebar-bottom">
             <UnstyledButton
               className="sidebar-link"
-              data-active={page === DesktopPage.SETTINGS || undefined}
-              aria-current={page === DesktopPage.SETTINGS ? 'page' : undefined}
+              data-active={dialogs.state.settings || undefined}
+              aria-haspopup="dialog"
+              aria-expanded={dialogs.state.settings}
               onClick={() => {
-                setPage(DesktopPage.SETTINGS);
+                dialogs.open(DesktopDialog.SETTINGS);
               }}
             >
               <IconSettings size={19} stroke={1.6} />
@@ -202,7 +232,7 @@ export function App(): ReactElement {
           <div className="main-panel">
             <header className="panel-header">
               <Text size="sm" c="dimmed">
-                {page === DesktopPage.WORKSPACE ? messages.workspace : messages.settings}
+                {messages.workspace}
               </Text>
               <Group gap="md">
                 {user && (
@@ -210,7 +240,7 @@ export function App(): ReactElement {
                     variant="subtle"
                     leftSection={<IconMicrophone size={16} />}
                     onClick={() => {
-                      setIsMicrophonePickerOpen(true);
+                      dialogs.open(DesktopDialog.MICROPHONE);
                     }}
                   >
                     {messages.microphone}
@@ -239,14 +269,7 @@ export function App(): ReactElement {
                   {messages.microphoneVoiceError}
                 </Alert>
               )}
-              {page === DesktopPage.SETTINGS ? (
-                <SettingsPage
-                  user={user}
-                  onChooseMicrophone={() => {
-                    setIsMicrophonePickerOpen(true);
-                  }}
-                />
-              ) : user && permissions.status?.kind !== 'ready' ? (
+              {user && permissions.status?.kind !== 'ready' ? (
                 <PermissionsOnboardingPage controller={permissions} />
               ) : (
                 <ComputerUsePage controller={controller} />

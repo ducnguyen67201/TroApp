@@ -177,8 +177,7 @@ textarea:focus-visible {
   background: var(--tro-muted-surface);
 }
 
-.workspace-empty h2,
-.settings-card h2 {
+.workspace-empty h2 {
   font-size: 18px;
   letter-spacing: -0.02em;
 }
@@ -240,11 +239,149 @@ textarea:focus-visible {
   line-height: 1.65;
 }
 
-.settings-card {
-  max-width: 640px;
-  padding: 28px;
-  border-color: var(--tro-border);
+/* Keep settings within the window while each category scrolls independently. */
+.settings-dialog {
   background: var(--tro-surface);
+}
+
+.settings-dialog-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--tro-border);
+  background: var(--tro-surface);
+}
+
+.settings-dialog-body {
+  padding: 0;
+}
+
+.settings-layout {
+  height: min(480px, calc(100dvh - 150px));
+  min-height: 0;
+}
+
+.settings-navigation {
+  flex: 0 0 190px;
+  padding: 20px 12px;
+  gap: 6px;
+  border-right: 1px solid var(--tro-border);
+  background: var(--tro-sidebar);
+}
+
+.settings-tab {
+  justify-content: flex-start;
+  padding: 11px 12px;
+  color: var(--tro-muted);
+}
+
+.settings-tab[data-active] {
+  background: var(--tro-selection);
+  color: var(--tro-text);
+}
+
+.settings-tab:hover {
+  background: var(--tro-muted-surface);
+}
+
+.settings-panel {
+  min-width: 0;
+  padding: 30px 34px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.settings-panel h3 {
+  font-size: 24px;
+  font-weight: 550;
+  letter-spacing: -0.025em;
+  margin-bottom: 24px;
+}
+
+.settings-rows {
+  padding: 0 20px;
+  border-radius: 12px;
+  background: var(--tro-muted-surface);
+}
+
+.settings-account-hint {
+  padding-block: 20px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 82px;
+  padding: 18px 0;
+}
+
+.settings-row + .settings-row {
+  border-top: 1px solid var(--tro-border);
+}
+
+.settings-row-copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-row-control {
+  flex: 0 0 164px;
+  text-align: right;
+}
+
+.settings-row-control button,
+.settings-row-control select {
+  width: 100%;
+}
+
+.settings-shortcut {
+  font-family: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--tro-muted);
+}
+
+.settings-microphone-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+}
+
+@media (max-width: 700px) {
+  .settings-navigation {
+    flex-basis: 136px;
+    padding: 16px 8px;
+  }
+
+  .settings-tab {
+    gap: 6px;
+    padding-inline: 8px;
+  }
+
+  .settings-panel {
+    padding: 20px;
+  }
+
+  .settings-panel h3 {
+    margin-bottom: 16px;
+  }
+
+  .settings-rows {
+    padding-inline: 14px;
+  }
+
+  .settings-row {
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 0;
+    padding-block: 14px;
+  }
+
+  .settings-row-control {
+    flex-basis: 100%;
+    text-align: left;
+  }
 }
 
 .account-email {

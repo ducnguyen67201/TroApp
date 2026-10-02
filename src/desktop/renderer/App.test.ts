@@ -119,7 +119,7 @@ describe('desktop scaffold', () => {
     renderDesktop();
     fireEvent.click(await screen.findByRole('button', { name: 'Sign in' }));
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
-    const account = screen.getByRole('region', { name: 'Your account' });
+    const account = screen.getByRole('region', { name: 'Your account', hidden: true });
     await waitFor(
       () => {
         expect(within(account).getByText(testUser.email)).toBeTruthy();
@@ -155,8 +155,10 @@ describe('desktop scaffold', () => {
     fireEvent.change(input, { target: { value: 'A draft to keep' } });
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy();
-    expect(screen.getAllByText(testUser.email)).toHaveLength(2);
-    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }));
+    const settings = screen.getByRole('dialog', { name: 'Settings' });
+    fireEvent.click(within(settings).getByRole('tab', { name: 'Account' }));
+    expect(within(settings).getByText(testUser.email)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Close settings' }));
     expect(screen.getByText('Here is your answer.')).toBeTruthy();
     const restoredInput = screen.getByRole('textbox', { name: 'Your message' });
     expect(restoredInput).toHaveProperty('value', 'A draft to keep');
@@ -172,6 +174,36 @@ describe('desktop scaffold', () => {
       AgentTaskMode.TEACH,
     );
     expect(bridge.stopAgentSession).not.toHaveBeenCalled();
+  });
+
+  it('shows compact General preferences and switches to Account without leaving the workspace', async () => {
+    const bridge = createDesktopBridge();
+    window.tro = bridge;
+    renderDesktop();
+    const input = await screen.findByRole('textbox', { name: 'Your message' });
+    fireEvent.change(input, { target: { value: 'Keep this draft' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    const dialog = screen.getByRole('dialog', { name: 'Settings' });
+    expect(within(dialog).getByRole('tab', { name: 'General' }).getAttribute('aria-selected')).toBe(
+      'true',
+    );
+    expect(within(dialog).getByText('Command + Control')).toBeTruthy();
+    expect(within(dialog).getByText('Auto-detect')).toBeTruthy();
+    expect(within(dialog).getByRole('combobox', { name: 'Language' })).toHaveProperty(
+      'value',
+      'en',
+    );
+    expect(within(dialog).getByText('Light')).toBeTruthy();
+    expect(within(dialog).queryByText(testUser.email)).toBeNull();
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Account' }));
+    expect(within(dialog).getByText(testUser.email)).toBeTruthy();
+    expect(within(dialog).queryByRole('combobox')).toBeNull();
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'General' }));
+    expect(within(dialog).getByRole('combobox', { name: 'Language' })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close settings' }));
+    expect(screen.getByRole('textbox', { name: 'Your message' })).toBe(input);
+    expect(input).toHaveProperty('value', 'Keep this draft');
+    expect(bridge.startAgentSession).not.toHaveBeenCalled();
   });
 
   it('clears account, draft and conversation after successful sidebar sign-out', async () => {
@@ -213,16 +245,22 @@ describe('desktop scaffold', () => {
       expect(bridge.sendAgentMessage).toHaveBeenCalledTimes(1);
     });
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
-    expect(screen.getByRole('button', { name: 'Sign out' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Sign out', hidden: true })).toHaveProperty(
+      'disabled',
+      true,
+    );
     completeTask?.({
       kind: 'completed',
       completion: { kind: 'response' },
       answer: 'Task finished.',
     });
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Sign out' })).toHaveProperty('disabled', false);
+      expect(screen.getByRole('button', { name: 'Sign out', hidden: true })).toHaveProperty(
+        'disabled',
+        false,
+      );
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close settings' }));
     expect(screen.getByText('Task finished.')).toBeTruthy();
   });
 
@@ -322,7 +360,7 @@ describe('desktop language', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Ngôn ngữ' }), {
       target: { value: 'en' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close settings' }));
     expect(screen.getByRole('heading', { name: 'Give Tro access to your desktop.' })).toBeTruthy();
     expect(screen.getByText('Not enabled')).toBeTruthy();
     expect(bridge.readDesktopPermissions).toHaveBeenCalledTimes(1);
@@ -341,6 +379,8 @@ describe('desktop language', () => {
     expect(language).toHaveProperty('value', 'vi');
     expect(within(language).getByRole('option', { name: 'Tiếng Việt' })).toBeTruthy();
     expect(within(language).getByRole('option', { name: 'English' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Chọn micrô' })).toHaveProperty('disabled', true);
+    fireEvent.click(screen.getByRole('tab', { name: 'Tài khoản' }));
     expect(screen.getByText('Đăng nhập ở thanh bên để xem tài khoản của bạn.')).toBeTruthy();
   });
 
@@ -361,7 +401,7 @@ describe('desktop language', () => {
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy();
     expect(document.documentElement.lang).toBe('en');
     expect(window.localStorage.getItem(localeStorageKey)).toBe('en');
-    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close settings' }));
     expect(screen.getByRole('textbox', { name: 'Your message' })).toHaveProperty(
       'value',
       'Bản nháp tiếng Việt',
@@ -406,7 +446,10 @@ describe('desktop language', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Language' }), {
       target: { value: 'vi' },
     });
-    expect(screen.getByRole('button', { name: 'Đăng xuất' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Đăng xuất', hidden: true })).toHaveProperty(
+      'disabled',
+      true,
+    );
     expect(bridge.stopAgentSession).not.toHaveBeenCalled();
     completeTask?.({
       kind: 'completed',
@@ -414,9 +457,12 @@ describe('desktop language', () => {
       answer: 'Completed in the original language.',
     });
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Đăng xuất' })).toHaveProperty('disabled', false);
+      expect(screen.getByRole('button', { name: 'Đăng xuất', hidden: true })).toHaveProperty(
+        'disabled',
+        false,
+      );
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Không gian làm việc' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Đóng cài đặt' }));
     expect(screen.getByText('Completed in the original language.')).toBeTruthy();
     expect(screen.getByText('Keep working')).toBeTruthy();
     expect(bridge.sendAgentMessage).toHaveBeenLastCalledWith(
@@ -468,7 +514,9 @@ describe('desktop language', () => {
       target: { value: 'en' },
     });
     expect(document.documentElement.lang).toBe('en');
-    expect(screen.getByRole('status').textContent).toContain('could not be saved');
+    expect(
+      within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('status').textContent,
+    ).toContain('could not be saved');
   });
 
   it('translates bridge errors and retranslates an existing alert when the language changes', async () => {
@@ -487,6 +535,7 @@ describe('desktop language', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Ngôn ngữ' }), {
       target: { value: 'en' },
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Close settings' }));
     expect(screen.getByRole('alert').textContent).toContain('Could not reach the sign-in service.');
     expect(bridge.readAuthSession).toHaveBeenCalledTimes(1);
   });
@@ -679,7 +728,7 @@ it('keeps voice active across navigation without a duplicate workspace panel', a
   expect(screen.queryByRole('button', { name: 'Enable voice input' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'Disable voice input' })).toBeNull();
   expect(screen.queryByLabelText('Hold-to-talk shortcut')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Workspace' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Close settings' }));
   await screen.findByRole('textbox', { name: 'Your message' });
   expect(screen.queryByText('Hold to talk; release to send')).toBeNull();
   expect(screen.queryByRole('button', { name: 'Hold to talk' })).toBeNull();
@@ -809,7 +858,15 @@ it('selects and saves a suggested microphone from the accessible picker without 
     expect(window.localStorage.getItem(microphoneStorageKey)).toBe('usb');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Choose microphone' }));
+    const settings = screen.getByRole('dialog', { name: 'Settings' });
+    expect(within(settings).getByText('USB microphone')).toBeTruthy();
+    fireEvent.click(within(settings).getByRole('button', { name: 'Choose microphone' }));
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Microphone' })).toBeNull();
+    });
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeTruthy();
+    fireEvent.click(within(settings).getByRole('button', { name: 'Choose microphone' }));
     expect(await screen.findByRole('radio', { name: /USB microphone/ })).toHaveProperty(
       'checked',
       true,
@@ -830,6 +887,13 @@ it('selects and saves a suggested microphone from the accessible picker without 
     expect(screen.getByText(/Sound is measured on this device/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Test AirPods' })).toBeTruthy();
     expect(getUserMedia).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(within(settings).getByText('Auto-detect')).toBeTruthy();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull();
+    });
+    expect(screen.getByRole('textbox', { name: 'Your message' })).toBeTruthy();
   } finally {
     cleanup();
     Reflect.deleteProperty(navigator, 'mediaDevices');

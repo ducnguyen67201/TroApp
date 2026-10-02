@@ -4,7 +4,7 @@ Read README.md, AGENTS.md, and Architecture.md first. Tro is one pnpm root. Use 
 
 | Change               | Start here                                                                               | Verify                                                   |
 | -------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| UI                   | `src/desktop/renderer/App.tsx`                                                           | Renderer types and interaction                           |
+| UI                   | `src/desktop/renderer/App.tsx`, `SettingsDialog.tsx`                                     | Renderer types and interaction                           |
 | Microphone selection | `src/desktop/renderer/voice/UseMicrophones.ts`, `Microphones.ts`, `MicrophonePicker.tsx` | Inventory, ranking, local test lease and capture cleanup |
 | Desktop capability   | `Preload.ts`, `Main.ts`                                                                  | IPC validation and sender restrictions                   |
 | Public response      | `src/contracts/SystemStatus.ts`                                                          | API/client/contract checks                               |

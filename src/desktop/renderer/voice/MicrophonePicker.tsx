@@ -8,9 +8,11 @@ import type { MicrophoneView } from './UseMicrophones.js';
 
 interface MicrophonePickerProps {
   opened: boolean;
+  stackId?: string;
   tests: MicrophoneTestsView;
   canTest: boolean;
   onClose: () => void;
+  onExitTransitionEnd: () => void;
   microphones: MicrophoneView;
   isEnabled: boolean;
   hasVoiceError: boolean;
@@ -90,9 +92,11 @@ function MicrophoneOption({
 /** Opening the dialog enumerates only. Tests require an explicit button press. */
 export function MicrophonePicker({
   opened,
+  stackId,
   tests,
   canTest,
   onClose,
+  onExitTransitionEnd,
   microphones,
   isEnabled,
   hasVoiceError,
@@ -123,8 +127,11 @@ export function MicrophonePicker({
 
   return (
     <Modal
+      {...(stackId ? { stackId } : {})}
       opened={opened}
       onClose={onClose}
+      returnFocus={false}
+      onExitTransitionEnd={onExitTransitionEnd}
       title={messages.microphone}
       size={isComparing ? 'lg' : 'md'}
     >
