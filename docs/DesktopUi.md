@@ -25,7 +25,8 @@ The theme's CSS variable resolver exposes semantic `--tro-*` tokens and aligns M
 - `Render.tsx` installs the one `LocaleProvider` around the complete desktop interface.
 - `App.tsx` owns the Mantine AppShell, sidebar and selected destination and reads all interface copy through `useLocale`.
 - `UseComputerUse.ts` owns authentication and the in-memory task state. It stays mounted when changing destinations, so Settings does not clear a draft or an active task.
-- `ComputerUsePage.tsx` renders the workspace and composer.
+- `ComputerUsePage.tsx` renders the workspace and composer. Voice capture and task progress use the companion HUD, with no duplicate voice panel above the workspace.
+- `App.tsx` keeps `UseVoiceInput.ts` mounted across navigation for shortcut capture, audio delivery and voice task replies.
 - `SettingsPage.tsx` renders account details, language selection and the current appearance.
 - `localization/LocaleProvider.tsx` owns locale state and persistence for the renderer root.
 - `localization/UseLocale.ts` is the typed hook components use to read messages and change the language.

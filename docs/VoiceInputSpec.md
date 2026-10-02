@@ -4,14 +4,13 @@ Status: implementation added October 1, 2026. This describes the code and its re
 
 ## User behavior
 
-Voice input starts automatically after signing in, with no enable/disable setting. The workspace shows the platform shortcut and explains that held-key audio goes to OpenAI and releasing sends the recognized instruction automatically. macOS requests microphone and Tro Accessibility permissions at startup; missing shortcut permission leaves the Talk button available. After granting access, use **Check voice permissions again** in the workspace. Signing out or closing the window stops the listener and cancels capture; signing in starts it again. Stale startup replies cannot reactivate voice after an account change. Voice uses the current `useLocale().locale`, with no separate speech-language preference.
+Voice input starts automatically after signing in, with no enable/disable setting. Held-key audio goes to OpenAI, and releasing sends the recognized instruction automatically. The companion HUD shows capture and task progress; the workspace has no separate voice panel, Talk button or transcript preview. macOS requests microphone and Tro Accessibility permissions at startup. If the shortcut is unavailable, use typed messages, restore OS access and sign in again to retry voice startup. Signing out or closing the window stops the listener and cancels capture; signing in starts it again. Stale startup replies cannot reactivate voice after an account change. Voice uses the current `useLocale().locale`, with no separate speech-language preference.
 
 - Mac default: hold Command + Control.
 - Windows default: hold Control + **Left** Alt. Right Alt is excluded because Windows uses it for AltGr.
 - Pressing the second modifier starts preparation and microphone capture. Releasing either stops recording. Both modifiers must be released before final instruction admission or another hold.
-- A Talk button supports pointer holds and Space/Enter holds, including when the native hook is unavailable.
-- Partial text is a preview. Only the complete final transcript starts an agent task. The accepted instruction appears immediately; typed drafts remain untouched.
-- Escape, Cancel, sleep, screen lock, account change, window close, or an error cancel capture. Late results from canceled captures cannot start tasks.
+- Partial text remains internal to the capture lifecycle. Only the complete final transcript starts an agent task. The accepted instruction appears immediately; typed drafts remain untouched.
+- Escape, sleep, screen lock, account change, window close, or an error cancel capture. Late results from canceled captures cannot start tasks.
 - A running agent blocks voice activation and concurrent text admission. This also prevents agent keyboard actions from activating voice. Voice retains the existing independent-task behavior and does not add conversation memory.
 
 No microphone tracks remain open between holds. Wait for the listening indicator before speaking on a cold microphone start; hardware activation cannot be instantaneous. A five-second bounded audio queue preserves captured speech while the relay connects. Releasing before the relay is ready stops the microphone immediately and waits for the connection to finalize already captured speech; it does not discard the command. Escape or an error cancels it.
@@ -32,7 +31,7 @@ The implementation opens one WebSocket per capture and closes it after completio
 
 ```mermaid
 flowchart LR
-  Keys[Native modifier listener / Talk button] --> Main[VoiceInputController]
+  Keys[Native modifier listener] --> Main[VoiceInputController]
   Main -->|Capture request| Hook[UseVoiceInput + existing useLocale]
   Hook --> Mic[VoiceAudioCapture + AudioWorklet]
   Mic -->|Bounded PCM frames| Preload[Named preload methods]
@@ -48,7 +47,7 @@ flowchart LR
 
 Main owns capture identity, account rechecks, deadlines, cancellation, and final submission. React never submits the final transcript again. It receives validated task events and displays them in memory. The existing agent controller still checks sign-in and desktop control permissions and owns the worker. Text submission accepts an explicit instruction rather than depending on a preceding React state update.
 
-The native listener owns physical key state, auto-repeat suppression, first-release stop, and both-release rearming. It is loaded during authenticated voice startup after OS permission checks. Mac requires Tro's Accessibility permission, shared with its embedded computer-use driver. Missing hook access leaves the Talk button available. Packaged permissions, Input Monitoring requirements, background recording and Windows AltGr behavior must be tested on each supported OS.
+The native listener owns physical key state, auto-repeat suppression, first-release stop, and both-release rearming. It is loaded during authenticated voice startup after OS permission checks. Mac requires Tro's Accessibility permission, shared with its embedded computer-use driver. Missing hook access prevents shortcut capture; typed messages remain available. Packaged permissions, Input Monitoring requirements, background recording and Windows AltGr behavior must be tested on each supported OS.
 
 The sandboxed renderer owns microphone resources. Electron's permission check and request handlers allow audio only for the trusted main frame during an active capture. Cameras, other permissions, and unrelated frames are denied. macOS packaging includes `NSMicrophoneUsageDescription` and the audio-input entitlement. Microphone tracks stop on release/cancel even if device setup completes late.
 
@@ -102,7 +101,6 @@ src/desktop/renderer/voice/
   UseVoiceInput.ts           Existing locale hook, audio queue and lifecycle
   VoiceAudioCapture.ts      Microphone, AudioContext and worklet cleanup
   VoiceAudioProcessor.ts    Audio-thread PCM16 conversion and tail flushing
-  VoiceInputPanel.tsx        Hold controls, preview and capture status
 src/server/features/transcription/
   TranscriptionConfig.ts             Typed daily allowance and recognition delay defaults
   ports/LiveTranscriber.ts            Provider-independent live capture
@@ -114,7 +112,7 @@ src/server/persistence/
   PrismaTranscriptionAllowance.ts     Prisma-only quota and lease implementation
 ```
 
-`Main.ts`, `Preload.ts`, `AuthClient.ts` and `StartApi.ts` compose these feature modules. App owns the voice hook across navigation. `VoiceInputPanel.tsx` and both localization catalogs own disclosure and permission recovery copy; Settings has no voice activation controls. No general event bus, sibling imports or new service is needed.
+`Main.ts`, `Preload.ts`, `AuthClient.ts` and `StartApi.ts` compose these feature modules. App owns the voice hook across navigation. The native companion HUD owns voice presentation; Workspace and Settings have no voice activation controls. No general event bus, sibling imports or new service is needed.
 
 ## Verification and release evidence
 
