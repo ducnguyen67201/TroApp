@@ -1,3 +1,7 @@
+import {
+  AgentProgressPhase,
+  type AgentProgressPhase as ProgressPhase,
+} from '#contracts/CompanionHud.js';
 import { z } from 'zod';
 import { MCPServerStdio, type CallToolResult, type MCPCallToolOptions } from '@openai/agents';
 import type { Logger } from 'pino';
@@ -138,6 +142,12 @@ function includeCuaMetadata(result: CallToolResult): CallToolResult {
 /** Trace the real SDK-to-Cua MCP boundary; the SDK calls this method for each tool. */
 export class LoggedCuaServer extends MCPServerStdio {
   readonly taskEvidence = new CuaTaskEvidence();
+  private activeToolCount = 0;
+  private receiveProgress: ((phase: ProgressPhase) => void) | null = null;
+
+  setProgressListener(listener: ((phase: ProgressPhase) => void) | null): void {
+    this.receiveProgress = listener;
+  }
   private taskMode: AgentTaskMode = AgentTaskMode.EXECUTE;
   private discoveredTools: Set<string> | null = null;
   private onTeachingTerminal: (() => void) | null = null;
@@ -282,7 +292,7 @@ export class LoggedCuaServer extends MCPServerStdio {
     const startedAt = performance.now();
     this.log.debug({ toolName, arguments: describeCuaArguments(args) }, 'cua.request');
     try {
-      const native = await super.callToolResult(toolName, args, meta, options);
+      const native = await this.callTaskTool(toolName, args, meta, options);
       let result = guidanceRequest ? native : validatePreviewResult(toolName, native);
       if (guidanceRequest) {
         const valid = this.taskEvidence.settleGuidanceRequest(guidanceRequest, result);
@@ -333,6 +343,27 @@ export class LoggedCuaServer extends MCPServerStdio {
         'cua.failed',
       );
       throw error;
+    }
+  }
+  private async callTaskTool(
+    toolName: string,
+    args: Record<string, unknown> | null,
+    meta?: Record<string, unknown> | null,
+    options?: MCPCallToolOptions,
+  ): Promise<CallToolResult> {
+    this.activeToolCount += 1;
+    this.receiveProgress?.(
+      this.taskMode === AgentTaskMode.TEACH
+        ? AgentProgressPhase.SHOWING
+        : AgentProgressPhase.WORKING,
+    );
+    try {
+      return await super.callToolResult(toolName, args, meta, options);
+    } finally {
+      this.activeToolCount -= 1;
+      if (this.activeToolCount === 0) {
+        this.receiveProgress?.(AgentProgressPhase.THINKING);
+      }
     }
   }
 }

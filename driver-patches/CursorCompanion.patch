@@ -1,5 +1,5 @@
 diff --git a/libs/cua-driver/rust/Cargo.lock b/libs/cua-driver/rust/Cargo.lock
-index 74051d8..7fb9e2e 100644
+index 74051d8..0eac161 100644
 --- a/libs/cua-driver/rust/Cargo.lock
 +++ b/libs/cua-driver/rust/Cargo.lock
 @@ -1205,7 +1205,7 @@ dependencies = [
@@ -7,7 +7,7 @@ index 74051d8..7fb9e2e 100644
  [[package]]
  name = "cua-driver"
 -version = "0.30.4"
-+version = "0.30.4-tro.2"
++version = "0.30.4-tro.3"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -16,7 +16,7 @@ index 74051d8..7fb9e2e 100644
  [[package]]
  name = "cua-driver-bindgen"
 -version = "0.30.4"
-+version = "0.30.4-tro.2"
++version = "0.30.4-tro.3"
  dependencies = [
   "cbindgen",
   "uniffi",
@@ -25,7 +25,7 @@ index 74051d8..7fb9e2e 100644
  [[package]]
  name = "cua-driver-contract"
 -version = "0.30.4"
-+version = "0.30.4-tro.2"
++version = "0.30.4-tro.3"
  dependencies = [
   "schemars",
   "serde",
@@ -34,7 +34,7 @@ index 74051d8..7fb9e2e 100644
  [[package]]
  name = "cua-driver-core"
 -version = "0.30.4"
-+version = "0.30.4-tro.2"
++version = "0.30.4-tro.3"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -43,7 +43,7 @@ index 74051d8..7fb9e2e 100644
  [[package]]
  name = "cua-driver-e2e"
 -version = "0.30.4"
-+version = "0.30.4-tro.2"
++version = "0.30.4-tro.3"
  dependencies = [
   "base64",
   "core-foundation",
@@ -52,7 +52,7 @@ index 74051d8..7fb9e2e 100644
  [[package]]
  name = "cua-driver-sdk"
 -version = "0.30.4"
-+version = "0.30.4-tro.2"
++version = "0.30.4-tro.3"
  dependencies = [
   "async-trait",
   "core-foundation",
@@ -61,7 +61,7 @@ index 74051d8..7fb9e2e 100644
  [[package]]
  name = "cua-driver-testkit"
 -version = "0.30.4"
-+version = "0.30.4-tro.2"
++version = "0.30.4-tro.3"
  dependencies = [
   "arbitrary",
   "async-trait",
@@ -70,7 +70,7 @@ index 74051d8..7fb9e2e 100644
  [[package]]
  name = "cua-driver-uia"
 -version = "0.30.4"
-+version = "0.30.4-tro.2"
++version = "0.30.4-tro.3"
  dependencies = [
   "anyhow",
   "cua-driver-core",
@@ -79,7 +79,7 @@ index 74051d8..7fb9e2e 100644
  [[package]]
  name = "cursor-overlay"
 -version = "0.30.4"
-+version = "0.30.4-tro.2"
++version = "0.30.4-tro.3"
  dependencies = [
   "anyhow",
   "cua-driver-contract",
@@ -88,7 +88,7 @@ index 74051d8..7fb9e2e 100644
  [[package]]
  name = "cursor-theme-cli"
 -version = "0.30.4"
-+version = "0.30.4-tro.2"
++version = "0.30.4-tro.3"
  dependencies = [
   "anyhow",
   "cursor-overlay",
@@ -97,7 +97,7 @@ index 74051d8..7fb9e2e 100644
  [[package]]
  name = "pip-preview"
 -version = "0.30.4"
-+version = "0.30.4-tro.2"
++version = "0.30.4-tro.3"
  dependencies = [
   "serde_json",
  ]
@@ -106,7 +106,7 @@ index 74051d8..7fb9e2e 100644
  [[package]]
  name = "platform-linux"
 -version = "0.30.4"
-+version = "0.30.4-tro.2"
++version = "0.30.4-tro.3"
  dependencies = [
   "anyhow",
   "ashpd",
@@ -115,7 +115,7 @@ index 74051d8..7fb9e2e 100644
  [[package]]
  name = "platform-macos"
 -version = "0.30.4"
-+version = "0.30.4-tro.2"
++version = "0.30.4-tro.3"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -124,12 +124,12 @@ index 74051d8..7fb9e2e 100644
  [[package]]
  name = "platform-windows"
 -version = "0.30.4"
-+version = "0.30.4-tro.2"
++version = "0.30.4-tro.3"
  dependencies = [
   "anyhow",
   "async-trait",
 diff --git a/libs/cua-driver/rust/Cargo.toml b/libs/cua-driver/rust/Cargo.toml
-index 53edeb0..e88cc66 100644
+index 53edeb0..fe85d8c 100644
 --- a/libs/cua-driver/rust/Cargo.toml
 +++ b/libs/cua-driver/rust/Cargo.toml
 @@ -19,7 +19,7 @@ members = [
@@ -137,7 +137,7 @@ index 53edeb0..e88cc66 100644
  
  [workspace.package]
 -version = "0.30.4"
-+version = "0.30.4-tro.2"
++version = "0.30.4-tro.3"
  edition = "2021"
  authors = ["trycua"]
  license = "MIT"
@@ -477,15 +477,159 @@ index 0000000..c04854c
 +    Legacy(CursorCompanionOutput),
 +}
 +impl ToolOutput for CursorSequenceOutput {}
+diff --git a/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs
+new file mode 100644
+index 0000000..1436edd
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs
+@@ -0,0 +1,133 @@
++//! Host-only content-free presentation vocabulary; no desktop action semantics.
++use crate::{Platform, SchemaMode, ToolAnnotations, ToolContract, ToolInput, ToolOutput};
++use schemars::JsonSchema;
++use serde::{Deserialize, Serialize};
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
++#[serde(rename_all = "snake_case")]
++pub enum CompanionHudPhase {
++    #[default]
++    Idle,
++    Preparing,
++    Listening,
++    Transcribing,
++    Sending,
++    Thinking,
++    Showing,
++    Working,
++    Done,
++    Canceled,
++    Error,
++    DailyLimit,
++    NeedsInput,
++}
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
++pub enum CompanionHudLocale {
++    #[default]
++    #[serde(rename = "en")]
++    English,
++    #[serde(rename = "vi")]
++    Vietnamese,
++}
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct SetCompanionHudInput {
++    pub session: Option<String>,
++    pub group: String,
++    pub sequence: u64,
++    pub phase: CompanionHudPhase,
++    pub locale: CompanionHudLocale,
++    pub level: f64,
++}
++impl ToolInput for SetCompanionHudInput {
++    const TOOL_NAME: &'static str = "set_companion_hud";
++    fn validate(&self) -> Result<(), String> {
++        if !valid_group(&self.group)
++            || !self.level.is_finite()
++            || !(0.0..=1.0).contains(&self.level)
++            || self.sequence > 9_007_199_254_740_991
++        {
++            return Err("Invalid bounded HUD snapshot.".into());
++        }
++        Ok(())
++    }
++}
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct BindCompanionHudCursorInput {
++    pub session: Option<String>,
++    pub group: String,
++}
++impl ToolInput for BindCompanionHudCursorInput {
++    const TOOL_NAME: &'static str = "bind_companion_hud_cursor";
++    fn validate(&self) -> Result<(), String> {
++        if !valid_group(&self.group) {
++            return Err("Invalid HUD group.".into());
++        }
++        Ok(())
++    }
++}
++fn valid_group(group: &str) -> bool {
++    group.len() == 36
++        && group.chars().enumerate().all(|(index, ch)| {
++            if [8, 13, 18, 23].contains(&index) {
++                ch == '-'
++            } else {
++                ch.is_ascii_hexdigit()
++            }
++        })
++}
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct CompanionHudOutput {
++    pub applied: bool,
++}
++impl ToolOutput for CompanionHudOutput {}
++pub fn contracts() -> Vec<ToolContract> {
++    vec![
++        contract::<SetCompanionHudInput>(),
++        contract::<BindCompanionHudCursorInput>(),
++    ]
++}
++fn contract<I: ToolInput>() -> ToolContract {
++    ToolContract {
++        name: I::TOOL_NAME.into(),
++        description: "Private host presentation. Not a model tool or desktop action.".into(),
++        platforms: vec![Platform::Macos],
++        aliases: vec![],
++        capabilities: vec!["agent_cursor.presentation".into()],
++        annotations: ToolAnnotations {
++            read_only: false,
++            destructive: false,
++            idempotent: true,
++            open_world: false,
++        },
++        schema_mode: SchemaMode::CanonicalRuntime,
++        cursor_semantics: None,
++        input_schema: I::input_schema(),
++        success_output_schema: Some(CompanionHudOutput::output_schema()),
++        error_output_schema: None,
++        output_validator: crate::validate_typed_output::<CompanionHudOutput>,
++    }
++}
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn companion_hud_rejects_unbounded_input() {
++        let mut input = SetCompanionHudInput {
++            session: None,
++            group: "11111111-1111-4111-8111-111111111111".into(),
++            sequence: 0,
++            phase: CompanionHudPhase::Listening,
++            locale: CompanionHudLocale::English,
++            level: 0.5,
++        };
++        assert!(input.validate().is_ok());
++        input.level = f64::NAN;
++        assert!(input.validate().is_err());
++        input.level = 0.5;
++        input.group = "bad".into();
++        assert!(input.validate().is_err());
++    }
++}
 diff --git a/libs/cua-driver/rust/crates/cua-driver-contract/src/lib.rs b/libs/cua-driver/rust/crates/cua-driver-contract/src/lib.rs
-index 5dceca8..c6c4541 100644
+index 5dceca8..f071836 100644
 --- a/libs/cua-driver/rust/crates/cua-driver-contract/src/lib.rs
 +++ b/libs/cua-driver/rust/crates/cua-driver-contract/src/lib.rs
-@@ -14,9 +14,11 @@ use serde_json::Value;
+@@ -14,9 +14,16 @@ use serde_json::Value;
  use std::collections::{BTreeMap, BTreeSet};
  use std::sync::OnceLock;
  
 +mod companion;
++mod companion_hud;
++pub use companion_hud::{
++    BindCompanionHudCursorInput, CompanionHudLocale, CompanionHudOutput, CompanionHudPhase,
++    SetCompanionHudInput,
++};
  pub mod compatibility;
  pub mod cursor;
  mod cursor_tools;
@@ -493,16 +637,17 @@ index 5dceca8..c6c4541 100644
  mod desktop;
  mod inputs;
  mod outputs;
-@@ -226,6 +228,7 @@ pub fn manifest() -> ContractManifest {
+@@ -226,6 +233,8 @@ pub fn manifest() -> ContractManifest {
      let mut tools = session::contracts();
      tools.extend(desktop::contracts());
      tools.extend(cursor_tools::contracts());
 +    tools.extend(companion::contracts());
++    tools.extend(companion_hud::contracts());
      tools.extend(verification::contracts());
      tools.extend(visual::contracts());
      tools.sort_by(|left, right| left.name.cmp(&right.name));
 diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs
-index b0902a0..a517178 100644
+index b0902a0..fe98600 100644
 --- a/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs
 +++ b/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs
 @@ -870,6 +870,8 @@ pub fn advertised_risk_for(tool: &str) -> RiskAssessment {
@@ -514,19 +659,21 @@ index b0902a0..a517178 100644
          | "get_agent_cursor_state"
          | "get_recording_state"
          | "check_for_update"
-@@ -898,6 +900,11 @@ pub fn advertised_risk_for(tool: &str) -> RiskAssessment {
+@@ -898,6 +900,13 @@ pub fn advertised_risk_for(tool: &str) -> RiskAssessment {
          | "set_window_frame"
          | "start_session"
          | "end_session"
 +        | "show_cursor_sequence"
 +        | "set_cursor_companion_mode"
++        | "set_companion_hud"
++        | "bind_companion_hud_cursor"
 +        | "cancel_cursor_sequence"
 +        | "begin_cursor_guidance_task"
 +        | "end_cursor_guidance_task"
          | "set_agent_cursor_enabled"
          | "set_agent_cursor_motion"
          | "set_agent_cursor_theme" => RiskClass::R1,
-@@ -1516,6 +1523,19 @@ mod tests {
+@@ -1516,6 +1525,19 @@ mod tests {
              .contains("no reviewed risk classification"));
      }
  
@@ -911,10 +1058,10 @@ index e1af27a..30bfff5 100644
          cli::Command::Autostart { subcommand } => {
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/examples/companion_preview.rs b/libs/cua-driver/rust/crates/cursor-overlay/examples/companion_preview.rs
 new file mode 100644
-index 0000000..61cea59
+index 0000000..05f2a88
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cursor-overlay/examples/companion_preview.rs
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,49 @@
 +//! Render the actual native teaching artwork without desktop permissions.
 +//! cargo run -p cursor-overlay --example companion_preview -- /tmp/Companion.png
 +use cursor_overlay::{
@@ -931,6 +1078,22 @@ index 0000000..61cea59
 +    // A dark backdrop makes the translucent halo readable in PNG viewers.
 +    image.fill(tiny_skia::Color::from_rgba8(16, 18, 22, 255));
 +    paint_cursor(&mut image, &core, 0.0, 0.0, None, 2.0);
++    if std::env::args().nth(2).as_deref() == Some("hud") {
++        use cua_driver_contract::{CompanionHudLocale, CompanionHudPhase};
++        let mut hud = cursor_overlay::companion_hud::CompanionHudPainter::default();
++        hud.update(
++            CompanionHudPhase::Thinking,
++            CompanionHudLocale::English,
++            0.0,
++        );
++        hud.tick(0.2, false);
++        hud.paint(
++            &mut image,
++            (core.pos.0 as f32, core.pos.1 as f32),
++            2.0,
++            false,
++        );
++    }
 +    let pixels: Vec<u8> = image
 +        .pixels()
 +        .iter()
@@ -1044,7 +1207,7 @@ index 0000000..47aa297
 +}
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/companion_appearance.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_appearance.rs
 new file mode 100644
-index 0000000..7712dd8
+index 0000000..cceea34
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_appearance.rs
 @@ -0,0 +1,146 @@
@@ -1056,9 +1219,9 @@ index 0000000..7712dd8
 +};
 +
 +pub const COMPANION_BLUE: [u8; 4] = [77, 163, 255, 255];
-+// Keep the silhouette compact at about 12 × 13 logical display points.
++// Keep the silhouette compact at about 9 × 10 logical display points.
 +// Apply the same factor to its outline, halo and click pulse without moving the tip.
-+const COMPANION_SIZE_SCALE: f32 = 5.0 / 12.0;
++const COMPANION_SIZE_SCALE: f32 = 0.3125;
 +const GLOW_RADIUS: f32 = 58.0;
 +
 +pub fn paint_companion_pointer(
@@ -1175,11 +1338,11 @@ index 0000000..7712dd8
 +                None,
 +            );
 +            let body = image
-+                .pixel((74.0 * scale) as u32, (71.0 * scale) as u32)
++                .pixel((73.0 * scale) as u32, (70.0 * scale) as u32)
 +                .unwrap();
 +            assert!(body.red() > 245 && body.green() > 245 && body.blue() > 245);
 +            let glow = image
-+                .pixel((62.0 * scale) as u32, (71.0 * scale) as u32)
++                .pixel((64.0 * scale) as u32, (70.0 * scale) as u32)
 +                .unwrap();
 +            assert!(glow.blue() > glow.green() && glow.green() > glow.red());
 +            assert!(glow.alpha() > 0 && glow.alpha() < 128);
@@ -1193,6 +1356,435 @@ index 0000000..7712dd8
 +        paint_companion_pointer(&mut image, (70.0, 65.0), 1.0, 0.0, true, Some(0.5));
 +        assert!(image.data().iter().all(|byte| *byte == 0));
 +    }
++}
+diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs
+new file mode 100644
+index 0000000..48be03c
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs
+@@ -0,0 +1,423 @@
++//! Compact host HUD in logical points. Never posts input or performs submission.
++use cua_driver_contract::{CompanionHudLocale as Locale, CompanionHudPhase as Phase};
++use fontdue::layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle};
++use std::sync::OnceLock;
++use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, PixmapPaint, Stroke, Transform};
++
++pub const HUD_WIDTH: f32 = 88.0;
++pub const HUD_HEIGHT: f32 = 22.0;
++#[derive(Default)]
++pub struct CompanionHudPainter {
++    pub phase: Phase,
++    pub locale: Locale,
++    pub level: f32,
++    previous: Phase,
++    transition: f32,
++    alpha: f32,
++    smoothed_level: f32,
++    time: f32,
++    above: bool,
++}
++impl CompanionHudPainter {
++    pub fn update(&mut self, phase: Phase, locale: Locale, level: f32) {
++        if phase != self.phase {
++            self.previous = self.phase;
++            self.phase = phase;
++            self.transition = 0.0;
++        }
++        self.locale = locale;
++        self.level = if phase == Phase::Listening {
++            level.clamp(0.0, 1.0)
++        } else {
++            0.0
++        };
++    }
++    pub fn is_visible(&self) -> bool {
++        self.phase != Phase::Idle || self.alpha > 0.002
++    }
++    pub fn tick(&mut self, dt: f32, reduced_motion: bool) {
++        self.time += dt;
++        let duration = if reduced_motion { 0.04 } else { 0.18 };
++        self.transition = (self.transition + dt / duration).min(1.0);
++        let target = if self.phase == Phase::Idle { 0.0 } else { 1.0 };
++        self.alpha += (target - self.alpha).clamp(-dt / duration, dt / duration);
++        let smoothing = if self.level > self.smoothed_level {
++            0.055
++        } else {
++            0.18
++        };
++        self.smoothed_level += (self.level - self.smoothed_level) * (1.0 - (-dt / smoothing).exp());
++    }
++    pub fn paint(
++        &mut self,
++        image: &mut Pixmap,
++        cursor: (f32, f32),
++        scale: f32,
++        reduced_motion: bool,
++    ) {
++        if self.alpha <= 0.002 {
++            return;
++        }
++        let width = if self.locale == Locale::Vietnamese {
++            98.0
++        } else {
++            HUD_WIDTH
++        };
++        let x = (cursor.0 + 4.0 - width / 2.0)
++            .clamp(8.0, (image.width() as f32 / scale - width - 8.0).max(8.0));
++        let bottom = image.height() as f32 / scale;
++        if self.above {
++            if cursor.1 + 16.0 + HUD_HEIGHT < bottom - 16.0 {
++                self.above = false;
++            }
++        } else if cursor.1 + 16.0 + HUD_HEIGHT > bottom - 8.0 {
++            self.above = true;
++        }
++        let y = if self.above {
++            cursor.1 - HUD_HEIGHT - 6.0
++        } else {
++            cursor.1 + 16.0
++        };
++        let y = y.clamp(8.0, (bottom - HUD_HEIGHT - 8.0).max(8.0));
++        let mut path = PathBuilder::new();
++        let r = HUD_HEIGHT / 2.0;
++        path.move_to(x + r, y);
++        path.line_to(x + width - r, y);
++        path.cubic_to(
++            x + width + r * 0.1,
++            y,
++            x + width + r * 0.1,
++            y + HUD_HEIGHT,
++            x + width - r,
++            y + HUD_HEIGHT,
++        );
++        path.line_to(x + r, y + HUD_HEIGHT);
++        path.cubic_to(x - r * 0.1, y + HUD_HEIGHT, x - r * 0.1, y, x + r, y);
++        path.close();
++        let Some(path) = path.finish() else {
++            return;
++        };
++        let transform = Transform::from_scale(scale, scale);
++        image.fill_path(
++            &path,
++            &paint([8, 13, 19], self.alpha * 0.95),
++            FillRule::Winding,
++            transform,
++            None,
++        );
++        image.stroke_path(
++            &path,
++            &paint([120, 188, 243], self.alpha * 0.7),
++            &Stroke {
++                width: 0.8,
++                ..Default::default()
++            },
++            transform,
++            None,
++        );
++        // Crossfade at the same anchor; fast lifecycle updates never delay work.
++        if self.phase != Phase::Idle && self.transition < 1.0 && self.previous != Phase::Idle {
++            self.paint_content(
++                image,
++                self.previous,
++                x,
++                y,
++                width,
++                scale,
++                self.alpha * (1.0 - self.transition),
++                reduced_motion,
++            );
++        }
++        if self.phase != Phase::Idle {
++            self.paint_content(
++                image,
++                self.phase,
++                x,
++                y,
++                width,
++                scale,
++                self.alpha * self.transition,
++                reduced_motion,
++            );
++        } else {
++            self.paint_content(
++                image,
++                self.previous,
++                x,
++                y,
++                width,
++                scale,
++                self.alpha,
++                reduced_motion,
++            );
++        }
++    }
++    fn paint_content(
++        &self,
++        image: &mut Pixmap,
++        phase: Phase,
++        x: f32,
++        y: f32,
++        width: f32,
++        scale: f32,
++        alpha: f32,
++        reduced: bool,
++    ) {
++        let transform = Transform::from_scale(scale, scale);
++        let blue = paint([138, 200, 250], alpha);
++        let icon_x = x + 7.0;
++        let mid = y + 11.0;
++        if phase == Phase::Thinking || phase == Phase::Transcribing || phase == Phase::Preparing {
++            for index in 0..3 {
++                let opacity = if reduced {
++                    1.0
++                } else {
++                    0.45 + 0.55 * ((self.time * 4.5 - index as f32 * 0.8).sin() + 1.0) / 2.0
++                };
++                if let Some(rect) =
++                    tiny_skia::Rect::from_xywh(icon_x + index as f32 * 3.0, mid - 1.0, 2.0, 2.0)
++                {
++                    image.fill_rect(
++                        rect,
++                        &paint([138, 200, 250], alpha * opacity),
++                        transform,
++                        None,
++                    );
++                }
++            }
++        } else {
++            let mut icon = PathBuilder::new();
++            if phase == Phase::Done {
++                icon.move_to(icon_x, mid);
++                icon.line_to(icon_x + 3.0, mid + 3.0);
++                icon.line_to(icon_x + 8.0, mid - 4.0);
++            } else {
++                icon.move_to(icon_x + 2.0, mid - 4.0);
++                icon.cubic_to(
++                    icon_x + 2.0,
++                    mid - 7.0,
++                    icon_x + 6.0,
++                    mid - 7.0,
++                    icon_x + 6.0,
++                    mid - 4.0,
++                );
++                icon.line_to(icon_x + 6.0, mid);
++                icon.cubic_to(
++                    icon_x + 6.0,
++                    mid + 3.0,
++                    icon_x + 2.0,
++                    mid + 3.0,
++                    icon_x + 2.0,
++                    mid,
++                );
++                icon.close();
++                icon.move_to(icon_x, mid);
++                icon.cubic_to(
++                    icon_x,
++                    mid + 6.0,
++                    icon_x + 8.0,
++                    mid + 6.0,
++                    icon_x + 8.0,
++                    mid,
++                );
++                icon.move_to(icon_x + 4.0, mid + 4.0);
++                icon.line_to(icon_x + 4.0, mid + 7.0);
++            }
++            if let Some(path) = icon.finish() {
++                image.stroke_path(
++                    &path,
++                    &blue,
++                    &Stroke {
++                        width: 1.0,
++                        ..Default::default()
++                    },
++                    transform,
++                    None,
++                );
++            }
++        }
++        if phase == Phase::Listening {
++            for index in 0..14 {
++                let weight = if reduced {
++                    1.0
++                } else {
++                    0.35 + 0.65 * ((self.time * 7.0 + index as f32 * 0.82).sin() + 1.0) / 2.0
++                };
++                let h = 2.0 + self.smoothed_level * 8.0 * weight;
++                if let Some(rect) =
++                    tiny_skia::Rect::from_xywh(x + 25.0 + index as f32 * 3.0, mid - h / 2.0, 1.8, h)
++                {
++                    image.fill_rect(rect, &blue, transform, None);
++                }
++            }
++        } else {
++            paint_text(
++                image,
++                label(phase, self.locale),
++                (x + 20.0, y),
++                width - 24.0,
++                scale,
++                alpha,
++            );
++        }
++    }
++}
++fn paint(rgb: [u8; 3], alpha: f32) -> Paint<'static> {
++    let mut p = Paint::default();
++    p.set_color(Color::from_rgba8(
++        rgb[0],
++        rgb[1],
++        rgb[2],
++        (255.0 * alpha.clamp(0.0, 1.0)) as u8,
++    ));
++    p
++}
++fn label(phase: Phase, locale: Locale) -> &'static str {
++    if locale == Locale::Vietnamese {
++        return match phase {
++            Phase::Idle => "",
++            Phase::Preparing => "Chuẩn bị…",
++            Phase::Listening => "Đang nghe",
++            Phase::Transcribing => "Chuyển lời…",
++            Phase::Sending => "Đang gửi…",
++            Phase::Thinking => "Suy nghĩ…",
++            Phase::Showing => "Hướng dẫn…",
++            Phase::Working => "Đang làm…",
++            Phase::Done => "Xong",
++            Phase::Canceled => "Đã hủy",
++            Phase::Error => "Có lỗi",
++            Phase::DailyLimit => "Hết lượt hôm nay",
++            Phase::NeedsInput => "Cần chỉ dẫn",
++        };
++    }
++    match phase {
++        Phase::Idle => "",
++        Phase::Preparing => "Preparing…",
++        Phase::Listening => "Listening",
++        Phase::Transcribing => "Transcribing…",
++        Phase::Sending => "Sending…",
++        Phase::Thinking => "Thinking…",
++        Phase::Showing => "Showing…",
++        Phase::Working => "Working…",
++        Phase::Done => "Done",
++        Phase::Canceled => "Canceled",
++        Phase::Error => "Try again",
++        Phase::DailyLimit => "Daily limit",
++        Phase::NeedsInput => "Needs input",
++    }
++}
++fn paint_text(
++    image: &mut Pixmap,
++    text: &str,
++    origin: (f32, f32),
++    width: f32,
++    scale: f32,
++    alpha: f32,
++) {
++    static FONT: OnceLock<Option<fontdue::Font>> = OnceLock::new();
++    let Some(font) = FONT.get_or_init(|| {
++        fontdue::Font::from_bytes(
++            include_bytes!("../assets/Inter.ttf") as &[u8],
++            fontdue::FontSettings::default(),
++        )
++        .ok()
++    }) else {
++        return;
++    };
++    let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
++    layout.reset(&LayoutSettings::default());
++    layout.append(&[font], &TextStyle::new(text, 9.5 * scale, 0));
++    let text_width = layout
++        .glyphs()
++        .iter()
++        .map(|glyph| glyph.x + glyph.width as f32)
++        .fold(0.0, f32::max);
++    let factor = (width * scale / text_width.max(1.0)).min(1.0);
++    if factor < 1.0 {
++        layout.reset(&LayoutSettings::default());
++        layout.append(&[font], &TextStyle::new(text, 9.5 * scale * factor, 0));
++    }
++    let text_width = layout
++        .glyphs()
++        .iter()
++        .map(|glyph| glyph.x + glyph.width as f32)
++        .fold(0.0, f32::max);
++    let min_y = layout
++        .glyphs()
++        .iter()
++        .map(|g| g.y)
++        .fold(f32::INFINITY, f32::min);
++    let max_y = layout
++        .glyphs()
++        .iter()
++        .map(|g| g.y + g.height as f32)
++        .fold(0.0, f32::max);
++    for glyph in layout.glyphs() {
++        let (metrics, bitmap) = font.rasterize_config(glyph.key);
++        let Some(mut pm) = Pixmap::new(metrics.width as u32, metrics.height as u32) else {
++            continue;
++        };
++        for (pixel, coverage) in pm.data_mut().chunks_exact_mut(4).zip(bitmap) {
++            let a = coverage as f32 * alpha;
++            pixel.copy_from_slice(&[
++                (138.0 / 255.0 * a) as u8,
++                (200.0 / 255.0 * a) as u8,
++                (250.0 / 255.0 * a) as u8,
++                a as u8,
++            ]);
++        }
++        image.draw_pixmap(
++            (origin.0 * scale + (width * scale - text_width) / 2.0 + glyph.x).round() as i32,
++            (origin.1 * scale + (HUD_HEIGHT * scale - (max_y - min_y)) / 2.0 - min_y + glyph.y)
++                .round() as i32,
++            pm.as_ref(),
++            &PixmapPaint::default(),
++            Transform::identity(),
++            None,
++        );
++    }
++}
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn companion_hud_renders_clamped_retina_and_fades() {
++        for scale in [1.0, 2.0] {
++            let mut pm = Pixmap::new((200.0 * scale) as u32, (100.0 * scale) as u32).unwrap();
++            let mut painter = CompanionHudPainter::default();
++            painter.update(Phase::Thinking, Locale::English, 0.0);
++            painter.tick(0.2, false);
++            painter.paint(&mut pm, (195.0, 95.0), scale, false);
++            assert!(painter.above);
++            assert!(pm.data().chunks_exact(4).any(|pixel| pixel[3] > 0));
++            painter.update(Phase::Idle, Locale::English, 0.0);
++            painter.tick(0.3, false);
++            assert!(!painter.is_visible());
++        }
++    }
++    #[test]
++    fn companion_hud_silence_stays_flat_and_levels_decay() {
++        let mut painter = CompanionHudPainter::default();
++        painter.update(Phase::Listening, Locale::English, 0.0);
++        painter.tick(0.2, false);
++        assert_eq!(painter.smoothed_level, 0.0);
++        painter.update(Phase::Listening, Locale::English, 1.0);
++        painter.tick(0.1, false);
++        assert!(painter.smoothed_level > 0.5);
++        painter.update(Phase::Transcribing, Locale::English, 0.0);
++        painter.tick(0.3, false);
++        assert!(painter.smoothed_level < 0.2);
++    }
++}
++
++/// Retain the same companion at handoff while no bound Tro cursor is visible.
++pub fn paint_fallback_pointer(image: &mut Pixmap, cursor: (f32, f32), scale: f32) {
++    crate::companion_appearance::paint_companion_pointer(
++        image,
++        (cursor.0 * scale, cursor.1 * scale),
++        scale,
++        1.0,
++        false,
++        None,
++    );
 +}
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/guidance.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/guidance.rs
 new file mode 100644
@@ -1454,25 +2046,28 @@ index 0000000..1442925
 +    }
 +}
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/lib.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/lib.rs
-index 36f3717..d4e7117 100644
+index 36f3717..322beb2 100644
 --- a/libs/cua-driver/rust/crates/cursor-overlay/src/lib.rs
 +++ b/libs/cua-driver/rust/crates/cursor-overlay/src/lib.rs
-@@ -10,6 +10,9 @@ pub mod badge_glyphs;
+@@ -10,6 +10,10 @@ pub mod badge_glyphs;
  pub mod bezier;
  pub mod capture_exclusion;
  pub mod capture_utils;
 +pub mod companion;
 +mod companion_appearance;
++pub mod companion_hud;
 +pub mod guidance;
  pub mod motion;
  pub mod path_planner;
  pub mod render_map;
-@@ -340,6 +343,14 @@ pub enum OverlayMsg {
+@@ -340,6 +344,16 @@ pub enum OverlayMsg {
  /// Commands sent from MCP tool handlers to the overlay's render thread.
  #[derive(Debug, Clone)]
  pub enum OverlayCommand {
 +    /// Host-owned teaching artwork; does not change the installed action theme.
 +    SetCompanionAppearance(bool),
++    SuppressSessionBadge(bool),
++    WakeCompanionHud,
 +    /// Atomic V2 scene, fenced and acknowledged by the platform compositor.
 +    GuidanceFrame(crate::guidance::GuidanceFrame),
 +    /// Presentation geometry only; never synthesizes operating-system input.
@@ -1482,16 +2077,29 @@ index 36f3717..d4e7117 100644
      /// Animate the cursor to a new screen position.
      MoveTo {
          x: f64,
+@@ -353,7 +367,10 @@ pub enum OverlayCommand {
+         heading_radians: Option<f64>,
+     },
+     /// Start the click-press visual.
+-    ClickPulse { x: f64, y: f64 },
++    ClickPulse {
++        x: f64,
++        y: f64,
++    },
+     /// Toggle the held-button visual state.
+     SetPressed(bool),
+     /// Show or hide the overlay.
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs
-index 264c427..df90d41 100644
+index 264c427..d912a2b 100644
 --- a/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs
 +++ b/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs
-@@ -48,6 +48,13 @@ pub const SESSION_BADGE_FADE_SECS: f64 = 0.4;
+@@ -48,6 +48,14 @@ pub const SESSION_BADGE_FADE_SECS: f64 = 0.4;
  /// Each platform wraps this in its own struct that adds OS-specific fields
  /// (e.g. `virt_x/y/w/h` on Windows, `focus_rect` on macOS).
  pub struct RenderStateCore {
 +    /// Teaching artwork selected by the host, independent of the action theme.
 +    pub companion_appearance: bool,
++    pub suppress_session_badge: bool,
 +    pub guidance_frame: Option<crate::guidance::GuidanceFrame>,
 +    pub companion_mark_alpha: f32,
 +    pub companion_teaching: bool,
@@ -1500,11 +2108,12 @@ index 264c427..df90d41 100644
      /// Frozen copy of the launch-time CursorConfig.
      pub cfg: CursorConfig,
      /// Current motion / timing config (mutable via [`OverlayCommand::SetMotion`]).
-@@ -126,6 +133,12 @@ impl RenderStateCore {
+@@ -126,6 +134,13 @@ impl RenderStateCore {
              ),
          };
          Self {
 +            companion_appearance: false,
++            suppress_session_badge: false,
 +            guidance_frame: None,
 +            companion_mark_alpha: 1.0,
 +            companion_teaching: false,
@@ -1513,7 +2122,7 @@ index 264c427..df90d41 100644
              cfg,
              motion,
              visual,
-@@ -175,7 +188,8 @@ impl RenderStateCore {
+@@ -175,7 +190,8 @@ impl RenderStateCore {
      /// off-workspace cursor paints nothing, and a single-frame custom theme
      /// has nothing to animate.
      pub fn has_resting_motion(&self) -> bool {
@@ -1523,7 +2132,7 @@ index 264c427..df90d41 100644
              || self.motion.idle_hide_ms <= 0.0
              || self.pinned_target_off_workspace
              || self.visual.reduced_motion == crate::ReducedMotion::On
-@@ -245,6 +259,9 @@ impl RenderStateCore {
+@@ -245,6 +261,9 @@ impl RenderStateCore {
      }
  
      pub fn session_badge_alpha(&self) -> f32 {
@@ -1533,7 +2142,7 @@ index 264c427..df90d41 100644
          if self.session_label.is_none() {
              return 0.0;
          }
-@@ -261,6 +278,9 @@ impl RenderStateCore {
+@@ -261,6 +280,9 @@ impl RenderStateCore {
      }
  
      pub fn session_badge_chip_alpha(&self) -> f32 {
@@ -1543,7 +2152,7 @@ index 264c427..df90d41 100644
          if self.badge_modifiers.is_none() {
              return 0.0;
          }
-@@ -596,7 +616,10 @@ impl RenderStateCore {
+@@ -596,7 +618,10 @@ impl RenderStateCore {
          }
          let idle_hide_ms = self.motion.idle_hide_ms;
          if idle_hide_ms > 0.0 {
@@ -1555,7 +2164,7 @@ index 264c427..df90d41 100644
              if moving {
                  self.idle_secs = 0.0;
                  self.idle_alpha = 1.0;
-@@ -638,6 +661,55 @@ impl RenderStateCore {
+@@ -638,6 +663,60 @@ impl RenderStateCore {
          click_pulse_sentinel_only: bool,
      ) -> bool {
          match cmd {
@@ -1589,6 +2198,11 @@ index 264c427..df90d41 100644
 +                self.guidance_frame = Some(frame);
 +                true
 +            }
++            OverlayCommand::WakeCompanionHud => true,
++            OverlayCommand::SuppressSessionBadge(suppress) => {
++                self.suppress_session_badge = suppress;
++                true
++            }
 +            OverlayCommand::SetCompanionAppearance(enabled) => {
 +                self.companion_appearance = enabled;
 +                if !self.companion_teaching || !enabled {
@@ -1611,7 +2225,7 @@ index 264c427..df90d41 100644
              OverlayCommand::MoveTo {
                  x,
                  y,
-@@ -895,6 +967,13 @@ pub fn paint_cursor(
+@@ -895,6 +974,13 @@ pub fn paint_cursor(
          return;
      }
  
@@ -1625,7 +2239,7 @@ index 264c427..df90d41 100644
      let s = backing_scale.max(1.0) as f64; // logical-pt → pixmap-pixel scale
      let sf = s as f32;
  
-@@ -959,7 +1038,53 @@ pub fn paint_cursor(
+@@ -959,7 +1045,53 @@ pub fn paint_cursor(
          }
      }
  
@@ -1680,7 +2294,17 @@ index 264c427..df90d41 100644
          let tint = (theme.id == crate::DEFAULT_THEME_ID)
              .then(|| crate::session_fill_rgba(&core.cfg.cursor_id));
          crate::paint_compiled_theme_with_tint(
-@@ -1003,7 +1128,11 @@ pub fn paint_cursor(
+@@ -989,6 +1121,9 @@ pub fn paint_cursor(
+         );
+     }
+ 
++    if core.suppress_session_badge {
++        return;
++    }
+     let (delivery, target) = core.badge_modifiers.unwrap_or((None, None));
+     if let Some(layout) = crate::session_badge_layout(crate::SessionBadgeInput {
+         label: core.session_label.as_deref(),
+@@ -1003,7 +1138,11 @@ pub fn paint_cursor(
          crate::paint_session_badge(
              pm,
              &layout,
@@ -1693,7 +2317,7 @@ index 264c427..df90d41 100644
              alpha_scale,
          );
      }
-@@ -1043,6 +1172,80 @@ mod glide_duration_tests {
+@@ -1043,6 +1182,80 @@ mod glide_duration_tests {
          t
      }
  
@@ -1774,11 +2398,206 @@ index 264c427..df90d41 100644
      #[test]
      fn fixed_duration_is_distance_independent_on_both_paths() {
          for swift in [false, true] {
+diff --git a/libs/cua-driver/rust/crates/platform-macos/src/cursor/companion_hud.rs b/libs/cua-driver/rust/crates/platform-macos/src/cursor/companion_hud.rs
+new file mode 100644
+index 0000000..b5f2419
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/platform-macos/src/cursor/companion_hud.rs
+@@ -0,0 +1,134 @@
++//! Independent presentation lease bound only to explicitly registered cursor sessions.
++use cua_driver_contract::{CompanionHudLocale, CompanionHudPhase, SetCompanionHudInput};
++use cursor_overlay::companion_hud::CompanionHudPainter;
++use std::{
++    collections::VecDeque,
++    sync::{Mutex, OnceLock},
++    time::{Duration, Instant},
++};
++
++#[derive(Default)]
++pub(super) struct HudState {
++    owner: Option<String>,
++    group: Option<String>,
++    sequence: Option<u64>,
++    expires: Option<Instant>,
++    pub bindings: VecDeque<String>,
++    pub painter: CompanionHudPainter,
++}
++pub(super) fn state() -> &'static Mutex<HudState> {
++    static STATE: OnceLock<Mutex<HudState>> = OnceLock::new();
++    STATE.get_or_init(|| Mutex::new(HudState::default()))
++}
++impl HudState {
++    pub fn update(&mut self, session: &str, input: SetCompanionHudInput) -> bool {
++        let live = self.expires.is_some_and(|expires| expires > Instant::now());
++        if live && self.owner.as_deref().is_some_and(|owner| owner != session) {
++            return false;
++        }
++        if self.owner.as_deref() == Some(session)
++            && self
++                .sequence
++                .is_some_and(|sequence| input.sequence <= sequence)
++        {
++            return false;
++        }
++        if self.group.as_deref() != Some(&input.group) {
++            self.bindings.clear();
++        }
++        self.owner = Some(session.into());
++        self.group = Some(input.group);
++        self.sequence = Some(input.sequence);
++        self.expires = Some(Instant::now() + Duration::from_secs(25));
++        self.painter
++            .update(input.phase, input.locale, input.level as f32);
++        true
++    }
++    pub fn bind(&mut self, session: &str, group: &str) -> bool {
++        if self.group.as_deref() != Some(group)
++            || !self.expires.is_some_and(|expires| expires > Instant::now())
++        {
++            return false;
++        }
++        self.bindings.retain(|key| key != session);
++        if self.bindings.len() >= 8 {
++            self.bindings.pop_front();
++        }
++        self.bindings.push_back(session.into());
++        true
++    }
++    pub fn tick(&mut self, dt: f32, reduced: bool) -> bool {
++        if self
++            .expires
++            .is_some_and(|expires| expires <= Instant::now())
++        {
++            self.owner = None;
++            self.sequence = None;
++            self.expires = None;
++            self.painter
++                .update(CompanionHudPhase::Idle, CompanionHudLocale::English, 0.0);
++        }
++        self.painter.tick(dt, reduced);
++        self.painter.is_visible()
++    }
++    pub fn retire(&mut self, key: &str, prefix: bool) {
++        let matches = |candidate: &str| {
++            if prefix {
++                candidate.starts_with(key)
++            } else {
++                candidate == key
++            }
++        };
++        self.bindings.retain(|candidate| !matches(candidate));
++        if self.owner.as_deref().is_some_and(matches) {
++            self.owner = None;
++            self.sequence = None;
++            self.expires = None;
++            self.painter
++                .update(CompanionHudPhase::Idle, CompanionHudLocale::English, 0.0);
++        }
++    }
++}
++#[cfg(test)]
++mod tests {
++    use super::*;
++    fn input(sequence: u64) -> SetCompanionHudInput {
++        SetCompanionHudInput {
++            session: None,
++            group: "11111111-1111-4111-8111-111111111111".into(),
++            sequence,
++            phase: CompanionHudPhase::Thinking,
++            locale: CompanionHudLocale::English,
++            level: 0.0,
++        }
++    }
++    #[test]
++    fn companion_hud_fences_ownership_sequence_and_foreign_binding() {
++        let mut state = HudState::default();
++        assert!(state.update("host", input(0)));
++        assert!(!state.update("foreign", input(1)));
++        assert!(!state.update("host", input(0)));
++        assert!(!state.bind("foreign", "another-group"));
++        assert!(state.bind("cursor", &input(0).group));
++        state.retire("cursor", false);
++        assert_eq!(state.owner.as_deref(), Some("host"));
++        state.retire("host", false);
++        assert!(state.owner.is_none());
++        assert_eq!(state.painter.phase, CompanionHudPhase::Idle);
++    }
++    #[test]
++    fn companion_hud_bounds_binding_memory_and_reconnects_same_group() {
++        let mut state = HudState::default();
++        state.update("host", input(0));
++        for index in 0..20 {
++            state.bind(&format!("cursor-{index}"), &input(0).group);
++        }
++        assert_eq!(state.bindings.len(), 8);
++        state.retire("host", false);
++        assert!(state.update("new-host", input(0)));
++        assert_eq!(state.bindings.len(), 8);
++        state.expires = Some(Instant::now() - Duration::from_secs(1));
++        state.tick(0.3, false);
++        assert!(!state.painter.is_visible());
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/platform-macos/src/cursor/mod.rs b/libs/cua-driver/rust/crates/platform-macos/src/cursor/mod.rs
+index cb5012c..37247b6 100644
+--- a/libs/cua-driver/rust/crates/platform-macos/src/cursor/mod.rs
++++ b/libs/cua-driver/rust/crates/platform-macos/src/cursor/mod.rs
+@@ -5,6 +5,7 @@
+ //! - `overlay::run_on_main_thread()` — called from `main()` on the main thread
+ //! - `overlay::send_command(cmd)` — called from tool implementations
+ 
++mod companion_hud;
+ pub mod overlay;
+ /// System cursor shape reporting (what the OS draws, not what Cua draws).
+ pub mod shape;
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs b/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
-index 8a4c547..89c8f16 100644
+index 8a4c547..27b4051 100644
 --- a/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
 +++ b/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
-@@ -163,6 +163,47 @@ fn apply_msg(map: &mut RenderMap, msg: OverlayMsg) -> Option<CursorKey> {
+@@ -40,6 +40,42 @@ use cursor_overlay::{
+     OverlayCommand, OverlayMsg, RenderEntry, RenderStateCore, ScreenFrame, ZOrderEnforcer,
+ };
+ 
++static HUD_REDUCED_MOTION: AtomicBool = AtomicBool::new(false);
++
++pub fn update_companion_hud(
++    session: &str,
++    input: cua_driver_contract::SetCompanionHudInput,
++) -> bool {
++    let applied = super::companion_hud::state()
++        .lock()
++        .unwrap()
++        .update(session, input);
++    if applied {
++        send_command_default(OverlayCommand::WakeCompanionHud);
++    }
++    applied
++}
++pub fn bind_companion_hud(session: &str, group: &str) -> bool {
++    let applied = super::companion_hud::state()
++        .lock()
++        .unwrap()
++        .bind(session, group);
++    if applied {
++        send_command(
++            session.to_owned(),
++            OverlayCommand::SuppressSessionBadge(true),
++        );
++    }
++    applied
++}
++pub fn retire_companion_hud(key: &str, prefix: bool) {
++    super::companion_hud::state()
++        .lock()
++        .unwrap()
++        .retire(key, prefix);
++    send_command_default(OverlayCommand::WakeCompanionHud);
++}
++
+ // ── Arrival-signal channels (one waiter slot per cursor key) ──────────────
+ //
+ // Each session's `animate_cursor_to` registers an arrival oneshot keyed by its
+@@ -163,6 +199,47 @@ fn apply_msg(map: &mut RenderMap, msg: OverlayMsg) -> Option<CursorKey> {
      outcome.applied_key().cloned()
  }
  
@@ -1826,7 +2645,7 @@ index 8a4c547..89c8f16 100644
  /// Initialise global overlay state (call once, before run_on_main_thread).
  pub fn init(cfg: CursorConfig) {
      static INITIALIZED: OnceLock<()> = OnceLock::new();
-@@ -232,6 +273,18 @@ pub fn send_command(key: CursorKey, cmd: OverlayCommand) {
+@@ -232,6 +309,18 @@ pub fn send_command(key: CursorKey, cmd: OverlayCommand) {
      }
  }
  
@@ -1845,7 +2664,18 @@ index 8a4c547..89c8f16 100644
  /// Convenience for callsites not yet threaded with a session key: drives the
  /// seeded `"default"` cursor (the anonymous / one-shot identity).
  pub fn send_command_default(cmd: OverlayCommand) {
-@@ -745,6 +798,19 @@ fn render_loop(
+@@ -541,6 +630,10 @@ unsafe fn run_appkit(_cfg: CursorConfig, rx: std::sync::mpsc::Receiver<OverlayMs
+     use objc2::{class, msg_send};
+     use objc2_foundation::NSRect;
+ 
++    let workspace: *mut AnyObject = msg_send![class!(NSWorkspace), sharedWorkspace];
++    let reduced: bool = msg_send![workspace, accessibilityDisplayShouldReduceMotion];
++    HUD_REDUCED_MOTION.store(reduced, Ordering::Release);
++
+     // ---- NSApplication ----
+     // Verify main thread (MainThreadMarker is a zero-size compile-time token).
+     let _mtm = objc2_foundation::MainThreadMarker::new()
+@@ -745,6 +838,19 @@ fn render_loop(
                              last_key = Some(k);
                          }
                      }
@@ -1865,7 +2695,35 @@ index 8a4c547..89c8f16 100644
                      // Tick every cursor while an animation/fade is in progress
                      // or immediately after a command changed render state. The
                      // latter lets a just-created path/click/focus rect start on
-@@ -832,7 +898,7 @@ fn render_loop(
+@@ -779,7 +885,11 @@ fn render_loop(
+                         .and_then(|k| map.cursors.get(k))
+                         .is_some_and(cursor_is_externally_visible)
+                         && pinned.is_none();
+-                    let next_frame_tick_needed = map.needs_frame_tick();
++                    let hud_tick = super::companion_hud::state()
++                        .lock()
++                        .unwrap()
++                        .tick(dt as f32, HUD_REDUCED_MOTION.load(Ordering::Acquire));
++                    let next_frame_tick_needed = map.needs_frame_tick() || hud_tick;
+                     let next_hover_poll_needed = map
+                         .cursors
+                         .values()
+@@ -815,7 +925,13 @@ fn render_loop(
+             if pinned_wid.is_some() && (pin_changed || repin_frames >= 60) {
+                 MacZOrderEnforcer { win_ptr }.reassert(pinned_wid);
+                 repin_frames = 0;
+-            } else if raise_unpinned {
++            } else if raise_unpinned
++                || super::companion_hud::state()
++                    .lock()
++                    .unwrap()
++                    .painter
++                    .is_visible()
++            {
+                 // A direct move_cursor has no target window to pin against.
+                 // Raise the normal-level, click-through overlay without
+                 // activating the driver so a later foreground application
+@@ -832,7 +948,7 @@ fn render_loop(
          // change pixels. A final frame is emitted as animations/fades finish so
          // the layer is left in the completed/cleared state before blocking.
          if had_msg || hover_changed || frame_tick_needed || next_frame_tick_needed {
@@ -1874,7 +2732,7 @@ index 8a4c547..89c8f16 100644
                  let guard = RENDER.lock().unwrap();
                  if let Some(map) = guard.as_ref() {
                      // Allocate the pixmap at the screen's PHYSICAL pixel
-@@ -843,8 +909,9 @@ fn render_loop(
+@@ -843,8 +959,9 @@ fn render_loop(
                      let scale = map.platform.backing_scale.max(1.0);
                      let w = (win_w * scale).max(1.0) as u32;
                      let h = (win_h * scale).max(1.0) as u32;
@@ -1886,11 +2744,41 @@ index 8a4c547..89c8f16 100644
                      let backing_scale_f32 = scale as f32;
                      note_overlay_frame(map.cursors.values().any(cursor_may_paint));
                      for (_k, rs) in &map.cursors {
-@@ -861,14 +928,20 @@ fn render_loop(
+@@ -861,14 +978,50 @@ fn render_loop(
                              backing_scale_f32,
                          );
                      }
 -                    pm
++                    let mut hud = super::companion_hud::state().lock().unwrap();
++                    if hud.painter.is_visible() {
++                        let bound = hud.bindings.iter().rev().find_map(|key| {
++                            map.cursors
++                                .get(key)
++                                .filter(|rs| cursor_is_externally_visible(rs))
++                        });
++                        let fallback = hardware_cursor_position().map(|(x, y)| {
++                            (
++                                (x + 24.0).clamp(8.0, (win_w - 18.0).max(8.0)),
++                                (y + 24.0).clamp(8.0, (win_h - 18.0).max(8.0)),
++                            )
++                        });
++                        if let Some(position) = bound.map(|rs| rs.core.pos).or(fallback) {
++                            if bound.is_none() {
++                                cursor_overlay::companion_hud::paint_fallback_pointer(
++                                    &mut pm,
++                                    (position.0 as f32, position.1 as f32),
++                                    backing_scale_f32,
++                                );
++                            }
++                            hud.painter.paint(
++                                &mut pm,
++                                (position.0 as f32, position.1 as f32),
++                                backing_scale_f32,
++                                HUD_REDUCED_MOTION.load(Ordering::Acquire),
++                            );
++                            note_overlay_frame(true);
++                        }
++                    }
 +                    let receipts = map
 +                        .cursors
 +                        .values()
@@ -1909,7 +2797,7 @@ index 8a4c547..89c8f16 100644
          }
  
          frame_tick_needed = next_frame_tick_needed;
-@@ -905,24 +978,45 @@ fn cursor_is_externally_visible(state: &RenderState) -> bool {
+@@ -905,24 +1058,45 @@ fn cursor_is_externally_visible(state: &RenderState) -> bool {
  
  /// Convert a `tiny_skia::Pixmap` to a `CGImage` and set it as the contents
  /// of the given `CALayer` via `dispatch_async(main_queue, ...)`.
@@ -1969,7 +2857,7 @@ index 8a4c547..89c8f16 100644
          static _dispatch_main_q: u8;
          fn dispatch_async_f(
              queue: *const c_void,
-@@ -930,28 +1024,50 @@ fn dispatch_set_layer_contents(layer_ptr: usize, pixmap: tiny_skia::Pixmap) {
+@@ -930,28 +1104,50 @@ fn dispatch_set_layer_contents(layer_ptr: usize, pixmap: tiny_skia::Pixmap) {
              work: unsafe extern "C" fn(*mut c_void),
          );
      }
@@ -2655,6 +3543,84 @@ index 0000000..472f836
 +        assert_eq!(state.terminal, Some("explicit_stop"));
 +    }
 +}
+diff --git a/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_hud_tools.rs b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_hud_tools.rs
+new file mode 100644
+index 0000000..b9d723f
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_hud_tools.rs
+@@ -0,0 +1,72 @@
++use super::{cursor_tools::resolve_cursor_key, ToolState};
++use async_trait::async_trait;
++use cua_driver_contract::{BindCompanionHudCursorInput, SetCompanionHudInput, ToolInput};
++use cua_driver_core::{
++    protocol::ToolResult,
++    tool::{Tool, ToolDef, ToolRegistry},
++    tool_args::parse_typed_input,
++};
++use serde_json::{json, Value};
++use std::sync::Arc;
++struct HudTool {
++    definition: ToolDef,
++    state: Arc<ToolState>,
++}
++#[async_trait]
++impl Tool for HudTool {
++    fn def(&self) -> &ToolDef {
++        &self.definition
++    }
++    async fn invoke(&self, args: Value) -> ToolResult {
++        if !self.state.cursor_overlay_available {
++            return super::cursor_overlay_unavailable();
++        }
++        let session = resolve_cursor_key(&args);
++        let applied = if self.definition.name == SetCompanionHudInput::TOOL_NAME {
++            let input = match parse_typed_input::<SetCompanionHudInput>(&self.definition.name, args)
++            {
++                Ok(input) => input,
++                Err(error) => return error,
++            };
++            if let Err(error) = input.validate() {
++                return ToolResult::error(error);
++            }
++            crate::cursor::overlay::update_companion_hud(&session, input)
++        } else {
++            let input =
++                match parse_typed_input::<BindCompanionHudCursorInput>(&self.definition.name, args)
++                {
++                    Ok(input) => input,
++                    Err(error) => return error,
++                };
++            if let Err(error) = input.validate() {
++                return ToolResult::error(error);
++            }
++            crate::cursor::overlay::bind_companion_hud(&session, &input.group)
++        };
++        if !applied {
++            return ToolResult::error("HUD lease, cursor binding or sequence refused.");
++        }
++        ToolResult::text("applied").with_structured(json!({"applied":true}))
++    }
++}
++pub(super) fn register_tools(registry: &mut ToolRegistry, state: Arc<ToolState>) {
++    for name in [
++        SetCompanionHudInput::TOOL_NAME,
++        BindCompanionHudCursorInput::TOOL_NAME,
++    ] {
++        let contract = cua_driver_contract::tool_contract(name).expect("HUD canonical contract");
++        registry.register(Box::new(HudTool {
++            state: state.clone(),
++            definition: ToolDef {
++                name: contract.name.clone(),
++                description: contract.description.clone(),
++                input_schema: contract.input_schema.clone(),
++                read_only: false,
++                destructive: false,
++                idempotent: true,
++                open_world: false,
++            },
++        }));
++    }
++}
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_tools.rs b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_tools.rs
 new file mode 100644
 index 0000000..2bc6111
@@ -3305,18 +4271,19 @@ index 0000000..2bc6111
 +    }
 +}
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/tools/mod.rs b/libs/cua-driver/rust/crates/platform-macos/src/tools/mod.rs
-index b6ec2b0..40c9cf3 100644
+index b6ec2b0..9782652 100644
 --- a/libs/cua-driver/rust/crates/platform-macos/src/tools/mod.rs
 +++ b/libs/cua-driver/rust/crates/platform-macos/src/tools/mod.rs
-@@ -25,6 +25,7 @@ mod type_text;
+@@ -25,6 +25,8 @@ mod type_text;
  // etc.) live elsewhere under CuaDriverCore::Capture and are reached
  // through GetWindowStateTool.
  mod check_permissions;
++mod companion_hud_tools;
 +mod companion_tools;
  mod cursor_tools;
  mod get_accessibility_tree;
  mod get_config;
-@@ -620,6 +621,7 @@ pub struct ToolState {
+@@ -620,6 +622,7 @@ pub struct ToolState {
      pub element_cache: Arc<ElementCache>,
      pub cursor_registry: Arc<CursorRegistry>,
      pub zoom_registry: Arc<ZoomRegistry>,
@@ -3324,7 +4291,7 @@ index b6ec2b0..40c9cf3 100644
      pub(crate) capture_bindings: Arc<capture_binding::MacCaptureBindings>,
      /// Global, disk-persisted config — the base layer and the only one the
      /// anonymous session / CLI writes.
-@@ -673,6 +675,7 @@ impl ToolState {
+@@ -673,6 +676,7 @@ impl ToolState {
              element_cache: Arc::new(ElementCache::new()),
              cursor_registry: Arc::new(CursorRegistry::new()),
              zoom_registry: Arc::new(ZoomRegistry::new()),
@@ -3332,27 +4299,30 @@ index b6ec2b0..40c9cf3 100644
              capture_bindings: Arc::new(capture_binding::MacCaptureBindings::new(capture_service)),
              // Load persisted config from ~/.cua-driver/config.json so that
              // `cua-driver config set` changes carry over into MCP sessions.
-@@ -785,6 +788,7 @@ pub fn register_all(
+@@ -785,6 +789,8 @@ pub fn register_all(
          let cursor_registry = state.cursor_registry.clone();
          let capture_bindings = state.capture_bindings.clone();
          registry.retain_runtime_cleanup(move || {
 +            companion_tools::retire_runtime(&prefix);
++            crate::cursor::overlay::retire_companion_hud(&prefix, true);
              capture_bindings.retire_runtime();
              for cursor in cursor_registry
                  .all_states()
-@@ -811,6 +815,7 @@ pub fn register_all(
+@@ -811,6 +817,8 @@ pub fn register_all(
          let capture_bindings = state.capture_bindings.clone();
          let registration =
              cua_driver_core::session::register_scoped_session_end_hook(move |session_id| {
 +                companion_tools::retire_session(session_id);
++                crate::cursor::overlay::retire_companion_hud(session_id, false);
                  session_config.clear(session_id);
                  zoom_registry.retire_session(session_id);
                  element_cache.retire_session_screenshots(session_id);
-@@ -903,6 +908,7 @@ pub fn register_all(
+@@ -903,6 +911,8 @@ pub fn register_all(
      // register the MCP server under the `cua-computer-use` name, which is what
      // triggers Claude Code's computer-use beta-tool injection (see cli.rs).
      let _ = compat;
 +    companion_tools::register_tools(registry, state.clone());
++    companion_hud_tools::register_tools(registry, state.clone());
      registry.register(Box::new(get_screen_size::GetScreenSizeTool));
      registry.register(Box::new(get_desktop_state::GetDesktopStateTool::new(
          state.clone(),

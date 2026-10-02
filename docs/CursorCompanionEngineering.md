@@ -3,7 +3,7 @@
 The native V2 implementation follows the reviewed
 [guidance specification](CursorCompanionGuidanceSpec.md). Tro ships the pinned
 Cua source plus `driver-patches/CursorCompanion.patch`; no sibling source or
-Electron presentation window is used. The local build version is `0.30.4-tro.2`.
+Electron presentation window is used. The local build version is `0.30.4-tro.3`.
 
 ## Ownership
 
@@ -21,6 +21,30 @@ playback; `cursor-overlay/guidance.rs` owns bounded geometry, timings, frame
 fences and per-step evidence. Existing `companion.rs` and the isolated legacy
 playback path retain V1 compatibility for clients outside Tro's teaching mode.
 These modules do not import desktop input executors.
+
+## Desktop composition
+
+`DesktopCompanion` is the Electron main entry point with `readonly cursor` and
+`readonly hud`. It composes explicit presentation ports; `AgentChatController`
+continues to own the cursor/task worker. `CompanionHudController` reduces voice,
+meter and task progress into presentation snapshots without capturing audio or
+submitting tasks. Capture and session identities reject late updates.
+
+`EmbeddedDesktopDriver` owns one cached native endpoint. The independent agent
+and HUD utility workers lease connections to that endpoint; disposing a worker
+closes its session without stopping the daemon. Unexpected daemon exit notifies
+both clients. Only main stops and destroys the host during app shutdown.
+`CompanionHudClient` coalesces snapshots, replays the latest state after bounded
+reconnection and fences startup against sign-out. Native session cleanup and
+bounded leases remove orphaned HUDs. Private group binding connects the HUD to
+Tro's cursor; model tool discovery and invocation cannot access HUD controls.
+
+The native compositor draws an 88 × 22 logical-point bar beneath the 9 × 10
+pointer. Its waveform consumes finite amplitude values from existing PCM capture,
+with native smoothing and crossfades. Voice input remains the sole transcript
+submitter. V2 `demonstrated`/`explained` outcomes show completion; `needs_input`,
+`canceled` and `failed` retain distinct HUD states. Success never derives from
+model prose alone. Reduce Motion also applies to HUD animation.
 
 ## Playback and rendering
 

@@ -129,3 +129,33 @@ it('cancels pending startup and releases the host before admitting another worke
   expect(host.stop).toHaveBeenCalledOnce();
   expect(host.uniffiDestroy).toHaveBeenCalledOnce();
 });
+
+it('shares one daemon with both workers and invalidates every subscriber on unexpected exit', async () => {
+  if (process.platform !== 'darwin') {
+    return;
+  }
+  let resolveExit:
+    ((exit: Awaited<ReturnType<DesktopDriverHost['waitForExit']>>) => void) | undefined;
+  vi.mocked(host.waitForExit).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        resolveExit = resolve;
+      }),
+  );
+  const driver = new EmbeddedDesktopDriver();
+  const hudExit = vi.fn<() => void>();
+  const agentExit = vi.fn<() => void>();
+  const [hudConnection, agentConnection] = await Promise.all([
+    driver.start(hudExit),
+    driver.start(agentExit),
+  ]);
+  expect(hudConnection).toEqual(agentConnection);
+  await driver.start(agentExit);
+  expect(host.start).toHaveBeenCalledOnce();
+  expect(host.waitForExit).toHaveBeenCalledOnce();
+  resolveExit?.({ generation: connection.generation, success: false, code: 1 });
+  await Promise.resolve();
+  expect(hudExit).toHaveBeenCalledOnce();
+  expect(agentExit).toHaveBeenCalledOnce();
+  await driver.stop();
+});

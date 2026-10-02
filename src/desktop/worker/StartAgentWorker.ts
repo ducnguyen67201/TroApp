@@ -1,3 +1,6 @@
+import { z } from 'zod';
+import { AgentProgressPhase, AgentProgressSchema } from '#contracts/CompanionHud.js';
+import { AgentFailureCode } from '#contracts/AgentSession.js';
 import { setDefaultOpenAIClient, setTracingDisabled } from '@openai/agents';
 import OpenAI from 'openai';
 import {
@@ -15,6 +18,26 @@ let runner: ComputerUseTaskRunner | null = null;
 let sessionId: string | null = null;
 let hasModelCredential = false;
 let activeRun: ReturnType<ComputerUseTaskRunner['runTask']> | null = null;
+let activeRequestId: string | null = null;
+let dailyLimitReached = false;
+
+function hasReachedDailyLimit(): boolean {
+  return dailyLimitReached;
+}
+
+function reportThinking(): void {
+  if (activeRequestId && sessionId) {
+    parentPort.postMessage(
+      AgentProgressSchema.parse({
+        kind: 'progress',
+        requestId: activeRequestId,
+        sessionId,
+        phase: AgentProgressPhase.THINKING,
+      }),
+    );
+  }
+}
+
 let activeAbort: AbortController | null = null;
 
 /* Screen content and model turns must not enter application traces. */
@@ -24,7 +47,7 @@ function sendResult(requestId: string, result: AgentResult): void {
   parentPort.postMessage(AgentWorkerResponseSchema.parse({ requestId, result }));
 }
 
-async function runCommand(command: AgentWorkerCommand): Promise<AgentResult> {
+async function runCommand(command: AgentWorkerCommand, requestId: string): Promise<AgentResult> {
   switch (command.kind) {
     case 'follow':
     case 'start': {
@@ -40,7 +63,22 @@ async function runCommand(command: AgentWorkerCommand): Promise<AgentResult> {
           new OpenAI({
             apiKey: command.gatewayToken,
             baseURL: command.gatewayBaseUrl,
-            ...(command.debugEnabled ? { fetch: createLoggedModelFetch(log) } : {}),
+            fetch: async (input, init) => {
+              reportThinking();
+              const modelFetch = command.debugEnabled ? createLoggedModelFetch(log) : fetch;
+              const response = await modelFetch(input, init);
+              if (response.status === 429) {
+                try {
+                  const raw: unknown = await response.clone().json();
+                  const parsed = z.object({ message: z.string() }).safeParse(raw);
+                  dailyLimitReached ||=
+                    parsed.success && parsed.data.message === 'Daily model allowance reached.';
+                } catch {
+                  /* Failure classification is optional. */
+                }
+              }
+              return response;
+            },
           }),
         );
       }
@@ -49,6 +87,7 @@ async function runCommand(command: AgentWorkerCommand): Promise<AgentResult> {
           log,
           command.desktopDriver,
           command.kind === 'follow',
+          command.hudGroup,
         );
       } catch {
         return {
@@ -71,17 +110,42 @@ async function runCommand(command: AgentWorkerCommand): Promise<AgentResult> {
         return { kind: 'failed', message: 'Wait for the current task to finish.' };
       }
 
+      activeRequestId = requestId;
+      dailyLimitReached = false;
       activeAbort = new AbortController();
-      const run = runner.runTask(command.message, command.locale, activeAbort.signal, command.mode);
+      const run = runner.runTask(
+        command.message,
+        command.locale,
+        activeAbort.signal,
+        command.mode,
+        (phase) => {
+          parentPort.postMessage(
+            AgentProgressSchema.parse({
+              kind: 'progress',
+              requestId,
+              sessionId: command.sessionId,
+              phase,
+            }),
+          );
+        },
+      );
       activeRun = run;
       try {
         return await run;
       } catch {
+        if (hasReachedDailyLimit()) {
+          return {
+            kind: 'failed',
+            message: 'Daily model allowance reached.',
+            code: AgentFailureCode.DAILY_LIMIT,
+          };
+        }
         return {
           kind: 'failed',
           message: 'Could not complete the task. Check the connection and desktop access.',
         };
       } finally {
+        activeRequestId = null;
         activeRun = null;
         activeAbort = null;
       }
@@ -112,7 +176,7 @@ parentPort.on('message', (event) => {
     return;
   }
 
-  void runCommand(parsed.data.command)
+  void runCommand(parsed.data.command, parsed.data.requestId)
     .then((result) => {
       sendResult(parsed.data.requestId, result);
     })

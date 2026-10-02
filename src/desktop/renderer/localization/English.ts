@@ -73,6 +73,7 @@ export const english = {
   errorOpenGoogle: 'Could not open Google sign-in.',
   errorClearTask: 'Could not clear the task. Please try again.',
   errorStartTask: 'Could not start a task. Please try again.',
+  errorDailyModelLimit: 'Today’s model allowance is used up. Try again after the daily reset.',
   errorCompleteTask: 'Could not complete the task. Check the connection and desktop access.',
   errorContactAgent: 'Could not contact the local agent. Try sending again.',
   errorSignOut: 'Could not sign out. Please try again.',

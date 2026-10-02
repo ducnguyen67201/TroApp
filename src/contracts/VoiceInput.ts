@@ -77,6 +77,7 @@ export const VoiceEventSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('release'), captureId: z.uuid() }),
   z.strictObject({ kind: z.literal('cancel'), captureId: z.uuid() }),
   z.strictObject({ kind: z.literal('preview'), captureId: z.uuid(), text: z.string().max(8000) }),
+  z.strictObject({ kind: z.literal('admitting'), captureId: z.uuid() }),
   z.strictObject({
     kind: z.literal('submitted'),
     captureId: z.uuid(),

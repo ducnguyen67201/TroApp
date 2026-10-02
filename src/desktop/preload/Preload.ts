@@ -1,3 +1,4 @@
+import { VoiceMeterSchema, type VoiceMeter } from '#contracts/CompanionHud.js';
 import {
   VoiceCommandSchema,
   VoiceAudioFrameSchema,
@@ -29,6 +30,12 @@ import {
 /* Expose named session operations, not generic IPC or direct computer tools.
    Validate IPC data before it enters the renderer. */
 const bridge: DesktopBridge = {
+  updateVoiceMeter(meter: VoiceMeter): void {
+    const parsed = VoiceMeterSchema.safeParse(meter);
+    if (parsed.success) {
+      ipcRenderer.send('tro:voice-meter', parsed.data);
+    }
+  },
   async controlVoiceInput(command: VoiceCommand): Promise<VoiceReply> {
     try {
       return VoiceReplySchema.parse(

@@ -42,6 +42,7 @@ function createBridge() {
       kind: 'ok',
       status: { state: 'idle', shortcut: 'command-control', globalShortcutAvailable: true },
     }),
+    updateVoiceMeter: vi.fn<DesktopBridge['updateVoiceMeter']>(),
     appendVoiceAudio: vi.fn<DesktopBridge['appendVoiceAudio']>().mockResolvedValue({
       kind: 'ok',
       status: { state: 'recording', shortcut: 'command-control', globalShortcutAvailable: true },
@@ -302,6 +303,7 @@ describe('locale-driven voice capture', () => {
       append(new Uint8Array(960));
     });
     expect(bridge.appendVoiceAudio).not.toHaveBeenCalled();
+    expect(bridge.updateVoiceMeter).toHaveBeenCalledTimes(1);
     act(() => {
       emit({ kind: 'record', captureId: firstId });
     });
@@ -323,6 +325,7 @@ describe('locale-driven voice capture', () => {
       });
     });
     expect(bridge.appendVoiceAudio).toHaveBeenCalledTimes(2);
+    expect(bridge.updateVoiceMeter).toHaveBeenCalledTimes(1);
     expect(bridge.sendAgentMessage).not.toHaveBeenCalled();
     expect(bridge.startAgentSession).not.toHaveBeenCalled();
     expect(received.some((event) => event.kind === 'release')).toBe(true);

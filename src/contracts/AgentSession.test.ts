@@ -199,3 +199,23 @@ it('requires the host-owned endpoint for companion startup and hides it from ren
     }).success,
   ).toBe(false);
 });
+
+it('keeps the HUD group private while both workers receive the embedded endpoint', () => {
+  const command = {
+    kind: 'follow',
+    sessionId,
+    debugEnabled: false,
+    hudGroup: sessionId,
+    desktopDriver: { command: '/tro/cua-driver', args: ['mcp', '--embedded'], env: {} },
+  };
+  expect(AgentWorkerRequestSchema.parse({ requestId: sessionId, command }).command).toEqual(
+    command,
+  );
+  expect(AgentCommandSchema.safeParse({ kind: 'follow', hudGroup: sessionId }).success).toBe(false);
+  expect(
+    AgentWorkerRequestSchema.safeParse({
+      requestId: sessionId,
+      command: { ...command, hudGroup: 'bad' },
+    }).success,
+  ).toBe(false);
+});

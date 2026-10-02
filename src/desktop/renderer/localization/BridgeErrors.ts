@@ -3,6 +3,7 @@ import type { TranslationKey } from './English.js';
 /* The existing bridge sends English messages. Keep this compatibility map at
    the presentation boundary until the protocol supplies stable error codes. */
 const bridgeErrorKeys: Readonly<Record<string, TranslationKey>> = {
+  'Daily model allowance reached.': 'errorDailyModelLimit',
   'Could not start the cursor companion.': 'errorCompanionUnavailable',
   'Cursor companion is unavailable. Install the companion-enabled Cua Driver and restart Tro.':
     'errorCompanionUnavailable',

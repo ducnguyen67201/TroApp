@@ -1,3 +1,4 @@
+import { CompanionHudTool } from '#contracts/CompanionHud.js';
 import { AgentTaskMode, CursorCompanionTool } from '#contracts/CursorCompanion.js';
 
 /* Review exact tools: readOnlyHint is a discovery hint, not an authorization
@@ -19,6 +20,7 @@ const TeachingTools = new Set<string>([
   CursorCompanionTool.READ_CAPABILITIES,
 ]);
 const HostTools = new Set<string>([
+  ...Object.values(CompanionHudTool),
   CursorCompanionTool.SET_MODE,
   CursorCompanionTool.BEGIN_TASK,
   CursorCompanionTool.END_TASK,

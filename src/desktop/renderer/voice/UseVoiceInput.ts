@@ -1,3 +1,4 @@
+import { VoiceLevelMeter } from './VoiceLevelMeter.js';
 import { useEffect, useRef, useState } from 'react';
 import {
   VoiceState,
@@ -24,6 +25,7 @@ export interface VoiceInputView {
 interface CaptureQueue {
   id: string;
   audio: VoiceAudioCapture;
+  meter: VoiceLevelMeter;
   ready: boolean;
   readySignal: Promise<void>;
   resolveReady: () => void;
@@ -66,6 +68,7 @@ export function useVoiceInput(
     }
 
     function cancelAudio(): void {
+      capture.current?.meter.stop();
       capture.current?.audio.dispose();
       capture.current?.resolveReady();
       capture.current = null;
@@ -123,12 +126,16 @@ export function useVoiceInput(
           cancelAudio();
           setError(false);
           setPreview('');
+          const meter = new VoiceLevelMeter(event.captureId, (update) => {
+            window.tro.updateVoiceMeter(update);
+          });
           const audio = new VoiceAudioCapture(
             (pcm) => {
               const current = capture.current;
               if (!current || current.id !== event.captureId) {
                 return;
               }
+              meter.appendFrame(pcm);
               // Five seconds bounds cold-start audio; normal transport has one IPC in flight.
               if (current.queue.length >= 250) {
                 failCapture();
@@ -155,6 +162,7 @@ export function useVoiceInput(
           const current: CaptureQueue = {
             id: event.captureId,
             audio,
+            meter,
             ready: false,
             readySignal,
             resolveReady,
@@ -199,6 +207,7 @@ export function useVoiceInput(
             break;
           }
           void (async () => {
+            current.meter.stop();
             await current.audio.flushCapture();
             await current.readySignal;
             if (capture.current !== current) {
@@ -344,6 +353,7 @@ export function useVoiceInput(
   }
 
   function cancelVoice(): void {
+    capture.current?.meter.stop();
     capture.current?.audio.dispose();
     capture.current?.resolveReady();
     capture.current = null;

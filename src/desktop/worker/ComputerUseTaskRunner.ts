@@ -1,3 +1,4 @@
+import { CompanionHudTool, type AgentProgressPhase } from '#contracts/CompanionHud.js';
 import type { AgentInputItem } from '@openai/agents';
 import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
@@ -52,6 +53,7 @@ export class ComputerUseTaskRunner {
     log: Logger,
     connection: DesktopDriverConnection,
     requiresCompanion = false,
+    hudGroup?: string,
   ): Promise<ComputerUseTaskRunner> {
     const desktopServer = new LoggedCuaServer(
       {
@@ -74,6 +76,11 @@ export class ComputerUseTaskRunner {
       if (requiresCompanion && !runner.companion) {
         throw new Error('Cua Driver did not expose companion tools.');
       }
+      if (hudGroup) {
+        await desktopServer
+          .callHostTool(CompanionHudTool.BIND_CURSOR, { group: hudGroup })
+          .catch(() => {});
+      }
       await runner.companion?.startFollowing();
       return runner;
     } catch (error) {
@@ -87,6 +94,7 @@ export class ComputerUseTaskRunner {
     locale: DesktopLocale,
     signal: AbortSignal,
     mode: AgentTaskMode = AgentTaskMode.EXECUTE,
+    receiveProgress?: (phase: AgentProgressPhase) => void,
   ): Promise<TaskResult> {
     if (
       mode === AgentTaskMode.TEACH &&
@@ -98,6 +106,7 @@ export class ComputerUseTaskRunner {
       };
     }
     this.desktopServer.setTaskMode(mode);
+    this.desktopServer.setProgressListener(receiveProgress ?? null);
     const cancelGuidance = (): void => {
       void this.desktopServer.close().catch(() => {});
     };
@@ -194,6 +203,7 @@ export class ComputerUseTaskRunner {
       );
       throw error;
     } finally {
+      this.desktopServer.setProgressListener(null);
       signal.removeEventListener('abort', cancelGuidance);
       if (mode === AgentTaskMode.TEACH) {
         this.desktopServer.endTeachingTask();

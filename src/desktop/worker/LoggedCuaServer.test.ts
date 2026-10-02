@@ -1,6 +1,7 @@
 import { MCPServerStdio, mcpToFunctionTool, RunContext, type CallToolResult } from '@openai/agents';
 import pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
+import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { TaskIssue } from './CuaTaskEvidence.js';
 import { LoggedCuaServer } from './LoggedCuaServer.js';
 
@@ -315,4 +316,34 @@ describe('host-pinned V2 guidance', () => {
       call.mockRestore();
     }
   });
+});
+
+it('never advertises or dispatches private HUD tools to a model in either task mode', async () => {
+  const native = vi.spyOn(MCPServerStdio.prototype, 'callToolResult');
+  const list = vi.spyOn(MCPServerStdio.prototype, 'listTools').mockResolvedValue([
+    {
+      name: 'set_companion_hud',
+      inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
+    },
+    {
+      name: 'bind_companion_hud_cursor',
+      inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
+    },
+  ]);
+  const server = new LoggedCuaServer(
+    { name: 'HUD policy', command: 'unused' },
+    pino({ level: 'silent' }),
+  );
+  try {
+    for (const mode of Object.values(AgentTaskMode)) {
+      server.setTaskMode(mode);
+      expect(await server.listTools()).toEqual([]);
+      expect((await server.callToolResult('set_companion_hud', {})).isError).toBe(true);
+      expect((await server.callToolResult('bind_companion_hud_cursor', {})).isError).toBe(true);
+    }
+    expect(native).not.toHaveBeenCalled();
+  } finally {
+    native.mockRestore();
+    list.mockRestore();
+  }
 });

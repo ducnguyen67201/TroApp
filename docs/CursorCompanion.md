@@ -11,7 +11,7 @@ Typed and spoken instructions carry the selected mode and app language to the
 worker. Voice capture snapshots both settings when recording is prepared, so
 changing them during a capture affects the next instruction.
 
-The teaching companion uses a compact white pointer about 12 × 13 logical points,
+The teaching companion uses a compact white pointer about 9 × 10 logical points,
 with a rounded blue outline and a proportionally scaled soft blue halo based on
 the supplied cursor reference. Gesture marks and the Tro badge share its blue palette. The native vector painter scales with the
 display's backing scale; the pointer tip remains the geometry hotspot. Click
@@ -98,3 +98,25 @@ demonstrated action. Old drivers do not silently downgrade Show me to V1.
 
 See [CursorCompanionEngineering.md](CursorCompanionEngineering.md) for ownership,
 protocol, cancellation and extension points.
+
+## Voice HUD
+
+`DesktopCompanion` composes `cursor` and `hud` in main. The passive voice bar uses
+the approved 88 × 22 point English pill (98 points wide for Vietnamese) and the
+9 × 10 point cursor. Existing PCM supplies the live waveform; voice release,
+transcription, admission and actual model/tool progress drive smooth native
+transitions. A V2 demonstrated or explained result shows Done; takeover shows
+Canceled, prose without a demonstration shows Needs input, and failures show
+Error. The final transcript still submits only through VoiceInputController.
+
+Presentation has its own persistent utility worker, connected to the same
+Tro-owned embedded endpoint as the task worker. A bounded private group binding
+attaches the pill to Tro cursors. Task-worker replacement does not stop the
+shared host or reset the HUD. Sign-out/window close end both worker sessions;
+main stops the embedded host when the app quits. HUD errors leave voice and
+workspace controls usable. The model cannot discover or invoke HUD host tools.
+
+macOS grants belong to Tro (Electron during development). Rebuild with
+`pnpm build:cua` and restart Tro to load a changed native patch. macOS reduced
+motion is read at native host startup. See [CursorCompanionVoiceBarPlan.md](CursorCompanionVoiceBarPlan.md)
+for state contracts, layout and validation limits.

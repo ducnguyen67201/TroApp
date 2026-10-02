@@ -3,6 +3,8 @@ import { DesktopLocaleSchema } from './DesktopLocale.js';
 import { AgentTaskMode, AgentTaskModeSchema, TeachingResultSchema } from './CursorCompanion.js';
 import { DesktopDriverConnectionSchema } from './DesktopDriver.js';
 
+export const AgentFailureCode = { DAILY_LIMIT: 'daily_limit' } as const;
+
 /** Lifecycle and chat messages crossing renderer, main, and the local agent worker. */
 export const AgentCommandSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('start') }),
@@ -26,6 +28,7 @@ export const AgentWorkerCommandSchema = z.discriminatedUnion('kind', [
     sessionId: z.uuid(),
     debugEnabled: z.boolean(),
     desktopDriver: DesktopDriverConnectionSchema,
+    hudGroup: z.uuid().optional(),
   }),
   z.strictObject({
     kind: z.literal('start'),
@@ -34,6 +37,7 @@ export const AgentWorkerCommandSchema = z.discriminatedUnion('kind', [
     gatewayBaseUrl: z.url(),
     debugEnabled: z.boolean(),
     desktopDriver: DesktopDriverConnectionSchema,
+    hudGroup: z.uuid().optional(),
   }),
   z.strictObject({
     kind: z.literal('turn'),
@@ -52,7 +56,11 @@ export const AgentResultSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('completed'), answer: z.string() }),
   z.strictObject({ kind: z.literal('teaching'), result: TeachingResultSchema }),
   z.strictObject({ kind: z.literal('stopped') }),
-  z.strictObject({ kind: z.literal('failed'), message: z.string() }),
+  z.strictObject({
+    kind: z.literal('failed'),
+    message: z.string(),
+    code: z.enum(AgentFailureCode).optional(),
+  }),
 ]);
 
 export type AgentResult = z.infer<typeof AgentResultSchema>;

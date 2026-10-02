@@ -76,6 +76,8 @@ export const vietnamese = {
   errorOpenGoogle: 'Không thể mở đăng nhập Google.',
   errorClearTask: 'Không thể xóa tác vụ. Vui lòng thử lại.',
   errorStartTask: 'Không thể bắt đầu tác vụ. Vui lòng thử lại.',
+  errorDailyModelLimit:
+    'Bạn đã dùng hết lượt mô hình hôm nay. Hãy thử lại sau khi hạn mức được đặt lại.',
   errorCompleteTask: 'Không thể hoàn tất tác vụ. Hãy kiểm tra kết nối và quyền truy cập máy tính.',
   errorContactAgent: 'Không thể kết nối với trợ lý trên máy tính. Vui lòng gửi lại.',
   errorSignOut: 'Không thể đăng xuất. Vui lòng thử lại.',

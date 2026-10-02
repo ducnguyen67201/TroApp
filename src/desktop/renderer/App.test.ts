@@ -18,6 +18,7 @@ const sessionId = 'a8f6d44a-5c18-4ce3-9237-44624549f63f';
 
 function createDesktopBridge() {
   return {
+    updateVoiceMeter: vi.fn<DesktopBridge['updateVoiceMeter']>(),
     controlVoiceInput: vi.fn<DesktopBridge['controlVoiceInput']>().mockImplementation((command) =>
       Promise.resolve<VoiceReply>({
         kind: 'ok',

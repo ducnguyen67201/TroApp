@@ -312,6 +312,7 @@ export class VoiceInputController {
     }
     this.running = true;
     this.setState(VoiceState.RUNNING);
+    this.dependencies.emit({ kind: 'admitting', captureId: capture.id });
     try {
       const auth = await this.dependencies.readSession();
       if (

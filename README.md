@@ -70,3 +70,9 @@ previews while the student controls the real pointer. **Do it for me** uses
 ordinary Cua actions. The companion follows while idle after permission setup; **Stop** cancels the task and returns to idle following. V2 guides approach, trace, hold and clear each cue; you can move your pointer while watching. Clicking, typing or scrolling stops the guide until a new request.
 This first adapter supports the primary macOS display. See
 [CursorCompanion.md](docs/CursorCompanion.md) for setup, boundaries and limits.
+
+The macOS companion includes a compact voice bar with live audio levels,
+transcription/submission transitions and actual task progress. `DesktopCompanion`
+composes cursor and HUD behind one main-process entry point. Both workers share
+Tro's embedded driver endpoint, while the HUD transport survives task handoffs.
+See [CursorCompanionVoiceBarPlan.md](docs/CursorCompanionVoiceBarPlan.md).

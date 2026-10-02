@@ -1,3 +1,6 @@
+import { VoiceMeterSchema } from '#contracts/CompanionHud.js';
+import { DesktopCompanion } from './companion/DesktopCompanion.js';
+import { CompanionHudClient } from './companion/CompanionHudClient.js';
 import { app, BrowserWindow, ipcMain, powerMonitor, systemPreferences } from 'electron';
 import {
   VoiceCommandSchema,
@@ -32,6 +35,7 @@ const mainDirectory = dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | undefined;
 let chat: AgentChatController | undefined;
 let voice: VoiceInputController | undefined;
+let desktopCompanion: DesktopCompanion | undefined;
 const voiceShortcut = new GlobalVoiceShortcut();
 let voiceEnableGeneration = 0;
 let voiceKeysReleased = true;
@@ -48,10 +52,18 @@ async function startDesktop(): Promise<void> {
     bundledAppEnvironment: import.meta.env['MAIN_VITE_APP_ENV'],
     isPackaged: app.isPackaged,
   });
+  const hudClient = new CompanionHudClient(
+    join(mainDirectory, 'StartCompanionHudWorker.js'),
+    desktopDriver,
+  );
   const agentWorker = new AgentWorkerClient(
     join(mainDirectory, 'StartAgentWorker.js'),
     environment.APP_ENV === AppEnvironment.DEV,
     desktopDriver,
+    process.platform === 'darwin' ? hudClient.group : undefined,
+    (progress) => {
+      desktopCompanion?.hud.receiveProgress(progress);
+    },
   );
   const rendererFile = join(mainDirectory, '../renderer/index.html');
   const developmentUrl = app.isPackaged ? undefined : environment.RENDERER_URL;
@@ -67,6 +79,29 @@ async function startDesktop(): Promise<void> {
     `${environment.API_BASE_URL}/api/v1/model`,
     permissions,
   );
+
+  const companionChat = chat;
+  const companion = new DesktopCompanion(
+    { startFollowing: () => companionChat.startCursorCompanion() },
+    {
+      canShow: async () =>
+        process.platform === 'darwin' &&
+        (await auth.readSession()).kind === 'signed-in' &&
+        (await permissions.readStatus()).kind === 'ready',
+    },
+    hudClient,
+    {
+      now: () => performance.now(),
+      schedule: (callback, delayMs) => {
+        const timer = setTimeout(callback, delayMs);
+        timer.unref();
+        return () => {
+          clearTimeout(timer);
+        };
+      },
+    },
+  );
+  desktopCompanion = companion;
 
   const voiceChat = chat;
   voice = new VoiceInputController(
@@ -87,6 +122,7 @@ async function startDesktop(): Promise<void> {
       sendAgentMessage: (sessionId, message, locale, mode) =>
         voiceChat.sendMessage(sessionId, message, locale, mode),
       emit: (event) => {
+        companion.hud.receiveVoiceEvent(event);
         sendVoiceEventToWindow(mainWindow, event);
       },
     },
@@ -98,15 +134,18 @@ async function startDesktop(): Promise<void> {
     voiceEnableGeneration += 1;
     voiceShortcut.disableShortcut();
     voice?.invalidateVoiceInput();
+    companion.dispose();
   }
 
   powerMonitor.on('suspend', () => {
     voiceShortcut.reset();
     voice?.cancelVoiceCapture();
+    companion.reset();
   });
   powerMonitor.on('lock-screen', () => {
     voiceShortcut.reset();
     voice?.cancelVoiceCapture();
+    companion.reset();
   });
 
   ipcMain.handle('tro:voice-command', async (event, rawCommand: unknown): Promise<VoiceReply> => {
@@ -131,6 +170,7 @@ async function startDesktop(): Promise<void> {
       case 'cancel':
         return controller.cancelVoiceCapture();
       case 'prepare':
+        companion.hud.setCaptureLocale(parsed.data.captureId, parsed.data.locale);
         return controller.prepareVoiceCapture(
           parsed.data.captureId,
           parsed.data.locale,
@@ -154,6 +194,7 @@ async function startDesktop(): Promise<void> {
         if (generation !== voiceEnableGeneration) {
           return { kind: 'failed' };
         }
+        void companion.startPresentation();
         let globalAvailable = false;
         try {
           if (
@@ -192,6 +233,16 @@ async function startDesktop(): Promise<void> {
     }
   });
 
+  ipcMain.on('tro:voice-meter', (event, rawMeter: unknown) => {
+    if (!isTrustedSender(event) || !voice?.isCapturing()) {
+      return;
+    }
+    const parsed = VoiceMeterSchema.safeParse(rawMeter);
+    if (parsed.success) {
+      companion.hud.updateMeter(parsed.data);
+    }
+  });
+
   ipcMain.handle('tro:voice-audio', (event, rawFrame: unknown): VoiceReply => {
     if (!isTrustedSender(event) || !voice) {
       return { kind: 'failed' };
@@ -220,7 +271,7 @@ async function startDesktop(): Promise<void> {
     }
   });
 
-  function isTrustedSender(event: Electron.IpcMainInvokeEvent): boolean {
+  function isTrustedSender(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent): boolean {
     return Boolean(
       mainWindow &&
       !mainWindow.isDestroyed() &&
@@ -266,12 +317,16 @@ async function startDesktop(): Promise<void> {
     }
 
     switch (parsed.data.kind) {
-      case 'follow':
-        return process.platform === 'darwin' ? chat.startCursorCompanion() : { kind: 'stopped' };
+      case 'follow': {
+        if (process.platform !== 'darwin') {
+          return { kind: 'stopped' };
+        }
+        return companion.startFollowing();
+      }
       case 'start': {
         return chat.startTaskSession();
       }
-      case 'turn':
+      case 'turn': {
         if (
           voice &&
           ![VoiceState.IDLE, VoiceState.DISABLED].some(
@@ -280,14 +335,19 @@ async function startDesktop(): Promise<void> {
         ) {
           return { kind: 'failed', message: 'Wait for the current task to finish.' };
         }
-        return chat.sendMessage(
+        companion.hud.startTask(parsed.data.sessionId, parsed.data.locale);
+        const result = await chat.sendMessage(
           parsed.data.sessionId,
           parsed.data.message,
           parsed.data.locale,
           parsed.data.mode,
         );
+        companion.hud.finishTask(result, parsed.data.sessionId);
+        return result;
+      }
       case 'stop':
         voice?.cancelVoiceCapture();
+        companion.reset();
         return chat.stopSession(parsed.data.sessionId);
     }
   });
@@ -380,6 +440,7 @@ app.on('before-quit', (event) => {
   voiceEnableGeneration += 1;
   voiceShortcut.disableShortcut();
   voice?.invalidateVoiceInput();
+  desktopCompanion?.dispose();
   chat?.dispose();
   void desktopDriver
     .stop()

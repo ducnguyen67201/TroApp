@@ -8,7 +8,8 @@ import {
   type AgentWorkerCommand,
   type AgentResult,
 } from '#contracts/AgentSession.js';
-import { EmbeddedDesktopDriver } from './EmbeddedDesktopDriver.js';
+import type { DesktopDriverPort } from './DesktopDriverPort.js';
+import { AgentProgressSchema, type AgentProgress } from '#contracts/CompanionHud.js';
 import type { DesktopDriverConnection } from '#contracts/DesktopDriver.js';
 
 interface PendingRequest {
@@ -23,12 +24,18 @@ const stopTimeoutMs = 10_000;
 /** Owns the one local computer-use process for the active chat session. */
 export class AgentWorkerClient implements AgentChatWorker {
   private worker: UtilityProcess | null = null;
+  private generation = 0;
+  private readonly onDriverExit = (): void => {
+    this.dispose();
+  };
   private readonly pending = new Map<string, PendingRequest>();
 
   constructor(
     private readonly workerEntryPath: string,
     private readonly debugEnabled: boolean,
-    private readonly desktopDriver: EmbeddedDesktopDriver,
+    private readonly desktopDriver: DesktopDriverPort,
+    private readonly hudGroup?: string,
+    private readonly receiveProgress?: (progress: AgentProgress) => void,
   ) {}
 
   isRunning(): boolean {
@@ -36,7 +43,12 @@ export class AgentWorkerClient implements AgentChatWorker {
   }
 
   startCompanion(sessionId: string): Promise<AgentResult> {
-    return this.startWorker({ kind: 'follow', sessionId, debugEnabled: this.debugEnabled });
+    return this.startWorker({
+      kind: 'follow',
+      sessionId,
+      debugEnabled: this.debugEnabled,
+      ...(this.hudGroup ? { hudGroup: this.hudGroup } : {}),
+    });
   }
 
   start(sessionId: string, gatewayToken: string, gatewayBaseUrl: string): Promise<AgentResult> {
@@ -46,6 +58,7 @@ export class AgentWorkerClient implements AgentChatWorker {
       gatewayToken,
       gatewayBaseUrl,
       debugEnabled: this.debugEnabled,
+      ...(this.hudGroup ? { hudGroup: this.hudGroup } : {}),
     });
   }
 
@@ -58,14 +71,17 @@ export class AgentWorkerClient implements AgentChatWorker {
       return { kind: 'failed', message: 'An agent session is already active.' };
     }
 
+    const generation = this.generation;
     let connection: DesktopDriverConnection;
     try {
-      connection = await this.desktopDriver.start(() => {
-        this.dispose();
-      });
+      connection = await this.desktopDriver.start(this.onDriverExit);
     } catch {
       this.dispose();
       return { kind: 'failed', message: 'Could not start Tro desktop control.' };
+    }
+
+    if (generation !== this.generation) {
+      return { kind: 'failed', message: 'The agent session ended.' };
     }
 
     /* Electron main starts this only after app.whenReady(). The agent and Cua
@@ -81,6 +97,16 @@ export class AgentWorkerClient implements AgentChatWorker {
     }
     this.worker = child;
     child.on('message', (message: unknown) => {
+      if (this.worker !== child) {
+        return;
+      }
+      const progress = AgentProgressSchema.safeParse(message);
+      if (progress.success) {
+        if (this.pending.has(progress.data.requestId)) {
+          this.receiveProgress?.(progress.data);
+        }
+        return;
+      }
       const parsed = AgentWorkerResponseSchema.safeParse(message);
       if (!parsed.success) {
         return;
@@ -97,7 +123,6 @@ export class AgentWorkerClient implements AgentChatWorker {
       if (this.worker === child) {
         this.failPending('The local agent worker stopped.');
         this.worker = null;
-        void this.desktopDriver.stop().catch(() => {});
       }
     });
 
@@ -109,7 +134,7 @@ export class AgentWorkerClient implements AgentChatWorker {
         resolve(false);
       });
     });
-    if (!ready) {
+    if (!ready || generation !== this.generation || this.worker !== child) {
       this.dispose();
       return { kind: 'failed', message: 'Could not start the local agent worker.' };
     }
@@ -141,10 +166,11 @@ export class AgentWorkerClient implements AgentChatWorker {
   }
 
   dispose(): void {
+    this.generation += 1;
     this.failPending('The agent session ended.');
     this.worker?.kill();
     this.worker = null;
-    void this.desktopDriver.stop().catch(() => {});
+    /* Main owns the shared daemon; HUD transport survives task-worker replacement. */
   }
 
   private send(command: AgentWorkerCommand): Promise<AgentResult> {
