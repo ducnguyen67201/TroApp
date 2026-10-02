@@ -75,15 +75,21 @@ Use `#contracts/SystemStatus.js` for shared contract imports across desktop and 
 
 ## Local agent orchestration
 
-The Agents SDK runs in a separate Electron utility process on the user's machine so automation does not block the UI. Electron main starts one worker on demand and stops it after 15 idle minutes, sign-out, or window close. [OpenAI Agents SDK](https://developers.openai.com/api/docs/guides/agents/sdk)
+The Agents SDK runs in a separate Electron utility process on the user's machine so automation does not block the UI. On macOS, Electron main starts a local companion-only worker after permission setup without a model credential. A task replaces that connection with a credentialed worker; following resumes after the task. Sign-out and window close stop it. Other platforms start on demand and stop after 15 idle minutes. [OpenAI Agents SDK](https://developers.openai.com/api/docs/guides/agents/sdk)
 
 The first implemented agent feature is a general computer-use text chat, specified in [ComputerUseSpec.md](ComputerUseSpec.md). The Agents SDK discovers Cua Driver's MCP tools directly; Tro does not copy each action into an OpenAI `Computer` adapter. [ComputerUseInstructions.ts](../src/desktop/worker/ComputerUseInstructions.ts) is the single place to edit the agent's standing instruction. General GUI actions can change content in any accessible app. Tro has no per-action approval UI; Cua's own runtime permission mode still applies. Voice input submits finalized instructions through the same controller; class context remains a later integration.
 
 The worker owns the loop and tool execution. Model requests normally still go over the network. Screenshots or tool outputs sent to the model leave the machine; local orchestration is not an offline or all-local privacy guarantee.
 
-Tro now signs users in with Google through backend Better Auth/Prisma. Better Auth's Electron client stores the Tro cookie with OS `safeStorage` when available, and main obtains a 15-minute model-only token from the backend. The local worker uses that token to call Tro's Responses gateway; the product OpenAI key and Google client secret remain on the backend. The gateway restricts the model and output tokens and meters requests per account. The worker starts on demand and stops after 15 idle minutes. Each message starts a fresh SDK run with no `Session` or previous message history. React displays messages in memory until the window closes; screenshots and tool outputs are not persisted. See [ComputerUseSpec.md](ComputerUseSpec.md) for limits and release work.
+Tro now signs users in with Google through backend Better Auth/Prisma. Better Auth's Electron client stores the Tro cookie with OS `safeStorage` when available, and main obtains a 15-minute model-only token from the backend. The local worker uses that token to call Tro's Responses gateway; the product OpenAI key and Google client secret remain on the backend. The gateway restricts the model and output tokens and meters requests per account. The companion keeps the macOS worker connected while the signed-in window is open; other platforms start on demand and stop after 15 idle minutes. Each message starts a fresh SDK run with no `Session` or previous message history. React displays messages in memory until the window closes; screenshots and tool outputs are not persisted. See [ComputerUseSpec.md](ComputerUseSpec.md) for limits and release work.
 
 The selected product direction remains a local worker. Desktop control needs Windows/macOS validation and permissions; a separate process alone does not make arbitrary model-generated GUI actions harmless.
+
+[CursorCompanion.md](CursorCompanion.md) describes the Cua-owned teaching companion,
+requested through MCP by the Agents SDK. Tro's validated task mode gates observation,
+previews and existing-window focus separately from ordinary desktop actions. The native
+patch and reproducible build support macOS's primary display; other displays and native
+platform adapters remain future work. Tro imports only a built driver, never sibling source.
 
 ## Persistence and jobs
 
@@ -116,3 +122,7 @@ The earlier exploratory options remain in [ArchitecturePrevious.md](Architecture
 ## Voice input
 
 The desktop captures held-key microphone audio in an AudioWorklet, sends bounded PCM frames through validated preload operations, and uses a scoped authenticated WebSocket relay in the backend. The existing locale hook supplies each capture’s language. Main admits one final instruction and its capture locale into the existing agent controller and reports submission/result events to the in-memory UI. Typed instructions also carry the current locale. The worker builds each task's agent instructions in that reply language while reusing its Cua connection. Prisma owns atomic audio quota reservations and single-use stream claims. See [VoiceInputSpec.md](VoiceInputSpec.md) for module ownership, limits, native packaging, and release evidence.
+
+## Companion presentation
+
+`DesktopCompanion` is the main-process entry point for desktop presentation. It composes `cursor` (the authenticated chat controller’s following port) and `hud` (`CompanionHudController`) through explicit injected ports. It checks presentation access, registers the HUD before cursor binding, and fences pending startup on disposal. The chat controller retains ownership of its shared cursor/task worker; the facade owns presentation cleanup. `CompanionHudController` reduces capture and worker progress events in Electron main. A narrow meter IPC accepts finite, capture-bound levels from the existing PCM stream. `CompanionHudClient` owns a persistent presentation utility worker, separate from task orchestration, and coalesces snapshots through Cua MCP. The native compositor owns the passive 88 × 22 pill, waveform smoothing, crossfades and primary-display placement. Private group registration binds only Tro cursors; bounded leases and native session cleanup prevent orphaned presentation. The model cannot discover or call HUD host tools. VoiceInputController remains the sole final-transcript submitter.

@@ -1,5 +1,16 @@
+import {
+  AgentProgressPhase,
+  type AgentProgressPhase as ProgressPhase,
+} from '#contracts/CompanionHud.js';
+import { z } from 'zod';
 import { MCPServerStdio, type CallToolResult, type MCPCallToolOptions } from '@openai/agents';
 import type { Logger } from 'pino';
+import {
+  CursorCompanionStateSchema,
+  CursorCompanionTool,
+  AgentTaskMode,
+} from '#contracts/CursorCompanion.js';
+import { canCallCuaTool, isCursorPresentationTool } from './CuaTeachingPolicy.js';
 import { CuaTaskEvidence } from './CuaTaskEvidence.js';
 
 type CuaTool = Awaited<ReturnType<MCPServerStdio['listTools']>>[number];
@@ -99,9 +110,49 @@ export function describeCuaResult(value: unknown): {
   };
 }
 
+function validatePreviewResult(toolName: string, result: CallToolResult): CallToolResult {
+  if (toolName !== CursorCompanionTool.SHOW_SEQUENCE || result.isError) {
+    return result;
+  }
+  const state = CursorCompanionStateSchema.safeParse(result.structuredContent);
+  return state.success && state.data.status === 'completed'
+    ? result
+    : {
+        isError: true,
+        content: [{ type: 'text', text: 'Cua did not acknowledge completed visual playback.' }],
+      };
+}
+
 /** Trace the real SDK-to-Cua MCP boundary; the SDK calls this method for each tool. */
 export class LoggedCuaServer extends MCPServerStdio {
   readonly taskEvidence = new CuaTaskEvidence();
+  private activeToolCount = 0;
+  private receiveProgress: ((phase: ProgressPhase) => void) | null = null;
+
+  setProgressListener(listener: ((phase: ProgressPhase) => void) | null): void {
+    this.receiveProgress = listener;
+  }
+
+  private taskMode: AgentTaskMode = AgentTaskMode.EXECUTE;
+  private discoveredTools: Set<string> | null = null;
+
+  setTaskMode(mode: AgentTaskMode): void {
+    this.taskMode = mode;
+  }
+
+  hasCompanionTools(): boolean {
+    return [
+      'show_cursor_sequence',
+      'set_cursor_companion_mode',
+      'cancel_cursor_sequence',
+      'get_cursor_companion_state',
+    ].every((name) => this.discoveredTools?.has(name));
+  }
+
+  /** Trusted worker lifecycle operations; never advertised to the model. */
+  callHostTool(toolName: string, args: Record<string, unknown>): Promise<CallToolResult> {
+    return super.callToolResult(toolName, args);
+  }
 
   constructor(
     options: ConstructorParameters<typeof MCPServerStdio>[0],
@@ -112,11 +163,29 @@ export class LoggedCuaServer extends MCPServerStdio {
 
   override async listTools(): ReturnType<MCPServerStdio['listTools']> {
     const tools = await super.listTools();
+    this.discoveredTools = new Set(tools.map((tool) => tool.name));
     /* Cua owns action classification; a write needs a fresh state observation. */
     this.taskEvidence.setToolsRequiringObservation(
-      tools.filter((tool) => !isReadOnlyCuaTool(tool)).map((tool) => tool.name),
+      tools
+        .filter((tool) => !isReadOnlyCuaTool(tool) && !isCursorPresentationTool(tool.name))
+        .map((tool) => tool.name),
     );
-    return tools.map(prepareCuaToolForAgent);
+    return tools
+      .filter((tool) => canCallCuaTool(tool.name, this.taskMode))
+      .map((tool) => {
+        const required = z.array(z.string()).default([]).parse(tool.inputSchema.required);
+        const properties = { ...tool.inputSchema.properties };
+        delete properties.session;
+        delete properties.cursor_id;
+        return prepareCuaToolForAgent({
+          ...tool,
+          inputSchema: {
+            ...tool.inputSchema,
+            properties,
+            required: required.filter((name) => name !== 'session' && name !== 'cursor_id'),
+          },
+        });
+      });
   }
 
   override async callToolResult(
@@ -125,8 +194,30 @@ export class LoggedCuaServer extends MCPServerStdio {
     meta?: Record<string, unknown> | null,
     options?: MCPCallToolOptions,
   ): Promise<CallToolResult> {
+    if (
+      !canCallCuaTool(toolName, this.taskMode) ||
+      (args !== null &&
+        (Object.hasOwn(args, 'session') ||
+          Object.hasOwn(args, 'cursor_id') ||
+          Object.keys(args).some((name) => name.startsWith('_'))))
+    ) {
+      const result: CallToolResult = {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'This tool or session override is unavailable in the current task mode.',
+          },
+        ],
+      };
+      this.taskEvidence.record(toolName, result);
+      return result;
+    }
     if (!this.log.isLevelEnabled('debug')) {
-      const result = await super.callToolResult(toolName, args, meta, options);
+      const result = validatePreviewResult(
+        toolName,
+        await this.callTaskTool(toolName, args, meta, options),
+      );
       this.taskEvidence.record(toolName, result);
       return result;
     }
@@ -134,7 +225,10 @@ export class LoggedCuaServer extends MCPServerStdio {
     const startedAt = performance.now();
     this.log.debug({ toolName, arguments: describeCuaArguments(args) }, 'cua.request');
     try {
-      const result = await super.callToolResult(toolName, args, meta, options);
+      const result = validatePreviewResult(
+        toolName,
+        await this.callTaskTool(toolName, args, meta, options),
+      );
       this.taskEvidence.record(toolName, result);
       this.log.debug(
         {
@@ -155,6 +249,27 @@ export class LoggedCuaServer extends MCPServerStdio {
         'cua.failed',
       );
       throw error;
+    }
+  }
+  private async callTaskTool(
+    toolName: string,
+    args: Record<string, unknown> | null,
+    meta?: Record<string, unknown> | null,
+    options?: MCPCallToolOptions,
+  ): Promise<CallToolResult> {
+    this.activeToolCount += 1;
+    this.receiveProgress?.(
+      this.taskMode === AgentTaskMode.TEACH
+        ? AgentProgressPhase.SHOWING
+        : AgentProgressPhase.WORKING,
+    );
+    try {
+      return await super.callToolResult(toolName, args, meta, options);
+    } finally {
+      this.activeToolCount -= 1;
+      if (this.activeToolCount === 0) {
+        this.receiveProgress?.(AgentProgressPhase.THINKING);
+      }
     }
   }
 }

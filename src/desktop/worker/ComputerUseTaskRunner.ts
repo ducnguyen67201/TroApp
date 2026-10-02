@@ -1,3 +1,4 @@
+import { CompanionHudTool, type AgentProgressPhase } from '#contracts/CompanionHud.js';
 import { run, type AgentInputItem } from '@openai/agents';
 import type { Logger } from 'pino';
 import type { AgentResult } from '#contracts/AgentSession.js';
@@ -6,10 +7,15 @@ import { createComputerUseAgent } from './CreateComputerUseAgent.js';
 import { chooseCuaDriverCommand, startCuaDriverApp } from './ChooseCuaDriverCommand.js';
 import { TaskIssue } from './CuaTaskEvidence.js';
 import { LoggedCuaServer } from './LoggedCuaServer.js';
+import { AgentTaskMode } from '#contracts/CursorCompanion.js';
+import { CuaCompanionClient } from './CuaCompanionClient.js';
 
 type TaskResult = Extract<AgentResult, { kind: 'completed' | 'failed' }>;
 
 function describeIncompleteTask(issue: TaskIssue): string {
+  if (issue === TaskIssue.GUIDANCE_FAILED) {
+    return 'Tro could not finish the visual guide.';
+  }
   if (issue === TaskIssue.VERIFICATION_FAILED) {
     return 'Tro could not verify that the requested desktop change completed.';
   }
@@ -29,19 +35,29 @@ function askAgentToFinishTask(): AgentInputItem {
 
 /** Owns the private Cua MCP transport; each message runs as a fresh task. */
 export class ComputerUseTaskRunner {
+  private readonly companion: CuaCompanionClient | null;
+
   private constructor(
     private readonly desktopServer: LoggedCuaServer,
     private readonly log: Logger,
-  ) {}
+  ) {
+    this.companion = desktopServer.hasCompanionTools()
+      ? new CuaCompanionClient(desktopServer)
+      : null;
+  }
 
-  static async connect(log: Logger): Promise<ComputerUseTaskRunner> {
+  static async connect(
+    log: Logger,
+    requiresCompanion = false,
+    hudGroup?: string,
+  ): Promise<ComputerUseTaskRunner> {
     const installation = await chooseCuaDriverCommand();
     await startCuaDriverApp(installation);
     const desktopServer = new LoggedCuaServer(
       {
         name: 'Cua Driver',
         command: installation.command,
-        args: ['mcp'],
+        args: ['mcp', ...(installation.socketPath ? ['--socket', installation.socketPath] : [])],
         cacheToolsList: true,
       },
       log,
@@ -55,19 +71,57 @@ export class ComputerUseTaskRunner {
         throw new Error('Cua Driver did not expose desktop tools.');
       }
       log.debug({ toolCount: tools.length }, 'cua.connected');
-      return new ComputerUseTaskRunner(desktopServer, log);
+      const runner = new ComputerUseTaskRunner(desktopServer, log);
+      if (requiresCompanion && !runner.companion) {
+        throw new Error('Cua Driver did not expose companion tools.');
+      }
+      if (hudGroup) {
+        await desktopServer
+          .callHostTool(CompanionHudTool.BIND_CURSOR, { group: hudGroup })
+          .catch(() => {});
+      }
+      await runner.companion?.startFollowing();
+      return runner;
     } catch (error) {
       await desktopServer.close();
       throw error;
     }
   }
 
-  async runTask(message: string, locale: DesktopLocale, signal: AbortSignal): Promise<TaskResult> {
+  async runTask(
+    message: string,
+    locale: DesktopLocale,
+    signal: AbortSignal,
+    mode: AgentTaskMode = AgentTaskMode.EXECUTE,
+    receiveProgress?: (phase: AgentProgressPhase) => void,
+  ): Promise<TaskResult> {
+    if (mode === AgentTaskMode.TEACH && !this.companion) {
+      return {
+        kind: 'failed',
+        message:
+          'Cursor companion is unavailable. Install the companion-enabled Cua Driver and restart Tro.',
+      };
+    }
+    this.desktopServer.setTaskMode(mode);
+    this.desktopServer.setProgressListener(receiveProgress ?? null);
+    const cancelGuidance = (): void => {
+      void this.desktopServer.close().catch(() => {});
+    };
+    signal.addEventListener('abort', cancelGuidance, { once: true });
     const startedAt = performance.now();
-    const agent = createComputerUseAgent(this.desktopServer, locale);
+    const agent = createComputerUseAgent(this.desktopServer, locale, mode);
     this.desktopServer.taskEvidence.reset();
     this.log.debug({ messageChars: message.length }, 'agent.task.started');
     try {
+      signal.throwIfAborted();
+      if (this.companion) {
+        if (mode === AgentTaskMode.TEACH) {
+          await this.companion.startFollowing();
+        } else {
+          await this.companion.pauseFollowing();
+        }
+      }
+      signal.throwIfAborted();
       let result = await run(agent, message, {
         signal,
         maxTurns: 15,
@@ -112,10 +166,21 @@ export class ComputerUseTaskRunner {
         'agent.task.failed',
       );
       throw error;
+    } finally {
+      this.desktopServer.setProgressListener(null);
+      signal.removeEventListener('abort', cancelGuidance);
+      await this.companion?.cancelSequence().catch(() => {});
+      if (!signal.aborted) {
+        await this.companion?.startFollowing().catch(() => {});
+      }
     }
   }
 
   async close(): Promise<void> {
-    await this.desktopServer.close();
+    try {
+      await this.companion?.close();
+    } finally {
+      await this.desktopServer.close();
+    }
   }
 }

@@ -42,4 +42,20 @@ describe('Cua permission status', () => {
       ).kind,
     ).toBe('unknown');
   });
+
+  it('checks the selected companion executable even when another daemon has grants', () => {
+    const companion = '/cache/tro/cua-companion/CuaDriver.app/Contents/MacOS/cua-driver';
+    const status = (executable?: string): string =>
+      JSON.stringify({
+        accessibility: true,
+        screen_recording: true,
+        source: { attribution: 'driver-daemon', ...(executable ? { executable } : {}) },
+      });
+
+    expect(parseCuaPermissionStatus(status(companion), companion).kind).toBe('ready');
+    expect(parseCuaPermissionStatus(status('/cache/tro/cua-driver'), companion).kind).toBe(
+      'unknown',
+    );
+    expect(parseCuaPermissionStatus(status(), companion).kind).toBe('unknown');
+  });
 });

@@ -30,7 +30,7 @@ See [Development](docs/Development.md) for setup and database commands.
 
 Google sign-in needs backend-only `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` plus the redirect URI in [Development](docs/Development.md). Give the backend a unique `AUTH_SECRET`; development startup applies the authentication migration automatically. Chat also needs a backend-only `OPENAI_API_KEY`; the API can start without it.
 
-The desktop build includes a pinned Cua Driver release. The development launcher downloads and verifies that release once before starting Electron. On macOS, Tro checks Screen Recording and Accessibility after Google sign-in and guides you to enable `CuaDriver.app` in System Settings before showing chat. Tro starts a local agent worker on the first task and keeps it warm for 15 minutes after a completed task. Each message has fresh agent context; only the current app window displays its messages, and they disappear when it closes. Model calls and screenshots sent to OpenAI require network access and may incur charges. See [ComputerUseSpec.md](docs/ComputerUseSpec.md) for details and validation limits.
+The desktop build includes a pinned Cua Driver release. The development launcher downloads and verifies that release once before starting Electron. On macOS, Tro checks Screen Recording and Accessibility after Google sign-in and guides you to enable `CuaDriver.app` in System Settings before showing chat. With the macOS companion installed, Tro starts a local pointer-following worker after permission setup, without model credentials or model requests. It stays connected while the signed-in window is open. Without the companion, Tro starts the worker on the first task and keeps it warm for 15 minutes after a completed task. Each message has fresh agent context; only the current app window displays its messages, and they disappear when it closes. Model calls and screenshots sent to OpenAI require network access and may incur charges. See [ComputerUseSpec.md](docs/ComputerUseSpec.md) for details and validation limits.
 
 Voice input starts automatically after signing in: hold Command + Control on Mac or Control + Left Alt on Windows, speak, and release to send the final transcript to the agent. It uses GPT Live Transcribe through the authenticated backend and follows the existing English/Vietnamese language choice. A Talk button is available if the global shortcut lacks permission. Development startup applies the transcription migration automatically; hosted releases use the normal reviewed migration workflow. Backend defaults allow one capture at a time and 3,600 audio seconds per account per UTC day. See [VoiceInputSpec.md](docs/VoiceInputSpec.md) for implementation and live/packaged verification limits.
 
@@ -60,3 +60,15 @@ pnpm test:integration
 ```
 
 Integration tests require a running Docker daemon and use a disposable PostgreSQL container. Packaging requires separate macOS/Windows validation and signing.
+
+## Cursor guidance
+
+Run `pnpm build:cua` on macOS to build the pinned companion-enabled Cua Driver,
+then run `pnpm dev:desktop`. Allow desktop permissions for the local CuaDriver app.
+Select **Show me** to demonstrate circles, arrows, selections and drag/click
+previews while the student controls the real pointer. **Do it for me** uses
+ordinary Cua actions. The companion follows while idle after permission setup; **Stop** cancels the task and returns to idle following.
+This first adapter supports the primary macOS display. See
+[CursorCompanion.md](docs/CursorCompanion.md) for setup, boundaries and limits.
+
+The macOS companion now includes a compact voice bar: live audio levels while holding Talk, followed by transcription, sending and real agent progress. The passive native surface uses the same microphone and task submission flow; no additional model calls are made for presentation. Rebuild the native companion and restart its daemon to load a changed patch.

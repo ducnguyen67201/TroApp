@@ -16,6 +16,7 @@ export default defineConfig({
         entry: {
           Main: resolve('src/desktop/main/Main.ts'),
           StartAgentWorker: resolve('src/desktop/worker/StartAgentWorker.ts'),
+          StartCompanionHudWorker: resolve('src/desktop/worker/StartCompanionHudWorker.ts'),
         },
         formats: ['es'],
         fileName: (_format, entryName) => `${entryName}.js`,

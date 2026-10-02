@@ -1,5 +1,6 @@
 import { VoiceState, type VoiceEvent } from '#contracts/VoiceInput.js';
 import { useEffect, useRef, useState } from 'react';
+import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { useLocale } from './localization/UseLocale.js';
 import { resolveBridgeError } from './localization/BridgeErrors.js';
 import type { TranslationKey } from './localization/English.js';
@@ -19,6 +20,9 @@ export interface ComputerUseController {
   isSigningOut: boolean;
   isSending: boolean;
   isResetting: boolean;
+  taskMode: AgentTaskMode;
+  setTaskMode: (mode: AgentTaskMode) => void;
+  stopTask: () => Promise<void>;
   messageInput: string;
   messages: TaskMessage[];
   message: string | null;
@@ -37,10 +41,12 @@ export interface ComputerUseController {
 export function useComputerUse(): ComputerUseController {
   const { messages: translations, locale } = useLocale();
   const currentSessionId = useRef<string | null>(null);
+  const taskGeneration = useRef(0);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSigning, setIsSigning] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [taskMode, setTaskMode] = useState<AgentTaskMode>(AgentTaskMode.TEACH);
   const [messageInput, setMessageInput] = useState('');
   const [messages, setMessages] = useState<TaskMessage[]>([]);
   const [message, setMessage] = useState<TranslationKey | null>(null);
@@ -180,12 +186,16 @@ export function useComputerUse(): ComputerUseController {
       return;
     }
     const submittedMessage = instruction.trim();
+    const generation = taskGeneration.current;
     setIsSending(true);
     setMessage(null);
     try {
       let activeId = currentSessionId.current;
       if (!activeId) {
         const started = await window.tro.startAgentSession();
+        if (taskGeneration.current !== generation) {
+          return;
+        }
         if (started.kind !== 'started') {
           setMessage(
             started.kind === 'failed'
@@ -198,7 +208,12 @@ export function useComputerUse(): ComputerUseController {
         currentSessionId.current = activeId;
       }
       setMessageInput('');
-      const result = await window.tro.sendAgentMessage(activeId, submittedMessage, locale);
+      const result = await window.tro.sendAgentMessage(
+        activeId,
+        submittedMessage,
+        locale,
+        taskMode,
+      );
       if (currentSessionId.current !== activeId) {
         return;
       }
@@ -217,10 +232,36 @@ export function useComputerUse(): ComputerUseController {
         setMessageInput(submittedMessage);
       }
     } catch {
-      setMessage('errorContactAgent');
-      setMessageInput(submittedMessage);
+      if (taskGeneration.current === generation) {
+        setMessage('errorContactAgent');
+        setMessageInput(submittedMessage);
+      }
     } finally {
       setIsSending(false);
+    }
+  }
+
+  async function stopTask(): Promise<void> {
+    const sessionId = currentSessionId.current;
+    if (isResetting) {
+      return;
+    }
+    taskGeneration.current += 1;
+    setIsResetting(true);
+    /* Invalidate the pending reply before awaiting stop, so cancellation
+       cannot append a late answer or restore the canceled message. */
+    currentSessionId.current = null;
+    try {
+      if (sessionId) {
+        const result = await window.tro.stopAgentSession(sessionId);
+        if (result.kind !== 'stopped') {
+          setMessage('errorClearTask');
+        }
+      }
+    } catch {
+      setMessage('errorClearTask');
+    } finally {
+      setIsResetting(false);
     }
   }
 
@@ -287,6 +328,9 @@ export function useComputerUse(): ComputerUseController {
     isSigningOut,
     isSending: isSending || isVoiceBusy,
     isResetting,
+    taskMode,
+    setTaskMode,
+    stopTask,
     messageInput,
     messages,
     message: message ? translations[message] : null,

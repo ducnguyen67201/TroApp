@@ -79,4 +79,26 @@ describe('Cua task completion evidence', () => {
     evidence.reset();
     expect(evidence.readIssue()).toBeNull();
   });
+  it('never treats cursor previews or metadata as desktop-action verification', () => {
+    const evidence = new CuaTaskEvidence();
+    evidence.setToolsRequiringObservation(['bring_to_front', 'show_cursor_sequence']);
+    evidence.record('bring_to_front', result({}));
+    for (const name of [
+      'show_cursor_sequence',
+      'get_agent_cursor_state',
+      'get_cursor_companion_state',
+      'get_config',
+      'get_cursor_position',
+    ]) {
+      evidence.record(name, result({ status: 'completed', following: true, active: false }));
+      expect(evidence.readIssue()).toBe(TaskIssue.OBSERVATION_MISSING);
+    }
+    evidence.record('get_desktop_state', result({}));
+    expect(evidence.readIssue()).toBeNull();
+    evidence.record(
+      'show_cursor_sequence',
+      result({ status: 'completed', following: true, active: false }),
+    );
+    expect(evidence.readIssue()).toBeNull();
+  });
 });

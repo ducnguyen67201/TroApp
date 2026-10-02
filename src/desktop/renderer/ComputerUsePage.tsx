@@ -1,6 +1,17 @@
-import { Button, Group, Loader, Paper, Stack, Text, Textarea, Title } from '@mantine/core';
+import {
+  Button,
+  Group,
+  Loader,
+  Paper,
+  SegmentedControl,
+  Stack,
+  Text,
+  Textarea,
+  Title,
+} from '@mantine/core';
 import { IconArrowUp, IconBrandGoogle, IconMessageCircle, IconPlus } from '@tabler/icons-react';
 import type { ReactElement } from 'react';
+import { AgentTaskMode, AgentTaskModeSchema } from '#contracts/CursorCompanion.js';
 import { useLocale } from './localization/UseLocale.js';
 import { MessageRole, type ComputerUseController } from './UseComputerUse.js';
 
@@ -89,6 +100,29 @@ export function ComputerUsePage({ controller }: ComputerUsePageProps): ReactElem
             </ol>
           )}
           <div className="composer-area">
+            <Group justify="space-between" mb="sm">
+              <SegmentedControl
+                aria-label={translations.taskMode}
+                value={controller.taskMode}
+                disabled={isSending || isSigningOut || isResetting}
+                data={[
+                  { value: AgentTaskMode.TEACH, label: translations.showMe },
+                  { value: AgentTaskMode.EXECUTE, label: translations.doIt },
+                ]}
+                onChange={(value) => {
+                  controller.setTaskMode(AgentTaskModeSchema.parse(value));
+                }}
+              />
+              {isSending && (
+                <Button
+                  variant="default"
+                  loading={isResetting}
+                  onClick={() => void controller.stopTask()}
+                >
+                  {translations.stopTask}
+                </Button>
+              )}
+            </Group>
             <Paper withBorder className="message-composer">
               <form
                 onSubmit={(event) => {
@@ -129,7 +163,9 @@ export function ComputerUsePage({ controller }: ComputerUsePageProps): ReactElem
               </form>
             </Paper>
             <Text size="xs" c="dimmed" className="task-disclosure">
-              {translations.taskDisclosure}
+              {controller.taskMode === AgentTaskMode.TEACH
+                ? translations.teachingDisclosure
+                : translations.taskDisclosure}
             </Text>
           </div>
         </>

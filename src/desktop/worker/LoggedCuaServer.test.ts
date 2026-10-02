@@ -1,3 +1,4 @@
+import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { MCPServerStdio, mcpToFunctionTool, type CallToolResult } from '@openai/agents';
 import pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
@@ -108,4 +109,73 @@ describe('Cua tool schemas presented to the Agents SDK', () => {
       callTool.mockRestore();
     }
   });
+  it('rejects hidden actions, host controls and session spoofing before native dispatch in teaching mode', async () => {
+    const call = vi
+      .spyOn(MCPServerStdio.prototype, 'callToolResult')
+      .mockResolvedValue({ content: [] });
+    const server = new LoggedCuaServer(
+      { name: 'Teaching policy test', command: 'unused' },
+      pino({ level: 'silent' }),
+    );
+    server.setTaskMode('teach');
+    try {
+      for (const name of [
+        'click',
+        'drag',
+        'type_text',
+        'hotkey',
+        'browser_navigate',
+        'run_code',
+        'future_tool',
+        'set_cursor_companion_mode',
+      ]) {
+        expect((await server.callToolResult(name, {})).isError).toBe(true);
+      }
+      expect(
+        (await server.callToolResult('get_desktop_state', { session: 'another-agent' })).isError,
+      ).toBe(true);
+      expect(
+        (await server.callToolResult('get_desktop_state', { _session_id: 'another-agent' }))
+          .isError,
+      ).toBe(true);
+      expect(call).not.toHaveBeenCalled();
+      await server.callToolResult('bring_to_front', { pid: 1, window_id: 2 });
+      expect(call).toHaveBeenCalledTimes(1);
+    } finally {
+      call.mockRestore();
+    }
+  });
+
+  it('requires a completed native preview result, not an acceptance receipt', async () => {
+    const call = vi
+      .spyOn(MCPServerStdio.prototype, 'callToolResult')
+      .mockResolvedValue({ content: [], structuredContent: { status: 'accepted' } });
+    const server = new LoggedCuaServer(
+      { name: 'Preview evidence test', command: 'unused' },
+      pino({ level: 'silent' }),
+    );
+    try {
+      expect((await server.callToolResult('show_cursor_sequence', {})).isError).toBe(true);
+      expect(server.taskEvidence.readIssue()).toBe(TaskIssue.GUIDANCE_FAILED);
+      call.mockResolvedValue({
+        content: [],
+        structuredContent: { status: 'completed', following: true, active: false },
+      });
+      expect((await server.callToolResult('show_cursor_sequence', {})).isError).not.toBe(true);
+      expect(server.taskEvidence.readIssue()).toBeNull();
+    } finally {
+      call.mockRestore();
+    }
+  });
+});
+
+// Host presentation operations stay outside model discovery and invocation.
+it('refuses private HUD operations in both task modes', async () => {
+  const { canCallCuaTool } = await import('./CuaTeachingPolicy.js');
+  const { CompanionHudTool } = await import('#contracts/CompanionHud.js');
+  for (const mode of Object.values(AgentTaskMode)) {
+    for (const name of Object.values(CompanionHudTool)) {
+      expect(canCallCuaTool(name, mode)).toBe(false);
+    }
+  }
 });

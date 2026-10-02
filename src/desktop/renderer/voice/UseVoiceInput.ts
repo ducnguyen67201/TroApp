@@ -1,3 +1,4 @@
+import { VoiceLevelMeter } from './VoiceLevelMeter.js';
 import { useEffect, useRef, useState } from 'react';
 import {
   VoiceState,
@@ -7,6 +8,7 @@ import {
   type VoiceAudioFrame,
 } from '#contracts/VoiceInput.js';
 import { useLocale } from '../localization/UseLocale.js';
+import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { VoiceAudioCapture } from './VoiceAudioCapture.js';
 
 export interface VoiceInputView {
@@ -23,6 +25,7 @@ export interface VoiceInputView {
 interface CaptureQueue {
   id: string;
   audio: VoiceAudioCapture;
+  meter: VoiceLevelMeter;
   ready: boolean;
   readySignal: Promise<void>;
   resolveReady: () => void;
@@ -37,10 +40,11 @@ interface CaptureQueue {
 export function useVoiceInput(
   userId: string | null,
   receiveTaskEvent: (event: VoiceEvent) => void,
+  taskMode: AgentTaskMode = AgentTaskMode.EXECUTE,
 ): VoiceInputView {
   const { locale } = useLocale();
-  const latest = useRef({ locale, receiveTaskEvent });
-  latest.current = { locale, receiveTaskEvent };
+  const latest = useRef({ locale, taskMode, receiveTaskEvent });
+  latest.current = { locale, taskMode, receiveTaskEvent };
   const capture = useRef<CaptureQueue | null>(null);
   const generation = useRef(0);
   const [status, setStatus] = useState<VoiceStatus>({
@@ -64,6 +68,7 @@ export function useVoiceInput(
     }
 
     function cancelAudio(): void {
+      capture.current?.meter.stop();
       capture.current?.audio.dispose();
       capture.current?.resolveReady();
       capture.current = null;
@@ -121,12 +126,16 @@ export function useVoiceInput(
           cancelAudio();
           setError(false);
           setPreview('');
+          const meter = new VoiceLevelMeter(event.captureId, (update) => {
+            window.tro.updateVoiceMeter(update);
+          });
           const audio = new VoiceAudioCapture(
             (pcm) => {
               const current = capture.current;
               if (!current || current.id !== event.captureId) {
                 return;
               }
+              meter.appendFrame(pcm);
               // Five seconds bounds cold-start audio; normal transport has one IPC in flight.
               if (current.queue.length >= 250) {
                 failCapture();
@@ -153,6 +162,7 @@ export function useVoiceInput(
           const current: CaptureQueue = {
             id: event.captureId,
             audio,
+            meter,
             ready: false,
             readySignal,
             resolveReady,
@@ -167,12 +177,13 @@ export function useVoiceInput(
               failCapture();
             }
           });
-          // Snapshot locale now. A change during this capture affects only the next capture.
+          // Snapshot locale and mode now; changes affect only the next capture.
           void window.tro
             .controlVoiceInput({
               kind: 'prepare',
               captureId: event.captureId,
               locale: latest.current.locale,
+              mode: latest.current.taskMode,
             })
             .then((reply) => {
               if (reply.kind !== 'ok' && capture.current === current) {
@@ -196,6 +207,7 @@ export function useVoiceInput(
             break;
           }
           void (async () => {
+            current.meter.stop();
             await current.audio.flushCapture();
             await current.readySignal;
             if (capture.current !== current) {
@@ -341,6 +353,7 @@ export function useVoiceInput(
   }
 
   function cancelVoice(): void {
+    capture.current?.meter.stop();
     capture.current?.audio.dispose();
     capture.current?.resolveReady();
     capture.current = null;

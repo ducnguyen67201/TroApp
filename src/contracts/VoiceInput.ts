@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { AgentResultSchema } from './AgentSession.js';
 import { DesktopLocaleSchema } from './DesktopLocale.js';
+import { AgentTaskMode, AgentTaskModeSchema } from './CursorCompanion.js';
 
 export const VoiceState = {
   DISABLED: 'disabled',
@@ -34,7 +35,12 @@ export const VoiceCommandSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('press') }),
   z.strictObject({ kind: z.literal('release') }),
   z.strictObject({ kind: z.literal('cancel') }),
-  z.strictObject({ kind: z.literal('prepare'), captureId: z.uuid(), locale: DesktopLocaleSchema }),
+  z.strictObject({
+    kind: z.literal('prepare'),
+    captureId: z.uuid(),
+    locale: DesktopLocaleSchema,
+    mode: AgentTaskModeSchema.default(AgentTaskMode.EXECUTE),
+  }),
   z.strictObject({
     kind: z.literal('finish'),
     captureId: z.uuid(),
@@ -71,6 +77,7 @@ export const VoiceEventSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('release'), captureId: z.uuid() }),
   z.strictObject({ kind: z.literal('cancel'), captureId: z.uuid() }),
   z.strictObject({ kind: z.literal('preview'), captureId: z.uuid(), text: z.string().max(8000) }),
+  z.strictObject({ kind: z.literal('admitting'), captureId: z.uuid() }),
   z.strictObject({
     kind: z.literal('submitted'),
     captureId: z.uuid(),

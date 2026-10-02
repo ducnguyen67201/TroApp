@@ -43,6 +43,14 @@ export const english = {
   welcome: (name: string): string => `Welcome back, ${name}`,
   workspaceHeading: 'A little space to do more.',
   workspaceDescription: 'Your desktop, with a helping hand.',
+  taskMode: 'How Tro helps',
+  showMe: 'Show me',
+  doIt: 'Do it for me',
+  stopTask: 'Stop',
+  teachingDisclosure:
+    'Tro shows visual previews while you control your mouse and keyboard. It may focus an existing app. Screen observations sent to OpenAI leave your computer. Guidance currently supports the main display on macOS.',
+  errorCompanionUnavailable:
+    'Cursor guidance is unavailable. Update or reinstall Tro, then try again.',
   newTask: 'New task',
   makeYourselfAtHome: 'Make yourself at home.',
   googleInvitation: 'Sign in to start a task with Tro. Google opens in your browser.',
@@ -65,6 +73,7 @@ export const english = {
   errorOpenGoogle: 'Could not open Google sign-in.',
   errorClearTask: 'Could not clear the task. Please try again.',
   errorStartTask: 'Could not start a task. Please try again.',
+  errorDailyModelLimit: 'Today’s model allowance is used up. Try again after the daily reset.',
   errorCompleteTask: 'Could not complete the task. Check the connection and desktop access.',
   errorContactAgent: 'Could not contact the local agent. Try sending again.',
   errorSignOut: 'Could not sign out. Please try again.',

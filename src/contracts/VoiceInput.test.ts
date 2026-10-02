@@ -2,8 +2,20 @@ import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { VoiceAudioFrameSchema, VoiceCommandSchema } from './VoiceInput.js';
 import { TranscriptionCommandSchema } from './Transcription.js';
+import { AgentTaskMode } from './CursorCompanion.js';
 
 describe('voice boundary validation', () => {
+  it('carries teaching mode and rejects unsupported modes', () => {
+    const command = {
+      kind: 'prepare',
+      captureId: randomUUID(),
+      locale: 'vi',
+      mode: AgentTaskMode.TEACH,
+    };
+    expect(VoiceCommandSchema.parse(command)).toEqual(command);
+    expect(VoiceCommandSchema.safeParse({ ...command, mode: 'unknown' }).success).toBe(false);
+  });
+
   it('requires the existing supported locale and denies arbitrary provider configuration', () => {
     const captureId = randomUUID();
     expect(VoiceCommandSchema.safeParse({ kind: 'prepare', captureId, locale: 'vi' }).success).toBe(

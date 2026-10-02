@@ -1,0 +1,2931 @@
+diff --git a/libs/cua-driver/rust/Cargo.lock b/libs/cua-driver/rust/Cargo.lock
+index 74051d8..995bacf 100644
+--- a/libs/cua-driver/rust/Cargo.lock
++++ b/libs/cua-driver/rust/Cargo.lock
+@@ -1205,7 +1205,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "cua-driver"
+-version = "0.30.4"
++version = "0.30.4-tro.1"
+ dependencies = [
+  "anyhow",
+  "async-trait",
+@@ -1247,7 +1247,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "cua-driver-bindgen"
+-version = "0.30.4"
++version = "0.30.4-tro.1"
+ dependencies = [
+  "cbindgen",
+  "uniffi",
+@@ -1255,7 +1255,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "cua-driver-contract"
+-version = "0.30.4"
++version = "0.30.4-tro.1"
+ dependencies = [
+  "schemars",
+  "serde",
+@@ -1265,7 +1265,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "cua-driver-core"
+-version = "0.30.4"
++version = "0.30.4-tro.1"
+ dependencies = [
+  "anyhow",
+  "async-trait",
+@@ -1303,7 +1303,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "cua-driver-e2e"
+-version = "0.30.4"
++version = "0.30.4-tro.1"
+ dependencies = [
+  "base64",
+  "core-foundation",
+@@ -1332,7 +1332,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "cua-driver-sdk"
+-version = "0.30.4"
++version = "0.30.4-tro.1"
+ dependencies = [
+  "async-trait",
+  "core-foundation",
+@@ -1355,7 +1355,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "cua-driver-testkit"
+-version = "0.30.4"
++version = "0.30.4-tro.1"
+ dependencies = [
+  "arbitrary",
+  "async-trait",
+@@ -1376,7 +1376,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "cua-driver-uia"
+-version = "0.30.4"
++version = "0.30.4-tro.1"
+ dependencies = [
+  "anyhow",
+  "cua-driver-core",
+@@ -1406,7 +1406,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "cursor-overlay"
+-version = "0.30.4"
++version = "0.30.4-tro.1"
+ dependencies = [
+  "anyhow",
+  "cua-driver-contract",
+@@ -1424,7 +1424,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "cursor-theme-cli"
+-version = "0.30.4"
++version = "0.30.4-tro.1"
+ dependencies = [
+  "anyhow",
+  "cursor-overlay",
+@@ -3434,7 +3434,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
+ 
+ [[package]]
+ name = "pip-preview"
+-version = "0.30.4"
++version = "0.30.4-tro.1"
+ dependencies = [
+  "serde_json",
+ ]
+@@ -3492,7 +3492,7 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
+ 
+ [[package]]
+ name = "platform-linux"
+-version = "0.30.4"
++version = "0.30.4-tro.1"
+ dependencies = [
+  "anyhow",
+  "ashpd",
+@@ -3546,7 +3546,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "platform-macos"
+-version = "0.30.4"
++version = "0.30.4-tro.1"
+ dependencies = [
+  "anyhow",
+  "async-trait",
+@@ -3585,7 +3585,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "platform-windows"
+-version = "0.30.4"
++version = "0.30.4-tro.1"
+ dependencies = [
+  "anyhow",
+  "async-trait",
+diff --git a/libs/cua-driver/rust/Cargo.toml b/libs/cua-driver/rust/Cargo.toml
+index 53edeb0..e01f6cc 100644
+--- a/libs/cua-driver/rust/Cargo.toml
++++ b/libs/cua-driver/rust/Cargo.toml
+@@ -19,7 +19,7 @@ members = [
+ ]
+ 
+ [workspace.package]
+-version = "0.30.4"
++version = "0.30.4-tro.1"
+ edition = "2021"
+ authors = ["trycua"]
+ license = "MIT"
+diff --git a/libs/cua-driver/rust/crates/cua-driver-contract/src/companion.rs b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion.rs
+new file mode 100644
+index 0000000..0712ace
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion.rs
+@@ -0,0 +1,220 @@
++//! Bounded presentation-only teaching protocol. Coordinates are fractions of
++//! a fresh primary-desktop capture, never OS input coordinates.
++use crate::{Platform, SchemaMode, ToolAnnotations, ToolContract, ToolInput, ToolOutput};
++use schemars::JsonSchema;
++use serde::{Deserialize, Serialize};
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq)]
++#[serde(deny_unknown_fields)]
++pub struct CompanionPoint {
++    pub x: f64,
++    pub y: f64,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
++pub enum CompanionStep {
++    Circle {
++        center: CompanionPoint,
++        radius: f64,
++        duration_ms: u32,
++    },
++    Arrow {
++        from: CompanionPoint,
++        to: CompanionPoint,
++        duration_ms: u32,
++    },
++    Move {
++        from: CompanionPoint,
++        to: CompanionPoint,
++        duration_ms: u32,
++    },
++    Drag {
++        from: CompanionPoint,
++        to: CompanionPoint,
++        duration_ms: u32,
++    },
++    Selection {
++        from: CompanionPoint,
++        to: CompanionPoint,
++        duration_ms: u32,
++    },
++    Click {
++        at: CompanionPoint,
++        duration_ms: u32,
++    },
++}
++
++impl CompanionStep {
++    pub fn duration_ms(&self) -> u32 {
++        match self {
++            Self::Circle { duration_ms, .. }
++            | Self::Arrow { duration_ms, .. }
++            | Self::Move { duration_ms, .. }
++            | Self::Drag { duration_ms, .. }
++            | Self::Selection { duration_ms, .. }
++            | Self::Click { duration_ms, .. } => *duration_ms,
++        }
++    }
++
++    fn validate(&self) -> bool {
++        let valid = |p: &CompanionPoint| {
++            p.x.is_finite()
++                && p.y.is_finite()
++                && (0.0..=1.0).contains(&p.x)
++                && (0.0..=1.0).contains(&p.y)
++        };
++        match self {
++            Self::Circle { center, radius, .. } => {
++                valid(center) && radius.is_finite() && (0.005..=0.5).contains(radius)
++            }
++            Self::Click { at, .. } => valid(at),
++            Self::Arrow { from, to, .. }
++            | Self::Move { from, to, .. }
++            | Self::Drag { from, to, .. }
++            | Self::Selection { from, to, .. } => valid(from) && valid(to),
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct ShowCursorSequenceInput {
++    pub session: Option<String>,
++    pub capture_id: String,
++    #[schemars(length(min = 1, max = 8))]
++    pub steps: Vec<CompanionStep>,
++}
++impl ToolInput for ShowCursorSequenceInput {
++    const TOOL_NAME: &'static str = "show_cursor_sequence";
++    fn validate(&self) -> Result<(), String> {
++        if self.capture_id.is_empty()
++            || self.steps.is_empty()
++            || self.steps.len() > 8
++            || self
++                .steps
++                .iter()
++                .any(|s| !s.validate() || !(200..=5000).contains(&s.duration_ms()))
++            || self
++                .steps
++                .iter()
++                .map(|s| u64::from(s.duration_ms()))
++                .sum::<u64>()
++                > 15000
++        {
++            return Err("Use 1..8 bounded steps, each 200..5000ms, total <=15000ms, and normalized finite coordinates.".into());
++        }
++        Ok(())
++    }
++}
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
++#[serde(rename_all = "snake_case")]
++pub enum CompanionMode {
++    Follow,
++    Hidden,
++}
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct SetCursorCompanionModeInput {
++    pub session: Option<String>,
++    pub mode: CompanionMode,
++    #[schemars(length(max = 24))]
++    pub label: Option<String>,
++}
++impl ToolInput for SetCursorCompanionModeInput {
++    const TOOL_NAME: &'static str = "set_cursor_companion_mode";
++    fn validate(&self) -> Result<(), String> {
++        if self
++            .label
++            .as_ref()
++            .is_some_and(|label| label.chars().count() > 24 || label.chars().any(char::is_control))
++        {
++            return Err(
++                "Companion label must be at most 24 characters without control characters.".into(),
++            );
++        }
++        Ok(())
++    }
++}
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct CancelCursorSequenceInput {
++    pub session: Option<String>,
++}
++impl ToolInput for CancelCursorSequenceInput {
++    const TOOL_NAME: &'static str = "cancel_cursor_sequence";
++}
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct GetCursorCompanionStateInput {
++    pub session: Option<String>,
++}
++impl ToolInput for GetCursorCompanionStateInput {
++    const TOOL_NAME: &'static str = "get_cursor_companion_state";
++}
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct CursorCompanionOutput {
++    pub status: String,
++    pub following: bool,
++    pub active: bool,
++}
++impl ToolOutput for CursorCompanionOutput {}
++
++pub fn contracts() -> Vec<ToolContract> {
++    vec![
++        contract::<ShowCursorSequenceInput>("Animate an ordered teaching preview on a fresh primary desktop capture. Circle radius is a fraction of the shorter display edge; points are normalized capture coordinates. Never clicks, drags, types or changes OS focus. Real pointer movement cancels playback. At most eight steps and fifteen seconds.", false),
++        contract::<SetCursorCompanionModeInput>("Follow the real pointer with a companion, or hide it. One desktop owner, renewable 60-second lease. macOS primary display only.", false),
++        contract::<CancelCursorSequenceInput>("Cancel the current teaching sequence and clear marks; restore pointer following if enabled.", false),
++        contract::<GetCursorCompanionStateInput>("Read presentation state for the current session. This is not evidence of a desktop action.", true),
++    ]
++}
++fn contract<I: ToolInput>(description: &str, read_only: bool) -> ToolContract {
++    ToolContract {
++        name: I::TOOL_NAME.into(),
++        description: description.into(),
++        platforms: vec![Platform::Macos],
++        aliases: vec![],
++        capabilities: vec!["agent_cursor.teaching".into()],
++        annotations: ToolAnnotations {
++            read_only,
++            destructive: false,
++            idempotent: I::TOOL_NAME != "show_cursor_sequence",
++            open_world: false,
++        },
++        schema_mode: SchemaMode::CanonicalRuntime,
++        cursor_semantics: None,
++        input_schema: I::input_schema(),
++        success_output_schema: Some(CursorCompanionOutput::output_schema()),
++        error_output_schema: None,
++        output_validator: crate::validate_typed_output::<CursorCompanionOutput>,
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn refuses_unbounded_or_nonfinite_sequences() {
++        let step = CompanionStep::Click {
++            at: CompanionPoint { x: 0.5, y: 0.5 },
++            duration_ms: 5000,
++        };
++        let mut input = ShowCursorSequenceInput {
++            session: None,
++            capture_id: "capture".into(),
++            steps: vec![step; 4],
++        };
++        assert!(input.validate().is_err());
++        input.steps.truncate(3);
++        assert!(input.validate().is_ok());
++        input.steps = vec![CompanionStep::Click {
++            at: CompanionPoint {
++                x: f64::NAN,
++                y: 0.5,
++            },
++            duration_ms: 1000,
++        }];
++        assert!(input.validate().is_err());
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs
+new file mode 100644
+index 0000000..fb7c418
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs
+@@ -0,0 +1,132 @@
++//! Host-only content-free presentation vocabulary; no desktop action semantics.
++use crate::{Platform, SchemaMode, ToolAnnotations, ToolContract, ToolInput, ToolOutput};
++use schemars::JsonSchema;
++use serde::{Deserialize, Serialize};
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
++#[serde(rename_all = "snake_case")]
++pub enum CompanionHudPhase {
++    #[default]
++    Idle,
++    Preparing,
++    Listening,
++    Transcribing,
++    Sending,
++    Thinking,
++    Showing,
++    Working,
++    Done,
++    Canceled,
++    Error,
++    DailyLimit,
++}
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
++pub enum CompanionHudLocale {
++    #[default]
++    #[serde(rename = "en")]
++    English,
++    #[serde(rename = "vi")]
++    Vietnamese,
++}
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct SetCompanionHudInput {
++    pub session: Option<String>,
++    pub group: String,
++    pub sequence: u64,
++    pub phase: CompanionHudPhase,
++    pub locale: CompanionHudLocale,
++    pub level: f64,
++}
++impl ToolInput for SetCompanionHudInput {
++    const TOOL_NAME: &'static str = "set_companion_hud";
++    fn validate(&self) -> Result<(), String> {
++        if !valid_group(&self.group)
++            || !self.level.is_finite()
++            || !(0.0..=1.0).contains(&self.level)
++            || self.sequence > 9_007_199_254_740_991
++        {
++            return Err("Invalid bounded HUD snapshot.".into());
++        }
++        Ok(())
++    }
++}
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct BindCompanionHudCursorInput {
++    pub session: Option<String>,
++    pub group: String,
++}
++impl ToolInput for BindCompanionHudCursorInput {
++    const TOOL_NAME: &'static str = "bind_companion_hud_cursor";
++    fn validate(&self) -> Result<(), String> {
++        if !valid_group(&self.group) {
++            return Err("Invalid HUD group.".into());
++        }
++        Ok(())
++    }
++}
++fn valid_group(group: &str) -> bool {
++    group.len() == 36
++        && group.chars().enumerate().all(|(index, ch)| {
++            if [8, 13, 18, 23].contains(&index) {
++                ch == '-'
++            } else {
++                ch.is_ascii_hexdigit()
++            }
++        })
++}
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct CompanionHudOutput {
++    pub applied: bool,
++}
++impl ToolOutput for CompanionHudOutput {}
++pub fn contracts() -> Vec<ToolContract> {
++    vec![
++        contract::<SetCompanionHudInput>(),
++        contract::<BindCompanionHudCursorInput>(),
++    ]
++}
++fn contract<I: ToolInput>() -> ToolContract {
++    ToolContract {
++        name: I::TOOL_NAME.into(),
++        description: "Private host presentation. Not a model tool or desktop action.".into(),
++        platforms: vec![Platform::Macos],
++        aliases: vec![],
++        capabilities: vec!["agent_cursor.presentation".into()],
++        annotations: ToolAnnotations {
++            read_only: false,
++            destructive: false,
++            idempotent: true,
++            open_world: false,
++        },
++        schema_mode: SchemaMode::CanonicalRuntime,
++        cursor_semantics: None,
++        input_schema: I::input_schema(),
++        success_output_schema: Some(CompanionHudOutput::output_schema()),
++        error_output_schema: None,
++        output_validator: crate::validate_typed_output::<CompanionHudOutput>,
++    }
++}
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn companion_hud_rejects_unbounded_input() {
++        let mut input = SetCompanionHudInput {
++            session: None,
++            group: "11111111-1111-4111-8111-111111111111".into(),
++            sequence: 0,
++            phase: CompanionHudPhase::Listening,
++            locale: CompanionHudLocale::English,
++            level: 0.5,
++        };
++        assert!(input.validate().is_ok());
++        input.level = f64::NAN;
++        assert!(input.validate().is_err());
++        input.level = 0.5;
++        input.group = "bad".into();
++        assert!(input.validate().is_err());
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/cua-driver-contract/src/lib.rs b/libs/cua-driver/rust/crates/cua-driver-contract/src/lib.rs
+index 5dceca8..9ed4643 100644
+--- a/libs/cua-driver/rust/crates/cua-driver-contract/src/lib.rs
++++ b/libs/cua-driver/rust/crates/cua-driver-contract/src/lib.rs
+@@ -14,9 +14,13 @@ use serde_json::Value;
+ use std::collections::{BTreeMap, BTreeSet};
+ use std::sync::OnceLock;
+ 
++mod companion;
++mod companion_hud;
+ pub mod compatibility;
+ pub mod cursor;
+ mod cursor_tools;
++pub use companion::*;
++pub use companion_hud::*;
+ mod desktop;
+ mod inputs;
+ mod outputs;
+@@ -226,6 +230,8 @@ pub fn manifest() -> ContractManifest {
+     let mut tools = session::contracts();
+     tools.extend(desktop::contracts());
+     tools.extend(cursor_tools::contracts());
++    tools.extend(companion::contracts());
++    tools.extend(companion_hud::contracts());
+     tools.extend(verification::contracts());
+     tools.extend(visual::contracts());
+     tools.sort_by(|left, right| left.name.cmp(&right.name));
+diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs
+index b0902a0..87f288b 100644
+--- a/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs
++++ b/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs
+@@ -870,6 +870,7 @@ pub fn advertised_risk_for(tool: &str) -> RiskAssessment {
+         | "get_session"
+         | "list_sessions"
+         | "get_session_state"
++        | "get_cursor_companion_state"
+         | "get_agent_cursor_state"
+         | "get_recording_state"
+         | "check_for_update"
+@@ -898,6 +899,11 @@ pub fn advertised_risk_for(tool: &str) -> RiskAssessment {
+         | "set_window_frame"
+         | "start_session"
+         | "end_session"
++        | "show_cursor_sequence"
++        | "set_cursor_companion_mode"
++        | "set_companion_hud"
++        | "bind_companion_hud_cursor"
++        | "cancel_cursor_sequence"
+         | "set_agent_cursor_enabled"
+         | "set_agent_cursor_motion"
+         | "set_agent_cursor_theme" => RiskClass::R1,
+diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/capture_registry.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/capture_registry.rs
+index f7e6be0..d0c0126 100644
+--- a/libs/cua-driver/rust/crates/cua-driver-core/src/capture_registry.rs
++++ b/libs/cua-driver/rust/crates/cua-driver-core/src/capture_registry.rs
+@@ -593,6 +593,12 @@ impl PerceptionCapture {
+         self.0.encoded_dimensions
+     }
+ 
++    /// Geometry metadata for native presentation, without an input transform
++    /// or one-shot action admission. This cannot authorize synthetic input.
++    pub fn presentation_dimensions(&self) -> NativeActionDimensions {
++        self.0.native_action_dimensions
++    }
++
+     pub(crate) fn screenshot_to_action(&self) -> ScreenshotToActionTransform {
+         self.0.screenshot_to_action
+     }
+@@ -1176,6 +1182,27 @@ impl CaptureService {
+         self.registry.read_for_perception_bound(id, binding)
+     }
+ 
++    /// A non-consuming preview read with a tighter freshness limit than
++    /// perception. Playback still rechecks capture retirement and expiry.
++    pub fn read_for_presentation(
++        &self,
++        id: CaptureId,
++        binding: &CaptureBinding,
++        max_age: Duration,
++    ) -> Result<PerceptionCapture, CaptureLookupError> {
++        let capture = self.read_for_perception(id, binding)?;
++        if self
++            .registry
++            .clock
++            .now()
++            .saturating_sub(capture.created_at())
++            > max_age
++        {
++            return Err(CaptureLookupError::Expired);
++        }
++        Ok(capture)
++    }
++
+     pub fn admit_action(
+         &self,
+         request: CaptureActionRequest,
+@@ -1352,6 +1379,49 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn companion_reads_are_fresh_bound_and_do_not_consume_actions() {
++        let clock = Arc::new(ManualClock::default());
++        let service = CaptureService::with_clock(config(4, 10_000), clock.clone()).unwrap();
++        let binding = service
++            .current_binding(Arc::<str>::from("teacher"))
++            .unwrap();
++        let id = service
++            .publish(CapturePublication {
++                png_bytes: png(2, 2, 1),
++                target: CaptureTarget::PrimaryDesktop,
++                encoded_dimensions: EncodedScreenshotDimensions::new(2, 2).unwrap(),
++                native_action_dimensions: NativeActionDimensions::new(2, 2).unwrap(),
++                screenshot_to_action: ScreenshotToActionTransform::identity(),
++                session_id: Arc::<str>::from("teacher"),
++                session_generation: binding.session_generation(),
++            })
++            .unwrap();
++        assert!(service
++            .read_for_presentation(id, &binding, Duration::from_secs(5))
++            .is_ok());
++        let other = service.current_binding(Arc::<str>::from("other")).unwrap();
++        assert!(matches!(
++            service.read_for_presentation(id, &other, Duration::from_secs(5)),
++            Err(CaptureLookupError::GenerationMismatch)
++        ));
++        clock.advance(Duration::from_secs(6));
++        assert!(matches!(
++            service.read_for_presentation(id, &binding, Duration::from_secs(5)),
++            Err(CaptureLookupError::Expired)
++        ));
++        assert!(service
++            .admit_action(CaptureActionRequest {
++                capture_id: id,
++                binding,
++                target: CaptureTarget::PrimaryDesktop,
++                current_native_action_dimensions: NativeActionDimensions::new(2, 2).unwrap(),
++                screenshot_x: 0.0,
++                screenshot_y: 0.0,
++            })
++            .is_ok());
++    }
++
+     #[test]
+     fn stores_immutable_png_metadata_and_never_reuses_ids() {
+         let registry = CaptureRegistry::new(config(2, 10_000)).unwrap();
+diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/cursor_sampler.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/cursor_sampler.rs
+index 4db0051..f41a84e 100644
+--- a/libs/cua-driver/rust/crates/cua-driver-core/src/cursor_sampler.rs
++++ b/libs/cua-driver/rust/crates/cua-driver-core/src/cursor_sampler.rs
+@@ -47,7 +47,7 @@ impl CursorSampler {
+             let interval = Duration::from_millis(1000 / SAMPLE_RATE_HZ as u64);
+             let mut count = 0usize;
+             while !flag_for_thread.load(Ordering::Relaxed) {
+-                if let Some((x, y)) = sample_cursor() {
++                if let Some((x, y)) = read_cursor_position() {
+                     let t_ms = session_start.elapsed().as_millis() as f64;
+                     // Write one JSON object per line. We hand-format
+                     // the trivial shape rather than pulling serde_json
+@@ -95,7 +95,7 @@ impl Drop for CursorSampler {
+ // ── per-platform cursor poll ────────────────────────────────────────────────
+ 
+ #[cfg(target_os = "windows")]
+-fn sample_cursor() -> Option<(f64, f64)> {
++pub fn read_cursor_position() -> Option<(f64, f64)> {
+     use windows::Win32::Foundation::POINT;
+     use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+     unsafe {
+@@ -109,7 +109,7 @@ fn sample_cursor() -> Option<(f64, f64)> {
+ }
+ 
+ #[cfg(target_os = "macos")]
+-fn sample_cursor() -> Option<(f64, f64)> {
++pub fn read_cursor_position() -> Option<(f64, f64)> {
+     // ApplicationServices/CGEvent.h: CGEventCreate(nil) → CGEventRef;
+     // CGEventGetLocation(event) → CGPoint. The point is in points
+     // (top-left origin) so it matches the cursor-space convention the
+@@ -142,7 +142,7 @@ fn sample_cursor() -> Option<(f64, f64)> {
+ }
+ 
+ #[cfg(target_os = "linux")]
+-fn sample_cursor() -> Option<(f64, f64)> {
++pub fn read_cursor_position() -> Option<(f64, f64)> {
+     // Wayland has no equivalent portable poll; on X11 use XQueryPointer.
+     // We try the X11 path via the `x11` crate if available; otherwise
+     // return None and the sampler writes an empty cursor.jsonl.
+@@ -155,6 +155,6 @@ fn sample_cursor() -> Option<(f64, f64)> {
+ }
+ 
+ #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+-fn sample_cursor() -> Option<(f64, f64)> {
++pub fn read_cursor_position() -> Option<(f64, f64)> {
+     None
+ }
+diff --git a/libs/cua-driver/rust/crates/cua-driver/src/bundle.rs b/libs/cua-driver/rust/crates/cua-driver/src/bundle.rs
+index 75331d1..1990e79 100644
+--- a/libs/cua-driver/rust/crates/cua-driver/src/bundle.rs
++++ b/libs/cua-driver/rust/crates/cua-driver/src/bundle.rs
+@@ -12,7 +12,7 @@ pub const LOCAL_CLI_NAME: &str = "cua-driver-local";
+ 
+ pub const RELEASE_APP_NAME: &str = "CuaDriver";
+ pub const LOCAL_APP_NAME: &str = "CuaDriverLocal";
+-pub const RELEASE_BUNDLE_ID: &str = "com.trycua.driver";
++pub const RELEASE_BUNDLE_ID: &str = "app.tro.cua-companion";
+ pub const LOCAL_BUNDLE_ID: &str = "com.trycua.driver.local";
+ 
+ pub(crate) fn path_is_local(path: &Path) -> bool {
+@@ -85,8 +85,24 @@ pub fn app_name() -> &'static str {
+     }
+ }
+ 
++/// Use this executable's bundle, including Tro's cache or packaged resources.
++fn app_bundle_for_executable(executable: &Path) -> Option<&Path> {
++    executable.ancestors().find(|path| {
++        matches!(
++            path.file_name().and_then(|name| name.to_str()),
++            Some("CuaDriver.app" | "CuaDriverLocal.app")
++        )
++    })
++}
++
+ pub fn app_bundle_path() -> String {
+-    format!("/Applications/{}.app", app_name())
++    std::env::current_exe()
++        .ok()
++        .and_then(|path| std::fs::canonicalize(path).ok())
++        .and_then(|path| {
++            app_bundle_for_executable(&path).map(|bundle| bundle.to_string_lossy().into_owned())
++        })
++        .unwrap_or_else(|| format!("/Applications/{}.app", app_name()))
+ }
+ 
+ pub fn bundle_id() -> &'static str {
+@@ -129,6 +145,24 @@ pub fn is_env_truthy(name: &str) -> bool {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn companion_permission_host_uses_its_own_bundle_path() {
++        let executable = Path::new(
++            "/Users/test/.cache/tro/cua-companion/CuaDriver.app/Contents/MacOS/cua-driver",
++        );
++        assert_eq!(
++            app_bundle_for_executable(executable),
++            Some(Path::new(
++                "/Users/test/.cache/tro/cua-companion/CuaDriver.app"
++            ))
++        );
++        assert_eq!(
++            app_bundle_for_executable(Path::new("/tmp/cua-driver")),
++            None
++        );
++        assert_eq!(RELEASE_BUNDLE_ID, "app.tro.cua-companion");
++    }
++
+     #[test]
+     fn local_identity_requires_the_explicit_local_product_name() {
+         assert!(path_is_local(Path::new(
+diff --git a/libs/cua-driver/rust/crates/cua-driver/src/cli.rs b/libs/cua-driver/rust/crates/cua-driver/src/cli.rs
+index e785dbd..3c1c071 100644
+--- a/libs/cua-driver/rust/crates/cua-driver/src/cli.rs
++++ b/libs/cua-driver/rust/crates/cua-driver/src/cli.rs
+@@ -141,6 +141,7 @@ pub enum Command {
+     Permissions {
+         subcommand: String,
+         json: bool,
++        socket: Option<String>,
+     },
+     Config {
+         /// `show` | `get` | `set` | `reset` (None → show)
+@@ -939,8 +940,7 @@ pub fn parse_command() -> Command {
+         Some("diagnose") => Command::Diagnose,
+         Some("permissions") => {
+             let subcommand = pos.next().unwrap_or("status").to_string();
+-            let json = args.iter().any(|a| a == "--json");
+-            Command::Permissions { subcommand, json }
++            parse_permissions_command(&args, subcommand)
+         }
+         Some("config") => {
+             let subcommand = pos.next().map(str::to_owned);
+@@ -1125,6 +1125,15 @@ fn parse_expected_stop_pid(args: &[String], command: Option<&str>) -> Option<u32
+     }
+ }
+ 
++/// Preserve the selected daemon endpoint for both permission operations.
++fn parse_permissions_command(args: &[String], subcommand: String) -> Command {
++    Command::Permissions {
++        subcommand,
++        json: args.iter().any(|a| a == "--json"),
++        socket: flag_value(args, "--socket"),
++    }
++}
++
+ /// Return the value of `--flag value` from argv, or `None`.
+ fn flag_value(args: &[String], flag: &str) -> Option<String> {
+     let mut it = args.iter();
+@@ -1331,7 +1340,7 @@ fn launch_daemon_with_state_and_wait(
+     let app_name = crate::bundle::app_name();
+     let app_path = crate::bundle::app_bundle_path();
+     let pass_socket = socket_path != crate::serve::default_socket_path();
+-    let open_args = daemon_launch_arguments(app_name, socket_path, state, experimental_history);
++    let open_args = daemon_launch_arguments(&app_path, socket_path, state, experimental_history);
+     // Thread the Claude-Code compat flag through to the daemon. Without this
+     // the proxy-spawned daemon always called build_macos_registry() (compat
+     // hardcoded false), so `cua-driver mcp --claude-code-computer-use-compat`
+@@ -3299,10 +3308,13 @@ pub fn run_update_cmd(apply: bool, json: bool) {
+ }
+ 
+ /// `cua-driver permissions status|grant`.
+-pub fn run_permissions_cmd(subcommand: &str, json: bool) {
++pub fn run_permissions_cmd(subcommand: &str, json: bool, socket: Option<&str>) {
++    let socket = socket
++        .map(str::to_owned)
++        .unwrap_or_else(crate::serve::default_socket_path);
+     match subcommand {
+-        "status" => run_permissions_status(json),
+-        "grant" => run_permissions_grant(),
++        "status" => run_permissions_status(json, &socket),
++        "grant" => run_permissions_grant(&socket),
+         other => {
+             eprintln!("unknown permissions subcommand '{other}'. Valid: status, grant.");
+             process::exit(2);
+@@ -3322,8 +3334,7 @@ pub fn run_permissions_cmd(subcommand: &str, json: bool) {
+ /// `✅ granted` while the driver itself has none. An honest "unknown" beats a
+ /// confident lie. To grant + verify, use `cua-driver permissions grant`.
+ /// Never raises a prompt.
+-fn run_permissions_status(json: bool) {
+-    let socket = crate::serve::default_socket_path();
++fn run_permissions_status(json: bool, socket: &str) {
+     let cli_name = crate::bundle::cli_name();
+     let app_name = crate::bundle::app_name();
+     let bundle_id = crate::bundle::bundle_id();
+@@ -3671,14 +3682,13 @@ fn request_permissions_via_launchservices(
+ /// com.trycua.driver, wait (user-paced) for the daemon to come up — its socket
+ /// only appears once the permissions gate passes, i.e. the grant was given —
+ /// then report the driver's own status.
+-fn run_permissions_grant() {
++fn run_permissions_grant(socket: &str) {
+     #[cfg(target_os = "macos")]
+     {
+         let cli_name = crate::bundle::cli_name();
+         let app_name = crate::bundle::app_name();
+         let app_path = crate::bundle::app_bundle_path();
+         let bundle_id = crate::bundle::bundle_id();
+-        let socket = crate::serve::default_socket_path();
+         let daemon_already_running = crate::serve::is_daemon_listening(&socket);
+         if daemon_already_running {
+             println!("{app_name} daemon already running — checking its permissions…");
+@@ -4882,6 +4892,31 @@ mod tests {
+         values.iter().map(|value| (*value).to_owned()).collect()
+     }
+ 
++    #[test]
++    fn companion_permissions_preserve_the_private_endpoint() {
++        for subcommand in ["status", "grant"] {
++            for flag in [
++                args(&["--socket", "/tmp/companion.sock"]),
++                args(&["--socket=/tmp/companion.sock"]),
++            ] {
++                let mut values = args(&["permissions", subcommand, "--json"]);
++                values.extend(flag);
++                match parse_permissions_command(&values, subcommand.to_owned()) {
++                    Command::Permissions {
++                        subcommand: parsed,
++                        json,
++                        socket,
++                    } => {
++                        assert_eq!(parsed, subcommand);
++                        assert!(json);
++                        assert_eq!(socket.as_deref(), Some("/tmp/companion.sock"));
++                    }
++                    _ => panic!("expected permissions command"),
++                }
++            }
++        }
++    }
++
+     #[test]
+     fn only_transports_skip_the_finite_broken_pipe_contract() {
+         for transport in [
+diff --git a/libs/cua-driver/rust/crates/cua-driver/src/main.rs b/libs/cua-driver/rust/crates/cua-driver/src/main.rs
+index e1af27a..30bfff5 100644
+--- a/libs/cua-driver/rust/crates/cua-driver/src/main.rs
++++ b/libs/cua-driver/rust/crates/cua-driver/src/main.rs
+@@ -815,8 +815,12 @@ fn main() {
+         cli::Command::Diagnose => {
+             cli::run_diagnose_cmd();
+         }
+-        cli::Command::Permissions { subcommand, json } => {
+-            cli::run_permissions_cmd(&subcommand, json);
++        cli::Command::Permissions {
++            subcommand,
++            json,
++            socket,
++        } => {
++            cli::run_permissions_cmd(&subcommand, json, socket.as_deref());
+         }
+         cli::Command::Autostart { subcommand } => {
+             autostart::run_autostart_cmd(&subcommand);
+@@ -1121,8 +1125,12 @@ fn main() -> anyhow::Result<()> {
+             cli::run_diagnose_cmd();
+             return Ok(());
+         }
+-        cli::Command::Permissions { subcommand, json } => {
+-            cli::run_permissions_cmd(&subcommand, json);
++        cli::Command::Permissions {
++            subcommand,
++            json,
++            socket,
++        } => {
++            cli::run_permissions_cmd(&subcommand, json, socket.as_deref());
+             return Ok(());
+         }
+         cli::Command::Autostart { subcommand } => {
+diff --git a/libs/cua-driver/rust/crates/cursor-overlay/examples/companion_preview.rs b/libs/cua-driver/rust/crates/cursor-overlay/examples/companion_preview.rs
+new file mode 100644
+index 0000000..05f2a88
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/cursor-overlay/examples/companion_preview.rs
+@@ -0,0 +1,49 @@
++//! Render the actual native teaching artwork without desktop permissions.
++//! cargo run -p cursor-overlay --example companion_preview -- /tmp/Companion.png
++use cursor_overlay::{
++    anchor_for_pointer, paint_cursor, CursorConfig, OverlayCommand, RenderStateCore,
++};
++
++fn main() -> Result<(), Box<dyn std::error::Error>> {
++    let destination = std::env::args().nth(1).ok_or("Provide a PNG output path")?;
++    let mut core = RenderStateCore::new(CursorConfig::default());
++    core.apply_command_base(OverlayCommand::SetCompanionAppearance(true), true, true);
++    core.heading = std::f64::consts::FRAC_PI_4;
++    core.pos = anchor_for_pointer(100.0, 80.0, core.heading);
++    let mut image = tiny_skia::Pixmap::new(480, 400).ok_or("Could not allocate preview")?;
++    // A dark backdrop makes the translucent halo readable in PNG viewers.
++    image.fill(tiny_skia::Color::from_rgba8(16, 18, 22, 255));
++    paint_cursor(&mut image, &core, 0.0, 0.0, None, 2.0);
++    if std::env::args().nth(2).as_deref() == Some("hud") {
++        use cua_driver_contract::{CompanionHudLocale, CompanionHudPhase};
++        let mut hud = cursor_overlay::companion_hud::CompanionHudPainter::default();
++        hud.update(
++            CompanionHudPhase::Thinking,
++            CompanionHudLocale::English,
++            0.0,
++        );
++        hud.tick(0.2, false);
++        hud.paint(
++            &mut image,
++            (core.pos.0 as f32, core.pos.1 as f32),
++            2.0,
++            false,
++        );
++    }
++    let pixels: Vec<u8> = image
++        .pixels()
++        .iter()
++        .flat_map(|pixel| {
++            let pixel = pixel.demultiply();
++            [pixel.red(), pixel.green(), pixel.blue(), pixel.alpha()]
++        })
++        .collect();
++    image::save_buffer(
++        destination,
++        &pixels,
++        image.width(),
++        image.height(),
++        image::ColorType::Rgba8,
++    )?;
++    Ok(())
++}
+diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/companion.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/companion.rs
+new file mode 100644
+index 0000000..4bb3cb9
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/cursor-overlay/src/companion.rs
+@@ -0,0 +1,86 @@
++//! Pure teaching geometry. No input, platform, or transport dependencies.
++use cua_driver_contract::{CompanionPoint, CompanionStep};
++
++pub fn plan_path(step: &CompanionStep, width: f64, height: f64) -> Vec<(f64, f64)> {
++    let point = |p: &CompanionPoint| (p.x * width, p.y * height);
++    match step {
++        CompanionStep::Circle { center, radius, .. } => {
++            let (x, y) = point(center);
++            let r = radius * width.min(height);
++            (0..=64)
++                .map(|index| {
++                    let angle = index as f64 / 64.0 * std::f64::consts::TAU;
++                    (x + r * angle.cos(), y + r * angle.sin())
++                })
++                .collect()
++        }
++        CompanionStep::Click { at, .. } => vec![point(at)],
++        CompanionStep::Selection { from, to, .. } => {
++            let (x, y) = point(from);
++            let (end_x, end_y) = point(to);
++            vec![(x, y), (end_x, y), (end_x, end_y), (x, end_y), (x, y)]
++        }
++        CompanionStep::Arrow { from, to, .. }
++        | CompanionStep::Move { from, to, .. }
++        | CompanionStep::Drag { from, to, .. } => vec![point(from), point(to)],
++    }
++}
++
++pub fn sample_path(path: &[(f64, f64)], progress: f64) -> (f64, f64) {
++    let distance = progress.clamp(0.0, 1.0) * path.len().saturating_sub(1) as f64;
++    let index = distance.floor() as usize;
++    let start = path.get(index).copied().unwrap_or((0.0, 0.0));
++    let end = path.get(index + 1).copied().unwrap_or(start);
++    let amount = distance - index as f64;
++    (
++        start.0 + (end.0 - start.0) * amount,
++        start.1 + (end.1 - start.1) * amount,
++    )
++}
++
++pub fn plan_mark(step: &CompanionStep, path: &[(f64, f64)]) -> Vec<(f64, f64)> {
++    match step {
++        CompanionStep::Move { .. } | CompanionStep::Click { .. } => vec![],
++        CompanionStep::Arrow { .. } => {
++            let mut mark = path.to_vec();
++            if let [from, to] = path {
++                let angle = (to.1 - from.1).atan2(to.0 - from.0);
++                for offset in [-0.55, 0.55] {
++                    mark.push((
++                        to.0 - 16.0 * (angle + offset).cos(),
++                        to.1 - 16.0 * (angle + offset).sin(),
++                    ));
++                    mark.push(*to);
++                }
++            }
++            mark
++        }
++        _ => path.to_vec(),
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn circle_closes_and_arrow_points_to_destination() {
++        let center = CompanionPoint { x: 0.5, y: 0.5 };
++        let circle = CompanionStep::Circle {
++            center,
++            radius: 0.1,
++            duration_ms: 1000,
++        };
++        let path = plan_path(&circle, 1000.0, 500.0);
++        assert_eq!(path.len(), 65);
++        assert!((path[0].0 - 550.0).abs() < 0.01);
++        assert!((path[0].1 - path[64].1).abs() < 0.01);
++        let arrow = CompanionStep::Arrow {
++            from: center,
++            to: CompanionPoint { x: 0.8, y: 0.8 },
++            duration_ms: 1000,
++        };
++        let path = plan_path(&arrow, 1000.0, 500.0);
++        assert_eq!(sample_path(&path, 1.0), (800.0, 400.0));
++        assert_eq!(plan_mark(&arrow, &path).last(), Some(&(800.0, 400.0)));
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/companion_appearance.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_appearance.rs
+new file mode 100644
+index 0000000..cceea34
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_appearance.rs
+@@ -0,0 +1,146 @@
++//! Tro's teaching pointer. Coordinates and sizes are logical display points;
++//! the hotspot stays at the pointer tip at every backing scale.
++use tiny_skia::{
++    Color, FillRule, GradientStop, Paint, PathBuilder, Pixmap, Point, RadialGradient, SpreadMode,
++    Stroke, Transform,
++};
++
++pub const COMPANION_BLUE: [u8; 4] = [77, 163, 255, 255];
++// Keep the silhouette compact at about 9 × 10 logical display points.
++// Apply the same factor to its outline, halo and click pulse without moving the tip.
++const COMPANION_SIZE_SCALE: f32 = 0.3125;
++const GLOW_RADIUS: f32 = 58.0;
++
++pub fn paint_companion_pointer(
++    image: &mut Pixmap,
++    tip: (f32, f32),
++    backing_scale: f32,
++    alpha: f32,
++    pressed: bool,
++    click_progress: Option<f64>,
++) {
++    let scale = backing_scale.max(1.0) * COMPANION_SIZE_SCALE;
++    let alpha = alpha.clamp(0.0, 1.0);
++    let transform = Transform::from_scale(scale, scale).post_translate(tip.0, tip.1);
++    let center = Point::from_xy(11.0, 14.0);
++    let [red, green, blue, _] = COMPANION_BLUE;
++    let color = |opacity: f32| Color::from_rgba8(red, green, blue, (opacity * alpha) as u8);
++    if let (Some(glow), Some(circle)) = (
++        RadialGradient::new(
++            center,
++            center,
++            GLOW_RADIUS,
++            vec![
++                GradientStop::new(0.0, color(120.0)),
++                GradientStop::new(0.35, color(96.0)),
++                GradientStop::new(0.7, color(24.0)),
++                GradientStop::new(1.0, color(0.0)),
++            ],
++            SpreadMode::Pad,
++            Transform::identity(),
++        ),
++        PathBuilder::from_circle(center.x, center.y, GLOW_RADIUS),
++    ) {
++        image.fill_path(
++            &circle,
++            &Paint {
++                shader: glow,
++                anti_alias: true,
++                ..Default::default()
++            },
++            FillRule::Winding,
++            transform,
++            None,
++        );
++    }
++
++    if let Some(progress) = click_progress {
++        let progress = progress.clamp(0.0, 1.0) as f32;
++        if let Some(ring) = PathBuilder::from_circle(0.0, 0.0, 10.0 + progress * 24.0) {
++            let mut paint = Paint::default();
++            paint.set_color(color(220.0 * (1.0 - progress)));
++            paint.anti_alias = true;
++            image.stroke_path(
++                &ring,
++                &paint,
++                &Stroke {
++                    width: 2.0,
++                    ..Default::default()
++                },
++                transform,
++                None,
++            );
++        }
++    }
++
++    // Rounded corners keep the source silhouette soft at the smaller display size. Its
++    // fixed orientation helps distinguish the teacher from the OS pointer.
++    let mut builder = PathBuilder::new();
++    builder.move_to(0.0, 2.0);
++    builder.quad_to(-0.8, -0.8, 2.0, 0.5);
++    builder.line_to(26.0, 14.0);
++    builder.quad_to(29.0, 16.0, 26.0, 17.5);
++    builder.line_to(16.0, 21.0);
++    builder.line_to(11.0, 30.0);
++    builder.quad_to(9.0, 33.0, 7.8, 29.5);
++    builder.close();
++    if let Some(pointer) = builder.finish() {
++        let press_scale = if pressed { 0.94 } else { 1.0 };
++        let transform = Transform::from_scale(scale * press_scale, scale * press_scale)
++            .post_translate(tip.0, tip.1);
++        let mut fill = Paint::default();
++        fill.set_color_rgba8(255, 255, 255, (255.0 * alpha) as u8);
++        fill.anti_alias = true;
++        image.fill_path(&pointer, &fill, FillRule::Winding, transform, None);
++        let mut outline = Paint::default();
++        outline.set_color(color(255.0));
++        outline.anti_alias = true;
++        image.stroke_path(
++            &pointer,
++            &outline,
++            &Stroke {
++                width: 2.0,
++                ..Default::default()
++            },
++            transform,
++            None,
++        );
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn companion_pointer_has_white_body_blue_glow_and_retina_scaling() {
++        for scale in [1.0, 2.0] {
++            let mut image = Pixmap::new((160.0 * scale) as u32, (160.0 * scale) as u32).unwrap();
++            paint_companion_pointer(
++                &mut image,
++                (70.0 * scale, 65.0 * scale),
++                scale,
++                1.0,
++                false,
++                None,
++            );
++            let body = image
++                .pixel((73.0 * scale) as u32, (70.0 * scale) as u32)
++                .unwrap();
++            assert!(body.red() > 245 && body.green() > 245 && body.blue() > 245);
++            let glow = image
++                .pixel((64.0 * scale) as u32, (70.0 * scale) as u32)
++                .unwrap();
++            assert!(glow.blue() > glow.green() && glow.green() > glow.red());
++            assert!(glow.alpha() > 0 && glow.alpha() < 128);
++            assert_eq!(image.pixel(0, 0).unwrap().alpha(), 0);
++        }
++    }
++
++    #[test]
++    fn companion_pointer_respects_visibility_alpha() {
++        let mut image = Pixmap::new(160, 160).unwrap();
++        paint_companion_pointer(&mut image, (70.0, 65.0), 1.0, 0.0, true, Some(0.5));
++        assert!(image.data().iter().all(|byte| *byte == 0));
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs
+new file mode 100644
+index 0000000..1846f82
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs
+@@ -0,0 +1,421 @@
++//! Compact host HUD in logical points. Never posts input or performs submission.
++use cua_driver_contract::{CompanionHudLocale as Locale, CompanionHudPhase as Phase};
++use fontdue::layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle};
++use std::sync::OnceLock;
++use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, PixmapPaint, Stroke, Transform};
++
++pub const HUD_WIDTH: f32 = 88.0;
++pub const HUD_HEIGHT: f32 = 22.0;
++#[derive(Default)]
++pub struct CompanionHudPainter {
++    pub phase: Phase,
++    pub locale: Locale,
++    pub level: f32,
++    previous: Phase,
++    transition: f32,
++    alpha: f32,
++    smoothed_level: f32,
++    time: f32,
++    above: bool,
++}
++impl CompanionHudPainter {
++    pub fn update(&mut self, phase: Phase, locale: Locale, level: f32) {
++        if phase != self.phase {
++            self.previous = self.phase;
++            self.phase = phase;
++            self.transition = 0.0;
++        }
++        self.locale = locale;
++        self.level = if phase == Phase::Listening {
++            level.clamp(0.0, 1.0)
++        } else {
++            0.0
++        };
++    }
++    pub fn is_visible(&self) -> bool {
++        self.phase != Phase::Idle || self.alpha > 0.002
++    }
++    pub fn tick(&mut self, dt: f32, reduced_motion: bool) {
++        self.time += dt;
++        let duration = if reduced_motion { 0.04 } else { 0.18 };
++        self.transition = (self.transition + dt / duration).min(1.0);
++        let target = if self.phase == Phase::Idle { 0.0 } else { 1.0 };
++        self.alpha += (target - self.alpha).clamp(-dt / duration, dt / duration);
++        let smoothing = if self.level > self.smoothed_level {
++            0.055
++        } else {
++            0.18
++        };
++        self.smoothed_level += (self.level - self.smoothed_level) * (1.0 - (-dt / smoothing).exp());
++    }
++    pub fn paint(
++        &mut self,
++        image: &mut Pixmap,
++        cursor: (f32, f32),
++        scale: f32,
++        reduced_motion: bool,
++    ) {
++        if self.alpha <= 0.002 {
++            return;
++        }
++        let width = if self.locale == Locale::Vietnamese {
++            98.0
++        } else {
++            HUD_WIDTH
++        };
++        let x = (cursor.0 + 4.0 - width / 2.0)
++            .clamp(8.0, (image.width() as f32 / scale - width - 8.0).max(8.0));
++        let bottom = image.height() as f32 / scale;
++        if self.above {
++            if cursor.1 + 16.0 + HUD_HEIGHT < bottom - 16.0 {
++                self.above = false;
++            }
++        } else if cursor.1 + 16.0 + HUD_HEIGHT > bottom - 8.0 {
++            self.above = true;
++        }
++        let y = if self.above {
++            cursor.1 - HUD_HEIGHT - 6.0
++        } else {
++            cursor.1 + 16.0
++        };
++        let y = y.clamp(8.0, (bottom - HUD_HEIGHT - 8.0).max(8.0));
++        let mut path = PathBuilder::new();
++        let r = HUD_HEIGHT / 2.0;
++        path.move_to(x + r, y);
++        path.line_to(x + width - r, y);
++        path.cubic_to(
++            x + width + r * 0.1,
++            y,
++            x + width + r * 0.1,
++            y + HUD_HEIGHT,
++            x + width - r,
++            y + HUD_HEIGHT,
++        );
++        path.line_to(x + r, y + HUD_HEIGHT);
++        path.cubic_to(x - r * 0.1, y + HUD_HEIGHT, x - r * 0.1, y, x + r, y);
++        path.close();
++        let Some(path) = path.finish() else {
++            return;
++        };
++        let transform = Transform::from_scale(scale, scale);
++        image.fill_path(
++            &path,
++            &paint([8, 13, 19], self.alpha * 0.95),
++            FillRule::Winding,
++            transform,
++            None,
++        );
++        image.stroke_path(
++            &path,
++            &paint([120, 188, 243], self.alpha * 0.7),
++            &Stroke {
++                width: 0.8,
++                ..Default::default()
++            },
++            transform,
++            None,
++        );
++        // Crossfade at the same anchor; fast lifecycle updates never delay work.
++        if self.phase != Phase::Idle && self.transition < 1.0 && self.previous != Phase::Idle {
++            self.paint_content(
++                image,
++                self.previous,
++                x,
++                y,
++                width,
++                scale,
++                self.alpha * (1.0 - self.transition),
++                reduced_motion,
++            );
++        }
++        if self.phase != Phase::Idle {
++            self.paint_content(
++                image,
++                self.phase,
++                x,
++                y,
++                width,
++                scale,
++                self.alpha * self.transition,
++                reduced_motion,
++            );
++        } else {
++            self.paint_content(
++                image,
++                self.previous,
++                x,
++                y,
++                width,
++                scale,
++                self.alpha,
++                reduced_motion,
++            );
++        }
++    }
++    fn paint_content(
++        &self,
++        image: &mut Pixmap,
++        phase: Phase,
++        x: f32,
++        y: f32,
++        width: f32,
++        scale: f32,
++        alpha: f32,
++        reduced: bool,
++    ) {
++        let transform = Transform::from_scale(scale, scale);
++        let blue = paint([138, 200, 250], alpha);
++        let icon_x = x + 7.0;
++        let mid = y + 11.0;
++        if phase == Phase::Thinking || phase == Phase::Transcribing || phase == Phase::Preparing {
++            for index in 0..3 {
++                let opacity = if reduced {
++                    1.0
++                } else {
++                    0.45 + 0.55 * ((self.time * 4.5 - index as f32 * 0.8).sin() + 1.0) / 2.0
++                };
++                if let Some(rect) =
++                    tiny_skia::Rect::from_xywh(icon_x + index as f32 * 3.0, mid - 1.0, 2.0, 2.0)
++                {
++                    image.fill_rect(
++                        rect,
++                        &paint([138, 200, 250], alpha * opacity),
++                        transform,
++                        None,
++                    );
++                }
++            }
++        } else {
++            let mut icon = PathBuilder::new();
++            if phase == Phase::Done {
++                icon.move_to(icon_x, mid);
++                icon.line_to(icon_x + 3.0, mid + 3.0);
++                icon.line_to(icon_x + 8.0, mid - 4.0);
++            } else {
++                icon.move_to(icon_x + 2.0, mid - 4.0);
++                icon.cubic_to(
++                    icon_x + 2.0,
++                    mid - 7.0,
++                    icon_x + 6.0,
++                    mid - 7.0,
++                    icon_x + 6.0,
++                    mid - 4.0,
++                );
++                icon.line_to(icon_x + 6.0, mid);
++                icon.cubic_to(
++                    icon_x + 6.0,
++                    mid + 3.0,
++                    icon_x + 2.0,
++                    mid + 3.0,
++                    icon_x + 2.0,
++                    mid,
++                );
++                icon.close();
++                icon.move_to(icon_x, mid);
++                icon.cubic_to(
++                    icon_x,
++                    mid + 6.0,
++                    icon_x + 8.0,
++                    mid + 6.0,
++                    icon_x + 8.0,
++                    mid,
++                );
++                icon.move_to(icon_x + 4.0, mid + 4.0);
++                icon.line_to(icon_x + 4.0, mid + 7.0);
++            }
++            if let Some(path) = icon.finish() {
++                image.stroke_path(
++                    &path,
++                    &blue,
++                    &Stroke {
++                        width: 1.0,
++                        ..Default::default()
++                    },
++                    transform,
++                    None,
++                );
++            }
++        }
++        if phase == Phase::Listening {
++            for index in 0..14 {
++                let weight = if reduced {
++                    1.0
++                } else {
++                    0.35 + 0.65 * ((self.time * 7.0 + index as f32 * 0.82).sin() + 1.0) / 2.0
++                };
++                let h = 2.0 + self.smoothed_level * 8.0 * weight;
++                if let Some(rect) =
++                    tiny_skia::Rect::from_xywh(x + 25.0 + index as f32 * 3.0, mid - h / 2.0, 1.8, h)
++                {
++                    image.fill_rect(rect, &blue, transform, None);
++                }
++            }
++        } else {
++            paint_text(
++                image,
++                label(phase, self.locale),
++                (x + 20.0, y),
++                width - 24.0,
++                scale,
++                alpha,
++            );
++        }
++    }
++}
++fn paint(rgb: [u8; 3], alpha: f32) -> Paint<'static> {
++    let mut p = Paint::default();
++    p.set_color(Color::from_rgba8(
++        rgb[0],
++        rgb[1],
++        rgb[2],
++        (255.0 * alpha.clamp(0.0, 1.0)) as u8,
++    ));
++    p
++}
++fn label(phase: Phase, locale: Locale) -> &'static str {
++    if locale == Locale::Vietnamese {
++        return match phase {
++            Phase::Idle => "",
++            Phase::Preparing => "Chuẩn bị…",
++            Phase::Listening => "Đang nghe",
++            Phase::Transcribing => "Chuyển lời…",
++            Phase::Sending => "Đang gửi…",
++            Phase::Thinking => "Suy nghĩ…",
++            Phase::Showing => "Hướng dẫn…",
++            Phase::Working => "Đang làm…",
++            Phase::Done => "Xong",
++            Phase::Canceled => "Đã hủy",
++            Phase::Error => "Có lỗi",
++            Phase::DailyLimit => "Hết lượt hôm nay",
++        };
++    }
++    match phase {
++        Phase::Idle => "",
++        Phase::Preparing => "Preparing…",
++        Phase::Listening => "Listening",
++        Phase::Transcribing => "Transcribing…",
++        Phase::Sending => "Sending…",
++        Phase::Thinking => "Thinking…",
++        Phase::Showing => "Showing…",
++        Phase::Working => "Working…",
++        Phase::Done => "Done",
++        Phase::Canceled => "Canceled",
++        Phase::Error => "Try again",
++        Phase::DailyLimit => "Daily limit",
++    }
++}
++fn paint_text(
++    image: &mut Pixmap,
++    text: &str,
++    origin: (f32, f32),
++    width: f32,
++    scale: f32,
++    alpha: f32,
++) {
++    static FONT: OnceLock<Option<fontdue::Font>> = OnceLock::new();
++    let Some(font) = FONT.get_or_init(|| {
++        fontdue::Font::from_bytes(
++            include_bytes!("../assets/Inter.ttf") as &[u8],
++            fontdue::FontSettings::default(),
++        )
++        .ok()
++    }) else {
++        return;
++    };
++    let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
++    layout.reset(&LayoutSettings::default());
++    layout.append(&[font], &TextStyle::new(text, 9.5 * scale, 0));
++    let text_width = layout
++        .glyphs()
++        .iter()
++        .map(|glyph| glyph.x + glyph.width as f32)
++        .fold(0.0, f32::max);
++    let factor = (width * scale / text_width.max(1.0)).min(1.0);
++    if factor < 1.0 {
++        layout.reset(&LayoutSettings::default());
++        layout.append(&[font], &TextStyle::new(text, 9.5 * scale * factor, 0));
++    }
++    let text_width = layout
++        .glyphs()
++        .iter()
++        .map(|glyph| glyph.x + glyph.width as f32)
++        .fold(0.0, f32::max);
++    let min_y = layout
++        .glyphs()
++        .iter()
++        .map(|g| g.y)
++        .fold(f32::INFINITY, f32::min);
++    let max_y = layout
++        .glyphs()
++        .iter()
++        .map(|g| g.y + g.height as f32)
++        .fold(0.0, f32::max);
++    for glyph in layout.glyphs() {
++        let (metrics, bitmap) = font.rasterize_config(glyph.key);
++        let Some(mut pm) = Pixmap::new(metrics.width as u32, metrics.height as u32) else {
++            continue;
++        };
++        for (pixel, coverage) in pm.data_mut().chunks_exact_mut(4).zip(bitmap) {
++            let a = coverage as f32 * alpha;
++            pixel.copy_from_slice(&[
++                (138.0 / 255.0 * a) as u8,
++                (200.0 / 255.0 * a) as u8,
++                (250.0 / 255.0 * a) as u8,
++                a as u8,
++            ]);
++        }
++        image.draw_pixmap(
++            (origin.0 * scale + (width * scale - text_width) / 2.0 + glyph.x).round() as i32,
++            (origin.1 * scale + (HUD_HEIGHT * scale - (max_y - min_y)) / 2.0 - min_y + glyph.y)
++                .round() as i32,
++            pm.as_ref(),
++            &PixmapPaint::default(),
++            Transform::identity(),
++            None,
++        );
++    }
++}
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn companion_hud_renders_clamped_retina_and_fades() {
++        for scale in [1.0, 2.0] {
++            let mut pm = Pixmap::new((200.0 * scale) as u32, (100.0 * scale) as u32).unwrap();
++            let mut painter = CompanionHudPainter::default();
++            painter.update(Phase::Thinking, Locale::English, 0.0);
++            painter.tick(0.2, false);
++            painter.paint(&mut pm, (195.0, 95.0), scale, false);
++            assert!(painter.above);
++            assert!(pm.data().chunks_exact(4).any(|pixel| pixel[3] > 0));
++            painter.update(Phase::Idle, Locale::English, 0.0);
++            painter.tick(0.3, false);
++            assert!(!painter.is_visible());
++        }
++    }
++    #[test]
++    fn companion_hud_silence_stays_flat_and_levels_decay() {
++        let mut painter = CompanionHudPainter::default();
++        painter.update(Phase::Listening, Locale::English, 0.0);
++        painter.tick(0.2, false);
++        assert_eq!(painter.smoothed_level, 0.0);
++        painter.update(Phase::Listening, Locale::English, 1.0);
++        painter.tick(0.1, false);
++        assert!(painter.smoothed_level > 0.5);
++        painter.update(Phase::Transcribing, Locale::English, 0.0);
++        painter.tick(0.3, false);
++        assert!(painter.smoothed_level < 0.2);
++    }
++}
++
++/// Retain the same companion at handoff while no bound Tro cursor is visible.
++pub fn paint_fallback_pointer(image: &mut Pixmap, cursor: (f32, f32), scale: f32) {
++    crate::companion_appearance::paint_companion_pointer(
++        image,
++        (cursor.0 * scale, cursor.1 * scale),
++        scale,
++        1.0,
++        false,
++        None,
++    );
++}
+diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/lib.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/lib.rs
+index 36f3717..de3873a 100644
+--- a/libs/cua-driver/rust/crates/cursor-overlay/src/lib.rs
++++ b/libs/cua-driver/rust/crates/cursor-overlay/src/lib.rs
+@@ -10,6 +10,9 @@ pub mod badge_glyphs;
+ pub mod bezier;
+ pub mod capture_exclusion;
+ pub mod capture_utils;
++pub mod companion;
++mod companion_appearance;
++pub mod companion_hud;
+ pub mod motion;
+ pub mod path_planner;
+ pub mod render_map;
+@@ -340,6 +343,14 @@ pub enum OverlayMsg {
+ /// Commands sent from MCP tool handlers to the overlay's render thread.
+ #[derive(Debug, Clone)]
+ pub enum OverlayCommand {
++    /// Host-owned teaching artwork; does not change the installed action theme.
++    SetCompanionAppearance(bool),
++    SuppressSessionBadge(bool),
++    WakeCompanionHud,
++    /// Presentation geometry only; never synthesizes operating-system input.
++    ShowCompanionMark(Vec<(f64, f64)>),
++    /// Acknowledged only after a visible composite paints this cursor.
++    FrameReceipt(std::sync::Arc<std::sync::atomic::AtomicBool>),
+     /// Animate the cursor to a new screen position.
+     MoveTo {
+         x: f64,
+@@ -353,7 +364,10 @@ pub enum OverlayCommand {
+         heading_radians: Option<f64>,
+     },
+     /// Start the click-press visual.
+-    ClickPulse { x: f64, y: f64 },
++    ClickPulse {
++        x: f64,
++        y: f64,
++    },
+     /// Toggle the held-button visual state.
+     SetPressed(bool),
+     /// Show or hide the overlay.
+diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs
+index 264c427..1e59019 100644
+--- a/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs
++++ b/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs
+@@ -48,6 +48,11 @@ pub const SESSION_BADGE_FADE_SECS: f64 = 0.4;
+ /// Each platform wraps this in its own struct that adds OS-specific fields
+ /// (e.g. `virt_x/y/w/h` on Windows, `focus_rect` on macOS).
+ pub struct RenderStateCore {
++    /// Teaching artwork selected by the host, independent of the action theme.
++    pub companion_appearance: bool,
++    pub suppress_session_badge: bool,
++    pub companion_mark: Vec<(f64, f64)>,
++    pub frame_receipt: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+     /// Frozen copy of the launch-time CursorConfig.
+     pub cfg: CursorConfig,
+     /// Current motion / timing config (mutable via [`OverlayCommand::SetMotion`]).
+@@ -126,6 +131,10 @@ impl RenderStateCore {
+             ),
+         };
+         Self {
++            companion_appearance: false,
++            suppress_session_badge: false,
++            companion_mark: vec![],
++            frame_receipt: None,
+             cfg,
+             motion,
+             visual,
+@@ -638,6 +647,23 @@ impl RenderStateCore {
+         click_pulse_sentinel_only: bool,
+     ) -> bool {
+         match cmd {
++            OverlayCommand::WakeCompanionHud => true,
++            OverlayCommand::SuppressSessionBadge(suppress) => {
++                self.suppress_session_badge = suppress;
++                true
++            }
++            OverlayCommand::SetCompanionAppearance(enabled) => {
++                self.companion_appearance = enabled;
++                true
++            }
++            OverlayCommand::ShowCompanionMark(points) => {
++                self.companion_mark = points;
++                true
++            }
++            OverlayCommand::FrameReceipt(receipt) => {
++                self.frame_receipt = Some(receipt);
++                true
++            }
+             OverlayCommand::MoveTo {
+                 x,
+                 y,
+@@ -959,7 +985,48 @@ pub fn paint_cursor(
+         }
+     }
+ 
+-    if let Some(theme) = core.theme.as_deref() {
++    if core.companion_mark.len() > 1 {
++        let mut builder = tiny_skia::PathBuilder::new();
++        for (index, (x, y)) in core.companion_mark.iter().enumerate() {
++            let x = ((x - origin_x) * s) as f32;
++            let y = ((y - origin_y) * s) as f32;
++            if index == 0 {
++                builder.move_to(x, y);
++            } else {
++                builder.line_to(x, y);
++            }
++        }
++        if let Some(path) = builder.finish() {
++            let mut paint = tiny_skia::Paint::default();
++            let [red, green, blue, _] = crate::companion_appearance::COMPANION_BLUE;
++            paint.set_color_rgba8(red, green, blue, (230.0 * alpha_scale) as u8);
++            paint.anti_alias = true;
++            pm.stroke_path(
++                &path,
++                &paint,
++                &tiny_skia::Stroke {
++                    width: 3.0 * sf,
++                    ..Default::default()
++                },
++                tiny_skia::Transform::identity(),
++                None,
++            );
++        }
++    }
++    if let Some(receipt) = &core.frame_receipt {
++        receipt.store(true, std::sync::atomic::Ordering::Release);
++    }
++
++    if core.companion_appearance {
++        crate::companion_appearance::paint_companion_pointer(
++            pm,
++            (tip_x as f32, tip_y as f32),
++            sf,
++            alpha_scale,
++            core.pressed,
++            core.click_t,
++        );
++    } else if let Some(theme) = core.theme.as_deref() {
+         let tint = (theme.id == crate::DEFAULT_THEME_ID)
+             .then(|| crate::session_fill_rgba(&core.cfg.cursor_id));
+         crate::paint_compiled_theme_with_tint(
+@@ -989,6 +1056,9 @@ pub fn paint_cursor(
+         );
+     }
+ 
++    if core.suppress_session_badge {
++        return;
++    }
+     let (delivery, target) = core.badge_modifiers.unwrap_or((None, None));
+     if let Some(layout) = crate::session_badge_layout(crate::SessionBadgeInput {
+         label: core.session_label.as_deref(),
+@@ -1003,7 +1073,11 @@ pub fn paint_cursor(
+         crate::paint_session_badge(
+             pm,
+             &layout,
+-            crate::session_fill_rgba(&core.cfg.cursor_id),
++            if core.companion_appearance {
++                crate::companion_appearance::COMPANION_BLUE
++            } else {
++                crate::session_fill_rgba(&core.cfg.cursor_id)
++            },
+             alpha_scale,
+         );
+     }
+@@ -1043,6 +1117,37 @@ mod glide_duration_tests {
+         t
+     }
+ 
++    #[test]
++    fn companion_appearance_leaves_the_action_theme_intact() {
++        let mut core = RenderStateCore::new(CursorConfig::default());
++        let theme = core.active_theme_metadata();
++        assert!(!core.companion_appearance);
++        for enabled in [true, false] {
++            assert!(core.apply_command_base(
++                OverlayCommand::SetCompanionAppearance(enabled),
++                true,
++                true
++            ));
++            assert_eq!(core.companion_appearance, enabled);
++            assert_eq!(core.active_theme_metadata(), theme);
++        }
++    }
++
++    #[test]
++    fn companion_frame_receipts_require_visible_compositing() {
++        let receipt = Arc::new(std::sync::atomic::AtomicBool::new(false));
++        let mut core = RenderStateCore::new(CursorConfig::default());
++        core.frame_receipt = Some(receipt.clone());
++        let mut image = tiny_skia::Pixmap::new(200, 200).unwrap();
++        paint_cursor(&mut image, &core, 0.0, 0.0, None, 1.0);
++        assert!(!receipt.load(std::sync::atomic::Ordering::Acquire));
++        core.pos = (100.0, 100.0);
++        core.companion_mark = vec![(30.0, 30.0), (150.0, 150.0)];
++        paint_cursor(&mut image, &core, 0.0, 0.0, None, 1.0);
++        assert!(receipt.load(std::sync::atomic::Ordering::Acquire));
++        assert!(image.data().iter().any(|pixel| *pixel != 0));
++    }
++
+     #[test]
+     fn fixed_duration_is_distance_independent_on_both_paths() {
+         for swift in [false, true] {
+diff --git a/libs/cua-driver/rust/crates/platform-macos/src/cursor/companion_hud.rs b/libs/cua-driver/rust/crates/platform-macos/src/cursor/companion_hud.rs
+new file mode 100644
+index 0000000..b5f2419
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/platform-macos/src/cursor/companion_hud.rs
+@@ -0,0 +1,134 @@
++//! Independent presentation lease bound only to explicitly registered cursor sessions.
++use cua_driver_contract::{CompanionHudLocale, CompanionHudPhase, SetCompanionHudInput};
++use cursor_overlay::companion_hud::CompanionHudPainter;
++use std::{
++    collections::VecDeque,
++    sync::{Mutex, OnceLock},
++    time::{Duration, Instant},
++};
++
++#[derive(Default)]
++pub(super) struct HudState {
++    owner: Option<String>,
++    group: Option<String>,
++    sequence: Option<u64>,
++    expires: Option<Instant>,
++    pub bindings: VecDeque<String>,
++    pub painter: CompanionHudPainter,
++}
++pub(super) fn state() -> &'static Mutex<HudState> {
++    static STATE: OnceLock<Mutex<HudState>> = OnceLock::new();
++    STATE.get_or_init(|| Mutex::new(HudState::default()))
++}
++impl HudState {
++    pub fn update(&mut self, session: &str, input: SetCompanionHudInput) -> bool {
++        let live = self.expires.is_some_and(|expires| expires > Instant::now());
++        if live && self.owner.as_deref().is_some_and(|owner| owner != session) {
++            return false;
++        }
++        if self.owner.as_deref() == Some(session)
++            && self
++                .sequence
++                .is_some_and(|sequence| input.sequence <= sequence)
++        {
++            return false;
++        }
++        if self.group.as_deref() != Some(&input.group) {
++            self.bindings.clear();
++        }
++        self.owner = Some(session.into());
++        self.group = Some(input.group);
++        self.sequence = Some(input.sequence);
++        self.expires = Some(Instant::now() + Duration::from_secs(25));
++        self.painter
++            .update(input.phase, input.locale, input.level as f32);
++        true
++    }
++    pub fn bind(&mut self, session: &str, group: &str) -> bool {
++        if self.group.as_deref() != Some(group)
++            || !self.expires.is_some_and(|expires| expires > Instant::now())
++        {
++            return false;
++        }
++        self.bindings.retain(|key| key != session);
++        if self.bindings.len() >= 8 {
++            self.bindings.pop_front();
++        }
++        self.bindings.push_back(session.into());
++        true
++    }
++    pub fn tick(&mut self, dt: f32, reduced: bool) -> bool {
++        if self
++            .expires
++            .is_some_and(|expires| expires <= Instant::now())
++        {
++            self.owner = None;
++            self.sequence = None;
++            self.expires = None;
++            self.painter
++                .update(CompanionHudPhase::Idle, CompanionHudLocale::English, 0.0);
++        }
++        self.painter.tick(dt, reduced);
++        self.painter.is_visible()
++    }
++    pub fn retire(&mut self, key: &str, prefix: bool) {
++        let matches = |candidate: &str| {
++            if prefix {
++                candidate.starts_with(key)
++            } else {
++                candidate == key
++            }
++        };
++        self.bindings.retain(|candidate| !matches(candidate));
++        if self.owner.as_deref().is_some_and(matches) {
++            self.owner = None;
++            self.sequence = None;
++            self.expires = None;
++            self.painter
++                .update(CompanionHudPhase::Idle, CompanionHudLocale::English, 0.0);
++        }
++    }
++}
++#[cfg(test)]
++mod tests {
++    use super::*;
++    fn input(sequence: u64) -> SetCompanionHudInput {
++        SetCompanionHudInput {
++            session: None,
++            group: "11111111-1111-4111-8111-111111111111".into(),
++            sequence,
++            phase: CompanionHudPhase::Thinking,
++            locale: CompanionHudLocale::English,
++            level: 0.0,
++        }
++    }
++    #[test]
++    fn companion_hud_fences_ownership_sequence_and_foreign_binding() {
++        let mut state = HudState::default();
++        assert!(state.update("host", input(0)));
++        assert!(!state.update("foreign", input(1)));
++        assert!(!state.update("host", input(0)));
++        assert!(!state.bind("foreign", "another-group"));
++        assert!(state.bind("cursor", &input(0).group));
++        state.retire("cursor", false);
++        assert_eq!(state.owner.as_deref(), Some("host"));
++        state.retire("host", false);
++        assert!(state.owner.is_none());
++        assert_eq!(state.painter.phase, CompanionHudPhase::Idle);
++    }
++    #[test]
++    fn companion_hud_bounds_binding_memory_and_reconnects_same_group() {
++        let mut state = HudState::default();
++        state.update("host", input(0));
++        for index in 0..20 {
++            state.bind(&format!("cursor-{index}"), &input(0).group);
++        }
++        assert_eq!(state.bindings.len(), 8);
++        state.retire("host", false);
++        assert!(state.update("new-host", input(0)));
++        assert_eq!(state.bindings.len(), 8);
++        state.expires = Some(Instant::now() - Duration::from_secs(1));
++        state.tick(0.3, false);
++        assert!(!state.painter.is_visible());
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/platform-macos/src/cursor/mod.rs b/libs/cua-driver/rust/crates/platform-macos/src/cursor/mod.rs
+index cb5012c..37247b6 100644
+--- a/libs/cua-driver/rust/crates/platform-macos/src/cursor/mod.rs
++++ b/libs/cua-driver/rust/crates/platform-macos/src/cursor/mod.rs
+@@ -5,6 +5,7 @@
+ //! - `overlay::run_on_main_thread()` — called from `main()` on the main thread
+ //! - `overlay::send_command(cmd)` — called from tool implementations
+ 
++mod companion_hud;
+ pub mod overlay;
+ /// System cursor shape reporting (what the OS draws, not what Cua draws).
+ pub mod shape;
+diff --git a/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs b/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
+index 8a4c547..f4f1442 100644
+--- a/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
++++ b/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
+@@ -40,6 +40,42 @@ use cursor_overlay::{
+     OverlayCommand, OverlayMsg, RenderEntry, RenderStateCore, ScreenFrame, ZOrderEnforcer,
+ };
+ 
++static HUD_REDUCED_MOTION: AtomicBool = AtomicBool::new(false);
++
++pub fn update_companion_hud(
++    session: &str,
++    input: cua_driver_contract::SetCompanionHudInput,
++) -> bool {
++    let applied = super::companion_hud::state()
++        .lock()
++        .unwrap()
++        .update(session, input);
++    if applied {
++        send_command_default(OverlayCommand::WakeCompanionHud);
++    }
++    applied
++}
++pub fn bind_companion_hud(session: &str, group: &str) -> bool {
++    let applied = super::companion_hud::state()
++        .lock()
++        .unwrap()
++        .bind(session, group);
++    if applied {
++        send_command(
++            session.to_owned(),
++            OverlayCommand::SuppressSessionBadge(true),
++        );
++    }
++    applied
++}
++pub fn retire_companion_hud(key: &str, prefix: bool) {
++    super::companion_hud::state()
++        .lock()
++        .unwrap()
++        .retire(key, prefix);
++    send_command_default(OverlayCommand::WakeCompanionHud);
++}
++
+ // ── Arrival-signal channels (one waiter slot per cursor key) ──────────────
+ //
+ // Each session's `animate_cursor_to` registers an arrival oneshot keyed by its
+@@ -232,6 +268,18 @@ pub fn send_command(key: CursorKey, cmd: OverlayCommand) {
+     }
+ }
+ 
++/// Teaching playback fails when its command cannot be admitted; never report
++/// completion for a dropped render command.
++pub fn try_send_command(key: CursorKey, cmd: OverlayCommand) -> bool {
++    if key.is_empty() {
++        return false;
++    }
++    CMD_TX.get().is_some_and(|tx| {
++        tx.try_send(OverlayMsg::Cmd(KeyedOverlayCommand { key, cmd }))
++            .is_ok()
++    })
++}
++
+ /// Convenience for callsites not yet threaded with a session key: drives the
+ /// seeded `"default"` cursor (the anonymous / one-shot identity).
+ pub fn send_command_default(cmd: OverlayCommand) {
+@@ -546,6 +594,9 @@ unsafe fn run_appkit(_cfg: CursorConfig, rx: std::sync::mpsc::Receiver<OverlayMs
+     let _mtm = objc2_foundation::MainThreadMarker::new()
+         .expect("run_appkit must be called from the main thread");
+ 
++    let workspace: *mut AnyObject = msg_send![class!(NSWorkspace), sharedWorkspace];
++    let reduced: bool = msg_send![workspace, accessibilityDisplayShouldReduceMotion];
++    HUD_REDUCED_MOTION.store(reduced, Ordering::Release);
+     let app: *mut AnyObject = msg_send![class!(NSApplication), sharedApplication];
+     // NSApplicationActivationPolicyAccessory = 1 (no Dock icon, no menu bar)
+     // setActivationPolicy: returns BOOL (success), not void.
+@@ -779,7 +830,11 @@ fn render_loop(
+                         .and_then(|k| map.cursors.get(k))
+                         .is_some_and(cursor_is_externally_visible)
+                         && pinned.is_none();
+-                    let next_frame_tick_needed = map.needs_frame_tick();
++                    let hud_tick = super::companion_hud::state()
++                        .lock()
++                        .unwrap()
++                        .tick(dt as f32, HUD_REDUCED_MOTION.load(Ordering::Acquire));
++                    let next_frame_tick_needed = map.needs_frame_tick() || hud_tick;
+                     let next_hover_poll_needed = map
+                         .cursors
+                         .values()
+@@ -815,7 +870,13 @@ fn render_loop(
+             if pinned_wid.is_some() && (pin_changed || repin_frames >= 60) {
+                 MacZOrderEnforcer { win_ptr }.reassert(pinned_wid);
+                 repin_frames = 0;
+-            } else if raise_unpinned {
++            } else if raise_unpinned
++                || super::companion_hud::state()
++                    .lock()
++                    .unwrap()
++                    .painter
++                    .is_visible()
++            {
+                 // A direct move_cursor has no target window to pin against.
+                 // Raise the normal-level, click-through overlay without
+                 // activating the driver so a later foreground application
+@@ -861,6 +922,36 @@ fn render_loop(
+                             backing_scale_f32,
+                         );
+                     }
++                    let mut hud = super::companion_hud::state().lock().unwrap();
++                    if hud.painter.is_visible() {
++                        let bound = hud.bindings.iter().rev().find_map(|key| {
++                            map.cursors
++                                .get(key)
++                                .filter(|rs| cursor_is_externally_visible(rs))
++                        });
++                        let fallback = hardware_cursor_position().map(|(x, y)| {
++                            (
++                                (x + 24.0).clamp(8.0, (win_w - 18.0).max(8.0)),
++                                (y + 24.0).clamp(8.0, (win_h - 18.0).max(8.0)),
++                            )
++                        });
++                        if let Some(position) = bound.map(|rs| rs.core.pos).or(fallback) {
++                            if bound.is_none() {
++                                cursor_overlay::companion_hud::paint_fallback_pointer(
++                                    &mut pm,
++                                    (position.0 as f32, position.1 as f32),
++                                    backing_scale_f32,
++                                );
++                            }
++                            hud.painter.paint(
++                                &mut pm,
++                                (position.0 as f32, position.1 as f32),
++                                backing_scale_f32,
++                                HUD_REDUCED_MOTION.load(Ordering::Acquire),
++                            );
++                            note_overlay_frame(true);
++                        }
++                    }
+                     pm
+                 } else {
+                     break;
+diff --git a/libs/cua-driver/rust/crates/platform-macos/src/tools/check_permissions.rs b/libs/cua-driver/rust/crates/platform-macos/src/tools/check_permissions.rs
+index 280f81c..50d0291 100644
+--- a/libs/cua-driver/rust/crates/platform-macos/src/tools/check_permissions.rs
++++ b/libs/cua-driver/rust/crates/platform-macos/src/tools/check_permissions.rs
+@@ -44,7 +44,7 @@ fn driver_bundle_id_for_executable(executable: &str) -> Option<&'static str> {
+     if executable.contains("/CuaDriverLocal.app/Contents/MacOS/") {
+         Some("com.trycua.driver.local")
+     } else if executable.contains("/CuaDriver.app/Contents/MacOS/") {
+-        Some("com.trycua.driver")
++        Some("app.tro.cua-companion")
+     } else {
+         None
+     }
+@@ -69,7 +69,7 @@ fn direct_capture_evidence_store_for_identity(
+     let bundle_id = driver_bundle_id_for_executable(executable)?;
+     let state_directory = match bundle_id {
+         "com.trycua.driver.local" => ".cua-driver-local",
+-        "com.trycua.driver" => ".cua-driver",
++        "app.tro.cua-companion" => ".tro-cua-companion",
+         _ => return None,
+     };
+     Some(DirectCaptureEvidenceStore::new(
+@@ -536,12 +536,12 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn recognizes_release_and_local_driver_bundles() {
++    fn companion_permissions_report_the_companion_bundle_identity() {
+         assert_eq!(
+             driver_bundle_id_for_executable(
+                 "/Applications/CuaDriver.app/Contents/MacOS/cua-driver"
+             ),
+-            Some("com.trycua.driver")
++            Some("app.tro.cua-companion")
+         );
+         assert_eq!(
+             driver_bundle_id_for_executable(
+@@ -556,7 +556,7 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn evidence_store_is_scoped_to_the_current_driver_identity() {
++    fn companion_evidence_store_is_scoped_to_the_current_driver_identity() {
+         let home =
+             std::env::temp_dir().join(format!("cua-direct-capture-test-{}", uuid::Uuid::new_v4()));
+         let release = release_evidence_store(&home);
+@@ -569,6 +569,12 @@ mod tests {
+ 
+         release.record_now().expect("record release verification");
+         assert!(release.load().is_some());
++        assert!(home
++            .join(".tro-cua-companion/direct-capture-verification.json")
++            .exists());
++        assert!(!home
++            .join(".cua-driver/direct-capture-verification.json")
++            .exists());
+         assert!(local.load().is_none());
+         assert!(direct_capture_evidence_store_for_identity(
+             "/usr/local/bin/cua-driver",
+@@ -627,7 +633,7 @@ mod tests {
+             std::env::temp_dir().join(format!("cua-direct-capture-test-{}", uuid::Uuid::new_v4()));
+         let store = release_evidence_store(&home);
+         store.record_now().expect("record prior evidence");
+-        let state_directory = home.join(".cua-driver");
++        let state_directory = home.join(".tro-cua-companion");
+         std::fs::set_permissions(&state_directory, std::fs::Permissions::from_mode(0o500))
+             .expect("make evidence directory read-only");
+ 
+diff --git a/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_hud_tools.rs b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_hud_tools.rs
+new file mode 100644
+index 0000000..b9d723f
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_hud_tools.rs
+@@ -0,0 +1,72 @@
++use super::{cursor_tools::resolve_cursor_key, ToolState};
++use async_trait::async_trait;
++use cua_driver_contract::{BindCompanionHudCursorInput, SetCompanionHudInput, ToolInput};
++use cua_driver_core::{
++    protocol::ToolResult,
++    tool::{Tool, ToolDef, ToolRegistry},
++    tool_args::parse_typed_input,
++};
++use serde_json::{json, Value};
++use std::sync::Arc;
++struct HudTool {
++    definition: ToolDef,
++    state: Arc<ToolState>,
++}
++#[async_trait]
++impl Tool for HudTool {
++    fn def(&self) -> &ToolDef {
++        &self.definition
++    }
++    async fn invoke(&self, args: Value) -> ToolResult {
++        if !self.state.cursor_overlay_available {
++            return super::cursor_overlay_unavailable();
++        }
++        let session = resolve_cursor_key(&args);
++        let applied = if self.definition.name == SetCompanionHudInput::TOOL_NAME {
++            let input = match parse_typed_input::<SetCompanionHudInput>(&self.definition.name, args)
++            {
++                Ok(input) => input,
++                Err(error) => return error,
++            };
++            if let Err(error) = input.validate() {
++                return ToolResult::error(error);
++            }
++            crate::cursor::overlay::update_companion_hud(&session, input)
++        } else {
++            let input =
++                match parse_typed_input::<BindCompanionHudCursorInput>(&self.definition.name, args)
++                {
++                    Ok(input) => input,
++                    Err(error) => return error,
++                };
++            if let Err(error) = input.validate() {
++                return ToolResult::error(error);
++            }
++            crate::cursor::overlay::bind_companion_hud(&session, &input.group)
++        };
++        if !applied {
++            return ToolResult::error("HUD lease, cursor binding or sequence refused.");
++        }
++        ToolResult::text("applied").with_structured(json!({"applied":true}))
++    }
++}
++pub(super) fn register_tools(registry: &mut ToolRegistry, state: Arc<ToolState>) {
++    for name in [
++        SetCompanionHudInput::TOOL_NAME,
++        BindCompanionHudCursorInput::TOOL_NAME,
++    ] {
++        let contract = cua_driver_contract::tool_contract(name).expect("HUD canonical contract");
++        registry.register(Box::new(HudTool {
++            state: state.clone(),
++            definition: ToolDef {
++                name: contract.name.clone(),
++                description: contract.description.clone(),
++                input_schema: contract.input_schema.clone(),
++                read_only: false,
++                destructive: false,
++                idempotent: true,
++                open_world: false,
++            },
++        }));
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_tools.rs b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_tools.rs
+new file mode 100644
+index 0000000..f1a48ab
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_tools.rs
+@@ -0,0 +1,580 @@
++//! Native companion controller. This module never imports input executors.
++//! A single desktop lease prevents competing agents from painting guidance.
++use super::{cursor_tools::resolve_cursor_key, get_screen_size::main_screen_size, ToolState};
++use async_trait::async_trait;
++use cua_driver_contract::{
++    CancelCursorSequenceInput, CompanionMode, CompanionStep, GetCursorCompanionStateInput,
++    SetCursorCompanionModeInput, ShowCursorSequenceInput, ToolInput,
++};
++use cua_driver_core::{
++    capture_runtime::CaptureTarget,
++    protocol::ToolResult,
++    tool::{Tool, ToolDef, ToolRegistry},
++    tool_args::parse_typed_input,
++};
++use cursor_overlay::{
++    companion::{plan_mark, plan_path, sample_path},
++    OverlayCommand,
++};
++use serde_json::{json, Value};
++use std::sync::{
++    atomic::{AtomicBool, Ordering},
++    Arc, Mutex, OnceLock,
++};
++use std::time::{Duration, Instant};
++
++#[derive(Default)]
++struct CompanionState {
++    owner: Option<String>,
++    generation: u64,
++    follow_generation: u64,
++    following: bool,
++    active: bool,
++    lease_until: Option<Instant>,
++}
++impl CompanionState {
++    fn begin_sequence(&mut self, session: &str) -> Result<u64, String> {
++        if self.active || self.owner.as_deref().is_some_and(|owner| owner != session) {
++            return Err("Desktop companion is busy.".into());
++        }
++        self.owner = Some(session.to_owned());
++        self.active = true;
++        self.generation = self.generation.wrapping_add(1);
++        Ok(self.generation)
++    }
++    fn cancel_sequence(&mut self, session: &str) -> bool {
++        if self.owner.as_deref() != Some(session) {
++            return false;
++        }
++        self.generation = self.generation.wrapping_add(1);
++        self.active = false;
++        true
++    }
++}
++
++/// Count only keyboard, button and scroll events. Guidance never posts any
++/// of these events; a changed counter signals student interaction.
++fn read_user_input_counters() -> [u32; 7] {
++    #[link(name = "ApplicationServices", kind = "framework")]
++    extern "C" {
++        fn CGEventSourceCounterForEventType(state: i32, event_type: u32) -> u32;
++    }
++    [1, 3, 10, 11, 12, 22, 25]
++        .map(|event_type| unsafe { CGEventSourceCounterForEventType(1, event_type) })
++}
++
++fn state() -> &'static Mutex<CompanionState> {
++    static STATE: OnceLock<Mutex<CompanionState>> = OnceLock::new();
++    STATE.get_or_init(|| Mutex::new(CompanionState::default()))
++}
++fn send(session: &str, command: OverlayCommand) -> Result<(), String> {
++    if crate::cursor::overlay::try_send_command(session.to_owned(), command) {
++        Ok(())
++    } else {
++        Err("Native overlay unavailable or command queue full.".into())
++    }
++}
++fn clear_marks(session: &str) {
++    let _ = send(session, OverlayCommand::ShowCompanionMark(vec![]));
++    let _ = send(session, OverlayCommand::SetPressed(false));
++}
++
++fn hide_companion(session: &str) {
++    let _ = send(session, OverlayCommand::SetEnabled(false));
++    let _ = send(session, OverlayCommand::SetCompanionAppearance(false));
++}
++
++fn snapshot(session: &str, status: &str) -> ToolResult {
++    let state = state().lock().unwrap();
++    let owned = state.owner.as_deref() == Some(session);
++    ToolResult::text(status).with_structured(json!({
++        "status": status, "following": owned && state.following, "active": owned && state.active,
++    }))
++}
++pub(super) fn retire_session(session: &str) {
++    let mut state = state().lock().unwrap();
++    retire_owned_cursor(&mut state, session);
++}
++fn retire_owned_cursor(state: &mut CompanionState, session: &str) {
++    if state.owner.as_deref() == Some(session) {
++        state.generation = state.generation.wrapping_add(1);
++        state.follow_generation = state.follow_generation.wrapping_add(1);
++        state.active = false;
++        state.following = false;
++        state.owner = None;
++        state.lease_until = None;
++        clear_marks(session);
++        hide_companion(session);
++    }
++}
++pub(super) fn retire_runtime(prefix: &str) {
++    let owner = state().lock().unwrap().owner.clone();
++    if let Some(owner) = owner.filter(|owner| owner.starts_with(prefix)) {
++        retire_session(&owner);
++    }
++}
++fn can_continue_playback(session: &str) -> bool {
++    !cua_driver_core::session::is_session_ending(session)
++}
++
++fn start_following(session: String, generation: u64) {
++    std::thread::spawn(move || loop {
++        if !can_continue_playback(&session) {
++            retire_session(&session);
++            break;
++        }
++        {
++            let mut state = state().lock().unwrap();
++            if state.owner.as_deref() != Some(&session)
++                || !state.following
++                || state.follow_generation != generation
++            {
++                break;
++            }
++            if state
++                .lease_until
++                .is_some_and(|deadline| Instant::now() > deadline)
++            {
++                retire_owned_cursor(&mut state, &session);
++                break;
++            }
++            if !state.active {
++                if let (Some((x, y)), Some((width, height, _))) = (
++                    cua_driver_core::cursor_sampler::read_cursor_position(),
++                    main_screen_size(),
++                ) {
++                    let visible = x >= 0.0 && y >= 0.0 && x < width as f64 && y < height as f64;
++                    if send(&session, OverlayCommand::SetEnabled(visible)).is_err() {
++                        retire_owned_cursor(&mut state, &session);
++                        break;
++                    }
++                    if visible {
++                        let point = cursor_overlay::anchor_for_pointer(
++                            (x + 24.0).min(width as f64 - 2.0),
++                            (y + 24.0).min(height as f64 - 2.0),
++                            std::f64::consts::FRAC_PI_4,
++                        );
++                        if send(
++                            &session,
++                            OverlayCommand::SnapTo {
++                                x: point.0,
++                                y: point.1,
++                                heading_radians: None,
++                            },
++                        )
++                        .is_err()
++                        {
++                            retire_owned_cursor(&mut state, &session);
++                            break;
++                        }
++                    }
++                }
++            }
++        }
++        std::thread::sleep(Duration::from_millis(33));
++    });
++}
++
++struct CompanionTool {
++    companion: CursorCompanion,
++    definition: ToolDef,
++}
++
++/// Native presentation engine composed by the Cua tool adapter.
++struct CursorCompanion {
++    state: Arc<ToolState>,
++}
++#[async_trait]
++impl Tool for CompanionTool {
++    fn def(&self) -> &ToolDef {
++        &self.definition
++    }
++    async fn invoke(&self, args: Value) -> ToolResult {
++        if !self.companion.state.cursor_overlay_available {
++            return super::cursor_overlay_unavailable();
++        }
++        let session = resolve_cursor_key(&args);
++        match self.definition.name.as_str() {
++            "get_cursor_companion_state" => {
++                if let Err(error) =
++                    parse_typed_input::<GetCursorCompanionStateInput>(&self.definition.name, args)
++                {
++                    return error;
++                }
++                snapshot(&session, "state")
++            }
++            "cancel_cursor_sequence" => {
++                if let Err(error) =
++                    parse_typed_input::<CancelCursorSequenceInput>(&self.definition.name, args)
++                {
++                    return error;
++                }
++                let mut state = state().lock().unwrap();
++                if state.cancel_sequence(&session) {
++                    clear_marks(&session);
++                    if !state.following {
++                        state.owner = None;
++                        hide_companion(&session);
++                    }
++                }
++                drop(state);
++                snapshot(&session, "canceled")
++            }
++            "set_cursor_companion_mode" => {
++                let input = match parse_typed_input::<SetCursorCompanionModeInput>(
++                    &self.definition.name,
++                    args,
++                ) {
++                    Ok(input) => input,
++                    Err(error) => return error,
++                };
++                if let Err(error) = input.validate() {
++                    return ToolResult::error(error);
++                }
++                if matches!(input.mode, CompanionMode::Hidden) {
++                    retire_session(&session);
++                    self.companion
++                        .state
++                        .cursor_registry
++                        .set_enabled(&session, false);
++                    return snapshot(&session, "hidden");
++                }
++                let mut state = state().lock().unwrap();
++                if state.owner.as_deref().is_some_and(|owner| owner != session) {
++                    return ToolResult::error("Another session owns the desktop companion.");
++                }
++                if let Err(error) = send(&session, OverlayCommand::SetCompanionAppearance(true)) {
++                    return ToolResult::error(error);
++                }
++                if let Some(label) = input.label {
++                    if let Err(error) = send(&session, OverlayCommand::SetSessionLabel(label)) {
++                        return ToolResult::error(error);
++                    }
++                }
++                let start = !state.following;
++                if start {
++                    state.follow_generation = state.follow_generation.wrapping_add(1);
++                }
++                let follow_generation = state.follow_generation;
++                state.owner = Some(session.clone());
++                state.following = true;
++                state.lease_until = Some(Instant::now() + Duration::from_secs(60));
++                self.companion
++                    .state
++                    .cursor_registry
++                    .set_enabled(&session, true);
++                if let Err(error) = send(&session, OverlayCommand::SetEnabled(true)) {
++                    state.owner = None;
++                    state.following = false;
++                    return ToolResult::error(error);
++                }
++                drop(state);
++                if start {
++                    start_following(session.clone(), follow_generation);
++                }
++                snapshot(&session, "following")
++            }
++            "show_cursor_sequence" => {
++                let input = match parse_typed_input::<ShowCursorSequenceInput>(
++                    &self.definition.name,
++                    args.clone(),
++                ) {
++                    Ok(input) => input,
++                    Err(error) => return error,
++                };
++                if let Err(error) = input.validate() {
++                    return ToolResult::error(error);
++                }
++                match self.companion.show_sequence(&session, &args, input).await {
++                    Ok(()) => snapshot(&session, "completed"),
++                    Err(error) => ToolResult::error(error),
++                }
++            }
++            _ => ToolResult::error("Unknown companion operation."),
++        }
++    }
++}
++
++impl CursorCompanion {
++    async fn show_sequence(
++        &self,
++        session: &str,
++        args: &Value,
++        input: ShowCursorSequenceInput,
++    ) -> Result<(), String> {
++        let captures = &self.state.companion_captures;
++        let binding = captures
++            .binding_from_args(args)
++            .map_err(|_| "Capture session is unavailable.")?;
++        let capture_id = captures
++            .parse_capture_id(&input.capture_id)
++            .map_err(|_| "Invalid capture_id.")?;
++        let capture = captures
++            .read_for_presentation(capture_id, &binding, Duration::from_secs(5))
++            .map_err(|_| "Capture expired or does not belong to this session.")?;
++        if capture.target() != &CaptureTarget::PrimaryDesktop {
++            return Err(
++                "Use get_desktop_state first; window captures are unsupported for teaching V1."
++                    .into(),
++            );
++        }
++        let (width, height, scale) = main_screen_size().ok_or("No primary display.")?;
++        let dimensions = capture.encoded_dimensions();
++        let original = capture.presentation_dimensions();
++        if original.width() as i64 != width || original.height() as i64 != height {
++            return Err("Display dimensions changed; capture the desktop again.".into());
++        }
++
++        if ((dimensions.width() as f64 / dimensions.height() as f64)
++            - (width as f64 / height as f64))
++            .abs()
++            > 0.01
++        {
++            return Err("Display geometry changed; capture the desktop again.".into());
++        }
++        let paths: Vec<_> = input
++            .steps
++            .iter()
++            .map(|step| plan_path(step, width as f64, height as f64))
++            .collect();
++        let marks: Vec<_> = input
++            .steps
++            .iter()
++            .zip(&paths)
++            .map(|(step, path)| plan_mark(step, path))
++            .collect();
++        if paths
++            .iter()
++            .chain(&marks)
++            .flatten()
++            .any(|(x, y)| *x < 0.0 || *y < 0.0 || *x >= width as f64 || *y >= height as f64)
++        {
++            return Err("Teaching geometry extends outside the primary display.".into());
++        }
++        let generation = {
++            let mut state = state().lock().unwrap();
++            state.begin_sequence(session)?
++        };
++        let outcome = self
++            .play_sequence(session, &input.steps, &paths, &marks, generation, || {
++                if main_screen_size() != Some((width, height, scale)) {
++                    return false;
++                }
++                captures.read_for_perception(capture_id, &binding).is_ok()
++            })
++            .await;
++        {
++            let mut state = state().lock().unwrap();
++            // Superseded work must not clear a newer sequence's visual state.
++            if state.owner.as_deref() == Some(session) && state.generation == generation {
++                clear_marks(session);
++                state.active = false;
++                if !state.following {
++                    state.owner = None;
++                    hide_companion(session);
++                }
++            }
++        }
++        outcome
++    }
++
++    async fn play_sequence(
++        &self,
++        session: &str,
++        steps: &[CompanionStep],
++        paths: &[Vec<(f64, f64)>],
++        marks: &[Vec<(f64, f64)>],
++        generation: u64,
++        is_capture_current: impl Fn() -> bool + Send + Sync,
++    ) -> Result<(), String> {
++        let playback_started = Instant::now();
++        send(session, OverlayCommand::SetCompanionAppearance(true))?;
++        send(session, OverlayCommand::SetEnabled(true))?;
++        let initial_input = read_user_input_counters();
++        let initial_pointer = cua_driver_core::cursor_sampler::read_cursor_position();
++        for ((step, path), mark) in steps.iter().zip(paths).zip(marks) {
++            {
++                let state = state().lock().unwrap();
++                if state.generation != generation
++                    || !state.active
++                    || state.owner.as_deref() != Some(session)
++                {
++                    return Err("Teaching sequence canceled.".into());
++                }
++                send(session, OverlayCommand::ShowCompanionMark(mark.clone()))?;
++                send(
++                    session,
++                    OverlayCommand::SetPressed(matches!(step, CompanionStep::Drag { .. })),
++                )?;
++                if let CompanionStep::Click { .. } = step {
++                    if let Some(&(x, y)) = path.first() {
++                        let (anchor_x, anchor_y) =
++                            cursor_overlay::anchor_for_pointer(x, y, std::f64::consts::FRAC_PI_4);
++                        send(
++                            session,
++                            OverlayCommand::SnapTo {
++                                x: anchor_x,
++                                y: anchor_y,
++                                heading_radians: None,
++                            },
++                        )?;
++                        send(session, OverlayCommand::ClickPulse { x, y })?;
++                    }
++                }
++            }
++            let started = Instant::now();
++            let duration = Duration::from_millis(u64::from(step.duration_ms()));
++            let receipt = Arc::new(AtomicBool::new(false));
++            loop {
++                if !can_continue_playback(session) {
++                    return Err("Teaching session stopped.".into());
++                }
++                // Hold admission through command enqueue; cancellation cannot be
++                // followed by one stale frame from this generation.
++                {
++                    let state = state().lock().unwrap();
++                    if state.owner.as_deref() != Some(session)
++                        || state.generation != generation
++                        || !state.active
++                    {
++                        return Err("Teaching sequence canceled.".into());
++                    }
++                    if playback_started.elapsed() > Duration::from_secs(17) {
++                        return Err("Teaching playback deadline exceeded.".into());
++                    }
++                    if read_user_input_counters() != initial_input {
++                        return Err("Teaching sequence canceled by user input.".into());
++                    }
++                    if !is_capture_current() {
++                        return Err(
++                            "Teaching capture expired or display changed; observe again.".into(),
++                        );
++                    }
++                    if let (Some(start), Some(current)) = (
++                        initial_pointer,
++                        cua_driver_core::cursor_sampler::read_cursor_position(),
++                    ) {
++                        if (current.0 - start.0).hypot(current.1 - start.1) > 12.0 {
++                            return Err(
++                                "Teaching sequence canceled by user pointer movement.".into()
++                            );
++                        }
++                    }
++                    let progress =
++                        (started.elapsed().as_secs_f64() / duration.as_secs_f64()).min(1.0);
++                    let (x, y) = sample_path(path, progress);
++                    let (anchor_x, anchor_y) =
++                        cursor_overlay::anchor_for_pointer(x, y, std::f64::consts::FRAC_PI_4);
++                    send(
++                        session,
++                        OverlayCommand::SnapTo {
++                            x: anchor_x,
++                            y: anchor_y,
++                            heading_radians: None,
++                        },
++                    )?;
++                    if progress >= 1.0 {
++                        send(session, OverlayCommand::FrameReceipt(receipt.clone()))?;
++                        break;
++                    }
++                }
++                tokio::time::sleep(Duration::from_millis(16)).await;
++            }
++            let deadline = Instant::now() + Duration::from_secs(2);
++            while !receipt.load(Ordering::Acquire) {
++                if !can_continue_playback(session) {
++                    return Err("Teaching session stopped.".into());
++                }
++                {
++                    let state = state().lock().unwrap();
++                    if state.generation != generation || !state.active {
++                        return Err("Teaching sequence canceled.".into());
++                    }
++                }
++                if Instant::now() > deadline || playback_started.elapsed() > Duration::from_secs(17)
++                {
++                    return Err("Native overlay did not acknowledge a visible frame.".into());
++                }
++                tokio::time::sleep(Duration::from_millis(16)).await;
++            }
++        }
++        let state = state().lock().unwrap();
++        if state.generation != generation || !state.active {
++            return Err("Teaching sequence canceled.".into());
++        }
++        Ok(())
++    }
++}
++
++pub(super) fn register_tools(registry: &mut ToolRegistry, state: Arc<ToolState>) {
++    for name in [
++        "show_cursor_sequence",
++        "set_cursor_companion_mode",
++        "cancel_cursor_sequence",
++        "get_cursor_companion_state",
++    ] {
++        let contract =
++            cua_driver_contract::tool_contract(name).expect("companion canonical contract");
++        registry.register(Box::new(CompanionTool {
++            companion: CursorCompanion {
++                state: state.clone(),
++            },
++            definition: ToolDef {
++                name: contract.name.clone(),
++                description: contract.description.clone(),
++                input_schema: contract.input_schema.clone(),
++                read_only: contract.annotations.read_only,
++                destructive: false,
++                idempotent: contract.annotations.idempotent,
++                open_world: false,
++            },
++        }));
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn companion_ownership_prevents_overlap_and_foreign_cancellation() {
++        let mut state = CompanionState::default();
++        let generation = state.begin_sequence("teacher").unwrap();
++        assert!(state.begin_sequence("teacher").is_err());
++        assert!(state.begin_sequence("other").is_err());
++        assert!(!state.cancel_sequence("other"));
++        assert_eq!(state.generation, generation);
++        assert!(state.cancel_sequence("teacher"));
++        assert_ne!(state.generation, generation);
++        assert!(!state.active);
++        assert!(state.begin_sequence("teacher").is_ok());
++    }
++    #[test]
++    fn companion_stops_before_deferred_session_cleanup() {
++        use cua_driver_core::session::{
++            begin_session_dispatch, end_session, is_session_ended, SessionClientKind,
++            SessionTransport,
++        };
++        let session = format!("companion-cancellation-{}", uuid::Uuid::new_v4());
++        let guard = begin_session_dispatch(
++            &session,
++            None,
++            &session,
++            true,
++            SessionTransport::McpStdio,
++            SessionClientKind::Mcp,
++        )
++        .unwrap();
++        assert!(can_continue_playback(&session));
++        end_session(&session);
++        assert!(
++            !is_session_ended(&session),
++            "cleanup waits for active dispatch"
++        );
++        assert!(
++            !can_continue_playback(&session),
++            "playback sees the stop request immediately"
++        );
++        drop(guard);
++        assert!(is_session_ended(&session));
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/platform-macos/src/tools/mod.rs b/libs/cua-driver/rust/crates/platform-macos/src/tools/mod.rs
+index b6ec2b0..9782652 100644
+--- a/libs/cua-driver/rust/crates/platform-macos/src/tools/mod.rs
++++ b/libs/cua-driver/rust/crates/platform-macos/src/tools/mod.rs
+@@ -25,6 +25,8 @@ mod type_text;
+ // etc.) live elsewhere under CuaDriverCore::Capture and are reached
+ // through GetWindowStateTool.
+ mod check_permissions;
++mod companion_hud_tools;
++mod companion_tools;
+ mod cursor_tools;
+ mod get_accessibility_tree;
+ mod get_config;
+@@ -620,6 +622,7 @@ pub struct ToolState {
+     pub element_cache: Arc<ElementCache>,
+     pub cursor_registry: Arc<CursorRegistry>,
+     pub zoom_registry: Arc<ZoomRegistry>,
++    pub(crate) companion_captures: Arc<cua_driver_core::capture_runtime::CaptureService>,
+     pub(crate) capture_bindings: Arc<capture_binding::MacCaptureBindings>,
+     /// Global, disk-persisted config — the base layer and the only one the
+     /// anonymous session / CLI writes.
+@@ -673,6 +676,7 @@ impl ToolState {
+             element_cache: Arc::new(ElementCache::new()),
+             cursor_registry: Arc::new(CursorRegistry::new()),
+             zoom_registry: Arc::new(ZoomRegistry::new()),
++            companion_captures: capture_service.clone(),
+             capture_bindings: Arc::new(capture_binding::MacCaptureBindings::new(capture_service)),
+             // Load persisted config from ~/.cua-driver/config.json so that
+             // `cua-driver config set` changes carry over into MCP sessions.
+@@ -785,6 +789,8 @@ pub fn register_all(
+         let cursor_registry = state.cursor_registry.clone();
+         let capture_bindings = state.capture_bindings.clone();
+         registry.retain_runtime_cleanup(move || {
++            companion_tools::retire_runtime(&prefix);
++            crate::cursor::overlay::retire_companion_hud(&prefix, true);
+             capture_bindings.retire_runtime();
+             for cursor in cursor_registry
+                 .all_states()
+@@ -811,6 +817,8 @@ pub fn register_all(
+         let capture_bindings = state.capture_bindings.clone();
+         let registration =
+             cua_driver_core::session::register_scoped_session_end_hook(move |session_id| {
++                companion_tools::retire_session(session_id);
++                crate::cursor::overlay::retire_companion_hud(session_id, false);
+                 session_config.clear(session_id);
+                 zoom_registry.retire_session(session_id);
+                 element_cache.retire_session_screenshots(session_id);
+@@ -903,6 +911,8 @@ pub fn register_all(
+     // register the MCP server under the `cua-computer-use` name, which is what
+     // triggers Claude Code's computer-use beta-tool injection (see cli.rs).
+     let _ = compat;
++    companion_tools::register_tools(registry, state.clone());
++    companion_hud_tools::register_tools(registry, state.clone());
+     registry.register(Box::new(get_screen_size::GetScreenSizeTool));
+     registry.register(Box::new(get_desktop_state::GetDesktopStateTool::new(
+         state.clone(),

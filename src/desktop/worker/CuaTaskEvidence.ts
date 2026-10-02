@@ -1,5 +1,7 @@
 import type { CallToolResult } from '@openai/agents';
 import { z } from 'zod';
+import { CursorCompanionTool } from '#contracts/CursorCompanion.js';
+import { isCursorPresentationTool } from './CuaTeachingPolicy.js';
 
 const VerificationResultSchema = z.object({
   status: z.enum(['satisfied', 'unsatisfied', 'unknown', 'refused']).optional(),
@@ -7,6 +9,7 @@ const VerificationResultSchema = z.object({
 
 export const TaskIssue = {
   DESKTOP_ACTION_FAILED: 'desktop_action_failed',
+  GUIDANCE_FAILED: 'guidance_failed',
   VERIFICATION_FAILED: 'verification_failed',
   OBSERVATION_MISSING: 'observation_missing',
 } as const;
@@ -19,11 +22,6 @@ const StateObservationTools = new Set([
   'get_desktop_state',
   'get_browser_state',
   'get_accessibility_tree',
-  'get_recording_state',
-  'get_agent_cursor_state',
-  'get_session_state',
-  'get_cursor_position',
-  'get_config',
   'verify_state',
 ]);
 
@@ -45,6 +43,17 @@ export class CuaTaskEvidence {
   }
 
   record(toolName: string, result: CallToolResult): void {
+    if (isCursorPresentationTool(toolName)) {
+      if (result.isError === true) {
+        this.issue ??= TaskIssue.GUIDANCE_FAILED;
+      } else if (
+        toolName === CursorCompanionTool.SHOW_SEQUENCE &&
+        this.issue === TaskIssue.GUIDANCE_FAILED
+      ) {
+        this.issue = null;
+      }
+      return;
+    }
     const parsed = VerificationResultSchema.safeParse(result.structuredContent);
     const status = parsed.success ? parsed.data.status : undefined;
 

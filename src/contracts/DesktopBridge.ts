@@ -1,4 +1,6 @@
+import type { VoiceMeter } from './CompanionHud.js';
 import type { VoiceAudioFrame, VoiceCommand, VoiceEvent, VoiceReply } from './VoiceInput.js';
+import type { AgentTaskMode } from './CursorCompanion.js';
 import type { AgentResult } from './AgentSession.js';
 import type { DesktopLocale } from './DesktopLocale.js';
 import type { AuthResult } from './AuthSession.js';
@@ -13,6 +15,7 @@ import type {
  * turns and controls the worker lifecycle.
  */
 export interface DesktopBridge {
+  updateVoiceMeter(meter: VoiceMeter): void;
   controlVoiceInput(command: VoiceCommand): Promise<VoiceReply>;
   appendVoiceAudio(frame: VoiceAudioFrame): Promise<VoiceReply>;
   subscribeVoiceInput(listener: (event: VoiceEvent) => void): () => void;
@@ -22,7 +25,13 @@ export interface DesktopBridge {
   readDesktopPermissions(): Promise<DesktopPermissionStatus>;
   requestDesktopPermissions(): Promise<PermissionActionResult>;
   openDesktopPermissionSettings(area: PermissionArea): Promise<PermissionActionResult>;
+  startCursorCompanion(): Promise<AgentResult>;
   startAgentSession(): Promise<AgentResult>;
-  sendAgentMessage(sessionId: string, message: string, locale: DesktopLocale): Promise<AgentResult>;
+  sendAgentMessage(
+    sessionId: string,
+    message: string,
+    locale: DesktopLocale,
+    mode?: AgentTaskMode,
+  ): Promise<AgentResult>;
   stopAgentSession(sessionId: string): Promise<AgentResult>;
 }

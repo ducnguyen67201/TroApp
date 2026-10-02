@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
 import type { AuthUser } from '#contracts/AuthSession.js';
 import type { AgentResult } from '#contracts/AgentSession.js';
+import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import type { VoiceReply } from '#contracts/VoiceInput.js';
 import { App } from './App.js';
 import { DesktopLocale, localeStorageKey } from './localization/Locale.js';
@@ -27,6 +28,7 @@ function createDesktopBridge() {
         },
       }),
     ),
+    updateVoiceMeter: vi.fn<DesktopBridge['updateVoiceMeter']>(),
     appendVoiceAudio: vi
       .fn<DesktopBridge['appendVoiceAudio']>()
       .mockResolvedValue({ kind: 'failed' }),
@@ -49,6 +51,9 @@ function createDesktopBridge() {
     openDesktopPermissionSettings: vi
       .fn<DesktopBridge['openDesktopPermissionSettings']>()
       .mockResolvedValue({ kind: 'opened' }),
+    startCursorCompanion: vi
+      .fn<DesktopBridge['startCursorCompanion']>()
+      .mockResolvedValue({ kind: 'started', sessionId: '11111111-1111-4111-8111-111111111111' }),
     startAgentSession: vi
       .fn<DesktopBridge['startAgentSession']>()
       .mockResolvedValue({ kind: 'started', sessionId }),
@@ -154,6 +159,7 @@ describe('desktop scaffold', () => {
       sessionId,
       'A draft to keep',
       DesktopLocale.ENGLISH,
+      AgentTaskMode.TEACH,
     );
     expect(bridge.stopAgentSession).not.toHaveBeenCalled();
   });
@@ -250,6 +256,7 @@ describe('desktop scaffold', () => {
     await screen.findByRole('heading', { name: 'Give Tro access to your desktop.' });
     expect(screen.queryByRole('textbox', { name: 'Your message' })).toBeNull();
     expect(bridge.startAgentSession).not.toHaveBeenCalled();
+    expect(bridge.startCursorCompanion).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Ask for permission' }));
     await waitFor(() => {
       expect(bridge.requestDesktopPermissions).toHaveBeenCalledTimes(1);
@@ -398,6 +405,7 @@ describe('desktop language', () => {
       sessionId,
       'Keep working',
       DesktopLocale.ENGLISH,
+      AgentTaskMode.TEACH,
     );
     bridge.sendAgentMessage.mockResolvedValue({ kind: 'completed', answer: 'Đã hoàn tất.' });
     fireEvent.change(screen.getByRole('textbox', { name: 'Tin nhắn của bạn' }), {
@@ -411,6 +419,7 @@ describe('desktop language', () => {
       sessionId,
       'Mở YouTube',
       DesktopLocale.VIETNAMESE,
+      AgentTaskMode.TEACH,
     );
     expect(await screen.findByText('Đã hoàn tất.')).toBeTruthy();
     expect(bridge.startAgentSession).toHaveBeenCalledTimes(1);
@@ -472,6 +481,40 @@ describe('desktop language', () => {
     expect(alert.textContent).not.toContain('Unrecognized diagnostic');
     expect(screen.getByText(testUser.email)).toBeTruthy();
   });
+
+  it('stops guidance and discards a late agent answer', async () => {
+    const bridge = createDesktopBridge();
+    let finishTask: ((result: AgentResult) => void) | undefined;
+    bridge.sendAgentMessage.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishTask = resolve;
+        }),
+    );
+    window.tro = bridge;
+    renderDesktop();
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Your message' }), {
+      target: { value: 'Show a circle and then an arrow' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send to Tro' }));
+    await waitFor(() => {
+      expect(bridge.sendAgentMessage).toHaveBeenCalledWith(
+        sessionId,
+        'Show a circle and then an arrow',
+        DesktopLocale.ENGLISH,
+        AgentTaskMode.TEACH,
+      );
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+    await waitFor(() => {
+      expect(bridge.stopAgentSession).toHaveBeenCalledWith(sessionId);
+    });
+    finishTask?.({ kind: 'completed', answer: 'Late guide answer' });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Send to Tro' })).toHaveProperty('disabled', true);
+    });
+    expect(screen.queryByText('Late guide answer')).toBeNull();
+  });
 });
 
 it('displays a voice instruction immediately and preserves the separately typed draft', async () => {
@@ -532,4 +575,18 @@ it('makes voice available automatically and keeps it active across Settings navi
   expect(
     bridge.controlVoiceInput.mock.calls.filter(([command]) => command.kind === 'enable'),
   ).toHaveLength(1);
+});
+
+it('starts the idle companion before any task and keeps it when execution mode is selected', async () => {
+  const bridge = createDesktopBridge();
+  window.tro = bridge;
+  renderDesktop();
+  await screen.findByRole('textbox', { name: 'Your message' });
+  await waitFor(() => {
+    expect(bridge.startCursorCompanion).toHaveBeenCalledTimes(1);
+  });
+  fireEvent.click(screen.getByRole('radio', { name: 'Do it for me' }));
+  expect(bridge.startAgentSession).not.toHaveBeenCalled();
+  expect(bridge.sendAgentMessage).not.toHaveBeenCalled();
+  expect(bridge.startCursorCompanion).toHaveBeenCalledTimes(1);
 });

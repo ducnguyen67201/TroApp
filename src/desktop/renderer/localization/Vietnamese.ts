@@ -45,6 +45,14 @@ export const vietnamese = {
   welcome: (name: string): string => `Chào mừng trở lại, ${name}`,
   workspaceHeading: 'Một không gian nhỏ, làm được nhiều hơn.',
   workspaceDescription: 'Máy tính của bạn, có thêm một người trợ giúp.',
+  taskMode: 'Cách Tro hỗ trợ',
+  showMe: 'Hướng dẫn tôi',
+  doIt: 'Làm giúp tôi',
+  stopTask: 'Dừng',
+  teachingDisclosure:
+    'Tro hiển thị hướng dẫn; bạn điều khiển chuột và bàn phím. Tro có thể đưa ứng dụng đang mở lên trước. Nội dung màn hình gửi đến OpenAI sẽ rời khỏi máy tính. Hiện hướng dẫn hỗ trợ màn hình chính trên macOS.',
+  errorCompanionUnavailable:
+    'Hướng dẫn con trỏ chưa khả dụng. Hãy cập nhật hoặc cài lại Tro rồi thử lại.',
   newTask: 'Tác vụ mới',
   makeYourselfAtHome: 'Chào mừng bạn đến với Tro.',
   googleInvitation: 'Đăng nhập để bắt đầu tác vụ với Tro. Google sẽ mở trong trình duyệt của bạn.',
@@ -68,6 +76,8 @@ export const vietnamese = {
   errorOpenGoogle: 'Không thể mở đăng nhập Google.',
   errorClearTask: 'Không thể xóa tác vụ. Vui lòng thử lại.',
   errorStartTask: 'Không thể bắt đầu tác vụ. Vui lòng thử lại.',
+  errorDailyModelLimit:
+    'Bạn đã dùng hết lượt mô hình hôm nay. Hãy thử lại sau khi hạn mức được đặt lại.',
   errorCompleteTask: 'Không thể hoàn tất tác vụ. Hãy kiểm tra kết nối và quyền truy cập máy tính.',
   errorContactAgent: 'Không thể kết nối với trợ lý trên máy tính. Vui lòng gửi lại.',
   errorSignOut: 'Không thể đăng xuất. Vui lòng thử lại.',
