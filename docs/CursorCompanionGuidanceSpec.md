@@ -488,21 +488,28 @@ the allowed outcome from context, evidence and terminal state.
 | Outcome        | Host condition                                                                                                                           | User-visible meaning                                                              |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | `demonstrated` | Required obligations have valid V2 receipts, at least one sequence completed, no pending/failing obligation and no terminal cancellation | The visual guide finished; the student action is not verified                     |
-| `explained`    | Explicit explanation-only host context, no failed/pending guide and no cancellation                                                      | An explanation was supplied; nothing was demonstrated                             |
+| `explained`    | Validated explicit explanation reply with nonempty instructions, no failed/pending guide and no cancellation                             | An explanation was supplied; nothing was demonstrated                             |
 | `needs_input`  | Clarification, unavailable target or missing demonstration evidence; no terminal cancellation                                            | The requested demonstration did not finish; another student instruction is needed |
 | `canceled`     | Takeover, Stop, session loss, lease expiry or target invalidation latched the task                                                       | Guidance ended; no automatic replay                                               |
 | `failed`       | Validation, transport or render failure with no admitted recovery or successful resolution                                               | Guidance could not be completed                                                   |
 
 Apply precedence: cancellation first, unresolved failures next, then validated
 demonstration; explanation/needs-input are explicit non-demonstration paths.
-A no-tool or observation-only model run cannot become `demonstrated`. For a
-required task, prose alone yields `needs_input` or `failed`; it cannot silently
-downgrade to `explained`. Render the typed outcome in Tro independently of the
-model's prose. Never show an unconditional completed label for every answer.
-For a required task without evidence, or any canceled/failed task, show a
-deterministic truthful status and suppress final model prose rather than trying
-to detect success claims in natural language or running a repair model. Explicit
-explanation-only context may display its explanatory answer with that label.
+A no-tool or observation-only model run cannot become `demonstrated`. A
+structured `guide` reply without receipt evidence yields `needs_input`; it cannot
+silently downgrade to `explained`. General how-to instructions may use the
+explicit `explanation` reply purpose. A structured `needs_input` reply may display
+its specific question or student action with that status. Render the typed outcome
+in Tro independently of the model's prose. Never show an unconditional completed
+label for every answer. For a guide claim without evidence, or any canceled/failed
+task, show a deterministic truthful status and suppress final model prose rather
+than trying to detect success claims in natural language or running a repair model.
+Explicit explanatory replies may display their instructions with that label.
+Show me now selects `get_desktop_state` as the first model tool choice, resetting
+it after the call. This grounds reply routing in the current screen; it does not
+prove that a tour was requested or that the model selected correct cue targets.
+Current-interface questions prompt an ordered tour of observed controls. Only
+native receipts establish that those cues were displayed.
 A demonstrated task may pass through the final answer after evidence validation;
 the receipt still does not prove semantic target correctness or student action.
 

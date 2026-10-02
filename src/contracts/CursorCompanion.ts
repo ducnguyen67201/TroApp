@@ -109,6 +109,7 @@ export const TeachingResultSchema = z.discriminatedUnion('outcome', [
   z.strictObject({
     outcome: z.literal(TeachingOutcome.NEEDS_INPUT),
     reason: z.literal(GuidanceReason.NO_DEMONSTRATION),
+    answer: z.string().trim().min(1).optional(),
   }),
   z.strictObject({ outcome: z.literal(TeachingOutcome.CANCELED), reason: GuidanceReasonSchema }),
   z.strictObject({ outcome: z.literal(TeachingOutcome.FAILED), reason: GuidanceReasonSchema }),

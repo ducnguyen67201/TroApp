@@ -80,6 +80,18 @@ headers, and tokens are excluded. Stage and production builds do not emit these
 debug records. The Agents SDK's separate strict-schema warnings can still
 appear; they indicate fallback to a non-strict tool schema.
 
+Teaching finalization emits `agent.teaching.settled` with the host task ID,
+validated reply purpose, outcome, reason, answer presence and duration. This
+distinguishes an explanation from a guide without receipts without logging the
+answer itself.
+
+For Show me, the first model request selects `get_desktop_state` explicitly.
+Expect `openai.response` to list that tool, followed by its `cua.request` and
+`cua.response`, then another model request containing the screenshot and capture
+metadata. A visual tour subsequently calls `show_cursor_sequence`; an
+`agent.teaching.settled` outcome of `explained` alone does not prove that a cursor
+cue appeared. A live model check is still needed for cue choice and placement.
+
 ## Doppler configuration
 
 The Featherlane AI Doppler workplace has two Tro projects: `tro-local` and `tro-api`. `tro-local` owns public Electron settings; `tro-api` owns backend and Prisma settings. Each project has `dev`, `stg`, and `prd` root configs.

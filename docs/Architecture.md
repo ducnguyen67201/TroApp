@@ -139,12 +139,22 @@ Show me uses host-bound V2 cursor guidance. The native companion approaches,
 traces, holds and clears one cue at a time, then returns to pointer following.
 Passive pointer movement is allowed. Click/key/scroll takeover is terminal for
 the task; teaching has no automatic recovery continuation. A typed `teaching`
-result carries demonstrated, needs_input, canceled or failed status through the
+result carries demonstrated, explained, needs_input, canceled or failed status through the
 existing main/preload and voice boundaries. Demonstrated requires native receipt
 evidence, independent of desktop-action verification. Host lifecycle tools remain
 private and the model cannot omit V2 to select legacy behavior. See
 [CursorCompanionEngineering.md](CursorCompanionEngineering.md) for implemented
 modules, timings, compositor evidence and primary-display limits.
+
+Teaching accepts structured explanatory replies for general how-to questions
+without requiring cursor playback. The worker validates the reply purpose and
+preserves a specific question or student action in `needs_input` replies. Native
+receipts still determine `demonstrated`; model prose cannot clear pending, failed
+or canceled guidance. Show me forces `get_desktop_state` as the first tool choice
+and releases that choice after the call. Questions about the interface "here"
+prompt a tour of observed controls through the cursor companion, rather than
+assumptions about an API chat or generic coding assistant. Follow-up messages
+still start fresh tasks.
 
 ## Companion presentation
 

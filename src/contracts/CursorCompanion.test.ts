@@ -6,6 +6,26 @@ const epoch = '11111111-1111-4111-8111-111111111111';
 const sequence = '22222222-2222-4222-8222-222222222222';
 
 describe('guidance boundary contracts', () => {
+  it('allows a specific student instruction without accepting an empty answer', () => {
+    expect(
+      AgentResultSchema.parse({
+        kind: 'teaching',
+        result: {
+          outcome: 'needs_input',
+          reason: 'no_demonstration',
+          answer: 'Open ChatGPT first.',
+        },
+      }),
+    ).toMatchObject({ result: { answer: 'Open ChatGPT first.' } });
+    expect(
+      TeachingResultSchema.safeParse({
+        outcome: 'needs_input',
+        reason: 'no_demonstration',
+        answer: '  ',
+      }).success,
+    ).toBe(false);
+  });
+
   it('requires task-bound step evidence rather than the V1 completed state', () => {
     expect(
       CursorGuidanceResultSchema.safeParse({ status: 'completed', following: true, active: false })

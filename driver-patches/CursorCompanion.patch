@@ -2090,7 +2090,7 @@ index 36f3717..322beb2 100644
      SetPressed(bool),
      /// Show or hide the overlay.
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs
-index 264c427..d912a2b 100644
+index 264c427..58e3a34 100644
 --- a/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs
 +++ b/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs
 @@ -48,6 +48,14 @@ pub const SESSION_BADGE_FADE_SECS: f64 = 0.4;
@@ -2239,43 +2239,31 @@ index 264c427..d912a2b 100644
      let s = backing_scale.max(1.0) as f64; // logical-pt → pixmap-pixel scale
      let sf = s as f32;
  
-@@ -959,7 +1045,53 @@ pub fn paint_cursor(
+@@ -959,7 +1045,41 @@ pub fn paint_cursor(
          }
      }
  
 -    if let Some(theme) = core.theme.as_deref() {
-+    if core.companion_mark.len() > 1 {
-+        let mut builder = tiny_skia::PathBuilder::new();
-+        for (index, (x, y)) in core.companion_mark.iter().enumerate() {
-+            let x = ((x - origin_x) * s) as f32;
-+            let y = ((y - origin_y) * s) as f32;
-+            if index == 0 {
-+                builder.move_to(x, y);
-+            } else {
-+                builder.line_to(x, y);
-+            }
-+        }
-+        if let Some(path) = builder.finish() {
-+            let mut paint = tiny_skia::Paint::default();
-+            let [red, green, blue, _] = crate::companion_appearance::COMPANION_BLUE;
-+            paint.set_color_rgba8(
-+                red,
-+                green,
-+                blue,
-+                (230.0 * alpha_scale * core.companion_mark_alpha) as u8,
-+            );
-+            paint.anti_alias = true;
-+            pm.stroke_path(
-+                &path,
-+                &paint,
-+                &tiny_skia::Stroke {
-+                    width: 3.0 * sf,
-+                    ..Default::default()
-+                },
-+                tiny_skia::Transform::identity(),
-+                None,
-+            );
-+        }
++    if let Some(path) = build_companion_mark_path(&core.companion_mark, origin_x, origin_y, s) {
++        let mut paint = tiny_skia::Paint::default();
++        let [red, green, blue, _] = crate::companion_appearance::COMPANION_BLUE;
++        paint.set_color_rgba8(
++            red,
++            green,
++            blue,
++            (230.0 * alpha_scale * core.companion_mark_alpha) as u8,
++        );
++        paint.anti_alias = true;
++        pm.stroke_path(
++            &path,
++            &paint,
++            &tiny_skia::Stroke {
++                width: 3.0 * sf,
++                ..Default::default()
++            },
++            tiny_skia::Transform::identity(),
++            None,
++        );
 +    }
 +    if let Some(receipt) = &core.frame_receipt {
 +        receipt.store(true, std::sync::atomic::Ordering::Release);
@@ -2294,7 +2282,7 @@ index 264c427..d912a2b 100644
          let tint = (theme.id == crate::DEFAULT_THEME_ID)
              .then(|| crate::session_fill_rgba(&core.cfg.cursor_id));
          crate::paint_compiled_theme_with_tint(
-@@ -989,6 +1121,9 @@ pub fn paint_cursor(
+@@ -989,6 +1109,9 @@ pub fn paint_cursor(
          );
      }
  
@@ -2304,7 +2292,7 @@ index 264c427..d912a2b 100644
      let (delivery, target) = core.badge_modifiers.unwrap_or((None, None));
      if let Some(layout) = crate::session_badge_layout(crate::SessionBadgeInput {
          label: core.session_label.as_deref(),
-@@ -1003,7 +1138,11 @@ pub fn paint_cursor(
+@@ -1003,12 +1126,56 @@ pub fn paint_cursor(
          crate::paint_session_badge(
              pm,
              &layout,
@@ -2317,7 +2305,52 @@ index 264c427..d912a2b 100644
              alpha_scale,
          );
      }
-@@ -1043,6 +1182,80 @@ mod glide_duration_tests {
+ }
+
++// A trace starts at a single point. f64 endpoints can still coincide after the
++// renderer converts them to f32 pixels. Wait for a drawable segment instead of
++// asking tiny-skia to stroke an empty outline; pointer/receipt rendering proceeds.
++const MIN_COMPANION_SEGMENT_PIXELS: f32 = 0.01;
++
++fn build_companion_mark_path(
++    points: &[(f64, f64)],
++    origin_x: f64,
++    origin_y: f64,
++    scale: f64,
++) -> Option<tiny_skia::Path> {
++    let mut builder = tiny_skia::PathBuilder::new();
++    let mut previous: Option<tiny_skia::Point> = None;
++    let mut has_segment = false;
++    for &(x, y) in points {
++        let point = tiny_skia::Point::from_xy(
++            ((x - origin_x) * scale) as f32,
++            ((y - origin_y) * scale) as f32,
++        );
++        if !point.x.is_finite() || !point.y.is_finite() {
++            return None;
++        }
++        if let Some(start) = previous {
++            if (point.x - start.x).hypot(point.y - start.y) < MIN_COMPANION_SEGMENT_PIXELS {
++                continue;
++            }
++            builder.line_to(point.x, point.y);
++            has_segment = true;
++        } else {
++            builder.move_to(point.x, point.y);
++        }
++        previous = Some(point);
++    }
++    if has_segment {
++        builder.finish()
++    } else {
++        None
++    }
++}
++
+ #[cfg(test)]
+ mod glide_duration_tests {
+     use super::*;
+@@ -1043,6 +1210,164 @@ mod glide_duration_tests {
          t
      }
  
@@ -2362,6 +2395,90 @@ index 264c427..d912a2b 100644
 +            frame.receipt.lock().unwrap().is_none(),
 +            "applying a command is not render evidence"
 +        );
++    }
++
++    #[test]
++    fn companion_cue_skips_empty_duplicate_and_tiny_prefixes() {
++        for points in [
++            vec![],
++            vec![(30.0, 30.0)],
++            vec![(30.0, 30.0), (30.0, 30.0)],
++            vec![(30.0, 30.0), (30.000000001, 30.0)],
++            vec![(30.0, 30.0), (30.004, 30.0), (30.008, 30.0)],
++            vec![(16_777_216.0, 30.0), (16_777_216.1, 30.0)],
++        ] {
++            assert!(build_companion_mark_path(&points, 0.0, 0.0, 1.0).is_none());
++        }
++        // Small increments accumulate relative to the last retained endpoint.
++        let points = [(30.0, 30.0), (30.004, 30.0), (30.008, 30.0), (30.016, 30.0)];
++        assert!(build_companion_mark_path(&points, 0.0, 0.0, 1.0).is_some());
++    }
++
++    #[test]
++    fn companion_cue_keeps_axis_aligned_strokes_at_both_display_scales() {
++        for scale in [1.0, 2.0] {
++            for points in [[(30.0, 30.0), (60.0, 30.0)], [(30.0, 30.0), (30.0, 60.0)]] {
++                let path = build_companion_mark_path(&points, 10.0, 20.0, scale).unwrap();
++                assert!(path
++                    .stroke(
++                        &tiny_skia::Stroke {
++                            width: 3.0 * scale as f32,
++                            ..Default::default()
++                        },
++                        1.0
++                    )
++                    .is_some());
++            }
++        }
++    }
++
++    #[test]
++    fn companion_circle_prefixes_become_drawable_after_the_initial_point() {
++        use cua_driver_contract::{CompanionPoint, CompanionStep};
++        let circle = CompanionStep::Circle {
++            center: CompanionPoint { x: 0.5, y: 0.5 },
++            radius: 0.05,
++            duration_ms: 1000,
++            hold_ms: None,
++        };
++        let points = crate::companion::plan_path(&circle, 1000.0, 800.0);
++        for scale in [1.0, 2.0] {
++            for progress in [0.0, 1e-12] {
++                let prefix = crate::guidance::reveal_path(&points, progress);
++                assert!(build_companion_mark_path(&prefix, 0.0, 0.0, scale).is_none());
++            }
++            for progress in [0.001, 0.01, 0.5, 1.0] {
++                let prefix = crate::guidance::reveal_path(&points, progress);
++                let path = build_companion_mark_path(&prefix, 0.0, 0.0, scale).unwrap();
++                assert!(path
++                    .stroke(
++                        &tiny_skia::Stroke {
++                            width: 3.0 * scale as f32,
++                            ..Default::default()
++                        },
++                        1.0
++                    )
++                    .is_some());
++            }
++        }
++    }
++
++    #[test]
++    fn companion_zero_length_cue_keeps_the_pointer_and_frame_receipt() {
++        let mut core = RenderStateCore::new(CursorConfig::default());
++        core.pos = (100.0, 100.0);
++        core.companion_appearance = true;
++        core.suppress_session_badge = true;
++        let mut pointer_only = tiny_skia::Pixmap::new(200, 200).unwrap();
++        paint_cursor(&mut pointer_only, &core, 0.0, 0.0, None, 1.0);
++        let receipt = Arc::new(std::sync::atomic::AtomicBool::new(false));
++        core.frame_receipt = Some(receipt.clone());
++        core.companion_mark = vec![(30.0, 30.0), (30.0, 30.0)];
++        let mut zero_length_cue = tiny_skia::Pixmap::new(200, 200).unwrap();
++        paint_cursor(&mut zero_length_cue, &core, 0.0, 0.0, None, 1.0);
++        assert_eq!(zero_length_cue.data(), pointer_only.data());
++        assert!(zero_length_cue.data().iter().any(|pixel| *pixel != 0));
++        assert!(receipt.load(std::sync::atomic::Ordering::Acquire));
 +    }
 +
 +    #[test]
