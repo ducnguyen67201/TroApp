@@ -1,13 +1,5 @@
 import { Button, Paper, createTheme, type CSSVariablesResolver } from '@mantine/core';
-
-/** The desktop palette lives here; components and CSS consume the same tokens. */
-const TroPalette = {
-  CREAM: '#FFFCF2',
-  GRAY: '#CCC5B9',
-  CHARCOAL: '#403D39',
-  BLACK: '#252422',
-  ORANGE: '#EB5E28',
-} as const;
+import { DesktopWindowAppearance, TroPalette } from '../DesktopAppearance.js';
 
 const fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
@@ -43,7 +35,7 @@ export const desktopTheme = createTheme({
 export const resolveDesktopCssVariables: CSSVariablesResolver = () => ({
   variables: {
     '--tro-surface': TroPalette.CREAM,
-    '--tro-sidebar': `color-mix(in srgb, ${TroPalette.CREAM}, ${TroPalette.GRAY} 16%)`,
+    '--tro-sidebar': DesktopWindowAppearance.BACKGROUND,
     '--tro-muted-surface': `color-mix(in srgb, ${TroPalette.CREAM}, ${TroPalette.GRAY} 12%)`,
     '--tro-selection': `color-mix(in srgb, ${TroPalette.CREAM}, ${TroPalette.GRAY} 42%)`,
     '--tro-border': `color-mix(in srgb, ${TroPalette.CREAM}, ${TroPalette.GRAY} 65%)`,

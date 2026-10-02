@@ -24,8 +24,14 @@ textarea:focus-visible {
   background: var(--tro-sidebar);
 }
 
+.window-titlebar {
+  background: var(--tro-sidebar);
+  app-region: drag;
+  user-select: none;
+}
+
 .desktop-sidebar {
-  padding: 30px 16px 18px;
+  padding: 16px 16px 18px;
   background: var(--tro-sidebar);
 }
 
@@ -89,14 +95,14 @@ textarea:focus-visible {
 
 .desktop-main {
   padding-right: 16px;
-  padding-top: 16px;
+  padding-top: var(--app-shell-header-offset);
   padding-bottom: 16px;
 }
 
 .main-panel {
   display: flex;
   flex-direction: column;
-  min-height: calc(100dvh - 32px);
+  min-height: calc(100dvh - var(--app-shell-header-offset) - 16px);
   border: 1px solid var(--tro-border);
   border-radius: var(--tro-panel-radius);
   background: var(--tro-surface);
