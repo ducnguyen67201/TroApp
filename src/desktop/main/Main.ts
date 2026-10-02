@@ -36,6 +36,7 @@ import { AuthClient } from './AuthClient.js';
 import { DesktopPermissions } from './DesktopPermissions.js';
 import { EmbeddedDesktopDriver } from './EmbeddedDesktopDriver.js';
 import { isTrustedFrameUrl } from './TrustedFrame.js';
+import { DesktopWindowAppearance } from '../DesktopAppearance.js';
 
 const mainDirectory = dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | undefined;
@@ -411,6 +412,14 @@ async function startDesktop(): Promise<void> {
       minWidth: 680,
       minHeight: 520,
       title: 'Tro',
+      backgroundColor: DesktopWindowAppearance.BACKGROUND,
+      titleBarStyle: 'hidden',
+      trafficLightPosition: { x: 20, y: 20 },
+      titleBarOverlay: {
+        color: DesktopWindowAppearance.BACKGROUND,
+        symbolColor: DesktopWindowAppearance.FOREGROUND,
+        height: DesktopWindowAppearance.TITLE_BAR_HEIGHT,
+      },
       webPreferences: {
         preload: join(mainDirectory, '../preload/Preload.cjs'),
         nodeIntegration: false,

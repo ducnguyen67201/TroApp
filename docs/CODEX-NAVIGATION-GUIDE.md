@@ -18,7 +18,7 @@ Read README.md, AGENTS.md, and Architecture.md first. Tro is one pnpm root. Use 
 
 Renderer/preload cannot import backend or main-process implementation. Contracts cannot import desktop/server implementation. Domain code cannot import frameworks, I/O, or persistence. Prisma belongs in backend persistence adapters and Prisma config. Environment modules are per process.
 
-For desktop styling, edit `src/desktop/renderer/Theme.ts`; it owns Mantine defaults and the shared palette. `App.css` owns layout using those tokens. See [DesktopUi.md](DesktopUi.md) for the scaffold and state ownership.
+For desktop styling, `src/desktop/DesktopAppearance.ts` owns the shared palette and native window appearance. `src/desktop/renderer/Theme.ts` owns Mantine defaults and semantic tokens. `App.css` owns layout using those tokens. See [DesktopUi.md](DesktopUi.md) for the scaffold and state ownership.
 
 Import shared contracts as `#contracts/SystemStatus.js` from either process. Keep imports within a feature relative; the alias is deliberately limited to contracts.
 

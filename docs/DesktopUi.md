@@ -4,9 +4,11 @@ Tro uses Mantine in Electron's React renderer. The sidebar opens Workspace and a
 
 The desktop opens at 1360 × 860 logical pixels, close to a 16:10 ratio. These defaults live in `src/desktop/main/Main.ts`. The window remains freely resizable down to 680 × 520.
 
+The 52-pixel top bar shares the sidebar's warm background, with no separate gray title strip or centered window title. Electron keeps native window controls: inset traffic lights on macOS and a matching controls overlay on Windows/Linux. The empty top bar is draggable; the workspace and dialogs remain outside that region. `src/desktop/DesktopAppearance.ts` shares the native background color and bar height with the renderer so controls and content stay aligned.
+
 ## Styling in one place
 
-Edit `src/desktop/renderer/Theme.ts` to change the application palette, typography, default radius, or Mantine component defaults. The palette is:
+Edit `src/desktop/DesktopAppearance.ts` to change the shared palette and window appearance, and `src/desktop/renderer/Theme.ts` for typography, default radius, semantic tokens, or Mantine component defaults. The palette is:
 
 | Color    | Value     | Use                                         |
 | -------- | --------- | ------------------------------------------- |

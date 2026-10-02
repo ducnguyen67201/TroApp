@@ -33,6 +33,7 @@ import { useComputerUse } from './UseComputerUse.js';
 import { useLocale } from './localization/UseLocale.js';
 import { useDesktopPermissions } from './UseDesktopPermissions.js';
 import { useCursorCompanion } from './UseCursorCompanion.js';
+import { DesktopWindowAppearance } from '../DesktopAppearance.js';
 
 const DesktopDialog = { SETTINGS: 'settings', MICROPHONE: 'microphone' } as const;
 
@@ -134,7 +135,13 @@ export function App(): ReactElement {
           isRetryingVoice={voice.isStarting}
         />
       </Modal.Stack>
-      <AppShell navbar={{ width: 232, breakpoint: 0 }} padding={0} className="desktop-shell">
+      <AppShell
+        header={{ height: DesktopWindowAppearance.TITLE_BAR_HEIGHT }}
+        navbar={{ width: 232, breakpoint: 0 }}
+        padding={0}
+        className="desktop-shell"
+      >
+        <AppShell.Header className="window-titlebar" withBorder={false} aria-hidden="true" />
         <AppShell.Navbar className="desktop-sidebar" withBorder={false}>
           <Group gap={10} className="brand">
             <span className="brand-mark">
