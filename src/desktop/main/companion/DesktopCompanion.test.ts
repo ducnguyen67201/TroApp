@@ -119,12 +119,18 @@ describe('desktop companion composition', () => {
     const following = companion.startFollowing();
     await Promise.resolve();
     companion.hud.startTask(sessionId, DesktopLocale.ENGLISH);
-    companion.hud.finishTask({ kind: 'completed', answer: 'Done' }, sessionId);
+    companion.hud.finishTask(
+      { kind: 'completed', completion: { kind: 'response' }, answer: 'Done' },
+      sessionId,
+    );
     companion.dispose();
     const snapshotsAfterClose = snapshots.length;
     finishConnection();
     expect(await following).toEqual({ kind: 'stopped' });
-    companion.hud.finishTask({ kind: 'completed', answer: 'Late result' }, sessionId);
+    companion.hud.finishTask(
+      { kind: 'completed', completion: { kind: 'response' }, answer: 'Late result' },
+      sessionId,
+    );
     companion.hud.receiveProgress({
       kind: 'progress',
       requestId: captureId,

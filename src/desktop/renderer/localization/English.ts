@@ -1,5 +1,9 @@
 /** Canonical desktop copy. Other catalogs must implement every key and parameter. */
 export const english = {
+  taskSucceeded: 'Task completed',
+  taskPartial: 'Partially completed',
+  taskBlocked: 'Unable to continue',
+  taskUnverified: 'Result not confirmed',
   voiceDisclosure:
     'While you hold the shortcut or Talk button, Tro sends your microphone audio to OpenAI. Release to send the recognized instruction to the agent automatically. Uses your current language. Press Escape to cancel. Audio and transcripts are not saved on this device.',
   voiceStarting: 'Preparing voice input…',

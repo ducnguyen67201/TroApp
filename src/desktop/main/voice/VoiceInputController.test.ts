@@ -42,7 +42,7 @@ function createHarness() {
       .mockResolvedValue({ kind: 'started', sessionId }),
     sendAgentMessage: vi
       .fn<VoiceDependencies['sendAgentMessage']>()
-      .mockResolvedValue({ kind: 'completed', answer: 'Done' }),
+      .mockResolvedValue({ kind: 'completed', completion: { kind: 'response' }, answer: 'Done' }),
     emit: (event: VoiceEvent): void => {
       events.push(event);
     },

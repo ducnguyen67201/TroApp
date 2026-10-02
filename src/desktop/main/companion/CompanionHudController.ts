@@ -1,3 +1,4 @@
+import { CompletionMode, TaskOutcomeStatus } from '#contracts/TaskOutcome.js';
 import { TeachingOutcome } from '#contracts/CursorCompanion.js';
 import {
   CompanionHudPhase,
@@ -161,6 +162,14 @@ export class CompanionHudController {
       }
     }
     if (result.kind === 'completed') {
+      if (
+        result.completion.kind === CompletionMode.TASK &&
+        result.completion.outcome.status !== TaskOutcomeStatus.SUCCEEDED
+      ) {
+        return result.completion.outcome.status === TaskOutcomeStatus.BLOCKED
+          ? CompanionHudPhase.NEEDS_INPUT
+          : CompanionHudPhase.ERROR;
+      }
       return CompanionHudPhase.DONE;
     }
     if (result.kind === 'stopped') {

@@ -234,3 +234,68 @@ describe('teaching task completion and cancellation', () => {
     ).toHaveLength(1);
   });
 });
+
+it('switches between harness execution and native teaching on the same transport with HUD progress', async () => {
+  vi.useFakeTimers();
+  const { server, runAgent, native } = await createRunner();
+  const progress: string[] = [];
+  const execution = vi
+    .fn<import('./MainAgentRunner.js').RunTaskAgent>()
+    .mockImplementation(async (_agent, _input, task) => {
+      if (!task.goal) {
+        task.defineGoal({
+          summary: 'Inspect desktop',
+          criteria: [{ description: 'Describe the current desktop' }],
+        });
+      }
+      task.admitModelTurn();
+      await server.callToolResult('get_desktop_state', {});
+      return { finalOutput: { mode: 'task', answer: 'Done', verificationId: null }, history: [] };
+    });
+  const runner = new ComputerUseTaskRunner(server, pino({ level: 'silent' }), runAgent, execution);
+  const result = await runner.runTask(
+    'Inspect desktop',
+    DesktopLocale.ENGLISH,
+    new AbortController().signal,
+    AgentTaskMode.EXECUTE,
+    (phase) => progress.push(phase),
+  );
+  expect(result).toMatchObject({
+    kind: 'completed',
+    completion: { kind: 'task', outcome: { status: 'unverified' } },
+  });
+  expect(execution).toHaveBeenCalledTimes(2);
+  expect(runAgent).not.toHaveBeenCalled();
+  expect(progress).toEqual(['working', 'thinking', 'working', 'thinking']);
+  expect(
+    native.mock.calls.some(
+      ([name, args]) => name === CursorCompanionTool.SET_MODE && args?.mode === 'hidden',
+    ),
+  ).toBe(true);
+  expect(server.taskEvidence.readSnapshot().observations).toEqual([]);
+  progress.length = 0;
+  runAgent.mockImplementation(async () => {
+    await server.callToolResult(CursorCompanionTool.SHOW_SEQUENCE, {
+      presentation_version: 2,
+      capture_id: 'capture',
+      steps: [{ kind: 'circle' }],
+    });
+    return { answer: 'Follow this circle', history: [] };
+  });
+  expect(
+    await runner.runTask(
+      'Show me',
+      DesktopLocale.VIETNAMESE,
+      new AbortController().signal,
+      AgentTaskMode.TEACH,
+      (phase) => progress.push(phase),
+    ),
+  ).toEqual({
+    kind: 'teaching',
+    result: { outcome: 'demonstrated', answer: 'Follow this circle' },
+  });
+  expect(progress).toEqual(['showing', 'thinking']);
+  expect(execution).toHaveBeenCalledTimes(2);
+  expect(runAgent).toHaveBeenCalledOnce();
+  await runner.close();
+});

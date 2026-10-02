@@ -1,80 +1,57 @@
-import { MCPServerStdio, mcpToFunctionTool, RunContext, type CallToolResult } from '@openai/agents';
+import { MCPServerStdio, mcpToFunctionTool, type CallToolResult } from '@openai/agents';
 import pino from 'pino';
+import { PassThrough } from 'node:stream';
+import { AgentLogRole, withAgentLogContext } from './AgentDebugLog.js';
 import { describe, expect, it, vi } from 'vitest';
-import { AgentTaskMode } from '#contracts/CursorCompanion.js';
-import { TaskIssue } from './CuaTaskEvidence.js';
+import { TaskContext } from './TaskContext.js';
 import { LoggedCuaServer } from './LoggedCuaServer.js';
 
 describe('Cua tool schemas presented to the Agents SDK', () => {
-  it.each(['silent', 'debug'])(
-    'passes capture IDs and screenshots through the SDK with %s logging',
-    async (level) => {
-      const captureId = 'capture_0123456789abcdef0123456789abcdef_0000000000000001';
-      const metadata = { capture_id: captureId, screenshot_width: 1200, screenshot_height: 800 };
-      const image = { type: 'image' as const, data: 'synthetic-image', mimeType: 'image/png' };
-      const call = vi.spyOn(MCPServerStdio.prototype, 'callToolResult').mockResolvedValue({
-        content: [image, { type: 'text', text: 'desktop screenshot 1200x800 px' }],
-        structuredContent: metadata,
-      });
-      const server = new LoggedCuaServer(
-        { name: 'Metadata test', command: 'unused' },
-        pino({ level }, { write() {} }),
-      );
-      const agentTool = mcpToFunctionTool(
-        {
-          name: 'get_desktop_state',
-          inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: true },
-        },
-        server,
-        false,
-      );
-      try {
-        const output: unknown = await agentTool.invoke(new RunContext(), '{}');
-        expect(output).toEqual([
-          image,
-          { type: 'text', text: 'desktop screenshot 1200x800 px' },
-          { type: 'text', text: JSON.stringify(metadata) },
-        ]);
-        expect(call).toHaveBeenCalledTimes(1);
-      } finally {
-        call.mockRestore();
-      }
-    },
-  );
-
-  it('preserves window targets and refusal details in the agent-visible result', async () => {
-    const call = vi.spyOn(MCPServerStdio.prototype, 'callToolResult');
-    const server = new LoggedCuaServer(
-      { name: 'Window metadata test', command: 'unused' },
-      pino({ level: 'silent' }),
-    );
+  it('correlates accepted calls and diagnoses admission refusals without logging private arguments', async () => {
+    const output = new PassThrough();
+    const lines: string[] = [];
+    output.on('data', (chunk: Buffer) => lines.push(chunk.toString('utf8')));
+    const log = pino({ level: 'debug' }, output);
+    const server = new LoggedCuaServer({ name: 'logging fixture', command: 'unused' }, log);
+    const task = new TaskContext(server.taskEvidence, new AbortController().signal);
+    server.bindTask(task);
+    server.taskEvidence.setReadOnlyTools(['get_window_state']);
+    const driver = vi.spyOn(MCPServerStdio.prototype, 'callToolResult').mockResolvedValue({
+      isError: true,
+      content: [{ type: 'text', text: 'private observed diagnostic' }],
+      structuredContent: { status: 'refused', error: { code: 'window_id_not_found' } },
+    });
     try {
-      const windows = { windows: [{ pid: 123, window_id: 456, title: 'Synthetic window' }] };
-      call.mockResolvedValue({
-        content: [{ type: 'text', text: 'Found 1 window.' }],
-        structuredContent: windows,
-      });
-      expect((await server.callToolResult('list_windows', {})).content).toContainEqual({
-        type: 'text',
-        text: JSON.stringify(windows),
-      });
-      const refusal = {
-        status: 'refused',
-        refusal: { code: 'synthetic_refusal', message: 'Refresh the window.' },
-      };
-      call.mockResolvedValue({
-        isError: true,
-        content: [{ type: 'text', text: 'Refused.' }],
-        structuredContent: refusal,
-      });
-      const result = await server.callToolResult('get_browser_state', {});
-      expect(result.isError).toBe(true);
-      expect(result.content).toContainEqual({ type: 'text', text: JSON.stringify(refusal) });
+      await withAgentLogContext(
+        { taskId: task.id, agentRole: AgentLogRole.MAIN, attemptNumber: 1 },
+        async () => {
+          await server.callToolResult('type_text', { text: 'private password' });
+          expect(driver).not.toHaveBeenCalled();
+          await server.callToolResult('get_window_state', {
+            pid: 7,
+            window_id: 12,
+            display_id: 2,
+            delivery_mode: 'background',
+            include_screenshot: true,
+            text: 'private password',
+          });
+        },
+      );
+      const logs = lines.join('');
+      expect(logs).toContain('cua.admission.rejected');
+      expect(logs).toContain('goal_acknowledgement_required');
+      expect(logs).toContain('"reasonCode":"window_id_not_found"');
+      expect(logs).toContain('"deliveryMode":"background"');
+      expect(logs).toContain('"windowId":12');
+      expect(logs.match(/"dispatchId":"dispatch-2"/g)).toHaveLength(2);
+      expect(logs.match(/"callId":"call-1"/g)).toHaveLength(2);
+      expect(logs).toContain('"taskId":"' + task.id + '"');
+      expect(logs).not.toContain('private');
     } finally {
-      call.mockRestore();
+      task.dispose();
+      driver.mockRestore();
     }
   });
-
   it('uses Cua read-only annotations to identify calls needing a later observation', async () => {
     const tools = [
       {
@@ -107,11 +84,12 @@ describe('Cua tool schemas presented to the Agents SDK', () => {
     try {
       await server.listTools();
       const accepted: CallToolResult = { content: [], structuredContent: {} };
-      server.taskEvidence.record('launch_app', accepted);
-      expect(server.taskEvidence.readIssue()).toBe(TaskIssue.OBSERVATION_MISSING);
-
-      server.taskEvidence.record('get_window_state', accepted);
-      expect(server.taskEvidence.readIssue()).toBeNull();
+      const write = server.taskEvidence.beginToolCall('launch_app');
+      server.taskEvidence.recordToolResult(write, null, accepted);
+      expect(server.taskEvidence.readSnapshot().revision).toBe(1);
+      const read = server.taskEvidence.beginToolCall('get_window_state');
+      server.taskEvidence.recordToolResult(read, null, accepted);
+      expect(server.taskEvidence.readSnapshot().revision).toBe(1);
     } finally {
       listTools.mockRestore();
     }
@@ -173,177 +151,86 @@ describe('Cua tool schemas presented to the Agents SDK', () => {
 
     try {
       await server.callToolResult('bring_to_front', { pid: 7, window_id: 12 });
-      expect(server.taskEvidence.readIssue()).toBe(TaskIssue.DESKTOP_ACTION_FAILED);
+      expect(server.taskEvidence.readSnapshot().failureCount).toBe(1);
     } finally {
       callTool.mockRestore();
     }
   });
-  it('rejects hidden actions, host controls and session spoofing before native dispatch in teaching mode', async () => {
-    const call = vi
-      .spyOn(MCPServerStdio.prototype, 'callToolResult')
-      .mockResolvedValue({ content: [] });
-    const server = new LoggedCuaServer(
-      { name: 'Teaching policy test', command: 'unused' },
-      pino({ level: 'silent' }),
-    );
-    server.setTaskMode('teach');
-    try {
-      for (const name of [
-        'click',
-        'drag',
-        'type_text',
-        'hotkey',
-        'browser_navigate',
-        'run_code',
-        'future_tool',
-        'set_cursor_companion_mode',
-      ]) {
-        expect((await server.callToolResult(name, {})).isError).toBe(true);
-      }
-      expect(
-        (await server.callToolResult('get_desktop_state', { session: 'another-agent' })).isError,
-      ).toBe(true);
-      expect(
-        (await server.callToolResult('get_desktop_state', { _session_id: 'another-agent' }))
-          .isError,
-      ).toBe(true);
-      expect(call).not.toHaveBeenCalled();
-      server.beginTeachingTask('11111111-1111-4111-8111-111111111111', () => {});
-      await server.callToolResult('bring_to_front', { pid: 1, window_id: 2 });
-      expect(call).toHaveBeenCalledTimes(1);
-    } finally {
-      call.mockRestore();
-    }
-  });
-
-  it('requires a completed native preview result, not an acceptance receipt', async () => {
-    const call = vi
-      .spyOn(MCPServerStdio.prototype, 'callToolResult')
-      .mockResolvedValue({ content: [], structuredContent: { status: 'accepted' } });
-    const server = new LoggedCuaServer(
-      { name: 'Preview evidence test', command: 'unused' },
-      pino({ level: 'silent' }),
-    );
-    try {
-      expect((await server.callToolResult('show_cursor_sequence', {})).isError).toBe(true);
-      expect(server.taskEvidence.readIssue()).toBe(TaskIssue.GUIDANCE_FAILED);
-      call.mockResolvedValue({
-        content: [],
-        structuredContent: { status: 'completed', following: true, active: false },
-      });
-      expect((await server.callToolResult('show_cursor_sequence', {})).isError).not.toBe(true);
-      expect(server.taskEvidence.readIssue()).toBeNull();
-    } finally {
-      call.mockRestore();
-    }
-  });
-});
-
-describe('host-pinned V2 guidance', () => {
-  const epoch = '11111111-1111-4111-8111-111111111111';
-  const sequence = '22222222-2222-4222-8222-222222222222';
-  const request = { presentation_version: 2, capture_id: 'capture', steps: [{ kind: 'circle' }] };
-
-  it('requires literal V2 in the advertised schema and rejects omission before dispatch', async () => {
-    const list = vi.spyOn(MCPServerStdio.prototype, 'listTools').mockResolvedValue([
-      {
-        name: 'show_cursor_sequence',
-        inputSchema: {
-          type: 'object',
-          properties: { session: { type: 'string' }, presentation_version: { type: 'integer' } },
-          required: [],
-          additionalProperties: false,
-        },
-      },
-      {
-        name: 'begin_cursor_guidance_task',
-        inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
-      },
-    ]);
-    const call = vi.spyOn(MCPServerStdio.prototype, 'callToolResult');
-    const stop = vi.fn();
-    const server = new LoggedCuaServer(
-      { name: 'V2', command: 'unused' },
-      pino({ level: 'silent' }),
-    );
-    server.beginTeachingTask(epoch, stop);
-    try {
-      const tools = await server.listTools();
-      expect(tools).toHaveLength(1);
-      expect(tools[0]?.inputSchema.properties).toEqual({
-        presentation_version: { type: 'integer', const: 2 },
-      });
-      expect(tools[0]?.inputSchema.required).toContain('presentation_version');
-      expect((await server.callToolResult('show_cursor_sequence', { steps: [] })).isError).toBe(
-        true,
-      );
-      expect(call).not.toHaveBeenCalled();
-      expect(stop).toHaveBeenCalledOnce();
-    } finally {
-      list.mockRestore();
-      call.mockRestore();
-    }
-  });
-
-  it('retains takeover as terminal and never dispatches a later replay', async () => {
-    const call = vi.spyOn(MCPServerStdio.prototype, 'callToolResult').mockResolvedValue({
-      content: [],
-      isError: true,
-      structuredContent: {
-        status: 'canceled',
-        active: false,
-        following: true,
-        task_epoch: epoch,
-        sequence_id: sequence,
-        reason: 'user_takeover',
-      },
+  it('blocks a write before goal acknowledgement and preserves observation images', async () => {
+    const driver = vi.spyOn(MCPServerStdio.prototype, 'callToolResult').mockResolvedValue({
+      content: [{ type: 'image', data: 'synthetic', mimeType: 'image/png' }],
+      structuredContent: { pid: 7, window_id: 12 },
     });
-    const stop = vi.fn();
     const server = new LoggedCuaServer(
-      { name: 'V2', command: 'unused' },
+      { name: 'goal gate test', command: 'unused', args: ['mcp'] },
       pino({ level: 'silent' }),
     );
-    server.beginTeachingTask(epoch, stop);
+    const task = new TaskContext(server.taskEvidence, new AbortController().signal);
+    server.bindTask(task);
     try {
-      await server.callToolResult('show_cursor_sequence', request);
-      await server.callToolResult('show_cursor_sequence', request);
-      expect(call).toHaveBeenCalledOnce();
-      expect(server.taskEvidence.readTeachingResult('Done')).toEqual({
-        outcome: 'canceled',
-        reason: 'user_takeover',
+      const blocked = await server.callToolResult('launch_app', {});
+      expect(blocked.isError).toBe(true);
+      expect(driver).not.toHaveBeenCalled();
+      task.defineGoal({
+        summary: 'Show app',
+        criteria: [
+          {
+            description: 'Show app content',
+          },
+        ],
       });
+      task.admitModelTurn();
+      server.taskEvidence.setReadOnlyTools(['get_window_state']);
+      const observed = await server.callToolResult('get_window_state', { pid: 7, window_id: 12 });
+      expect(observed.content[0]).toEqual({
+        type: 'image',
+        data: 'synthetic',
+        mimeType: 'image/png',
+      });
+      const reference = observed.content.at(-1);
+      expect(reference?.type).toBe('text');
+      if (reference?.type === 'text' && typeof reference.text === 'string') {
+        expect(reference.text).toContain('evidence-call-1-1');
+      }
+      expect(server.taskEvidence.readSnapshot().observations).toHaveLength(1);
     } finally {
-      call.mockRestore();
+      task.dispose();
+      driver.mockRestore();
     }
   });
-});
 
-it('never advertises or dispatches private HUD tools to a model in either task mode', async () => {
-  const native = vi.spyOn(MCPServerStdio.prototype, 'callToolResult');
-  const list = vi.spyOn(MCPServerStdio.prototype, 'listTools').mockResolvedValue([
-    {
-      name: 'set_companion_hud',
-      inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
-    },
-    {
-      name: 'bind_companion_hud_cursor',
-      inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
-    },
-  ]);
-  const server = new LoggedCuaServer(
-    { name: 'HUD policy', command: 'unused' },
-    pino({ level: 'silent' }),
-  );
-  try {
-    for (const mode of Object.values(AgentTaskMode)) {
-      server.setTaskMode(mode);
-      expect(await server.listTools()).toEqual([]);
-      expect((await server.callToolResult('set_companion_hud', {})).isError).toBe(true);
-      expect((await server.callToolResult('bind_companion_hud_cursor', {})).isError).toBe(true);
+  it('serializes desktop calls and prevents queued work after cancellation', async () => {
+    let release: ((value: CallToolResult) => void) | undefined;
+    const driver = vi.spyOn(MCPServerStdio.prototype, 'callToolResult').mockImplementation(
+      () =>
+        new Promise<CallToolResult>((resolve) => {
+          release = resolve;
+        }),
+    );
+    const server = new LoggedCuaServer(
+      { name: 'queue test', command: 'unused', args: ['mcp'] },
+      pino({ level: 'silent' }),
+    );
+    const user = new AbortController();
+    const task = new TaskContext(server.taskEvidence, user.signal);
+    server.bindTask(task);
+    server.taskEvidence.setReadOnlyTools(['get_window_state']);
+    try {
+      const first = server.callToolResult('get_window_state', { pid: 7, window_id: 12 });
+      const second = server.callToolResult('get_window_state', { pid: 7, window_id: 12 });
+      const rejected = expect(second).rejects.toThrow();
+      await Promise.resolve();
+      expect(driver).toHaveBeenCalledTimes(1);
+      user.abort();
+      release?.({ content: [] });
+      await first;
+      await rejected;
+      await server.settleCalls();
+      expect(driver).toHaveBeenCalledTimes(1);
+      expect(server.taskEvidence.readSnapshot().inFlight).toBe(0);
+    } finally {
+      task.dispose();
+      driver.mockRestore();
     }
-    expect(native).not.toHaveBeenCalled();
-  } finally {
-    native.mockRestore();
-    list.mockRestore();
-  }
+  });
 });

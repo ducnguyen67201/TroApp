@@ -1,9 +1,10 @@
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
-import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { ComputerUseInstructions } from './ComputerUseInstructions.js';
-import { createComputerUseAgent } from './CreateComputerUseAgent.js';
+import { createComputerUseAgent, createTeachingAgent } from './CreateComputerUseAgent.js';
+import { TaskContext } from './TaskContext.js';
+import { CompletionProposalSchema } from './TaskCompletionProposal.js';
 import { LoggedCuaServer } from './LoggedCuaServer.js';
 
 describe('computer-use agent tools', () => {
@@ -12,7 +13,7 @@ describe('computer-use agent tools', () => {
       { name: 'Cua agent test', command: 'unused-in-this-test', args: ['mcp'] },
       pino({ level: 'silent' }),
     );
-    const agent = createComputerUseAgent(server, DesktopLocale.VIETNAMESE, AgentTaskMode.TEACH);
+    const agent = createTeachingAgent(server, DesktopLocale.VIETNAMESE);
     expect(agent.instructions).toContain('Respond to the user in Vietnamese');
     expect(agent.instructions).toContain('This task is teaching');
     expect(agent.instructions).not.toContain(ComputerUseInstructions);
@@ -25,10 +26,17 @@ describe('computer-use agent tools', () => {
       { name: 'Cua agent test', command: 'unused-in-this-test', args: ['mcp'] },
       pino({ level: 'silent' }),
     );
-    const agent = createComputerUseAgent(server, DesktopLocale.ENGLISH);
+    const task = new TaskContext(server.taskEvidence, new AbortController().signal);
+    const agent = createComputerUseAgent(server, DesktopLocale.ENGLISH, {
+      defineGoal: (input) => task.defineGoal(input),
+      requestVerification: () => Promise.resolve(null),
+    });
+    task.dispose();
 
     expect(agent.mcpServers).toContain(server);
-    expect(agent.tools).toEqual([]);
+    expect(agent.tools.map((tool) => tool.name)).toEqual(['define_task_goal', 'verify_task']);
+    expect(agent.outputType).toBe(CompletionProposalSchema);
+    expect(agent.modelSettings.parallelToolCalls).toBe(false);
   });
 
   it('uses the task locale when reusing the same Cua connection', () => {
@@ -36,8 +44,16 @@ describe('computer-use agent tools', () => {
       { name: 'Cua agent test', command: 'unused-in-this-test', args: ['mcp'] },
       pino({ level: 'silent' }),
     );
-    const vietnameseAgent = createComputerUseAgent(server, DesktopLocale.VIETNAMESE);
-    const englishAgent = createComputerUseAgent(server, DesktopLocale.ENGLISH);
+    const task = new TaskContext(server.taskEvidence, new AbortController().signal);
+    const vietnameseAgent = createComputerUseAgent(server, DesktopLocale.VIETNAMESE, {
+      defineGoal: (input) => task.defineGoal(input),
+      requestVerification: () => Promise.resolve(null),
+    });
+    const englishAgent = createComputerUseAgent(server, DesktopLocale.ENGLISH, {
+      defineGoal: (input) => task.defineGoal(input),
+      requestVerification: () => Promise.resolve(null),
+    });
+    task.dispose();
 
     expect(vietnameseAgent.instructions).toContain(ComputerUseInstructions);
     expect(vietnameseAgent.instructions).toContain('Respond to the user in Vietnamese');

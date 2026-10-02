@@ -6,6 +6,7 @@ import { useLocale } from './localization/UseLocale.js';
 import { resolveBridgeError } from './localization/BridgeErrors.js';
 import type { TranslationKey } from './localization/English.js';
 import type { AuthUser } from '#contracts/AuthSession.js';
+import type { AgentCompletion } from '#contracts/TaskOutcome.js';
 
 export const MessageRole = { USER: 'user', AGENT: 'agent' } as const;
 
@@ -13,6 +14,7 @@ interface TaskMessage {
   role: (typeof MessageRole)[keyof typeof MessageRole];
   text: string;
   outcome?: TeachingOutcome;
+  completion?: AgentCompletion;
 }
 
 export interface ComputerUseController {
@@ -223,7 +225,7 @@ export function useComputerUse(): ComputerUseController {
         setMessages((current) => [
           ...current,
           { role: MessageRole.USER, text: submittedMessage },
-          { role: MessageRole.AGENT, text: result.answer },
+          { role: MessageRole.AGENT, text: result.answer, completion: result.completion },
         ]);
       } else if (result.kind === 'teaching') {
         setMessages((current) => [
@@ -321,8 +323,11 @@ export function useComputerUse(): ComputerUseController {
     ) {
       voiceCaptureId.current = null;
       if (event.result.kind === 'completed') {
-        const answer = event.result.answer;
-        setMessages((current) => [...current, { role: MessageRole.AGENT, text: answer }]);
+        const result = event.result;
+        setMessages((current) => [
+          ...current,
+          { role: MessageRole.AGENT, text: result.answer, completion: result.completion },
+        ]);
       } else if (event.result.kind === 'teaching') {
         const result = event.result.result;
         setMessages((current) => [

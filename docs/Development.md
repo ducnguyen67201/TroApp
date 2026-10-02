@@ -33,6 +33,14 @@ The selected `tro-api` config needs `DATABASE_URL` and a unique `AUTH_SECRET` (`
 
 Pino emits debug records only in `dev`, while operational info and errors remain available in all modes. The API defaults to the local host and port, and the desktop defaults to the local API. `ELECTRON_RENDERER_URL` is supplied by electron-vite during development; you do not set it yourself.
 
+The model gateway uses the same API console logger. Under `[api]`, messages explain request dispatch, OpenAI acceptance/rejection, completion, network failures, local credential rejection and interrupted forwarding. Failures include the original provider HTTP status, recognized error code/type, safe schema parameter path, provider request ID and elapsed time. Network failures include known transport codes such as `ECONNRESET` or `ENOTFOUND`, plus timeout/disconnection flags. Unknown error details are marked unavailable; raw provider messages, prompts, tool results, screenshots, tokens, user identifiers and credentials are excluded. No extra logging environment variable is required.
+
+Match `gatewayRequestId` in the desktop's `openai.response` record to the API gateway records. The gateway returns that identifier in `x-tro-request-id`; provider failures retain the existing generic 502 response body. For example, `OpenAI rejected the model request.` with `providerStatus: 400`, `providerErrorCode: invalid_value` and `providerParameter: input[4].content[0].type` identifies an invalid upstream input instead of suggesting a desktop or verification failure. This example is illustrative; it is not a diagnosis of a particular run.
+
+The gateway retries a rejected model fetch once after 250 ms only for `UND_ERR_SOCKET`, `ECONNRESET` or `EPIPE`. Both attempts share the original cancellation/deadline and request body. The removed daily model quota is not restored. `model.gateway.retry` explains recovery. HTTP errors, other network errors and failures after response headers are not retried. The SDK still disables its own automatic retries, and no desktop tool is replayed. A broken connection leaves provider execution uncertain, so a retry can incur another inference charge; this is bounded recovery, not an exactly-once guarantee.
+
+Cua diagnostics recognize the pinned driver's nested `refusal.code`, browser binding/setup/consent codes and focus/window codes. Focus results report only supplied boolean flags such as `request_accepted`, `process_activated`, `focused` and `front_in_process_on_display`, excluding titles and raw messages. Response counters reflect the post-call task state; `recordedObservationCount` reports new captures from that call separately from the retained observation count.
+
 Backend settings and provider keys belong in Doppler, not `.env`. Copy `.env.example` to
 `.env.local` only when overriding the two public desktop settings.
 

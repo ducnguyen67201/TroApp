@@ -1,6 +1,10 @@
 import type { TranslationCatalog } from './English.js';
 
 export const vietnamese = {
+  taskSucceeded: 'Đã hoàn tất yêu cầu',
+  taskPartial: 'Đã hoàn tất một phần',
+  taskBlocked: 'Không thể tiếp tục',
+  taskUnverified: 'Chưa xác nhận được kết quả',
   voiceDisclosure:
     'Khi bạn giữ phím tắt hoặc nút Nói, Tro gửi âm thanh từ micrô đến OpenAI. Thả để tự động gửi chỉ dẫn đã nhận dạng cho trợ lý. Sử dụng ngôn ngữ hiện tại. Nhấn Escape để hủy. Âm thanh và bản chép lời không được lưu trên thiết bị.',
   voiceStarting: 'Đang chuẩn bị nhập bằng giọng nói…',
