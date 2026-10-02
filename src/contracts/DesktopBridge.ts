@@ -1,3 +1,8 @@
+import type {
+  MicrophoneTestCommand,
+  MicrophoneTestEvent,
+  MicrophoneTestReply,
+} from './MicrophoneTest.js';
 import type { VoiceMeter } from './CompanionHud.js';
 import type { VoiceAudioFrame, VoiceCommand, VoiceEvent, VoiceReply } from './VoiceInput.js';
 import type { AgentTaskMode } from './CursorCompanion.js';
@@ -15,6 +20,8 @@ import type {
  * turns and controls the worker lifecycle.
  */
 export interface DesktopBridge {
+  controlMicrophoneTest(command: MicrophoneTestCommand): Promise<MicrophoneTestReply>;
+  subscribeMicrophoneTest(listener: (event: MicrophoneTestEvent) => void): () => void;
   updateVoiceMeter(meter: VoiceMeter): void;
   controlVoiceInput(command: VoiceCommand): Promise<VoiceReply>;
   appendVoiceAudio(frame: VoiceAudioFrame): Promise<VoiceReply>;

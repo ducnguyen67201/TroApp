@@ -17,18 +17,21 @@ import { useVoiceInput } from './UseVoiceInput.js';
 
 const doubles = vi.hoisted(() => {
   const append: Array<(pcm: Uint8Array) => void> = [];
+  const fail: Array<() => void> = [];
   return {
     append,
+    fail,
     dispose: vi.fn<() => void>(),
     flush: vi.fn<() => Promise<void>>().mockResolvedValue(),
-    start: vi.fn<() => Promise<void>>().mockResolvedValue(),
+    start: vi.fn<(deviceId?: string) => Promise<void>>().mockResolvedValue(),
   };
 });
 
 vi.mock('./VoiceAudioCapture.js', () => ({
   VoiceAudioCapture: class {
-    constructor(appendFrame: (pcm: Uint8Array) => void) {
+    constructor(appendFrame: (pcm: Uint8Array) => void, failCapture: () => void) {
       doubles.append.push(appendFrame);
+      doubles.fail.push(failCapture);
     }
     startCapture = doubles.start;
     flushCapture = doubles.flush;
@@ -42,6 +45,12 @@ function createBridge() {
       kind: 'ok',
       status: { state: 'idle', shortcut: 'command-control', globalShortcutAvailable: true },
     }),
+    controlMicrophoneTest: vi
+      .fn<DesktopBridge['controlMicrophoneTest']>()
+      .mockResolvedValue({ kind: 'ok' }),
+    subscribeMicrophoneTest: vi
+      .fn<DesktopBridge['subscribeMicrophoneTest']>()
+      .mockReturnValue(() => {}),
     updateVoiceMeter: vi.fn<DesktopBridge['updateVoiceMeter']>(),
     appendVoiceAudio: vi.fn<DesktopBridge['appendVoiceAudio']>().mockResolvedValue({
       kind: 'ok',
@@ -89,6 +98,7 @@ function wrapper({ children }: { children: ReactNode }) {
 beforeEach(() => {
   window.localStorage.clear();
   doubles.append.splice(0);
+  doubles.fail.splice(0);
   doubles.dispose.mockClear();
   doubles.flush.mockClear();
 });
@@ -394,4 +404,72 @@ it('stops and flushes on early release, then waits for relay readiness before se
     });
   });
   expect(bridge.appendVoiceAudio).toHaveBeenCalledTimes(1);
+});
+
+it('snapshots the selected microphone per hold without restarting the subscription', async () => {
+  const bridge = createBridge();
+  window.tro = bridge;
+  const { rerender } = renderHook(
+    ({ deviceId }) =>
+      useVoiceInput('user', () => {}, AgentTaskMode.EXECUTE, {
+        selectedDeviceId: deviceId,
+        refreshMicrophones: () => Promise.resolve(),
+      }),
+    { wrapper, initialProps: { deviceId: 'usb' } },
+  );
+  await waitFor(() => {
+    expect(bridge.subscribeVoiceInput).toHaveBeenCalled();
+  });
+  const emit = bridge.subscribeVoiceInput.mock.calls.at(-1)?.[0];
+  if (!emit) {
+    throw new Error('Missing voice subscription.');
+  }
+  act(() => {
+    emit({ kind: 'prepare', captureId: firstId });
+  });
+  expect(doubles.start).toHaveBeenLastCalledWith('usb');
+  rerender({ deviceId: 'built-in' });
+  expect(doubles.start).toHaveBeenLastCalledWith('usb');
+  act(() => {
+    emit({ kind: 'cancel', captureId: firstId });
+  });
+  act(() => {
+    emit({ kind: 'prepare', captureId: nextId });
+  });
+  expect(doubles.start).toHaveBeenLastCalledWith('built-in');
+  expect(bridge.subscribeVoiceInput).toHaveBeenCalledOnce();
+});
+
+it('cancels a disconnected microphone and ignores its remaining frames and release', () => {
+  const bridge = createBridge();
+  window.tro = bridge;
+  const { result } = renderHook(() => useVoiceInput('user', () => {}), { wrapper });
+  const emit = bridge.subscribeVoiceInput.mock.calls[0]?.[0];
+  if (!emit) {
+    throw new Error('Missing voice subscription.');
+  }
+  act(() => {
+    emit({ kind: 'prepare', captureId: firstId });
+  });
+  const failCapture = doubles.fail[0];
+  const appendFrame = doubles.append[0];
+  if (!failCapture || !appendFrame) {
+    throw new Error('Missing capture callbacks.');
+  }
+  act(() => {
+    failCapture();
+  });
+  expect(result.current.error).toBe(true);
+  expect(bridge.controlVoiceInput).toHaveBeenCalledWith({ kind: 'cancel' });
+  expect(doubles.dispose).toHaveBeenCalledOnce();
+  act(() => {
+    appendFrame(new Uint8Array(960));
+    emit({ kind: 'record', captureId: firstId });
+    emit({ kind: 'release', captureId: firstId });
+  });
+  expect(bridge.appendVoiceAudio).not.toHaveBeenCalled();
+  expect(bridge.controlVoiceInput.mock.calls.some(([command]) => command.kind === 'finish')).toBe(
+    false,
+  );
+  expect(bridge.sendAgentMessage).not.toHaveBeenCalled();
 });

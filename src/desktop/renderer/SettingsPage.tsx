@@ -1,4 +1,4 @@
-import { Divider, Group, NativeSelect, Paper, Stack, Text, Title } from '@mantine/core';
+import { Button, Divider, Group, NativeSelect, Paper, Stack, Text, Title } from '@mantine/core';
 import type { ReactElement } from 'react';
 import { desktopLocales } from './localization/Locale.js';
 import { useLocale } from './localization/UseLocale.js';
@@ -6,10 +6,11 @@ import type { AuthUser } from '#contracts/AuthSession.js';
 
 interface SettingsPageProps {
   user: AuthUser | null;
+  onChooseMicrophone: () => void;
 }
 
-/** Account details, device language preference and the current appearance. */
-export function SettingsPage({ user }: SettingsPageProps): ReactElement {
+/** Account details, local language and microphone preferences, and appearance. */
+export function SettingsPage({ user, onChooseMicrophone }: SettingsPageProps): ReactElement {
   const { locale, messages, changeLocale, isLocaleSaved } = useLocale();
 
   return (
@@ -67,6 +68,18 @@ export function SettingsPage({ user }: SettingsPageProps): ReactElement {
             {messages.languageStorageWarning}
           </Text>
         )}
+        <Divider my="xl" color="var(--tro-border)" />
+        <Group justify="space-between" align="flex-start">
+          <div>
+            <Title order={2}>{messages.microphone}</Title>
+            <Text size="sm" c="dimmed" mt={6}>
+              {messages.microphoneDescription}
+            </Text>
+          </div>
+          <Button variant="default" onClick={onChooseMicrophone} disabled={!user}>
+            {messages.microphoneChange}
+          </Button>
+        </Group>
         <Divider my="xl" color="var(--tro-border)" />
         <Group justify="space-between">
           <div>

@@ -9,6 +9,7 @@ import type { AgentResult } from '#contracts/AgentSession.js';
 import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import type { VoiceReply } from '#contracts/VoiceInput.js';
 import { CompletionMode, TaskOutcomeStatus } from '#contracts/TaskOutcome.js';
+import { microphoneStorageKey } from './voice/Microphones.js';
 import { App } from './App.js';
 import { DesktopLocale, localeStorageKey } from './localization/Locale.js';
 import { LocaleProvider } from './localization/LocaleProvider.js';
@@ -19,6 +20,12 @@ const sessionId = 'a8f6d44a-5c18-4ce3-9237-44624549f63f';
 
 function createDesktopBridge() {
   return {
+    controlMicrophoneTest: vi
+      .fn<DesktopBridge['controlMicrophoneTest']>()
+      .mockResolvedValue({ kind: 'ok' }),
+    subscribeMicrophoneTest: vi
+      .fn<DesktopBridge['subscribeMicrophoneTest']>()
+      .mockReturnValue(() => {}),
     updateVoiceMeter: vi.fn<DesktopBridge['updateVoiceMeter']>(),
     controlVoiceInput: vi.fn<DesktopBridge['controlVoiceInput']>().mockImplementation((command) =>
       Promise.resolve<VoiceReply>({
@@ -754,4 +761,77 @@ it('renders a voice takeover with the same typed teaching outcome', async () => 
   expect(
     screen.getByText('The guide stopped. Send a new request when you want to continue.'),
   ).toBeTruthy();
+});
+
+it('selects and saves a suggested microphone from the accessible picker without opening audio', async () => {
+  function createDevice(deviceId: string, label: string): MediaDeviceInfo {
+    return {
+      deviceId,
+      label,
+      kind: 'audioinput',
+      groupId: deviceId,
+      toJSON: () => ({ deviceId, label }),
+    };
+  }
+
+  const events = new EventTarget();
+  const getUserMedia = vi.fn<MediaDevices['getUserMedia']>();
+  const enumerateDevices = vi
+    .fn<MediaDevices['enumerateDevices']>()
+    .mockResolvedValue([
+      createDevice('default', 'Default - AirPods'),
+      createDevice('usb', 'USB microphone'),
+      createDevice('wireless', 'AirPods'),
+    ]);
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: {
+      enumerateDevices,
+      getUserMedia,
+      addEventListener: events.addEventListener.bind(events),
+      removeEventListener: events.removeEventListener.bind(events),
+    },
+  });
+  try {
+    renderDesktop();
+    fireEvent.click(await screen.findByRole('button', { name: 'Microphone' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Microphone' });
+    expect(await within(dialog).findByText('Suggested')).toBeTruthy();
+    expect(
+      within(dialog).getAllByText(
+        'Appears to be Bluetooth. Wireless startup and audio quality can vary.',
+      )[0],
+    ).toBeTruthy();
+    const usbOption = within(dialog).getByRole('radio', { name: 'USB microphone' });
+    expect(usbOption.getAttribute('aria-describedby')).toBeTruthy();
+    expect(within(dialog).getByText('2 microphone inputs')).toBeTruthy();
+    fireEvent.click(usbOption);
+    expect(window.localStorage.getItem(microphoneStorageKey)).toBe('usb');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose microphone' }));
+    expect(await screen.findByRole('radio', { name: /USB microphone/ })).toHaveProperty(
+      'checked',
+      true,
+    );
+    enumerateDevices.mockResolvedValue([createDevice('wireless', 'AirPods')]);
+    act(() => {
+      events.dispatchEvent(new Event('devicechange'));
+    });
+    expect(await screen.findByText(/Your selected microphone is unavailable/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: /Auto-detect/ }));
+    expect(window.localStorage.getItem(microphoneStorageKey)).toBe('default');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit ranking' }));
+    expect(screen.getByRole('button', { name: 'Move AirPods up' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Compare microphones' }));
+    expect(screen.getByText(/Sound is measured on this device/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Test AirPods' })).toBeTruthy();
+    expect(getUserMedia).not.toHaveBeenCalled();
+  } finally {
+    cleanup();
+    Reflect.deleteProperty(navigator, 'mediaDevices');
+  }
 });

@@ -36,6 +36,8 @@ A per-task harness gates desktop completion: task replies distinguish succeeded,
 
 Voice input starts automatically after signing in: hold Command + Control on Mac or Control + Left Alt on Windows, speak, and release to send the final transcript to the agent. It uses GPT Live Transcribe through the authenticated backend and follows the existing English/Vietnamese language choice. The companion HUD shows voice capture and task progress; the workspace has no separate voice panel. If the global shortcut is unavailable, use typed messages until OS access is restored and you sign in again. Development startup applies the transcription migration automatically; hosted releases use the normal reviewed migration workflow. Backend defaults allow one capture at a time and 3,600 audio seconds per account per UTC day. See [VoiceInputSpec.md](docs/VoiceInputSpec.md) for implementation and live/packaged verification limits.
 
+Choose an input from **Microphone** in the app header or Settings. Auto-detect follows your computer settings; a specific choice is saved locally. Tro suggests recognized wired or built-in inputs using device-name hints, with explanations for wireless/virtual inputs. Use **Edit ranking** to save your preferred order, or **Compare microphones** to run a six-second local quiet/speech test for each input. Tests show levels, clipping and startup time without uploading or saving audio. Ranking never changes the selected route. Missing explicit choices never silently switch to another microphone. See [MicrophoneSelection.md](docs/MicrophoneSelection.md) for engineering details and hardware checks.
+
 ## Ownership
 
 | Folder          | Owns                                                              |

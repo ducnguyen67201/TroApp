@@ -13,7 +13,9 @@ Voice input starts automatically after signing in, with no enable/disable settin
 - Escape, sleep, screen lock, account change, window close, or an error cancel capture. Late results from canceled captures cannot start tasks.
 - A running agent blocks voice activation and concurrent text admission. This also prevents agent keyboard actions from activating voice. Voice retains the existing independent-task behavior and does not add conversation memory.
 
-No microphone tracks remain open between holds. Wait for the listening indicator before speaking on a cold microphone start; hardware activation cannot be instantaneous. A five-second bounded audio queue preserves captured speech while the relay connects. Releasing before the relay is ready stops the microphone immediately and waits for the connection to finalize already captured speech; it does not discard the command. Escape or an error cancels it.
+The microphone dialog in the app header and Settings selects a local input for the next hold. Auto-detect follows the OS; explicit choices use exact device constraints and fail visibly when unavailable. Name-based suggestions do not measure audio quality. Editable ranking sets a local preference independently of the selected route; local comparison reports quiet/speech levels and clipping without sending audio to the relay or agent. See [MicrophoneSelection.md](MicrophoneSelection.md).
+
+No voice microphone tracks remain open between holds. Explicit local comparison tests open one separate bounded stream and pause hold-to-talk admission until completion/cancellation. Wait for the listening indicator before speaking on a cold microphone start; hardware activation cannot be instantaneous. A five-second bounded audio queue preserves captured speech while the relay connects. Releasing before the relay is ready stops the microphone immediately and waits for the connection to finalize already captured speech; it does not discard the command. Escape or an error cancels it.
 
 ## Transcription choice and latency
 
@@ -49,7 +51,7 @@ Main owns capture identity, account rechecks, deadlines, cancellation, and final
 
 The native listener owns physical key state, auto-repeat suppression, first-release stop, and both-release rearming. It is loaded during authenticated voice startup after OS permission checks. Mac requires Tro's Accessibility permission, shared with its embedded computer-use driver. Missing hook access prevents shortcut capture; typed messages remain available. Packaged permissions, Input Monitoring requirements, background recording and Windows AltGr behavior must be tested on each supported OS.
 
-The sandboxed renderer owns microphone resources. Electron's permission check and request handlers allow audio only for the trusted main frame during an active capture. Cameras, other permissions, and unrelated frames are denied. macOS packaging includes `NSMicrophoneUsageDescription` and the audio-input entitlement. Microphone tracks stop on release/cancel even if device setup completes late.
+The sandboxed renderer owns microphone resources. Electron's permission check handler allows audio only for the trusted main frame while voice is enabled, permitting idle device enumeration. New permission requests require an active voice capture or an authorized main-owned local test lease. Chromium can reuse an existing audio grant for streams; the trusted capture implementation enforces held-key recording lifetime. Cameras, other permissions, and unrelated frames are denied. macOS packaging includes `NSMicrophoneUsageDescription` and the audio-input entitlement. Microphone tracks stop on release/cancel even if device setup completes late.
 
 Closing the window detaches it before canceling voice. Voice event delivery checks both the window and web contents for destruction, so cleanup and late callbacks can finish without sending IPC to a destroyed renderer.
 

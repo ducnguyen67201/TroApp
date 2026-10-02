@@ -1,3 +1,4 @@
+import { defaultMicrophoneId } from './Microphones.js';
 import { VoiceLevelMeter } from './VoiceLevelMeter.js';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -10,6 +11,7 @@ import {
 import { useLocale } from '../localization/UseLocale.js';
 import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { VoiceAudioCapture } from './VoiceAudioCapture.js';
+import type { MicrophoneView } from './UseMicrophones.js';
 
 export interface VoiceInputView {
   status: VoiceStatus;
@@ -35,16 +37,27 @@ interface CaptureQueue {
   pumping: boolean;
 }
 
+type VoiceMicrophoneSelection = Pick<MicrophoneView, 'selectedDeviceId' | 'refreshMicrophones'>;
+
 /** App-level subscription reads the existing locale hook at each preparation.
  * The capture snapshot and audio queue survive page navigation, not account changes. */
 export function useVoiceInput(
   userId: string | null,
   receiveTaskEvent: (event: VoiceEvent) => void,
   taskMode: AgentTaskMode = AgentTaskMode.EXECUTE,
+  microphone?: VoiceMicrophoneSelection,
 ): VoiceInputView {
   const { locale } = useLocale();
-  const latest = useRef({ locale, taskMode, receiveTaskEvent });
-  latest.current = { locale, taskMode, receiveTaskEvent };
+  const microphoneId = microphone?.selectedDeviceId ?? defaultMicrophoneId;
+  const refreshMicrophones = microphone?.refreshMicrophones;
+  const latest = useRef({
+    locale,
+    taskMode,
+    receiveTaskEvent,
+    microphoneId,
+    refreshMicrophones,
+  });
+  latest.current = { locale, taskMode, receiveTaskEvent, microphoneId, refreshMicrophones };
   const capture = useRef<CaptureQueue | null>(null);
   const generation = useRef(0);
   const [status, setStatus] = useState<VoiceStatus>({
@@ -172,11 +185,19 @@ export function useVoiceInput(
             pumping: false,
           };
           capture.current = current;
-          void audio.startCapture().catch(() => {
-            if (capture.current === current) {
-              failCapture();
-            }
-          });
+          // Snapshot the input for this hold; selection changes affect the next hold.
+          void audio
+            .startCapture(latest.current.microphoneId)
+            .then(() => {
+              if (capture.current === current) {
+                void latest.current.refreshMicrophones?.();
+              }
+            })
+            .catch(() => {
+              if (capture.current === current) {
+                failCapture();
+              }
+            });
           // Snapshot locale and mode now; changes affect only the next capture.
           void window.tro
             .controlVoiceInput({

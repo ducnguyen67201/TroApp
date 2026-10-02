@@ -1,3 +1,8 @@
+import {
+  MicrophoneTestCommandSchema,
+  MicrophoneTestEventSchema,
+  MicrophoneTestReplySchema,
+} from '#contracts/MicrophoneTest.js';
 import { VoiceMeterSchema, type VoiceMeter } from '#contracts/CompanionHud.js';
 import {
   VoiceCommandSchema,
@@ -30,6 +35,27 @@ import {
 /* Expose named session operations, not generic IPC or direct computer tools.
    Validate IPC data before it enters the renderer. */
 const bridge: DesktopBridge = {
+  async controlMicrophoneTest(command) {
+    try {
+      return MicrophoneTestReplySchema.parse(
+        await ipcRenderer.invoke('tro:microphone-test', MicrophoneTestCommandSchema.parse(command)),
+      );
+    } catch {
+      return { kind: 'failed' };
+    }
+  },
+  subscribeMicrophoneTest(listener) {
+    const receive = (_event: Electron.IpcRendererEvent, raw: unknown): void => {
+      const parsed = MicrophoneTestEventSchema.safeParse(raw);
+      if (parsed.success) {
+        listener(parsed.data);
+      }
+    };
+    ipcRenderer.on('tro:microphone-test-event', receive);
+    return () => {
+      ipcRenderer.removeListener('tro:microphone-test-event', receive);
+    };
+  },
   updateVoiceMeter(meter: VoiceMeter): void {
     const parsed = VoiceMeterSchema.safeParse(meter);
     if (parsed.success) {
