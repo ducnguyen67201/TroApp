@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
 import { chooseCuaDriverCommand } from './ChooseCuaDriverCommand.js';
+import { CuaCompanionBuild } from '#contracts/CuaCompanionBuild.js';
 
 const temporaryDirectories: string[] = [];
 
@@ -47,6 +48,44 @@ it('uses the cached Windows driver when no packaged executable exists', async ()
   await expect(
     chooseCuaDriverCommand({ resourcesPath, homeDirectory, platform: 'win32' }),
   ).resolves.toEqual({ command });
+});
+
+it('selects the verified companion executable in the embedded layout', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'tro-companion-choice-'));
+  temporaryDirectories.push(root);
+  const homeDirectory = join(root, 'home');
+  const cache = join(homeDirectory, '.cache', 'tro', 'cua-companion');
+  const command = join(cache, 'cua-driver');
+  await createExecutable(command);
+  await createExecutable(join(homeDirectory, '.cache', 'tro', 'cua-driver', 'cua-driver'));
+  await writeFile(
+    join(cache, 'CompanionBuild.json'),
+    JSON.stringify({
+      version: CuaCompanionBuild.VERSION,
+      sourceCommit: CuaCompanionBuild.SOURCE_COMMIT,
+      patchSha256: 'a'.repeat(64),
+      executableSha256: 'b'.repeat(64),
+      architecture: 'arm64',
+    }),
+  );
+  await expect(
+    chooseCuaDriverCommand({
+      resourcesPath: join(root, 'resources'),
+      homeDirectory,
+      platform: 'darwin',
+    }),
+  ).resolves.toEqual({ command });
+
+  await writeFile(join(cache, 'CompanionBuild.json'), '{}');
+  await expect(
+    chooseCuaDriverCommand({
+      resourcesPath: join(root, 'resources'),
+      homeDirectory,
+      platform: 'darwin',
+    }),
+  ).resolves.toEqual({
+    command: join(homeDirectory, '.cache', 'tro', 'cua-driver', 'cua-driver'),
+  });
 });
 
 it('does not use an independent macOS app when Tro has no prepared driver', async () => {

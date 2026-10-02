@@ -45,6 +45,14 @@ export const vietnamese = {
   welcome: (name: string): string => `Chào mừng trở lại, ${name}`,
   workspaceHeading: 'Một không gian nhỏ, làm được nhiều hơn.',
   workspaceDescription: 'Máy tính của bạn, có thêm một người trợ giúp.',
+  taskMode: 'Cách Tro hỗ trợ',
+  showMe: 'Hướng dẫn tôi',
+  doIt: 'Làm giúp tôi',
+  stopTask: 'Dừng',
+  teachingDisclosure:
+    'Tro hiển thị hướng dẫn; bạn điều khiển chuột và bàn phím. Tro có thể đưa ứng dụng đang mở lên trước. Nội dung màn hình gửi đến OpenAI sẽ rời khỏi máy tính. Hiện hướng dẫn hỗ trợ màn hình chính trên macOS.',
+  errorCompanionUnavailable:
+    'Hướng dẫn con trỏ chưa khả dụng. Hãy cập nhật hoặc cài lại Tro rồi thử lại.',
   newTask: 'Tác vụ mới',
   makeYourselfAtHome: 'Chào mừng bạn đến với Tro.',
   googleInvitation: 'Đăng nhập để bắt đầu tác vụ với Tro. Google sẽ mở trong trình duyệt của bạn.',
@@ -78,6 +86,16 @@ export const vietnamese = {
   errorAgentActive: 'Một phiên trợ lý đang hoạt động.',
   errorAgentStopped: 'Phiên trợ lý đã kết thúc. Hãy bắt đầu tác vụ mới.',
   errorAgentTimeout: 'Yêu cầu gửi đến trợ lý đã hết thời gian chờ. Vui lòng thử lại.',
+  guidanceDemonstrated: 'Đã hiển thị hướng dẫn',
+  guidanceExplained: 'Giải thích',
+  guidanceNeedsInput: 'Cần bạn hỗ trợ',
+  guidanceCanceled: 'Đã dừng hướng dẫn',
+  guidanceFailed: 'Chưa hoàn tất hướng dẫn',
+  guidanceNeedsInputMessage:
+    'Tro chưa thể minh họa bước này. Hãy kiểm tra mục tiêu hiển thị trên màn hình chính, rồi gửi yêu cầu mới.',
+  guidanceCanceledMessage: 'Hướng dẫn đã dừng. Hãy gửi yêu cầu mới khi bạn muốn tiếp tục.',
+  guidanceFailedMessage:
+    'Tro chưa thể hoàn tất hướng dẫn trực quan. Hãy gửi yêu cầu mới để thử lại.',
   errorDesktopPermissions:
     'Không thể bắt đầu điều khiển máy tính. Hãy cấp quyền Ghi màn hình và Trợ năng cho Tro trong Cài đặt hệ thống, rồi thử lại.',
   errorDesktopStart:

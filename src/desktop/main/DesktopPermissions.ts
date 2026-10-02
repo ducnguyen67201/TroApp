@@ -8,6 +8,7 @@ import {
   type DesktopPermissionStatus,
   type PermissionActionResult,
 } from '#contracts/DesktopPermissions.js';
+import type { AgentChatPermissions } from './AgentChatPorts.js';
 import { loadCuaSdk } from './LoadCuaSdk.js';
 
 const runFile = promisify(execFile);
@@ -49,7 +50,7 @@ export function readHostPermissionStatus(grants: {
 
 /** Tro owns macOS permission UX. Status reads never start a driver or prompt;
  * a renderer can request access but cannot supply a command or Settings URL. */
-export class DesktopPermissions {
+export class DesktopPermissions implements AgentChatPermissions {
   async readStatus(): Promise<DesktopPermissionStatus> {
     if (process.platform !== 'darwin') {
       return {

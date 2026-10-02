@@ -1,6 +1,18 @@
-import { access, constants } from 'node:fs/promises';
+import { access, constants, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { CuaCompanionBuildSchema } from '#contracts/CuaCompanionBuild.js';
+
+async function hasCompanionBuild(directory: string): Promise<boolean> {
+  try {
+    const metadata: unknown = JSON.parse(
+      await readFile(join(directory, 'CompanionBuild.json'), 'utf8'),
+    );
+    return CuaCompanionBuildSchema.safeParse(metadata).success;
+  } catch {
+    return false;
+  }
+}
 
 export interface CuaDriverCommand {
   command: string;
@@ -30,8 +42,12 @@ export async function chooseCuaDriverCommand(
     platform: process.platform,
   },
 ): Promise<CuaDriverCommand> {
+  const companionDirectory = join(locations.homeDirectory, '.cache', 'tro', 'cua-companion');
   const directories = [
     join(locations.resourcesPath, 'cua-driver'),
+    ...(locations.platform === 'darwin' && (await hasCompanionBuild(companionDirectory))
+      ? [companionDirectory]
+      : []),
     join(locations.homeDirectory, '.cache', 'tro', 'cua-driver'),
   ];
   for (const directory of directories) {

@@ -36,6 +36,12 @@ Pino emits debug records only in `dev`, while operational info and errors remain
 Backend settings and provider keys belong in Doppler, not `.env`. Copy `.env.example` to
 `.env.local` only when overriding the two public desktop settings.
 
+The model gateway has no per-account or daily model request cap. Authenticated requests
+are forwarded regardless of previous request counts, and Tro no longer increments the
+historical `ModelUsage` records. Existing records and applied migrations are preserved.
+Idle cursor following does not make model requests. OpenAI's own provider limits may
+still apply.
+
 Start the database separately when needed. `pnpm dev` applies existing migrations automatically;
 use `db:migrate` when authoring a new migration after editing `schema.prisma`:
 
@@ -138,3 +144,15 @@ Set `MAIN_VITE_API_BASE_URL` to the public HTTPS backend URL before building, th
 `build:desktop` bundles the main, local worker, preload, and renderer and writes an isolated `out/package.json`. `package:desktop` stages that output outside the pnpm workspace, downloads the pinned Cua Driver 0.30.4 release for the build platform, verifies its SHA-256 digest, and includes it outside ASAR as an executable resource. This prevents the workspace's backend dependencies from entering the desktop artifact and gives users the driver with Tro's installer. Development caches the same verified release under `~/.cache/tro/cua-driver`. Build installers on each target OS/architecture; macOS carries the driver executable and native SDK as resources; Tro owns the OS grants and directly starts a private embedded daemon. Sign the native libraries and driver before signing/notarizing the enclosing Tro app. Windows carries the native executable. Validate signed/notarized packaging and OS permissions before release. A packaged build does not download driver code on first launch; updates arrive with a new Tro installer.
 
 The app package uses ASAR for JavaScript, while the bundled Cua executable and SDK libraries live inside Tro's physical Resources directory. Packaging checks their presence before signing. There is no separate CuaDriver app to install or authorize. The worker uses a short-lived Tro gateway token and disables SDK tracing. The provider key is backend-only.
+
+## Companion driver build
+
+Run `pnpm build:cua` before testing native cursor guidance on macOS. It builds
+the pinned companion patch into the same embedded executable layout used by
+Tro’s standard driver, with its runtime libraries and build metadata under
+`~/.cache/tro/cua-companion`. Development prefers a valid companion cache over
+the standard release cache; packaged resources take precedence over both.
+Tro’s main process owns the native host, permission checks and private endpoint
+for both idle following and credentialed tasks. Enable Tro in System Settings;
+development builds use Electron’s identity. Rebuild an older companion cache
+with this command before restarting the desktop.

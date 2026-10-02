@@ -43,6 +43,14 @@ export const english = {
   welcome: (name: string): string => `Welcome back, ${name}`,
   workspaceHeading: 'A little space to do more.',
   workspaceDescription: 'Your desktop, with a helping hand.',
+  taskMode: 'How Tro helps',
+  showMe: 'Show me',
+  doIt: 'Do it for me',
+  stopTask: 'Stop',
+  teachingDisclosure:
+    'Tro shows visual previews while you control your mouse and keyboard. It may focus an existing app. Screen observations sent to OpenAI leave your computer. Guidance currently supports the main display on macOS.',
+  errorCompanionUnavailable:
+    'Cursor guidance is unavailable. Update or reinstall Tro, then try again.',
   newTask: 'New task',
   makeYourselfAtHome: 'Make yourself at home.',
   googleInvitation: 'Sign in to start a task with Tro. Google opens in your browser.',
@@ -75,6 +83,15 @@ export const english = {
   errorAgentActive: 'An agent session is already active.',
   errorAgentStopped: 'The agent session ended. Start a new task.',
   errorAgentTimeout: 'The agent request timed out. Please try again.',
+  guidanceDemonstrated: 'Guide finished',
+  guidanceExplained: 'Explanation',
+  guidanceNeedsInput: 'Your input is needed',
+  guidanceCanceled: 'Guide stopped',
+  guidanceFailed: 'Guide could not finish',
+  guidanceNeedsInputMessage:
+    'Tro could not show this step. Check that the target is visible on your primary display, then send a new request.',
+  guidanceCanceledMessage: 'The guide stopped. Send a new request when you want to continue.',
+  guidanceFailedMessage: 'Tro could not finish the visual guide. Send a new request to try again.',
   errorDesktopPermissions:
     'Desktop control could not start. Allow Tro Screen Recording and Accessibility in System Settings, then try again.',
   errorDesktopStart:

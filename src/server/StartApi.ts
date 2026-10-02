@@ -37,12 +37,7 @@ async function startApi(): Promise<void> {
     environment.AUTH_BASE_URL,
     Boolean(environment.GOOGLE_CLIENT_ID),
   );
-  registerModelGateway(
-    api,
-    authentication.readSignedInUserId,
-    authentication.countModelRequest,
-    environment,
-  );
+  registerModelGateway(api, authentication.readSignedInUserId, environment);
 
   api.addHook('onClose', async () => {
     await database.close();

@@ -63,12 +63,7 @@ describe('Tro account and scoped model credential', () => {
     const authentication = createAuthDatabase(environment);
     const api = createApi(database);
     registerAuthRoutes(api, authentication.auth, environment.AUTH_BASE_URL, true);
-    registerModelGateway(
-      api,
-      authentication.readSignedInUserId,
-      authentication.countModelRequest,
-      environment,
-    );
+    registerModelGateway(api, authentication.readSignedInUserId, environment);
 
     try {
       const google = await api.inject('/api/v1/auth/google');

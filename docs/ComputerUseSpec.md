@@ -18,13 +18,13 @@ flowchart LR
   AUTH --> PG[(PostgreSQL)]
 ```
 
-The user signs into Tro with Google in the system browser. Public email/password signup and sign-in are disabled so a client cannot mint new accounts through an unverified password form to reset the per-user model allowance. Better Auth returns a short-lived code to Electron through the registered app protocol; Electron main exchanges it for a session. The backend keeps `OPENAI_API_KEY` and the Google client secret, and issues a 15-minute model-only token to Electron main. Main passes that token to the local utility process, where the Agents SDK calls Tro's model gateway. React receives neither the model token nor the provider keys. The gateway limits the model and output tokens and counts requests per user per UTC day. The model runs remotely; screen observations or tool results sent to it leave the computer.
+The user signs into Tro with Google in the system browser. Google is the supported sign-in flow; public email/password signup and sign-in are disabled. Better Auth returns a short-lived code to Electron through the registered app protocol; Electron main exchanges it for a session. The backend keeps `OPENAI_API_KEY` and the Google client secret, and issues a 15-minute model-only token to Electron main. Main passes that token to the local utility process, where the Agents SDK calls Tro's model gateway. React receives neither the model token nor the provider keys. The gateway limits the model and output tokens but does not cap or count model requests per account or per day. Historical ModelUsage records remain in the database and no longer affect requests. The model runs remotely; screen observations or tool results sent to it leave the computer.
 
 Cua Driver is included in packaged desktop builds and exposes its current tools over a private MCP connection. During development, Tro downloads the pinned, SHA-256-verified release once. On macOS, Tro requests Accessibility and Screen Recording in its own main process. Once both grants are verified, main directly starts a private embedded Cua daemon and supplies its MCP command, environment, and socket to the worker. The driver inherits the host's permissions and never launches a second app through LaunchServices. The pinned native SDK and executable are shipped outside ASAR. Signed packaged builds use Tro; development Electron has its own identity. The Agents SDK discovers the tool catalog and chooses actions. Tro's standing instruction is [ComputerUseInstructions.ts](../src/desktop/worker/ComputerUseInstructions.ts). Tro does not maintain a wrapper for each Cua action. The agent can take general GUI actions in accessible apps. This prototype has no per-action approval UI, though Cua's runtime permission mode may apply. Push-to-talk is implemented as described in [VoiceInputSpec.md](VoiceInputSpec.md); class context is not implemented.
 
 Some Cua tools declare open-ended JSON arguments. [LoggedCuaServer.ts](../src/desktop/worker/LoggedCuaServer.ts) adjusts their advertised top-level schema before the Agents SDK reads it, avoiding a repeated strict-schema conversion warning. The SDK still sends these tools to the model in non-strict mode with open arguments; Cua remains the owner of tool execution. Tro does not add browser-specific tools or call macOS LaunchServices to carry out user tasks. Cua provides `launch_app`, `list_windows`, `bring_to_front`, `get_window_state`, `browser_prepare`, `get_browser_state`, and `browser_navigate`. The agent first looks for existing windows across all Spaces and displays, reuses a matching tab or window, and focuses that exact window. A current-Space-only or PID-filtered empty list does not establish that an app is absent. `browser_navigate` requires a tab identified by Cua; `browser_prepare` only establishes browser control. Desktop hotkeys are a fallback after the target window is confirmed.
 
-An accepted `launch_app` call does not prove that a requested page is visible. Cua's MCP annotations identify state-changing tools; after one runs, the worker requires a fresh Cua desktop, window, browser, accessibility, or verification observation before accepting the task as complete. The agent is instructed to compare that observation with the user's actual goal. The worker also tracks MCP errors, refusals, and unsatisfied `verify_state` results across one task. An earlier failed tool no longer forces a retry after a later successful action and fresh state observation; an unsatisfied `verify_state` still needs a satisfied verification. The worker gives the agent one bounded continuation to correct an incomplete task and reports failure if the problem remains. This general check does not interpret arbitrary screenshots or guarantee that the model chose a verification predicate matching the user's goal. Browser navigation and visible-window behavior still need end-to-end validation on macOS and Windows.
+An accepted `launch_app` call does not prove that a requested page is visible. Cua's MCP annotations identify state-changing tools; after one runs, the worker requires a fresh Cua desktop, window, browser, accessibility, or verification observation before accepting the task as complete. The agent is instructed to compare that observation with the user's actual goal. The MCP bridge includes Cua structured metadata as a text content block alongside its screenshots and text summaries. This lets the model read exact window IDs, capture IDs, capture geometry and refusal details through the SDK's content-based tool output. Metadata is not added to debug logs; host lifecycle calls retain the original native result. The worker also tracks MCP errors, refusals, and unsatisfied `verify_state` results across one task. An earlier failed tool no longer forces a retry after a later successful action and fresh state observation; an unsatisfied `verify_state` still needs a satisfied verification. The worker gives the agent one bounded continuation to correct an incomplete task and reports failure if the problem remains. This general check does not interpret arbitrary screenshots or guarantee that the model chose a verification predicate matching the user's goal. Browser navigation and visible-window behavior still need end-to-end validation on macOS and Windows.
 
 ## Task and process lifetime
 
@@ -55,7 +55,7 @@ src/desktop/main/AgentWorkerClient.ts       # Utility process and reply correlat
 src/desktop/worker/StartAgentWorker.ts      # Agents SDK client configuration
 src/desktop/worker/ComputerUseTaskRunner.ts # One-run tasks and Cua MCP lifetime
 src/desktop/worker/ComputerUseInstructions.ts
-src/server/persistence/AuthDatabase.ts      # Better Auth/Prisma adapter and usage
+src/server/persistence/AuthDatabase.ts      # Better Auth/Prisma adapter
 src/server/auth/RegisterAuthRoutes.ts       # Fastify /api/auth/* adapter
 src/server/auth/RegisterModelGateway.ts     # Scoped token and Responses proxy
 prisma/schema.prisma                         # Accounts, sessions, usage
@@ -70,3 +70,16 @@ Before public release, validate actual Cua MCP startup, screenshot/action calls,
 - [OpenAI Agents SDK sessions](https://openai.github.io/openai-agents-js/guides/sessions/)
 - [Better Auth Electron integration](https://better-auth.com/docs/integrations/electron)
 - [Cua Driver MCP integration](https://cua.ai/docs/how-to-guides/driver/connect-your-agent)
+
+## Native V2 teaching guidance
+
+Show me uses host-bound V2 cursor guidance. The native companion approaches,
+traces, holds and clears one cue at a time, then returns to pointer following.
+Passive pointer movement is allowed. Click/key/scroll takeover is terminal for
+the task; teaching has no automatic recovery continuation. A typed `teaching`
+result carries demonstrated, needs_input, canceled or failed status through the
+existing main/preload and voice boundaries. Demonstrated requires native receipt
+evidence, independent of desktop-action verification. Host lifecycle tools remain
+private and the model cannot omit V2 to select legacy behavior. See
+[CursorCompanionEngineering.md](CursorCompanionEngineering.md) for implemented
+modules, timings, compositor evidence and primary-display limits.

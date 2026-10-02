@@ -8,6 +8,7 @@ import {
   type VoiceEvent,
   type VoiceReply,
 } from '#contracts/VoiceInput.js';
+import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
 import {
@@ -112,6 +113,15 @@ const bridge: DesktopBridge = {
       return { kind: 'failed', message: 'Could not open System Settings.' };
     }
   },
+  async startCursorCompanion(): Promise<AgentResult> {
+    try {
+      return AgentResultSchema.parse(
+        await ipcRenderer.invoke('tro:agent-command', { kind: 'follow' }),
+      );
+    } catch {
+      return { kind: 'failed', message: 'Could not start the cursor companion.' };
+    }
+  },
   async startAgentSession(): Promise<AgentResult> {
     try {
       return AgentResultSchema.parse(
@@ -125,12 +135,13 @@ const bridge: DesktopBridge = {
     sessionId: string,
     message: string,
     locale: DesktopLocale,
+    mode: AgentTaskMode = AgentTaskMode.EXECUTE,
   ): Promise<AgentResult> {
     try {
       return AgentResultSchema.parse(
         await ipcRenderer.invoke(
           'tro:agent-command',
-          AgentCommandSchema.parse({ kind: 'turn', sessionId, message, locale }),
+          AgentCommandSchema.parse({ kind: 'turn', sessionId, message, locale, mode }),
         ),
       );
     } catch {

@@ -3,6 +3,9 @@ import type { TranslationKey } from './English.js';
 /* The existing bridge sends English messages. Keep this compatibility map at
    the presentation boundary until the protocol supplies stable error codes. */
 const bridgeErrorKeys: Readonly<Record<string, TranslationKey>> = {
+  'Could not start the cursor companion.': 'errorCompanionUnavailable',
+  'Cursor companion is unavailable. Install the companion-enabled Cua Driver and restart Tro.':
+    'errorCompanionUnavailable',
   'Could not check your sign-in.': 'errorCheckSignIn',
   'Could not read your sign-in.': 'errorCheckSignIn',
   'Could not reach the sign-in service.': 'errorSignInService',

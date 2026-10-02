@@ -1,6 +1,8 @@
+import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { randomUUID } from 'node:crypto';
 import { utilityProcess, type UtilityProcess } from 'electron';
 import type { DesktopLocale } from '#contracts/DesktopLocale.js';
+import type { AgentChatWorker } from './AgentChatPorts.js';
 import {
   AgentWorkerResponseSchema,
   type AgentWorkerCommand,
@@ -19,7 +21,7 @@ const startTimeoutMs = 30_000;
 const stopTimeoutMs = 10_000;
 
 /** Owns the one local computer-use process for the active chat session. */
-export class AgentWorkerClient {
+export class AgentWorkerClient implements AgentChatWorker {
   private worker: UtilityProcess | null = null;
   private readonly pending = new Map<string, PendingRequest>();
 
@@ -33,10 +35,24 @@ export class AgentWorkerClient {
     return this.worker !== null;
   }
 
-  async start(
-    sessionId: string,
-    gatewayToken: string,
-    gatewayBaseUrl: string,
+  startCompanion(sessionId: string): Promise<AgentResult> {
+    return this.startWorker({ kind: 'follow', sessionId, debugEnabled: this.debugEnabled });
+  }
+
+  start(sessionId: string, gatewayToken: string, gatewayBaseUrl: string): Promise<AgentResult> {
+    return this.startWorker({
+      kind: 'start',
+      sessionId,
+      gatewayToken,
+      gatewayBaseUrl,
+      debugEnabled: this.debugEnabled,
+    });
+  }
+
+  private async startWorker(
+    command:
+      | Omit<Extract<AgentWorkerCommand, { kind: 'start' }>, 'desktopDriver'>
+      | Omit<Extract<AgentWorkerCommand, { kind: 'follow' }>, 'desktopDriver'>,
   ): Promise<AgentResult> {
     if (this.worker !== null) {
       return { kind: 'failed', message: 'An agent session is already active.' };
@@ -98,22 +114,20 @@ export class AgentWorkerClient {
       return { kind: 'failed', message: 'Could not start the local agent worker.' };
     }
 
-    const result = await this.send({
-      kind: 'start',
-      sessionId,
-      gatewayToken,
-      gatewayBaseUrl,
-      debugEnabled: this.debugEnabled,
-      desktopDriver: connection,
-    });
+    const result = await this.send({ ...command, desktopDriver: connection });
     if (result.kind !== 'started') {
       this.dispose();
     }
     return result;
   }
 
-  sendMessage(sessionId: string, message: string, locale: DesktopLocale): Promise<AgentResult> {
-    return this.send({ kind: 'turn', sessionId, message, locale });
+  sendMessage(
+    sessionId: string,
+    message: string,
+    locale: DesktopLocale,
+    mode: AgentTaskMode = AgentTaskMode.EXECUTE,
+  ): Promise<AgentResult> {
+    return this.send({ kind: 'turn', sessionId, message, locale, mode });
   }
 
   async stop(sessionId: string): Promise<AgentResult> {
@@ -142,7 +156,7 @@ export class AgentWorkerClient {
     const requestId = randomUUID();
     return new Promise<AgentResult>((resolve) => {
       let timeoutMs = turnTimeoutMs;
-      if (command.kind === 'start') {
+      if (command.kind === 'start' || command.kind === 'follow') {
         timeoutMs = startTimeoutMs;
       } else if (command.kind === 'stop') {
         timeoutMs = stopTimeoutMs;

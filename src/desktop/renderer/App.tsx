@@ -25,6 +25,7 @@ import { SettingsPage } from './SettingsPage.js';
 import { useComputerUse } from './UseComputerUse.js';
 import { useLocale } from './localization/UseLocale.js';
 import { useDesktopPermissions } from './UseDesktopPermissions.js';
+import { useCursorCompanion } from './UseCursorCompanion.js';
 
 const DesktopPage = { WORKSPACE: 'workspace', SETTINGS: 'settings' } as const;
 
@@ -35,8 +36,12 @@ export function App(): ReactElement {
   const [page, setPage] = useState<DesktopPage>(DesktopPage.WORKSPACE);
   const controller = useComputerUse();
   const { user } = controller;
-  const voice = useVoiceInput(user?.id ?? null, controller.receiveVoiceEvent);
+  const voice = useVoiceInput(user?.id ?? null, controller.receiveVoiceEvent, controller.taskMode);
   const permissions = useDesktopPermissions(user?.id ?? null);
+  const companionMessage = useCursorCompanion(
+    user?.id ?? null,
+    permissions.status?.kind === 'ready' && !controller.isSigningOut,
+  );
   const previousPermissionKind = useRef(permissions.status?.kind);
 
   useEffect(() => {
@@ -152,7 +157,7 @@ export function App(): ReactElement {
             </span>
           </header>
           <div className="panel-content">
-            {controller.message && (
+            {(controller.message || companionMessage) && (
               <Alert
                 role="alert"
                 title={messages.attention}
@@ -160,7 +165,7 @@ export function App(): ReactElement {
                 variant="light"
                 mb="lg"
               >
-                {controller.message}
+                {controller.message || companionMessage}
               </Alert>
             )}
             {page === DesktopPage.SETTINGS ? (
