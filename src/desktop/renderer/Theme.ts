@@ -42,6 +42,7 @@ export const resolveDesktopCssVariables: CSSVariablesResolver = () => ({
     '--tro-text': TroPalette.BLACK,
     '--tro-muted': TroPalette.CHARCOAL,
     '--tro-accent': TroPalette.ORANGE,
+    '--tro-update-icon': `color-mix(in srgb, ${TroPalette.ORANGE}, ${TroPalette.BLACK} 25%)`,
     '--tro-panel-radius': '24px',
   },
   light: {

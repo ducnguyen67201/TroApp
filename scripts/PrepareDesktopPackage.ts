@@ -3,6 +3,9 @@ import { dirname } from 'node:path';
 import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { prepareCuaSdk } from './PrepareCuaSdk.js';
+import { loadDesktopReleaseEnv } from './Env.js';
+
+const { updateFeedUrl } = loadDesktopReleaseEnv();
 
 const metadata: unknown = JSON.parse(await readFile('package.json', 'utf8'));
 const packageMetadata = z
@@ -47,6 +50,9 @@ await writeFile(
       dependencies: { 'uiohook-napi': '1.5.5', 'node-gyp-build': '4.8.4' },
       build: {
         ...packageMetadata.build,
+        publish: updateFeedUrl
+          ? { provider: 'generic', url: updateFeedUrl, useMultipleRangeRequest: false }
+          : null,
         electronVersion: packageMetadata.devDependencies.electron,
         directories: { output: '../release', buildResources: 'branding' },
       },

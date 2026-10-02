@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tro · App update preview</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        --cream: #fffcf2;
+        --sidebar: #f7f3e9;
+        --border: #e0d8cd;
+        --selection: #eae5da;
+        --text: #252422;
+        --muted: #625e57;
+        --orange: #eb5e28;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--sidebar);
+        color: var(--text);
+      }
+      button,
+      textarea {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:disabled {
+        cursor: default;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      textarea:focus-visible {
+        outline: 2px solid var(--orange);
+        outline-offset: 4px;
+      }
+      button,
+      a {
+        -webkit-tap-highlight-color: transparent;
+      }
+      svg {
+        width: 19px;
+        height: 19px;
+        flex-shrink: 0;
+      }
+      .icon-definitions {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+      }
+      .shell {
+        display: grid;
+        grid-template-columns: 232px minmax(0, 1fr);
+        min-height: 100dvh;
+      }
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        padding: 68px 16px 18px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 12px;
+        margin-bottom: 36px;
+        font-size: 22px;
+        font-weight: 650;
+        letter-spacing: -0.06em;
+      }
+      .brand img {
+        width: 32px;
+        height: 32px;
+        object-fit: contain;
+      }
+      .sidebar-link {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        width: 100%;
+        padding: 11px 12px;
+        border: 0;
+        border-radius: 8px;
+        color: var(--muted);
+        background: transparent;
+        font-size: 14px;
+        text-decoration: none;
+      }
+      .sidebar-link:hover,
+      .sidebar-link[aria-current] {
+        color: var(--text);
+        background: var(--selection);
+      }
+      .sidebar-link[aria-current] {
+        font-weight: 500;
+      }
+      .sidebar-bottom {
+        margin-top: auto;
+        padding-top: 32px;
+      }
+
+      /* The update action uses the same full content width as the settings group. */
+      .update-slot {
+        margin-bottom: 16px;
+      }
+      .update-slot[hidden] {
+        display: none;
+      }
+      .update-button {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        width: 100%;
+        min-height: 60px;
+        padding: 12px;
+        overflow: hidden;
+        border: 1px solid #eb5e2833;
+        border-radius: 10px;
+        background: #eb5e2810;
+        color: var(--text);
+        text-align: left;
+        transition:
+          background 160ms ease,
+          border-color 160ms ease;
+      }
+      .update-button:hover:enabled {
+        background: #eb5e2820;
+        border-color: #eb5e2866;
+      }
+      .update-symbol {
+        color: #b33c10;
+      }
+      .update-copy {
+        display: grid;
+        gap: 4px;
+        min-width: 0;
+        flex: 1;
+      }
+      .update-title {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .update-detail {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .update-percent {
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+      .update-progress {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        margin: 0;
+        appearance: none;
+        border: 0;
+        background: transparent;
+      }
+      .update-progress::-webkit-progress-bar {
+        background: #eb5e2818;
+      }
+      .update-progress::-webkit-progress-value {
+        background: var(--orange);
+        transition: width 180ms linear;
+      }
+      .update-progress::-moz-progress-bar {
+        background: var(--orange);
+      }
+      .update-button[data-state='ready'] {
+        background: var(--text);
+        color: var(--cream);
+        border-color: var(--text);
+      }
+      .update-button[data-state='ready']:hover {
+        background: #403d39;
+      }
+      .update-button[data-state='ready'] .update-detail {
+        color: #e0d8cd;
+      }
+      .update-button[data-state='ready'] .update-symbol {
+        color: var(--cream);
+      }
+      .update-button[data-state='downloading'] .update-symbol {
+        animation: spin 1.8s linear infinite;
+      }
+      .account {
+        margin-top: 16px;
+        padding: 20px 8px 0;
+        border-top: 1px solid var(--border);
+      }
+      .account-person {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .avatar {
+        display: grid;
+        place-items: center;
+        flex: 0 0 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: var(--selection);
+        font-size: 13px;
+      }
+      .account-copy {
+        min-width: 0;
+        display: grid;
+        gap: 4px;
+      }
+      .account-name {
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .account-email {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .version {
+        margin: 14px 0 0 44px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .stage {
+        display: flex;
+        padding: 52px 16px 16px 0;
+        min-width: 0;
+      }
+      .panel {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        background: var(--cream);
+        overflow: hidden;
+      }
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 22px 32px;
+        border-bottom: 1px solid var(--border);
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .desktop-label {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0.1em;
+      }
+      .accent-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--orange);
+      }
+      .workspace {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        padding: 32px 40px 24px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 30px;
+        font-weight: 600;
+        letter-spacing: -0.035em;
+      }
+      .heading-detail {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      .empty {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 50px 0;
+        text-align: center;
+      }
+      .empty img {
+        width: 58px;
+        height: 58px;
+        object-fit: contain;
+        margin-bottom: 20px;
+      }
+      .empty h2 {
+        font-size: 18px;
+        font-weight: 550;
+        letter-spacing: -0.02em;
+        margin: 0 0 10px;
+      }
+      .empty p {
+        max-width: 330px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.7;
+        margin: 0;
+      }
+      .composer {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 18px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: #f9f5eb;
+      }
+      .composer > span:first-child {
+        flex: 1;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .send-placeholder {
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: var(--selection);
+        color: var(--muted);
+      }
+      .preview {
+        margin-top: 22px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border);
+      }
+      .preview-heading {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .preview-title {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .preview-note {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .preview-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 14px;
+      }
+      .state-choice {
+        padding: 7px 10px;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .state-choice:hover {
+        background: var(--selection);
+      }
+      .state-choice[aria-pressed='true'] {
+        border-color: var(--border);
+        background: var(--sidebar);
+        color: var(--text);
+      }
+      .status {
+        min-height: 32px;
+        margin: 12px 0 0;
+        font-size: 12px;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+      .restart-overlay {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: #f7f3e9f5;
+        z-index: 2;
+      }
+      .restart-overlay[hidden] {
+        display: none;
+      }
+      .restart-copy {
+        display: grid;
+        justify-items: center;
+        gap: 18px;
+      }
+      .restart-copy img {
+        width: 54px;
+        height: 54px;
+      }
+      .restart-copy p {
+        margin: 0;
+        font-size: 15px;
+      }
+      .restart-copy small {
+        color: var(--muted);
+      }
+      dialog {
+        width: min(420px, calc(100vw - 40px));
+        padding: 28px;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: var(--cream);
+        color: var(--text);
+      }
+      dialog::backdrop {
+        background: #25242244;
+      }
+      dialog h2 {
+        margin: 0 0 20px;
+        font-size: 20px;
+      }
+      dialog p {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      .dialog-close {
+        width: 100%;
+        padding: 10px;
+        margin-top: 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--sidebar);
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (max-width: 760px) {
+        .shell {
+          grid-template-columns: 212px minmax(0, 1fr);
+        }
+        .sidebar {
+          padding-inline: 12px;
+        }
+        .workspace {
+          padding: 28px 22px 20px;
+        }
+        .panel-header {
+          padding: 20px 22px;
+        }
+        .desktop-label {
+          display: none;
+        }
+        h1 {
+          font-size: 25px;
+        }
+      }
+      @media (max-width: 480px) {
+        .shell {
+          grid-template-columns: 188px minmax(0, 1fr);
+        }
+        .sidebar {
+          padding: 30px 8px 16px;
+        }
+        .stage {
+          padding: 16px 8px 16px 0;
+        }
+        .panel {
+          border-radius: 16px;
+        }
+        .workspace {
+          padding: 22px 14px 18px;
+        }
+        .panel-header {
+          padding: 16px 14px;
+        }
+        .composer {
+          padding: 12px;
+        }
+        .composer span {
+          overflow-wrap: anywhere;
+        }
+        .send-placeholder {
+          display: none;
+        }
+        .update-button {
+          padding: 12px 10px;
+          gap: 8px;
+        }
+        .update-title {
+          font-size: 12px;
+        }
+        .update-detail {
+          font-size: 10px;
+        }
+        .account {
+          padding-inline: 4px;
+        }
+        .account-email {
+          font-size: 10px;
+        }
+        .empty {
+          padding: 28px 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <symbol id="workspace-icon" viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <path d="M9 4v16" />
+        </symbol>
+        <symbol id="settings-icon" viewBox="0 0 24 24">
+          <path d="m9 4 1-2h4l1 2 3 2h2l2 4-2 2v3l1 2-3 3-2-1h-3l-2 2-4-2v-2l-2-3-2-1v-4l2-1z" />
+          <circle cx="12" cy="12" r="3" />
+        </symbol>
+        <symbol id="download-icon" viewBox="0 0 24 24">
+          <path d="M12 3v12m-5-5 5 5 5-5M4 15v5h16v-5" />
+        </symbol>
+        <symbol id="restart-icon" viewBox="0 0 24 24">
+          <path d="M20 7v5h-5M20 12a8 8 0 1 0-2 6" />
+        </symbol>
+        <symbol id="arrow-icon" viewBox="0 0 24 24"><path d="M12 19V5m-6 6 6-6 6 6" /></symbol>
+        <symbol id="retry-icon" viewBox="0 0 24 24">
+          <path d="M12 4v9m0 4v1" />
+          <circle cx="12" cy="12" r="10" />
+        </symbol>
+      </defs>
+    </svg>
+    <div class="shell">
+      <aside class="sidebar" aria-label="Sidebar">
+        <div class="brand"><img src="../src/desktop/assets/TroMark.png" alt="" />Tro</div>
+        <nav aria-label="Navigation">
+          <a class="sidebar-link" href="#workspace" aria-current="page"
+            ><svg fill="none" stroke="currentColor" stroke-width="1.6">
+              <use href="#workspace-icon" /></svg
+            >Workspace</a
+          >
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="update-slot" id="update-slot">
+            <button
+              class="update-button"
+              id="update-button"
+              type="button"
+              data-state="available"
+              aria-describedby="update-detail"
+            >
+              <svg
+                class="update-symbol"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <use id="update-icon" href="#download-icon" />
+              </svg>
+              <span class="update-copy"
+                ><span class="update-title" id="update-title">Update Tro</span
+                ><span class="update-detail" id="update-detail">Version 0.2.0 available</span></span
+              >
+              <span class="update-percent" id="update-percent" aria-hidden="true" hidden></span>
+              <progress
+                class="update-progress"
+                id="update-progress"
+                max="100"
+                value="0"
+                aria-label="Update download"
+                hidden
+              ></progress>
+            </button>
+          </div>
+          <button class="sidebar-link" id="settings-button" type="button" aria-haspopup="dialog">
+            <svg
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <use href="#settings-icon" /></svg
+            >Settings
+          </button>
+          <section class="account" aria-label="Your account">
+            <div class="account-person">
+              <span class="avatar" aria-hidden="true">D</span>
+              <div class="account-copy">
+                <span class="account-name">Demo account</span
+                ><span class="account-email">demo@example.com</span>
+              </div>
+            </div>
+            <p class="version" id="app-version">Tro 0.1.0</p>
+          </section>
+        </div>
+      </aside>
+      <main class="stage" id="workspace">
+        <div class="panel">
+          <header class="panel-header">
+            <span>Workspace</span
+            ><span class="desktop-label"><span class="accent-dot"></span>YOUR DESKTOP</span>
+          </header>
+          <div class="workspace">
+            <div>
+              <h1>Your workspace</h1>
+              <p class="heading-detail">A little help, right where you work.</p>
+            </div>
+            <div class="empty">
+              <img src="../src/desktop/assets/TroMark.png" alt="" />
+              <h2>What can I help with?</h2>
+              <p>Ask Tro to show you how, or take care of a task on your desktop.</p>
+            </div>
+            <div class="composer" aria-label="Message composer preview">
+              <span>Ask Tro to help with a task…</span
+              ><span class="send-placeholder" aria-hidden="true"
+                ><svg fill="none" stroke="currentColor" stroke-width="1.7">
+                  <use href="#arrow-icon" /></svg
+              ></span>
+            </div>
+            <section class="preview" aria-label="Update demo controls">
+              <div class="preview-heading">
+                <span class="preview-title">Update preview</span
+                ><span class="preview-note">Simulated download &amp; restart</span>
+              </div>
+              <div class="preview-controls" id="preview-controls">
+                <button
+                  class="state-choice"
+                  type="button"
+                  data-preview="available"
+                  aria-pressed="true"
+                >
+                  Available
+                </button>
+                <button
+                  class="state-choice"
+                  type="button"
+                  data-preview="downloading"
+                  aria-pressed="false"
+                >
+                  Downloading
+                </button>
+                <button
+                  class="state-choice"
+                  type="button"
+                  data-preview="ready"
+                  aria-pressed="false"
+                >
+                  Ready to restart
+                </button>
+                <button
+                  class="state-choice"
+                  type="button"
+                  data-preview="error"
+                  aria-pressed="false"
+                >
+                  Download failed
+                </button>
+                <button
+                  class="state-choice"
+                  type="button"
+                  data-preview="current"
+                  aria-pressed="false"
+                >
+                  Up to date
+                </button>
+              </div>
+              <p
+                class="status"
+                id="demo-status"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                Click Update Tro in the sidebar to try the flow. No files are downloaded.
+              </p>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+    <div class="restart-overlay" id="restart-overlay" hidden role="status" aria-live="polite">
+      <div class="restart-copy">
+        <img src="../src/desktop/assets/TroMark.png" alt="" />
+        <p>Restarting Tro…</p>
+        <small>Preview only · your app stays open</small>
+      </div>
+    </div>
+    <dialog id="settings-dialog" aria-labelledby="settings-title">
+      <h2 id="settings-title">Settings</h2>
+      <p id="settings-version">Tro 0.1.0</p>
+      <p>This is an update UI demo. Use the preview controls to try each update state.</p>
+      <form method="dialog"><button class="dialog-close">Done</button></form>
+    </dialog>
+    <script>
+      /** @param {string} id @returns {HTMLElement} */
+      function findElement(id) {
+        const element = document.getElementById(id);
+        if (!element) {
+          throw new Error(`Missing preview element: ${id}`);
+        }
+        return element;
+      }
+
+      const updateButton = findElement('update-button');
+      const progress = findElement('update-progress');
+      const settingsDialog = findElement('settings-dialog');
+      if (
+        !(updateButton instanceof HTMLButtonElement) ||
+        !(progress instanceof HTMLProgressElement) ||
+        !(settingsDialog instanceof HTMLDialogElement)
+      ) {
+        throw new Error('Invalid preview controls');
+      }
+
+      const UpdateState = /** @type {const} */ ({
+        AVAILABLE: 'available',
+        DOWNLOADING: 'downloading',
+        READY: 'ready',
+        ERROR: 'error',
+        CURRENT: 'current',
+        RESTARTING: 'restarting',
+      });
+      /** @typedef {(typeof UpdateState)[keyof typeof UpdateState]} UpdateStateValue */
+      /** @type {UpdateStateValue} */
+      let updateState = UpdateState.AVAILABLE;
+      /** @type {number | undefined} */
+      let downloadTimer;
+      /** @type {number | undefined} */
+      let restartTimer;
+      let downloadPercent = 0;
+      let installedVersion = '0.1.0';
+
+      function clearTimers() {
+        window.clearInterval(downloadTimer);
+        window.clearTimeout(restartTimer);
+      }
+
+      /** @param {UpdateStateValue} state @param {string} message */
+      function showUpdateState(state, message) {
+        updateState = state;
+        updateButton.dataset.state = state;
+        updateButton.disabled =
+          state === UpdateState.DOWNLOADING || state === UpdateState.RESTARTING;
+        findElement('update-slot').hidden = state === UpdateState.CURRENT;
+        progress.hidden = state !== UpdateState.DOWNLOADING;
+        findElement('update-percent').hidden = state !== UpdateState.DOWNLOADING;
+        findElement('restart-overlay').hidden = state !== UpdateState.RESTARTING;
+        findElement('app-version').textContent = `Tro ${installedVersion}`;
+        findElement('settings-version').textContent = `Tro ${installedVersion}`;
+        findElement('demo-status').textContent = message;
+
+        let title = 'Update Tro';
+        let detail = 'Version 0.2.0 available';
+        let icon = '#download-icon';
+        if (state === UpdateState.DOWNLOADING) {
+          title = 'Downloading…';
+          detail = 'Keep using Tro';
+          icon = '#restart-icon';
+        } else if (state === UpdateState.READY) {
+          title = 'Restart to update';
+          detail = 'Version 0.2.0 is ready';
+          icon = '#restart-icon';
+        } else if (state === UpdateState.ERROR) {
+          title = 'Retry update';
+          detail = 'Download failed. Try again.';
+          icon = '#retry-icon';
+        } else if (state === UpdateState.RESTARTING) {
+          title = 'Restarting Tro…';
+          detail = 'Installing version 0.2.0';
+          icon = '#restart-icon';
+        }
+        findElement('update-title').textContent = title;
+        findElement('update-detail').textContent = detail;
+        findElement('update-icon').setAttribute('href', icon);
+        for (const button of document.querySelectorAll('[data-preview]')) {
+          if (button instanceof HTMLButtonElement) {
+            button.setAttribute('aria-pressed', String(button.dataset.preview === state));
+          }
+        }
+      }
+
+      /** @param {number} percent */
+      function showDownloadProgress(percent) {
+        downloadPercent = percent;
+        progress.value = percent;
+        findElement('update-percent').textContent = `${percent}%`;
+      }
+
+      /** Simulates progress locally; it never contacts an update server. */
+      function startDemoDownload() {
+        clearTimers();
+        showDownloadProgress(0);
+        showUpdateState(
+          UpdateState.DOWNLOADING,
+          'Downloading the demo update. Tro stays available while it downloads.',
+        );
+        downloadTimer = window.setInterval(() => {
+          showDownloadProgress(Math.min(100, downloadPercent + 4));
+          if (downloadPercent === 100) {
+            clearTimers();
+            showUpdateState(
+              UpdateState.READY,
+              'Download complete. Click Restart to update when you’re ready.',
+            );
+          }
+        }, 180);
+      }
+
+      function restartDemoApp() {
+        clearTimers();
+        showUpdateState(UpdateState.RESTARTING, 'Simulating an app restart…');
+        restartTimer = window.setTimeout(() => {
+          installedVersion = '0.2.0';
+          showUpdateState(
+            UpdateState.CURRENT,
+            'Tro is now up to date. The update button disappears. Select Available to replay.',
+          );
+          const replayButton = document.querySelector('[data-preview="available"]');
+          if (replayButton instanceof HTMLButtonElement) {
+            replayButton.focus();
+          }
+        }, 1400);
+      }
+
+      updateButton.addEventListener('click', () => {
+        if (updateState === UpdateState.AVAILABLE || updateState === UpdateState.ERROR) {
+          startDemoDownload();
+        } else if (updateState === UpdateState.READY) {
+          restartDemoApp();
+        }
+      });
+
+      findElement('preview-controls').addEventListener('click', (event) => {
+        if (!(event.target instanceof HTMLButtonElement)) {
+          return;
+        }
+        clearTimers();
+        installedVersion = '0.1.0';
+        const state = event.target.dataset.preview;
+        if (state === UpdateState.DOWNLOADING) {
+          startDemoDownload();
+        } else if (state === UpdateState.READY) {
+          showUpdateState(
+            state,
+            'The update has downloaded. Click Restart to update in the sidebar.',
+          );
+        } else if (state === UpdateState.ERROR) {
+          showUpdateState(
+            state,
+            'A download failure keeps Tro open. Click Retry update to try again.',
+          );
+        } else if (state === UpdateState.CURRENT) {
+          installedVersion = '0.2.0';
+          showUpdateState(
+            state,
+            'Tro is up to date. The sidebar only shows the update button when an update is available.',
+          );
+        } else {
+          showUpdateState(
+            UpdateState.AVAILABLE,
+            'Click Update Tro in the sidebar to try the flow. No files are downloaded.',
+          );
+        }
+      });
+
+      findElement('settings-button').addEventListener('click', () => {
+        settingsDialog.showModal();
+      });
+
+      window.addEventListener('pagehide', clearTimers);
+    </script>
+  </body>
+</html>

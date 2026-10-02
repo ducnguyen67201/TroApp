@@ -8,6 +8,8 @@ The 52-pixel top bar shares the sidebar's warm background, with no separate gray
 
 ## Styling in one place
 
+When a packaged app finds an update, a full-width action appears above the Settings group. It downloads on click, displays progress and becomes **Restart to update** when ready. Active tasks and voice operations defer restarting. See [AppUpdates.md](AppUpdates.md) for configuration, ownership and release checks.
+
 `src/desktop/assets/TroIcon.png` owns the approved teacher-and-student artwork with native app padding. `TroMark.png` crops the transparent margin for the sidebar, welcome screens, permission onboarding and favicon. `TroIcon.tsx` displays the decorative mark beside accessible text. Action icons still describe their controls.
 
 The committed `TroIcon.icns` and `TroIcon.ico` supply macOS app/permission identity and Windows app/installer identity. Run `pnpm generate:icons` on macOS after updating `TroIcon.png`. Packaging stages the complete artwork directory under `out/branding`; main imports the PNG as a build asset for the Dock and window. See [Development](Development.md) for the branded macOS development host.

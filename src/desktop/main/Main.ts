@@ -45,6 +45,9 @@ import { DesktopPermissions } from './DesktopPermissions.js';
 import { EmbeddedDesktopDriver } from './EmbeddedDesktopDriver.js';
 import { isTrustedFrameUrl } from './TrustedFrame.js';
 import { DesktopWindowAppearance } from '../DesktopAppearance.js';
+import { AppUpdateState, AppUpdatePhase, type AppUpdateReply } from '#contracts/AppUpdate.js';
+import { AppUpdateController } from './updates/AppUpdateController.js';
+import { runAppUpdateCommand } from './updates/AppUpdateCommand.js';
 
 const mainDirectory = dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | undefined;
@@ -58,6 +61,8 @@ let voiceKeysReleased = true;
 const permissions = new DesktopPermissions();
 const desktopDriver = new EmbeddedDesktopDriver();
 let isQuitting = false;
+let updates: AppUpdateController | undefined;
+let updateCheckTimer: ReturnType<typeof setInterval> | undefined;
 
 async function startDesktop(): Promise<void> {
   /* Vite embeds this public URL when packaging the desktop app. The validator
@@ -66,6 +71,7 @@ async function startDesktop(): Promise<void> {
     environment: process.env,
     bundledApiUrl: import.meta.env['MAIN_VITE_API_BASE_URL'],
     bundledAppEnvironment: import.meta.env['MAIN_VITE_APP_ENV'],
+    bundledUpdateUrl: import.meta.env['MAIN_VITE_UPDATE_FEED_URL'] || undefined,
     isPackaged: app.isPackaged,
   });
   const hudClient = new CompanionHudClient(
@@ -94,6 +100,48 @@ async function startDesktop(): Promise<void> {
     throw new Error('Tro application icon is missing.');
   }
   app.dock?.setIcon(applicationIcon);
+  const canUseUpdates =
+    app.isPackaged &&
+    Boolean(environment.UPDATE_FEED_URL) &&
+    (process.platform === 'darwin' || process.platform === 'win32');
+  const updater = canUseUpdates
+    ? (await import('./updates/ElectronAppUpdater.js')).createElectronAppUpdater()
+    : null;
+  updates = new AppUpdateController({
+    updater,
+    emit: (snapshot) => {
+      if (
+        snapshot.status.state === AppUpdateState.ERROR &&
+        snapshot.status.phase === AppUpdatePhase.INSTALL
+      ) {
+        isQuitting = false;
+      }
+      if (
+        mainWindow &&
+        !mainWindow.isDestroyed() &&
+        !mainWindow.webContents.isDestroyed() &&
+        isTrustedFrameUrl(mainWindow.webContents.getURL(), documentUrl)
+      ) {
+        mainWindow.webContents.send('tro:update-event', snapshot);
+      }
+    },
+    canRestart: () =>
+      !isQuitting &&
+      !chat?.isBusy() &&
+      !microphoneTests?.isActive() &&
+      (!voice ||
+        voice.readStatus().state === VoiceState.IDLE ||
+        voice.readStatus().state === VoiceState.DISABLED),
+    requestRestart: () => {
+      setImmediate(() => {
+        app.quit();
+      });
+    },
+  });
+  const updateController = updates;
+  ipcMain.handle('tro:update-command', (event, rawCommand: unknown): Promise<AppUpdateReply> =>
+    runAppUpdateCommand(updateController, rawCommand, isTrustedSender(event)),
+  );
   chat = new AgentChatController(
     auth,
     agentWorker,
@@ -339,6 +387,8 @@ async function startDesktop(): Promise<void> {
 
   function isTrustedSender(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent): boolean {
     return Boolean(
+      !isQuitting &&
+      updates?.readStatus().status.state !== AppUpdateState.RESTARTING &&
       mainWindow &&
       !mainWindow.isDestroyed() &&
       !mainWindow.webContents.isDestroyed() &&
@@ -504,6 +554,16 @@ async function startDesktop(): Promise<void> {
   }
 
   await openWindow();
+  if (canUseUpdates) {
+    void updateController.checkForUpdates();
+    updateCheckTimer = setInterval(
+      () => {
+        void updateController.checkForUpdates();
+      },
+      4 * 60 * 60 * 1000,
+    );
+    updateCheckTimer.unref();
+  }
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       void openWindow().catch(() => {
@@ -535,8 +595,17 @@ app.on('before-quit', (event) => {
     .stop()
     .catch(() => {})
     .finally(() => {
-      app.quit();
+      if (updates?.readStatus().status.state === AppUpdateState.RESTARTING) {
+        updates.installAfterShutdown();
+      } else {
+        app.quit();
+      }
     });
+});
+
+app.on('will-quit', () => {
+  clearInterval(updateCheckTimer);
+  updates?.dispose();
 });
 
 void startDesktop().catch((error: unknown) => {
