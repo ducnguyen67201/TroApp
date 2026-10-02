@@ -23,7 +23,6 @@ import {
   IconLayoutSidebar,
   IconLogout,
   IconSettings,
-  IconSparkles,
 } from '@tabler/icons-react';
 import { useEffect, useRef, type ReactElement } from 'react';
 import { ComputerUsePage } from './ComputerUsePage.js';
@@ -34,6 +33,7 @@ import { useLocale } from './localization/UseLocale.js';
 import { useDesktopPermissions } from './UseDesktopPermissions.js';
 import { useCursorCompanion } from './UseCursorCompanion.js';
 import { DesktopWindowAppearance } from '../DesktopAppearance.js';
+import { TroIcon } from './TroIcon.js';
 
 const DesktopDialog = { SETTINGS: 'settings', MICROPHONE: 'microphone' } as const;
 
@@ -144,9 +144,7 @@ export function App(): ReactElement {
         <AppShell.Header className="window-titlebar" withBorder={false} aria-hidden="true" />
         <AppShell.Navbar className="desktop-sidebar" withBorder={false}>
           <Group gap={10} className="brand">
-            <span className="brand-mark">
-              <IconSparkles size={22} stroke={1.5} />
-            </span>
+            <TroIcon size={32} />
             <Text fw={650} size="xl">
               Tro
             </Text>

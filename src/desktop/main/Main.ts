@@ -7,7 +7,15 @@ import { isMicrophonePermissionAllowed } from './voice/MicrophonePermission.js';
 import { VoiceMeterSchema } from '#contracts/CompanionHud.js';
 import { DesktopCompanion } from './companion/DesktopCompanion.js';
 import { CompanionHudClient } from './companion/CompanionHudClient.js';
-import { app, BrowserWindow, ipcMain, powerMonitor, systemPreferences } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  nativeImage,
+  powerMonitor,
+  systemPreferences,
+} from 'electron';
+import troIconPath from '../assets/TroIcon.png?asset';
 import {
   VoiceCommandSchema,
   VoiceAudioFrameSchema,
@@ -81,6 +89,11 @@ async function startDesktop(): Promise<void> {
   /* The OAuth protocol must be registered before Electron becomes ready. */
   auth.registerDeepLink(() => mainWindow);
   await app.whenReady();
+  const applicationIcon = nativeImage.createFromPath(troIconPath);
+  if (applicationIcon.isEmpty()) {
+    throw new Error('Tro application icon is missing.');
+  }
+  app.dock?.setIcon(applicationIcon);
   chat = new AgentChatController(
     auth,
     agentWorker,
@@ -412,6 +425,7 @@ async function startDesktop(): Promise<void> {
       minWidth: 680,
       minHeight: 520,
       title: 'Tro',
+      icon: applicationIcon,
       backgroundColor: DesktopWindowAppearance.BACKGROUND,
       titleBarStyle: 'hidden',
       trafficLightPosition: { x: 20, y: 20 },

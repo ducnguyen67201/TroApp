@@ -39,8 +39,8 @@ commit, applies the patch in an isolated checkout, runs native companion tests,
 and creates an ad-hoc signed executable under `~/.cache/tro/cua-companion`. Development
 selects it before the standard release cache. Electron main starts it through
 Tro's embedded Cua host and gives the worker that host's private MCP endpoint.
-Permission checks and prompts run inside Tro; development builds use Electron's
-identity. Enable Tro (Electron in development) in macOS Accessibility and Screen
+Permission checks and prompts run inside Tro; the standard development launcher uses a separate Tro
+identity. Enable Tro in macOS Accessibility and Screen
 Recording settings. Tro cannot grant these permissions itself. An independent
 CuaDriver installation's grants do not unlock Tro. No separate CuaDriver app
 is launched, and an independent installation or daemon is not replaced.
@@ -116,7 +116,7 @@ shared host or reset the HUD. Sign-out/window close end both worker sessions;
 main stops the embedded host when the app quits. HUD errors leave voice and
 workspace controls usable. The model cannot discover or invoke HUD host tools.
 
-macOS grants belong to Tro (Electron during development). Rebuild with
+macOS grants belong to Tro. Rebuild with
 `pnpm build:cua` and restart Tro to load a changed native patch. macOS reduced
 motion is read at native host startup. See [CursorCompanionVoiceBarPlan.md](CursorCompanionVoiceBarPlan.md)
 for state contracts, layout and validation limits.

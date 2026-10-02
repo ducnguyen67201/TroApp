@@ -9,7 +9,8 @@ import {
   Textarea,
   Title,
 } from '@mantine/core';
-import { IconArrowUp, IconBrandGoogle, IconMessageCircle, IconPlus } from '@tabler/icons-react';
+import { IconArrowUp, IconBrandGoogle, IconPlus } from '@tabler/icons-react';
+import { TroIcon } from './TroIcon.js';
 import type { ReactElement } from 'react';
 import { AgentTaskMode, AgentTaskModeSchema } from '#contracts/CursorCompanion.js';
 import { useLocale } from './localization/UseLocale.js';
@@ -67,7 +68,7 @@ export function ComputerUsePage({ controller }: ComputerUsePageProps): ReactElem
       ) : !user ? (
         <div className="workspace-empty">
           <div className="empty-symbol">
-            <IconMessageCircle size={28} stroke={1.5} />
+            <TroIcon size={58} />
           </div>
           <Title order={2}>{translations.makeYourselfAtHome}</Title>
           <Text c="dimmed" size="sm" maw={340} ta="center">
@@ -86,7 +87,7 @@ export function ComputerUsePage({ controller }: ComputerUsePageProps): ReactElem
           {messages.length === 0 ? (
             <div className="workspace-empty">
               <div className="empty-symbol">
-                <IconMessageCircle size={28} stroke={1.5} />
+                <TroIcon size={58} />
               </div>
               <Title order={2}>{translations.helpHeading}</Title>
               <Text c="dimmed" size="sm" maw={360} ta="center">

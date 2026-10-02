@@ -5,7 +5,16 @@ import { defineConfig } from 'eslint/config';
 import stylistic from '@stylistic/eslint-plugin';
 
 export default defineConfig(
-  { ignores: ['node_modules/**', 'out/**', 'dist/**', 'release/**', 'src/server/generated/**'] },
+  {
+    ignores: [
+      'node_modules/**',
+      'out/**',
+      'dist/**',
+      'release/**',
+      'src/server/generated/**',
+      '.tro-development/**',
+    ],
+  },
   eslint.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   {

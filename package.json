@@ -19,9 +19,10 @@
     "select": "doppler setup",
     "dev": "concurrently --kill-others -n api,desktop \"doppler run -- pnpm dev:api\" \"pnpm dev:desktop\"",
     "dev:api": "pnpm db:deploy && pnpm db:generate && node --conditions=development --watch --import tsx src/server/StartApi.ts",
-    "dev:desktop": "tsx scripts/PrepareCuaDriver.ts --development && electron-vite dev",
+    "dev:desktop": "tsx scripts/PrepareCuaDriver.ts --development && tsx scripts/StartDesktop.ts",
     "start": "node dist/server/StartApi.js",
-    "start:desktop": "electron-vite preview",
+    "start:desktop": "tsx scripts/StartDesktop.ts --preview",
+    "generate:icons": "tsx scripts/GenerateDesktopIcons.ts",
     "db:start": "docker compose up -d postgres",
     "db:stop": "docker compose stop postgres",
     "db:generate": "prisma generate",
@@ -127,6 +128,7 @@
       "output": "release"
     },
     "mac": {
+      "icon": "branding/TroIcon.icns",
       "target": "dmg",
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Tro uses your microphone for held voice instructions and optional local sound tests. Voice instructions are sent to the agent; test audio stays on this device."
@@ -135,7 +137,12 @@
       "entitlementsInherit": "DesktopEntitlements.plist"
     },
     "win": {
+      "icon": "branding/TroIcon.ico",
       "target": "nsis"
+    },
+    "nsis": {
+      "installerIcon": "branding/TroIcon.ico",
+      "uninstallerIcon": "branding/TroIcon.ico"
     },
     "asarUnpack": [
       "node_modules/uiohook-napi/prebuilds/**/*"

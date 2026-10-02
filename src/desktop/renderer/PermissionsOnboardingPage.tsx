@@ -5,6 +5,7 @@ import { PermissionArea, PermissionGrant } from '#contracts/DesktopPermissions.j
 import { useLocale } from './localization/UseLocale.js';
 import type { TranslationCatalog } from './localization/English.js';
 import type { DesktopPermissionsController } from './UseDesktopPermissions.js';
+import { TroIcon } from './TroIcon.js';
 
 interface PermissionsOnboardingPageProps {
   controller: DesktopPermissionsController;
@@ -45,7 +46,7 @@ export function PermissionsOnboardingPage({
           </Text>
         </div>
         <div className="permission-hero-icon" aria-hidden="true">
-          <IconShieldLock size={52} stroke={1.2} />
+          <TroIcon size={132} />
         </div>
       </div>
 

@@ -41,14 +41,10 @@ textarea:focus-visible {
   letter-spacing: -0.06em;
 }
 
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  background: var(--tro-text);
-  color: var(--tro-surface);
+.tro-icon {
+  display: block;
+  flex-shrink: 0;
+  object-fit: contain;
 }
 
 .sidebar-link {
@@ -177,10 +173,6 @@ textarea:focus-visible {
   width: 58px;
   height: 58px;
   margin-bottom: 6px;
-  border: 1px solid var(--tro-border);
-  border-radius: 18px;
-  color: var(--tro-muted);
-  background: var(--tro-muted-surface);
 }
 
 .workspace-empty h2 {
@@ -465,10 +457,6 @@ textarea:focus-visible {
   place-items: center;
   width: 132px;
   height: 132px;
-  border: 1px solid var(--tro-border);
-  border-radius: 32px;
-  background: var(--tro-muted-surface);
-  color: var(--tro-accent);
 }
 
 .permission-card {

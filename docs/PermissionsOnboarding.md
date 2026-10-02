@@ -5,7 +5,7 @@ Status: implemented in Electron. The [interactive HTML prototype](PermissionsOnb
 ## Flow
 
 1. Before the first model request, Electron main reads its own host permission status through the pinned native Cua SDK without starting a daemon or presenting a prompt. Do not send a chat message, screenshot, or tool catalog to OpenAI while setup is incomplete.
-2. After sign-in, if Accessibility or Screen Recording is missing or the host's status is unknown, show setup before the chat workspace. Name **Tro** as the app the person must enable. Plain development Electron may appear as **Electron**, and its grants do not transfer to a signed installed Tro.
+2. After sign-in, if Accessibility or Screen Recording is missing or the host's status is unknown, show setup before the chat workspace. Name **Tro** as the app the person must enable. The standard development launcher uses a branded **Tro** bundle (`app.tro.desktop.development`); its grants remain separate from installed Tro (`app.tro.desktop`). Direct Electron launches may still appear as **Electron**.
 3. **Ask for permission** invokes the native SDK's `requestMacOsPermissions()` in Electron main after readiness. macOS presents permission UI for the importing host. Tro cannot flip those switches. No `cua-driver permissions grant` child or LaunchServices driver launch is used.
 4. Provide **Open Settings** as a fallback action for each permission. Electron main opens a fixed macOS Settings destination and falls back to the general Privacy & Security area if the specific pane link fails. System Settings is a separate macOS window, not content embedded in Tro. Do not accept a URL or executable path from the renderer.
 5. On return to Tro or **Check again**, read the host's status again. Treat `unknown` as unresolved. If macOS requires Tro to quit and reopen after a grant, say so and recheck after it restarts.
@@ -14,6 +14,8 @@ Status: implemented in Electron. The [interactive HTML prototype](PermissionsOnb
 Do not repeatedly launch prompts on a timer. Read-only rechecks on window focus and an explicit button are enough. Windows has no equivalent macOS permission screen in this release; its driver capability and installer behavior still need a signed-install smoke test.
 
 The installer contains one Tro app, and one setup button requests the required desktop access. macOS still controls Accessibility and Screen Recording as separate grants; bundling cannot combine those into one OS permission. Both Settings entries belong to Tro. Voice input additionally requires microphone access.
+
+The teacher-and-student icon appears in the onboarding hero and is embedded as the macOS bundle icon for system prompts and Settings. The development launcher applies the same icon to its own copy of Electron. Relaunch a rebuilt app to see new artwork; macOS can retain cached icons for existing entries. Actual OS dialog presentation still needs an interactive check on the target system.
 
 ## Code ownership
 

@@ -61,7 +61,7 @@ doppler run -- pnpm db:migrate
 `pnpm db:stop` stops the local database while preserving its volume. Always confirm that the saved
 Doppler selection points to the intended development database before running a migration.
 
-The development API requires the database to be reachable for migrations. `pnpm dev:desktop` can still run independently. The desktop has no connection-check control; `/health/ready` remains available for operational readiness. `pnpm dev:desktop` downloads a checksum-verified Cua Driver release into Tro's local development cache when needed. On macOS, grant Screen Recording and Accessibility to Tro (Electron during development); the OS cannot grant those automatically. Sign in with Google in the system browser. Chat requires the database and backend model key. The first message starts a local agent worker and a private `cua-driver mcp` connection. Edit `src/desktop/worker/ComputerUseInstructions.ts` to change the agent's standing instruction.
+The development API requires the database to be reachable for migrations. `pnpm dev:desktop` can still run independently. The desktop has no connection-check control; `/health/ready` remains available for operational readiness. `pnpm dev:desktop` downloads a checksum-verified Cua Driver release into Tro's local development cache when needed. On macOS, grant Screen Recording and Accessibility to Tro; the OS cannot grant those automatically. Sign in with Google in the system browser. Chat requires the database and backend model key. The first message starts a local agent worker and a private `cua-driver mcp` connection. Edit `src/desktop/worker/ComputerUseInstructions.ts` to change the agent's standing instruction.
 
 To see the exact schema Cua publishes and the tool parameters produced by the
 OpenAI Agents SDK, run `pnpm inspect:cua:mcp browser_click`. Use
@@ -159,6 +159,10 @@ The main build leaves `ws`'s optional `bufferutil` and `utf-8-validate` requires
 
 ## Desktop packaging
 
+On macOS, `pnpm dev:desktop` and `pnpm start:desktop` launch a checkout-owned `.tro-development/Tro.app` with Tro's icon and display name. `scripts/PrepareDesktopDevelopmentHost.ts` copies the pinned Electron runtime, applies the committed icon and microphone purpose, and signs only that local copy ad hoc. The dependency in `node_modules` remains intact. The host is reused until its Electron version, artwork or purpose changes; quit Tro before rebuilding it. `pnpm exec tsx scripts/StartDesktop.ts --prepare-only` prepares the host without launching the app or requesting permissions.
+
+The development bundle ID is `app.tro.desktop.development`; installed Tro remains `app.tro.desktop`. macOS grants are separate, and the first branded development launch needs its own grants. Direct `electron-vite` launches still use Electron's identity. No existing Settings entries or grants are removed. The native host receives the matching identity so permission checks remain tied to the actual app. The packaged ICNS supplies the icon in Finder and macOS permission dialogs; runtime Dock changes alone do not change the OS permission identity.
+
 Set `MAIN_VITE_API_BASE_URL` to the public HTTPS backend URL before building, then run `pnpm package:desktop` on the target operating system. This is the only desktop API URL setting; Vite embeds it in the build, so changing it requires a new build. The desktop defaults to `dev` during development and `prod` when packaged; set public `MAIN_VITE_APP_ENV=stage` for a staging build. This command does not publish artifacts. Windows and macOS signing, macOS notarization, installer smoke tests, and updater configuration remain release work. Desktop builds contain public settings, never database credentials or shared provider keys.
 
 `build:desktop` bundles the main, local worker, preload, and renderer and writes an isolated `out/package.json`. `package:desktop` stages that output outside the pnpm workspace, downloads the pinned Cua Driver 0.30.4 release for the build platform, verifies its SHA-256 digest, and includes it outside ASAR as an executable resource. This prevents the workspace's backend dependencies from entering the desktop artifact and gives users the driver with Tro's installer. Development caches the same verified release under `~/.cache/tro/cua-driver`. Build installers on each target OS/architecture; macOS carries the driver executable and native SDK as resources; Tro owns the OS grants and directly starts a private embedded daemon. Sign the native libraries and driver before signing/notarizing the enclosing Tro app. Windows carries the native executable. Validate signed/notarized packaging and OS permissions before release. A packaged build does not download driver code on first launch; updates arrive with a new Tro installer.
@@ -174,5 +178,5 @@ Tro’s standard driver, with its runtime libraries and build metadata under
 the standard release cache; packaged resources take precedence over both.
 Tro’s main process owns the native host, permission checks and private endpoint
 for both idle following and credentialed tasks. Enable Tro in System Settings;
-development builds use Electron’s identity. Rebuild an older companion cache
+the standard development launcher uses a separate Tro development identity. Rebuild an older companion cache
 with this command before restarting the desktop.
