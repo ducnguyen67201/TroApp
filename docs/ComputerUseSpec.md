@@ -79,9 +79,39 @@ Show me uses host-bound V2 cursor guidance. The native companion approaches,
 traces, holds and clears one cue at a time, then returns to pointer following.
 Passive pointer movement is allowed. Click/key/scroll takeover is terminal for
 the task; teaching has no automatic recovery continuation. A typed `teaching`
-result carries demonstrated, needs_input, canceled or failed status through the
+result carries demonstrated, explained, needs_input, canceled or failed status through the
 existing main/preload and voice boundaries. Demonstrated requires native receipt
 evidence, independent of desktop-action verification. Host lifecycle tools remain
 private and the model cannot omit V2 to select legacy behavior. See
 [CursorCompanionEngineering.md](CursorCompanionEngineering.md) for implemented
 modules, timings, compositor evidence and primary-display limits.
+
+Teaching also answers general how-to questions without requiring a visual guide.
+Every Show me run starts with a forced `get_desktop_state` tool choice, released
+by the SDK after the first tool call. The model therefore receives desktop context
+before deciding whether the request needs a guide, explanation or clarification.
+References such as "here" or "this app" are resolved from that context instead of
+assuming the student means Tro's own chat. An interface introduction prompts an
+ordered tour of two to four observed controls, with matching explanations.
+Standing instructions use Markdown sections and short bullets, with separate
+teaching examples and an appended reply-language section. See
+[AgentPromptResearch.md](AgentPromptResearch.md) for the public-source comparison
+and proposed live evaluation cases.
+The prompt chooses a useful beginner path for broad requests, gives concrete steps
+and a checkpoint, and asks a focused clarification only when the missing information
+prevents progress. Procedures in an identifiable app prompt screen observation and
+a cursor cue for the first visible, actionable control, even without a separate
+request to highlight it. Abstract learning steps remain text. If no target is
+observable, general instructions remain useful; an explicitly requested guide may
+instead need a specific student action to expose the target. Screen-specific
+instructions require observation; conceptual explanations need no further screen
+inspection after the initial capture. For a visual guide, the agent must
+obtain a fresh capture, call `show_cursor_sequence` and await its native receipt
+before returning the final answer, which ends the run. The model returns a
+validated reply purpose and answer.
+The worker preserves explanations as `explained` and specific questions or required
+student actions as `needs_input` with an optional answer. Legacy results without an
+answer retain deterministic localized copy. A guide claim without receipts still
+cannot become `demonstrated`; pending, failed and canceled guides suppress model
+prose. Each next message remains a fresh task, so requested follow-up information
+should identify the app or screen rather than relying on retained chat context.

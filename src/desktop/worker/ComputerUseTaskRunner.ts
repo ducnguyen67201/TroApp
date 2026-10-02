@@ -135,14 +135,25 @@ export class ComputerUseTaskRunner {
       guidanceEnded = true;
       await this.companion?.endGuidanceTask(taskEpoch);
       signal.throwIfAborted();
+      const teachingResult = this.desktopServer.taskEvidence.readTeachingResult(
+        result.answer ?? '',
+        result.replyKind,
+      );
+      this.log.debug(
+        {
+          taskId: taskEpoch,
+          mode,
+          outcome: teachingResult.outcome,
+          reason: 'reason' in teachingResult ? teachingResult.reason : null,
+          replyKind: result.replyKind ?? null,
+          hasAnswer: result.answer !== null,
+          durationMs: Math.round(performance.now() - startedAt),
+        },
+        'agent.teaching.settled',
+      );
       return {
         kind: 'teaching',
-        result: this.desktopServer.taskEvidence.readTeachingResult(
-          result.answer ??
-            (locale === DesktopLocale.VIETNAMESE
-              ? 'Hướng dẫn trực quan đã hoàn tất.'
-              : 'The visual guide finished.'),
-        ),
+        result: teachingResult,
       };
     } catch (error) {
       if (mode === AgentTaskMode.TEACH) {

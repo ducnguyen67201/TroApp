@@ -3,7 +3,7 @@
 The native V2 implementation follows the reviewed
 [guidance specification](CursorCompanionGuidanceSpec.md). Tro ships the pinned
 Cua source plus `driver-patches/CursorCompanion.patch`; no sibling source or
-Electron presentation window is used. The local build version is `0.30.4-tro.3`.
+Electron presentation window is used. The local build version is `0.30.4-tro.4`.
 
 ## Ownership
 
@@ -69,6 +69,15 @@ image; stale generations cannot restore a retired mark. During teaching the Tro
 badge is hidden and idle fading is suppressed, preserving the same complete cue
 through its hold. The small white/blue pointer retains its existing size.
 
+Cue paths are filtered after conversion to `f32` destination pixels. Consecutive
+endpoints less than 0.01 pixel apart are omitted, accumulating distance from the
+last retained endpoint. Empty and coincident initial prefixes therefore wait for
+a drawable segment instead of triggering tiny-skia's `path stroking failed`
+warning. Horizontal and vertical strokes remain valid. Pointer drawing and frame
+acknowledgments still proceed while a cue has no drawable length. Native regression
+tests cover initial circle prefixes, duplicate points, pixel precision, 1×/2×
+scales and unchanged pointer pixels/receipts.
+
 Each step needs an intermediate trace acknowledgment, a complete cue acknowledgment
 and a full hold measured from the complete cue's compositor timestamp. Gaps over
 150ms fail presentation, including an initial unacknowledged frame. The final
@@ -96,12 +105,16 @@ cannot create guidance evidence or clear a guidance failure. The SDK receives
 both screenshots and Cua structured metadata; neither is logged in ordinary logs.
 
 The public bridge carries `kind: teaching` with a typed outcome. `demonstrated`
-requires positive receipts and successful host release; `needs_input` means no
-demonstration completed. Canceled/failed results carry a reason and display
+requires positive receipts and successful host release. A validated model reply
+with purpose `explanation` and nonempty instructions can become `explained` when
+no guide is pending, failed or canceled. `needs_input` carries a specific question
+or student action when the model explicitly requests input; a guide claim with no
+receipt retains the deterministic fallback. Canceled/failed results carry a reason and display
 deterministic English/Vietnamese copy rather than a model completion claim.
-Typed and voice replies share this rendering path. `explained` remains reserved
-for a future explicit host-authorized explanation mode; ordinary Show me cannot
-silently choose it.
+Typed and voice replies share this rendering path. Explanation means instructions
+were supplied; it does not prove a demonstration or student action. Teaching
+instructions encourage a useful starting path for broad how-to requests and
+require observation before claiming anything about the current screen.
 
 Stop closes the private transport immediately because upstream stdio dispatch
 serializes calls. Native session-ending checks stop playback before deferred

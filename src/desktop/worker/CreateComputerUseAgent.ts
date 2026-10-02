@@ -8,6 +8,7 @@ import type { TaskContext } from './TaskContext.js';
 import { DefineTaskGoalSchema } from './TaskGoal.js';
 import { CompletionProposalSchema } from './TaskCompletionProposal.js';
 import type { TaskControls } from './TaskExecutionPorts.js';
+import { TeachingReplySchema } from './TeachingReply.js';
 
 /** Cua publishes its own tool catalog over MCP; Tro does not map actions. */
 export function createComputerUseAgent(
@@ -43,14 +44,22 @@ export function createComputerUseAgent(
   });
 }
 
-/** Teaching is settled by native presentation receipts, not task verification. */
-export function createTeachingAgent(desktopServer: LoggedCuaServer, locale: DesktopLocale): Agent {
+/**
+ * Show me starts with desktop observation; the SDK releases the forced tool
+ * choice after that call. Native receipts still settle presentation success.
+ */
+export function createTeachingAgent(
+  desktopServer: LoggedCuaServer,
+  locale: DesktopLocale,
+): Agent<unknown, typeof TeachingReplySchema> {
   return new Agent({
     name: 'Tro teaching assistant',
     model: 'gpt-5.4',
     instructions: createComputerUseInstructions(locale, AgentTaskMode.TEACH),
     mcpServers: [desktopServer],
     mcpConfig: { convertSchemasToStrict: false },
-    modelSettings: { parallelToolCalls: false },
+    modelSettings: { parallelToolCalls: false, toolChoice: 'get_desktop_state' },
+    resetToolChoice: true,
+    outputType: TeachingReplySchema,
   });
 }

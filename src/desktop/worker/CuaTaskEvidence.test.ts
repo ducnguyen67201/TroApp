@@ -1,6 +1,8 @@
 import type { CallToolResult } from '@openai/agents';
 import { describe, expect, it } from 'vitest';
 import { CuaTaskEvidence } from './CuaTaskEvidence.js';
+import { TeachingReplyKind } from './TeachingReply.js';
+import { GuidanceReason } from '#contracts/CursorCompanion.js';
 
 const state: CallToolResult = {
   content: [{ type: 'text', text: 'Synthetic page text' }],
@@ -129,6 +131,41 @@ const completedGuide = {
 };
 
 describe('positive V2 teaching evidence', () => {
+  it('requires a nonempty explicit explanation before exposing prose without a guide', () => {
+    const evidence = new CuaTaskEvidence();
+    evidence.beginGuidanceTask(taskEpoch);
+    expect(
+      evidence.readTeachingResult('Start with a question', TeachingReplyKind.EXPLANATION),
+    ).toEqual({
+      outcome: 'explained',
+      answer: 'Start with a question',
+    });
+    expect(evidence.readTeachingResult('  ', TeachingReplyKind.EXPLANATION)).toEqual({
+      outcome: 'needs_input',
+      reason: 'no_demonstration',
+    });
+  });
+
+  it('never replaces a pending, failed or canceled guide with an explanation', () => {
+    const evidence = new CuaTaskEvidence();
+    evidence.beginGuidanceTask(taskEpoch);
+    evidence.beginGuidanceRequest(2);
+    expect(evidence.readTeachingResult('Try this', TeachingReplyKind.EXPLANATION)).toEqual({
+      outcome: 'failed',
+      reason: 'transport_failed',
+    });
+    evidence.failGuidance(GuidanceReason.INVALID_REQUEST);
+    expect(evidence.readTeachingResult('Try this', TeachingReplyKind.EXPLANATION)).toEqual({
+      outcome: 'failed',
+      reason: 'invalid_request',
+    });
+    evidence.cancelGuidance(GuidanceReason.USER_TAKEOVER);
+    expect(evidence.readTeachingResult('Try this', TeachingReplyKind.EXPLANATION)).toEqual({
+      outcome: 'canceled',
+      reason: 'user_takeover',
+    });
+  });
+
   it('does not call a guide demonstrated when only prose or desktop verification succeeds', () => {
     const evidence = new CuaTaskEvidence();
     evidence.beginGuidanceTask(taskEpoch);

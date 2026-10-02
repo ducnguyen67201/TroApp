@@ -19,7 +19,7 @@ export function describeTeachingResult(
     case TeachingOutcome.EXPLAINED:
       return result.answer;
     case TeachingOutcome.NEEDS_INPUT:
-      return translations.guidanceNeedsInputMessage;
+      return result.answer ?? translations.guidanceNeedsInputMessage;
     case TeachingOutcome.CANCELED:
       return translations.guidanceCanceledMessage;
     case TeachingOutcome.FAILED:

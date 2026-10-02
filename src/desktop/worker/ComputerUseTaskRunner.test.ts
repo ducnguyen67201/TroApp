@@ -6,6 +6,7 @@ import { AgentTaskMode, CursorCompanionTool } from '#contracts/CursorCompanion.j
 import { ComputerUseTaskRunner } from './ComputerUseTaskRunner.js';
 import { LoggedCuaServer } from './LoggedCuaServer.js';
 import { runComputerUseAgent } from './RunComputerUseAgent.js';
+import { TeachingReplyKind } from './TeachingReply.js';
 
 async function createRunner() {
   let epoch = '';
@@ -160,6 +161,62 @@ describe('teaching task completion and cancellation', () => {
       ),
     ).toEqual({ kind: 'teaching', result: { outcome: 'needs_input', reason: 'no_demonstration' } });
     expect(runAgent).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    {
+      message: 'How do I use ChatGPT?',
+      replyKind: TeachingReplyKind.EXPLANATION,
+      answer: 'Open ChatGPT and enter a first question, such as Help me write a short email.',
+      outcome: 'explained',
+    },
+    {
+      message: 'Show me where to type in ChatGPT',
+      replyKind: TeachingReplyKind.NEEDS_INPUT,
+      answer: 'Open ChatGPT on the primary display, then describe the screen you see.',
+      outcome: 'needs_input',
+    },
+  ])('preserves useful $replyKind text without calling it demonstrated', async (reply) => {
+    vi.useFakeTimers();
+    const { runner, runAgent, native } = await createRunner();
+    runAgent.mockResolvedValue({ answer: reply.answer, replyKind: reply.replyKind, history: [] });
+    expect(
+      await runner.runTask(
+        reply.message,
+        DesktopLocale.ENGLISH,
+        new AbortController().signal,
+        AgentTaskMode.TEACH,
+      ),
+    ).toEqual({
+      kind: 'teaching',
+      result: {
+        outcome: reply.outcome,
+        answer: reply.answer,
+        ...(reply.outcome === 'needs_input' ? { reason: 'no_demonstration' } : {}),
+      },
+    });
+    expect(runAgent).toHaveBeenCalledOnce();
+    expect(native.mock.calls.some(([name]) => name === CursorCompanionTool.SHOW_SEQUENCE)).toBe(
+      false,
+    );
+  });
+
+  it('does not turn a claimed guide into an explanation without native receipts', async () => {
+    vi.useFakeTimers();
+    const { runner, runAgent } = await createRunner();
+    runAgent.mockResolvedValue({
+      answer: 'Done, I showed you',
+      replyKind: TeachingReplyKind.GUIDE,
+      history: [],
+    });
+    expect(
+      await runner.runTask(
+        'Show me',
+        DesktopLocale.ENGLISH,
+        new AbortController().signal,
+        AgentTaskMode.TEACH,
+      ),
+    ).toEqual({ kind: 'teaching', result: { outcome: 'needs_input', reason: 'no_demonstration' } });
   });
 
   it('commits demonstrated only after receipt validation and host release', async () => {

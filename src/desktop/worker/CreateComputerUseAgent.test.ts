@@ -6,6 +6,7 @@ import { createComputerUseAgent, createTeachingAgent } from './CreateComputerUse
 import { TaskContext } from './TaskContext.js';
 import { CompletionProposalSchema } from './TaskCompletionProposal.js';
 import { LoggedCuaServer } from './LoggedCuaServer.js';
+import { TeachingReplySchema } from './TeachingReply.js';
 
 describe('computer-use agent tools', () => {
   it('combines teaching restrictions with the selected reply language', () => {
@@ -19,6 +20,9 @@ describe('computer-use agent tools', () => {
     expect(agent.instructions).not.toContain(ComputerUseInstructions);
     expect(agent.instructions).toContain('presentation_version: 2');
     expect(agent.instructions).toContain('never retry or replay');
+    expect(agent.outputType).toBe(TeachingReplySchema);
+    expect(agent.modelSettings.toolChoice).toBe('get_desktop_state');
+    expect(agent.resetToolChoice).toBe(true);
   });
 
   it('exposes Cua MCP without duplicating desktop actions as local tools', () => {

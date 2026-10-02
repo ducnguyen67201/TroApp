@@ -6,6 +6,7 @@ import {
   type TeachingResult,
 } from '#contracts/CursorCompanion.js';
 import { isCursorPresentationTool } from './CuaTeachingPolicy.js';
+import { TeachingReplyKind } from './TeachingReply.js';
 
 import type { CallToolResult } from '@openai/agents';
 import { createHash } from 'node:crypto';
@@ -230,16 +231,24 @@ export class CuaTaskEvidence {
     return this.terminalGuidance !== null;
   }
 
-  readTeachingResult(answer: string): TeachingResult {
+  readTeachingResult(answer: string, replyKind?: TeachingReplyKind): TeachingResult {
     if (this.terminalGuidance) {
       return this.terminalGuidance;
     }
     if (this.guidanceIssue || this.pendingGuidance.size > 0) {
       return { outcome: TeachingOutcome.FAILED, reason: GuidanceReason.TRANSPORT_FAILED };
     }
-    return this.completedSequences.size > 0
-      ? { outcome: TeachingOutcome.DEMONSTRATED, answer }
-      : { outcome: TeachingOutcome.NEEDS_INPUT, reason: GuidanceReason.NO_DEMONSTRATION };
+    if (this.completedSequences.size > 0) {
+      return { outcome: TeachingOutcome.DEMONSTRATED, answer };
+    }
+    if (replyKind === TeachingReplyKind.EXPLANATION && answer.trim()) {
+      return { outcome: TeachingOutcome.EXPLAINED, answer };
+    }
+    return {
+      outcome: TeachingOutcome.NEEDS_INPUT,
+      reason: GuidanceReason.NO_DEMONSTRATION,
+      ...(replyKind === TeachingReplyKind.NEEDS_INPUT && answer.trim() ? { answer } : {}),
+    };
   }
 
   readIssue(): TaskIssue | null {
