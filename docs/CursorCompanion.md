@@ -36,13 +36,14 @@ Cua's lease; all pointer sampling, geometry, animation and rendering run nativel
 
 Run `pnpm build:cua`, then `pnpm dev:desktop`. The build checks a pinned source
 commit, applies the patch in an isolated checkout, runs native companion tests,
-and creates an ad-hoc signed app under `~/.cache/tro/cua-companion`. Development
-selects it before the standard release cache. It uses a private socket and app
-identity so it does not replace an independent Cua installation or its daemon.
-macOS requires desktop permissions for this local app. Tro cannot grant them.
-Permission checks use the private companion socket and verify its executable;
-permission setup launches that same app bundle, including in development.
-An independent CuaDriver installation's grants do not unlock the companion.
+and creates an ad-hoc signed executable under `~/.cache/tro/cua-companion`. Development
+selects it before the standard release cache. Electron main starts it through
+Tro's embedded Cua host and gives the worker that host's private MCP endpoint.
+Permission checks and prompts run inside Tro; development builds use Electron's
+identity. Enable Tro (Electron in development) in macOS Accessibility and Screen
+Recording settings. Tro cannot grant these permissions itself. An independent
+CuaDriver installation's grants do not unlock Tro. No separate CuaDriver app
+is launched, and an independent installation or daemon is not replaced.
 
 After sign-in and permission setup, select **Show me**, then ask, for example: “Circle the toolbar,
 show an arrow toward the destination, then show me how to drag this item there.”
@@ -59,7 +60,8 @@ You can move your real pointer to follow the guide. Clicking, typing or scrollin
 stops the entire teaching task; send a new request to start another guide.
 
 Packaging on macOS requires the matching native build. The packaging script
-checks the patch and executable hashes before copying the app into resources.
+checks the patch and executable hashes before copying the driver and runtime
+libraries into resources outside ASAR.
 No source checkout or Rust toolchain is needed by the installed app. Public
 release signing and notarization remain release work.
 

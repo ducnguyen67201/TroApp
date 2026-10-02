@@ -8,6 +8,8 @@ import {
   type AgentWorkerCommand,
   type AgentResult,
 } from '#contracts/AgentSession.js';
+import { EmbeddedDesktopDriver } from './EmbeddedDesktopDriver.js';
+import type { DesktopDriverConnection } from '#contracts/DesktopDriver.js';
 
 interface PendingRequest {
   resolve(result: AgentResult): void;
@@ -26,6 +28,7 @@ export class AgentWorkerClient implements AgentChatWorker {
   constructor(
     private readonly workerEntryPath: string,
     private readonly debugEnabled: boolean,
+    private readonly desktopDriver: EmbeddedDesktopDriver,
   ) {}
 
   isRunning(): boolean {
@@ -47,17 +50,35 @@ export class AgentWorkerClient implements AgentChatWorker {
   }
 
   private async startWorker(
-    command: Extract<AgentWorkerCommand, { kind: 'start' | 'follow' }>,
+    command:
+      | Omit<Extract<AgentWorkerCommand, { kind: 'start' }>, 'desktopDriver'>
+      | Omit<Extract<AgentWorkerCommand, { kind: 'follow' }>, 'desktopDriver'>,
   ): Promise<AgentResult> {
     if (this.worker !== null) {
       return { kind: 'failed', message: 'An agent session is already active.' };
     }
 
+    let connection: DesktopDriverConnection;
+    try {
+      connection = await this.desktopDriver.start(() => {
+        this.dispose();
+      });
+    } catch {
+      this.dispose();
+      return { kind: 'failed', message: 'Could not start Tro desktop control.' };
+    }
+
     /* Electron main starts this only after app.whenReady(). The agent and Cua
        MCP client run in the utility child, never in renderer or preload. */
-    const child = utilityProcess.fork(this.workerEntryPath, [], {
-      serviceName: 'Tro computer-use agent',
-    });
+    let child: UtilityProcess;
+    try {
+      child = utilityProcess.fork(this.workerEntryPath, [], {
+        serviceName: 'Tro computer-use agent',
+      });
+    } catch {
+      this.dispose();
+      return { kind: 'failed', message: 'Could not start the local agent worker.' };
+    }
     this.worker = child;
     child.on('message', (message: unknown) => {
       const parsed = AgentWorkerResponseSchema.safeParse(message);
@@ -76,6 +97,7 @@ export class AgentWorkerClient implements AgentChatWorker {
       if (this.worker === child) {
         this.failPending('The local agent worker stopped.');
         this.worker = null;
+        void this.desktopDriver.stop().catch(() => {});
       }
     });
 
@@ -88,10 +110,11 @@ export class AgentWorkerClient implements AgentChatWorker {
       });
     });
     if (!ready) {
+      this.dispose();
       return { kind: 'failed', message: 'Could not start the local agent worker.' };
     }
 
-    const result = await this.send(command);
+    const result = await this.send({ ...command, desktopDriver: connection });
     if (result.kind !== 'started') {
       this.dispose();
     }
@@ -121,6 +144,7 @@ export class AgentWorkerClient implements AgentChatWorker {
     this.failPending('The agent session ended.');
     this.worker?.kill();
     this.worker = null;
+    void this.desktopDriver.stop().catch(() => {});
   }
 
   private send(command: AgentWorkerCommand): Promise<AgentResult> {

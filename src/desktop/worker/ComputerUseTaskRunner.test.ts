@@ -75,6 +75,12 @@ async function createRunner() {
           },
         };
       }
+      if (name === CursorCompanionTool.SET_MODE && args?.mode === 'hidden') {
+        return {
+          content: [],
+          structuredContent: { status: 'hidden', following: false, active: false },
+        };
+      }
       return {
         content: [],
         structuredContent: { status: 'following', following: true, active: false },
@@ -93,6 +99,51 @@ async function createRunner() {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
+});
+
+it('starts companion following on the main-owned endpoint without a model run', async () => {
+  vi.useFakeTimers();
+  vi.spyOn(MCPServerStdio.prototype, 'connect').mockResolvedValue(undefined);
+  vi.spyOn(MCPServerStdio.prototype, 'close').mockResolvedValue(undefined);
+  const { native } = await createRunner();
+  const runner = await ComputerUseTaskRunner.connect(
+    pino({ level: 'silent' }),
+    {
+      command: '/tro/cua-driver',
+      args: ['mcp', '--embedded', '--socket', '/private/tro.sock'],
+      env: { CUA_DRIVER_EMBEDDED: '1' },
+    },
+    true,
+  );
+  expect(native).toHaveBeenCalledWith(CursorCompanionTool.SET_MODE, {
+    mode: 'follow',
+    label: 'Tro',
+  });
+  await runner.close();
+  expect(native).toHaveBeenCalledWith(CursorCompanionTool.SET_MODE, { mode: 'hidden' });
+});
+
+it('closes the host transport when required companion tools are absent', async () => {
+  vi.spyOn(MCPServerStdio.prototype, 'connect').mockResolvedValue(undefined);
+  const close = vi.spyOn(MCPServerStdio.prototype, 'close').mockResolvedValue(undefined);
+  vi.spyOn(MCPServerStdio.prototype, 'listTools').mockResolvedValue([
+    {
+      name: 'get_desktop_state',
+      inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
+    },
+  ]);
+  await expect(
+    ComputerUseTaskRunner.connect(
+      pino({ level: 'silent' }),
+      {
+        command: '/tro/cua-driver',
+        args: ['mcp', '--embedded'],
+        env: {},
+      },
+      true,
+    ),
+  ).rejects.toThrow('companion tools');
+  expect(close).toHaveBeenCalledOnce();
 });
 
 describe('teaching task completion and cancellation', () => {

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { DesktopLocaleSchema } from './DesktopLocale.js';
 import { AgentTaskMode, AgentTaskModeSchema, TeachingResultSchema } from './CursorCompanion.js';
+import { DesktopDriverConnectionSchema } from './DesktopDriver.js';
 
 /** Lifecycle and chat messages crossing renderer, main, and the local agent worker. */
 export const AgentCommandSchema = z.discriminatedUnion('kind', [
@@ -20,13 +21,19 @@ export type AgentCommand = z.infer<typeof AgentCommandSchema>;
 
 /** Main supplies a scoped model credential only over its private worker port. */
 export const AgentWorkerCommandSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('follow'), sessionId: z.uuid(), debugEnabled: z.boolean() }),
+  z.strictObject({
+    kind: z.literal('follow'),
+    sessionId: z.uuid(),
+    debugEnabled: z.boolean(),
+    desktopDriver: DesktopDriverConnectionSchema,
+  }),
   z.strictObject({
     kind: z.literal('start'),
     sessionId: z.uuid(),
     gatewayToken: z.string().min(1),
     gatewayBaseUrl: z.url(),
     debugEnabled: z.boolean(),
+    desktopDriver: DesktopDriverConnectionSchema,
   }),
   z.strictObject({
     kind: z.literal('turn'),

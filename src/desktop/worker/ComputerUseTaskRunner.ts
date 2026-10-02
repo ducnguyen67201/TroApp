@@ -2,9 +2,9 @@ import type { AgentInputItem } from '@openai/agents';
 import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
 import type { AgentResult } from '#contracts/AgentSession.js';
+import type { DesktopDriverConnection } from '#contracts/DesktopDriver.js';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
 import { createComputerUseAgent } from './CreateComputerUseAgent.js';
-import { chooseCuaDriverCommand, startCuaDriverApp } from './ChooseCuaDriverCommand.js';
 import { TaskIssue } from './CuaTaskEvidence.js';
 import { LoggedCuaServer } from './LoggedCuaServer.js';
 import { AgentTaskMode, GuidanceReason, TeachingOutcome } from '#contracts/CursorCompanion.js';
@@ -48,14 +48,15 @@ export class ComputerUseTaskRunner {
       : null;
   }
 
-  static async connect(log: Logger, requiresCompanion = false): Promise<ComputerUseTaskRunner> {
-    const installation = await chooseCuaDriverCommand();
-    await startCuaDriverApp(installation);
+  static async connect(
+    log: Logger,
+    connection: DesktopDriverConnection,
+    requiresCompanion = false,
+  ): Promise<ComputerUseTaskRunner> {
     const desktopServer = new LoggedCuaServer(
       {
         name: 'Cua Driver',
-        command: installation.command,
-        args: ['mcp', ...(installation.socketPath ? ['--socket', installation.socketPath] : [])],
+        ...connection,
         cacheToolsList: true,
       },
       log,

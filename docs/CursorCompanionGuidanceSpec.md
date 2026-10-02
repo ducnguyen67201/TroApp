@@ -5,6 +5,12 @@ been reviewed. [CursorCompanionEngineering.md](CursorCompanionEngineering.md)
 records the implemented modules and runtime limits. Native Pause/Resume and an
 explicit explanation-only product mode remain deferred.
 
+The desktop wiring uses Tro’s embedded Cua host from Electron main. Both idle
+following and model-backed tasks receive its validated private MCP endpoint.
+Permission checks and prompts belong to Tro (Electron in development), and the
+companion build uses the embedded executable layout rather than a separately
+launched native app.
+
 Revision 2 incorporates findings A1–A4 from
 [CursorCompanionAudit.md](CursorCompanionAudit.md). The audit is a historical
 review of the earlier design; regression coverage now targets those findings.

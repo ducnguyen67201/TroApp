@@ -95,7 +95,11 @@ Native Pause/Resume is deferred; the HTML preview controls are review controls.
 
 `pnpm build:cua` verifies the pinned upstream commit, applies the complete patch
 in an isolated checkout, runs native companion tests and stages an ad-hoc signed
-private app. Development and packaging verify patch/executable hashes. Public
+executable with its runtime libraries. Packaging verifies patch/executable hashes.
+Electron main's embedded Cua host owns permission attribution and daemon lifetime;
+companion-only and credentialed worker starts both receive its validated private
+MCP endpoint. Development uses Electron's identity; packaged builds use Tro.
+The standalone app launcher and daemon permission parser have been removed. Public
 signing and notarization remain release work. Unit tests cover host evidence,
 version policy, takeover, SDK completion, UI outcomes, geometry, render fencing,
 trace stalls and hold evidence; a live desktop smoke check is still needed for
