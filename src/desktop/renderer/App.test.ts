@@ -654,11 +654,14 @@ it('shows a localized voice outcome and discards a late result from another capt
   expect(screen.queryByText('Stale answer')).toBeNull();
 });
 
-it('makes voice available automatically and keeps it active across Settings navigation', async () => {
+it('keeps voice active across navigation without a duplicate workspace panel', async () => {
   const bridge = createDesktopBridge();
   window.tro = bridge;
   renderDesktop();
-  expect(await screen.findByText('Hold to talk; release to send')).toBeTruthy();
+  await screen.findByRole('textbox', { name: 'Your message' });
+  expect(screen.queryByText('Hold to talk; release to send')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Hold to talk' })).toBeNull();
+  expect(screen.queryByText('Command + Control')).toBeNull();
   expect(bridge.controlVoiceInput).toHaveBeenCalledWith({
     kind: 'enable',
     shortcut: 'command-control',
@@ -670,7 +673,9 @@ it('makes voice available automatically and keeps it active across Settings navi
   expect(screen.queryByRole('button', { name: 'Disable voice input' })).toBeNull();
   expect(screen.queryByLabelText('Hold-to-talk shortcut')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Workspace' }));
-  expect(await screen.findByText('Hold to talk; release to send')).toBeTruthy();
+  await screen.findByRole('textbox', { name: 'Your message' });
+  expect(screen.queryByText('Hold to talk; release to send')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Hold to talk' })).toBeNull();
   expect(bridge.subscribeVoiceInput).toHaveBeenCalledTimes(subscriptions);
   expect(
     bridge.controlVoiceInput.mock.calls.filter(([command]) => command.kind === 'enable'),

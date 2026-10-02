@@ -1,5 +1,4 @@
 import { useVoiceInput } from './voice/UseVoiceInput.js';
-import { VoiceInputPanel } from './voice/VoiceInputPanel.js';
 import {
   Alert,
   AppShell,
@@ -36,7 +35,7 @@ export function App(): ReactElement {
   const [page, setPage] = useState<DesktopPage>(DesktopPage.WORKSPACE);
   const controller = useComputerUse();
   const { user } = controller;
-  const voice = useVoiceInput(user?.id ?? null, controller.receiveVoiceEvent, controller.taskMode);
+  useVoiceInput(user?.id ?? null, controller.receiveVoiceEvent, controller.taskMode);
   const permissions = useDesktopPermissions(user?.id ?? null);
   const companionMessage = useCursorCompanion(
     user?.id ?? null,
@@ -173,10 +172,7 @@ export function App(): ReactElement {
             ) : user && permissions.status?.kind !== 'ready' ? (
               <PermissionsOnboardingPage controller={permissions} />
             ) : (
-              <>
-                {user && <VoiceInputPanel voice={voice} isBusy={controller.isSending} />}
-                <ComputerUsePage controller={controller} />
-              </>
+              <ComputerUsePage controller={controller} />
             )}
           </div>
         </div>
