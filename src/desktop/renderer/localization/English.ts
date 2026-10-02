@@ -1,5 +1,67 @@
 /** Canonical desktop copy. Other catalogs must implement every key and parameter. */
 export const english = {
+  microphone: 'Microphone',
+  microphoneDescription:
+    'Choose the microphone Tro uses for voice instructions. Voice instructions are captured while you hold the talk shortcut. You can also start a local sound test below.',
+  microphoneChoose: 'Audio input',
+  microphoneInputCount: (count: number): string => `${String(count)} microphone inputs`,
+  microphoneAuto: 'Auto-detect',
+  microphoneAutoHint: 'Follows the input selected in your computer settings.',
+  microphoneUnnamed: 'Microphone',
+  microphoneSuggested: 'Suggested',
+  microphoneWiredHint: 'Appears to be wired or USB. A useful starting point for voice input.',
+  microphoneBuiltInHint:
+    'Appears to be built in. A useful starting point without a wireless connection.',
+  microphoneBluetoothHint: 'Appears to be Bluetooth. Wireless startup and audio quality can vary.',
+  microphoneVirtualHint:
+    'Appears to be a virtual input. Check that it routes your voice rather than computer audio.',
+  microphoneUnknownHint: 'Try this input if it is the microphone you normally speak into.',
+  microphoneRecommendationHint:
+    'Suggestions use device names, not a sound test. The best choice depends on your setup and surroundings.',
+  microphoneNextHoldHint:
+    'Your choice is saved on this device and applies to the next hold. Opening this list does not record audio.',
+  microphonePermissionHint:
+    'No named inputs yet. Hold the talk shortcut once to allow microphone access, then refresh. Also check microphone permission in your computer settings.',
+  microphoneUnavailable:
+    'Your selected microphone is unavailable. Reconnect it, choose another input, or select Auto-detect. Tro will not silently switch inputs.',
+  microphoneListError: 'Could not list microphones. Check OS microphone access and try refreshing.',
+  microphoneStorageWarning:
+    'Your microphone preferences work for this session but could not be saved on this device.',
+  microphoneVoiceError:
+    'Voice input could not start or finish. Check your microphone and OS permission, then try again.',
+  microphoneRetryVoice: 'Retry voice startup',
+  microphoneSignInHint: 'Sign in to choose a microphone.',
+  microphoneRefresh: 'Refresh inputs',
+  microphoneDone: 'Done',
+  microphonePreferred: 'Preferred',
+  microphoneEditRanking: 'Edit ranking',
+  microphoneResetRanking: 'Reset ranking',
+  microphoneRankingHint:
+    'Your first available ranked input is preferred. Ranking does not change your selected microphone or Auto-detect.',
+  microphoneMoveUp: (name: string): string => `Move ${name} up`,
+  microphoneMoveDown: (name: string): string => `Move ${name} down`,
+  microphoneCompare: 'Compare microphones',
+  microphoneTestPrivacy:
+    'Tests open one microphone for six seconds. Sound is measured on this device, never uploaded or saved. Close this dialog or cancel to stop.',
+  microphoneTestInstructions:
+    'For each input: stay quiet for two seconds, then speak the same phrase for four seconds. Keep your position and surroundings the same. Hold-to-talk is paused during a test.',
+  microphoneTestPhrase: '“This is a microphone test. I want my voice to sound clear.”',
+  microphoneTestDevice: (name: string): string => `Test ${name}`,
+  microphoneTestOpening: 'Opening microphone…',
+  microphoneTestQuiet: 'Stay quiet',
+  microphoneTestSpeak: 'Speak now',
+  microphoneTestCancel: 'Cancel test',
+  microphoneTestBusy: 'Finish the current voice instruction or task before testing.',
+  microphoneTestError:
+    'The test could not finish. Check microphone access and the connected input, then try again.',
+  microphoneTestLimitations:
+    'Lower quiet noise and less clipping can help. Louder speech is not always better. These levels include device processing and do not measure transcription accuracy. Choose or rank an input yourself; results clear when devices change or you sign out.',
+  microphoneNoise: 'Quiet noise',
+  microphoneSpeech: 'Speech level',
+  microphoneClipping: 'Clipping',
+  microphoneStartup: 'Startup',
+  microphoneChange: 'Choose microphone',
+
   taskSucceeded: 'Task completed',
   taskPartial: 'Partially completed',
   taskBlocked: 'Unable to continue',
@@ -15,7 +77,13 @@ export const english = {
   signIn: 'Sign in',
   yourDesktop: 'YOUR DESKTOP',
   attention: 'Something needs attention',
-  settingsDescription: 'The essentials, all in one place.',
+  settingsGeneral: 'General',
+  settingsNavigation: 'Settings categories',
+  settingsClose: 'Close settings',
+  settingsShortcut: 'Talk shortcut',
+  settingsShortcutHint: 'Hold to speak, release to send.',
+  settingsShortcutUnavailable: 'Shortcut unavailable. Use typed messages for now.',
+  settingsMicrophoneUnavailable: 'Unavailable',
   account: 'Account',
   name: 'Name',
   email: 'Email',
@@ -25,8 +93,7 @@ export const english = {
   appearanceDescription: 'A simple, warm light theme.',
   light: 'Light',
   language: 'Language',
-  languageDescription:
-    'Choose the language Tro uses. Changes apply immediately and are saved on this device.',
+  languageDescription: 'Display language, saved on this device.',
   languageStorageWarning: 'The language changed for now, but could not be saved on this device.',
   assistant: 'Computer-use assistant',
   welcome: (name: string): string => `Welcome back, ${name}`,

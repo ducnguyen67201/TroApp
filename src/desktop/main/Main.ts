@@ -1,3 +1,9 @@
+import {
+  MicrophoneTestCommandSchema,
+  type MicrophoneTestReply,
+} from '#contracts/MicrophoneTest.js';
+import { MicrophoneTestLease } from './voice/MicrophoneTestLease.js';
+import { isMicrophonePermissionAllowed } from './voice/MicrophonePermission.js';
 import { VoiceMeterSchema } from '#contracts/CompanionHud.js';
 import { DesktopCompanion } from './companion/DesktopCompanion.js';
 import { CompanionHudClient } from './companion/CompanionHudClient.js';
@@ -35,6 +41,7 @@ const mainDirectory = dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | undefined;
 let chat: AgentChatController | undefined;
 let voice: VoiceInputController | undefined;
+let microphoneTests: MicrophoneTestLease | undefined;
 let desktopCompanion: DesktopCompanion | undefined;
 const voiceShortcut = new GlobalVoiceShortcut();
 let voiceEnableGeneration = 0;
@@ -116,7 +123,7 @@ async function startDesktop(): Promise<void> {
         }
         return openTranscriptionConnection(environment.API_BASE_URL, token, cookie, emit);
       },
-      isAgentBusy: () => voiceChat.isBusy(),
+      isAgentBusy: () => voiceChat.isBusy() || Boolean(microphoneTests?.isActive()),
       areTriggerKeysReleased: () => voiceKeysReleased,
       startAgentSession: () => voiceChat.startTaskSession(),
       sendAgentMessage: (sessionId, message, locale, mode) =>
@@ -129,7 +136,46 @@ async function startDesktop(): Promise<void> {
     process.platform === 'darwin' ? VoiceShortcut.COMMAND_CONTROL : VoiceShortcut.CONTROL_ALT,
   );
 
+  microphoneTests = new MicrophoneTestLease({
+    canStart: () =>
+      !voiceChat.isBusy() &&
+      Boolean(
+        voice &&
+        (voice.readStatus().state === VoiceState.IDLE ||
+          voice.readStatus().state === VoiceState.DISABLED),
+      ),
+    requestAccess: async () =>
+      (await auth.readSession()).kind === 'signed-in' &&
+      (process.platform !== 'darwin' || (await systemPreferences.askForMediaAccess('microphone'))),
+    schedule: (callback, delayMs) => {
+      const timer = setTimeout(callback, delayMs);
+      timer.unref();
+      return () => {
+        clearTimeout(timer);
+      };
+    },
+    emit: (event) => {
+      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
+        mainWindow.webContents.send('tro:microphone-test-event', event);
+      }
+    },
+  });
+
+  ipcMain.handle(
+    'tro:microphone-test',
+    async (event, rawCommand: unknown): Promise<MicrophoneTestReply> => {
+      const parsed = MicrophoneTestCommandSchema.safeParse(rawCommand);
+      if (!isTrustedSender(event) || !parsed.success || !microphoneTests) {
+        return { kind: 'failed' };
+      }
+      return parsed.data.kind === 'start'
+        ? microphoneTests.startTest(parsed.data.testId)
+        : microphoneTests.stopTest(parsed.data.testId);
+    },
+  );
+
   function disableVoice(): void {
+    microphoneTests?.cancelTest();
     voiceKeysReleased = true;
     voiceEnableGeneration += 1;
     voiceShortcut.disableShortcut();
@@ -138,11 +184,13 @@ async function startDesktop(): Promise<void> {
   }
 
   powerMonitor.on('suspend', () => {
+    microphoneTests?.cancelTest();
     voiceShortcut.reset();
     voice?.cancelVoiceCapture();
     companion.reset();
   });
   powerMonitor.on('lock-screen', () => {
+    microphoneTests?.cancelTest();
     voiceShortcut.reset();
     voice?.cancelVoiceCapture();
     companion.reset();
@@ -225,6 +273,10 @@ async function startDesktop(): Promise<void> {
           // Hold button remains available when Tro lacks native hook permission.
         }
         if (generation !== voiceEnableGeneration) {
+          voiceShortcut.disableShortcut();
+          return { kind: 'failed' };
+        }
+        if (microphoneTests?.isActive()) {
           voiceShortcut.disableShortcut();
           return { kind: 'failed' };
         }
@@ -368,37 +420,50 @@ async function startDesktop(): Promise<void> {
       },
     });
     mainWindow = window;
+    window.webContents.on('render-process-gone', () => {
+      disableVoice();
+    });
+    window.webContents.on('did-start-navigation', (_event, _url, _inPlace, isMainFrame) => {
+      if (isMainFrame) {
+        microphoneTests?.cancelTest();
+      }
+    });
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     window.webContents.on('will-navigate', (event, targetUrl) => {
       if (!isTrustedFrameUrl(targetUrl, documentUrl)) {
         event.preventDefault();
       }
     });
-    const canUseMicrophone = (
+    const isTrustedMicrophoneFrame = (
       contents: Electron.WebContents | null,
-      permission: string,
       url: string,
-    ): boolean =>
-      Boolean(
-        contents === window.webContents &&
-        permission === 'media' &&
-        isTrustedFrameUrl(url, documentUrl) &&
-        voice?.isCapturing(),
-      );
-    window.webContents.session.setPermissionCheckHandler(
-      (contents, permission, _origin, details) =>
-        canUseMicrophone(contents, permission, details.requestingUrl ?? '') &&
-        details.isMainFrame &&
-        details.mediaType === 'audio',
+    ): boolean => contents === window.webContents && isTrustedFrameUrl(url, documentUrl);
+
+    /* Enumeration requires audio permission while voice is enabled. Chromium can
+       reuse that permission for streams; the trusted renderer owns held-key capture.
+       New requests require an active voice capture or authorized local test lease. */
+    window.webContents.session.setPermissionCheckHandler((contents, permission, _origin, details) =>
+      isMicrophonePermissionAllowed({
+        permission,
+        isTrustedFrame: isTrustedMicrophoneFrame(contents, details.requestingUrl ?? ''),
+        isMainFrame: details.isMainFrame,
+        mediaTypes: [details.mediaType ?? 'unknown'],
+        isAudioAuthorized: Boolean(
+          (voice && voice.readStatus().state !== VoiceState.DISABLED) ||
+          microphoneTests?.isAuthorized(),
+        ),
+      }),
     );
     window.webContents.session.setPermissionRequestHandler(
       (contents, permission, callback, details) => {
         callback(
-          canUseMicrophone(contents, permission, details.requestingUrl) &&
-            details.isMainFrame &&
-            'mediaTypes' in details &&
-            details.mediaTypes.length === 1 &&
-            details.mediaTypes[0] === 'audio',
+          isMicrophonePermissionAllowed({
+            permission,
+            isTrustedFrame: isTrustedMicrophoneFrame(contents, details.requestingUrl),
+            isMainFrame: details.isMainFrame,
+            mediaTypes: 'mediaTypes' in details ? details.mediaTypes : [],
+            isAudioAuthorized: Boolean(voice?.isCapturing() || microphoneTests?.isAuthorized()),
+          }),
         );
       },
     );
@@ -437,6 +502,7 @@ app.on('before-quit', (event) => {
   }
   event.preventDefault();
   isQuitting = true;
+  microphoneTests?.cancelTest();
   voiceEnableGeneration += 1;
   voiceShortcut.disableShortcut();
   voice?.invalidateVoiceInput();

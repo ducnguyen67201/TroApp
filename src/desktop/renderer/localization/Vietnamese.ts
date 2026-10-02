@@ -1,6 +1,70 @@
 import type { TranslationCatalog } from './English.js';
 
 export const vietnamese = {
+  microphone: 'Micrô',
+  microphoneDescription:
+    'Chọn micrô Tro dùng cho yêu cầu bằng giọng nói. Thu lệnh khi bạn giữ phím tắt nói; bạn cũng có thể bắt đầu bài thử âm thanh cục bộ bên dưới.',
+  microphoneChoose: 'Thiết bị thu âm',
+  microphoneInputCount: (count: number): string => `${String(count)} thiết bị thu âm`,
+  microphoneAuto: 'Tự động chọn',
+  microphoneAutoHint: 'Dùng thiết bị thu âm đã chọn trong cài đặt máy tính.',
+  microphoneUnnamed: 'Micrô',
+  microphoneSuggested: 'Đề xuất',
+  microphoneWiredHint: 'Có vẻ là micrô có dây hoặc USB. Một lựa chọn ban đầu cho giọng nói.',
+  microphoneBuiltInHint:
+    'Có vẻ là micrô tích hợp. Một lựa chọn ban đầu không cần kết nối không dây.',
+  microphoneBluetoothHint:
+    'Có vẻ dùng Bluetooth. Thời gian khởi động và chất lượng âm thanh có thể thay đổi.',
+  microphoneVirtualHint:
+    'Có vẻ là thiết bị thu âm ảo. Kiểm tra thiết bị truyền giọng nói của bạn thay vì âm thanh máy tính.',
+  microphoneUnknownHint: 'Hãy chọn nếu đây là micrô bạn thường dùng để nói.',
+  microphoneRecommendationHint:
+    'Đề xuất dựa trên tên thiết bị, chưa kiểm tra âm thanh. Lựa chọn phù hợp tùy thuộc thiết bị và môi trường của bạn.',
+  microphoneNextHoldHint:
+    'Lựa chọn được lưu trên thiết bị này và áp dụng cho lần giữ phím tiếp theo. Mở danh sách không thu âm.',
+  microphonePermissionHint:
+    'Chưa có thiết bị được đặt tên. Giữ phím tắt nói một lần để cấp quyền micrô rồi làm mới. Kiểm tra quyền micrô trong cài đặt máy tính.',
+  microphoneUnavailable:
+    'Micrô đã chọn không khả dụng. Kết nối lại, chọn thiết bị khác hoặc Tự động chọn. Tro sẽ không tự đổi thiết bị.',
+  microphoneListError:
+    'Không thể liệt kê micrô. Kiểm tra quyền micrô của hệ điều hành rồi làm mới.',
+  microphoneStorageWarning:
+    'Lựa chọn có hiệu lực trong phiên này nhưng không thể lưu trên thiết bị.',
+  microphoneVoiceError:
+    'Không thể bắt đầu hoặc hoàn tất nhập giọng nói. Kiểm tra micrô và quyền hệ điều hành rồi thử lại.',
+  microphoneRetryVoice: 'Thử khởi động giọng nói lại',
+  microphoneSignInHint: 'Đăng nhập để chọn micrô.',
+  microphoneRefresh: 'Làm mới thiết bị',
+  microphoneDone: 'Xong',
+  microphonePreferred: 'Ưu tiên',
+  microphoneEditRanking: 'Sửa thứ tự ưu tiên',
+  microphoneResetRanking: 'Đặt lại thứ tự',
+  microphoneRankingHint:
+    'Micrô khả dụng đầu tiên trong thứ tự của bạn được ưu tiên. Thứ tự không thay đổi micrô đã chọn hoặc chế độ Tự động chọn.',
+  microphoneMoveUp: (name: string): string => `Đưa ${name} lên`,
+  microphoneMoveDown: (name: string): string => `Đưa ${name} xuống`,
+  microphoneCompare: 'So sánh micrô',
+  microphoneTestPrivacy:
+    'Mỗi lần thử mở một micrô trong sáu giây. Âm thanh được đo ngay trên máy, không tải lên hoặc lưu lại. Đóng hộp thoại hoặc hủy để dừng.',
+  microphoneTestInstructions:
+    'Với mỗi micrô: giữ im lặng hai giây, rồi đọc cùng một câu trong bốn giây. Giữ nguyên vị trí và môi trường. Nhấn giữ để nói tạm dừng khi thử.',
+  microphoneTestPhrase: '“Đây là bài thử micrô. Tôi muốn giọng nói của mình rõ ràng.”',
+  microphoneTestDevice: (name: string): string => `Thử ${name}`,
+  microphoneTestOpening: 'Đang mở micrô…',
+  microphoneTestQuiet: 'Giữ im lặng',
+  microphoneTestSpeak: 'Nói ngay bây giờ',
+  microphoneTestCancel: 'Hủy bài thử',
+  microphoneTestBusy: 'Hoàn tất lệnh giọng nói hoặc tác vụ hiện tại trước khi thử.',
+  microphoneTestError:
+    'Không thể hoàn tất bài thử. Kiểm tra quyền micrô và thiết bị đang kết nối rồi thử lại.',
+  microphoneTestLimitations:
+    'Ít tiếng ồn khi im lặng và ít méo do quá mức có thể hữu ích. Nói to hơn không luôn tốt hơn. Các mức này bao gồm xử lý của thiết bị, không đo độ chính xác chuyển giọng nói thành chữ. Tự chọn hoặc xếp thứ tự; kết quả xóa khi đổi thiết bị hoặc đăng xuất.',
+  microphoneNoise: 'Ồn khi im lặng',
+  microphoneSpeech: 'Mức giọng nói',
+  microphoneClipping: 'Quá mức',
+  microphoneStartup: 'Khởi động',
+  microphoneChange: 'Chọn micrô',
+
   taskSucceeded: 'Đã hoàn tất yêu cầu',
   taskPartial: 'Đã hoàn tất một phần',
   taskBlocked: 'Không thể tiếp tục',
@@ -16,7 +80,13 @@ export const vietnamese = {
   signIn: 'Đăng nhập',
   yourDesktop: 'MÁY TÍNH CỦA BẠN',
   attention: 'Có vấn đề cần xử lý',
-  settingsDescription: 'Mọi cài đặt cần thiết ở cùng một nơi.',
+  settingsGeneral: 'Chung',
+  settingsNavigation: 'Nhóm cài đặt',
+  settingsClose: 'Đóng cài đặt',
+  settingsShortcut: 'Phím tắt nói',
+  settingsShortcutHint: 'Giữ để nói, thả để gửi.',
+  settingsShortcutUnavailable: 'Phím tắt chưa khả dụng. Bạn có thể nhập tin nhắn.',
+  settingsMicrophoneUnavailable: 'Chưa kết nối',
   account: 'Tài khoản',
   name: 'Tên',
   email: 'Email',
@@ -26,8 +96,7 @@ export const vietnamese = {
   appearanceDescription: 'Giao diện sáng, đơn giản và ấm áp.',
   light: 'Sáng',
   language: 'Ngôn ngữ',
-  languageDescription:
-    'Chọn ngôn ngữ hiển thị của Tro. Thay đổi có hiệu lực ngay và được lưu trên thiết bị này.',
+  languageDescription: 'Ngôn ngữ hiển thị, lưu trên thiết bị này.',
   languageStorageWarning: 'Đã đổi ngôn ngữ cho lần sử dụng này, nhưng không thể lưu trên thiết bị.',
   assistant: 'Trợ lý sử dụng máy tính',
   welcome: (name: string): string => `Chào mừng trở lại, ${name}`,

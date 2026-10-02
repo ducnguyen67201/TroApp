@@ -1,6 +1,6 @@
 # Desktop UI
 
-Tro uses Mantine in Electron's React renderer. It has two destinations: Workspace and Settings. The sidebar shows the current Google account and sign-out control. The existing preload bridge remains the only route to authentication and agent tasks.
+Tro uses Mantine in Electron's React renderer. The sidebar opens Workspace and a compact Settings dialog. The sidebar shows the current Google account and sign-out control. The existing preload bridge remains the only route to authentication and agent tasks.
 
 The desktop opens at 1360 × 860 logical pixels, close to a 16:10 ratio. These defaults live in `src/desktop/main/Main.ts`. The window remains freely resizable down to 680 × 520.
 
@@ -23,11 +23,11 @@ The theme's CSS variable resolver exposes semantic `--tro-*` tokens and aligns M
 ## Ownership and behavior
 
 - `Render.tsx` installs the one `LocaleProvider` around the complete desktop interface.
-- `App.tsx` owns the Mantine AppShell, sidebar and selected destination and reads all interface copy through `useLocale`.
-- `UseComputerUse.ts` owns authentication and the in-memory task state. It stays mounted when changing destinations, so Settings does not clear a draft or an active task.
+- `App.tsx` owns the Mantine AppShell, sidebar and Settings/microphone dialog stack and reads all interface copy through `useLocale`.
+- `UseComputerUse.ts` owns authentication and the in-memory task state. The workspace stays mounted behind Settings, so opening or closing it does not clear a draft, restart voice input or interrupt an active task.
 - `ComputerUsePage.tsx` renders the workspace and composer. Voice capture and task progress use the companion HUD, with no duplicate voice panel above the workspace.
-- `App.tsx` keeps `UseVoiceInput.ts` mounted across navigation for shortcut capture, audio delivery and voice task replies.
-- `SettingsPage.tsx` renders account details, language selection and the current appearance.
+- `App.tsx` keeps `UseVoiceInput.ts` mounted while dialogs are open for shortcut capture, audio delivery and voice task replies.
+- `SettingsDialog.tsx` renders General and Account tabs. General shows the actual talk shortcut, selected microphone, language and fixed appearance as compact rows. Account shows the signed-in name and email. Microphone selection, sound tests and ranking open in the existing picker above Settings; closing it returns to Settings. Mantine Modal.Stack owns focus trapping and top-dialog Escape dismissal. App restores focus to each opener after the exit transition, so closing the picker returns to its Settings button and closing Settings returns to its sidebar button. The panel scrolls at small window sizes, and the language remains available before sign-in.
 - `localization/LocaleProvider.tsx` owns locale state and persistence for the renderer root.
 - `localization/UseLocale.ts` is the typed hook components use to read messages and change the language.
 
@@ -35,7 +35,7 @@ Google still opens in the system browser. No credentials or database access move
 
 ## Languages
 
-Vietnamese (`vi`) is the default. Settings → Ngôn ngữ / Language offers Tiếng Việt and English (`en`), including before sign-in. Switching updates the interface, accessibility labels, current alerts and the document's `lang` immediately. It preserves task state and drafts. The renderer stores only the locale under `tro.desktop.locale` in local storage; the choice survives app restarts on the same device. An absent, unsupported or unreadable preference falls back to Vietnamese. If saving fails, switching still works for the current window and Settings explains that the preference was not saved.
+Vietnamese (`vi`) is the default. Settings → General → Ngôn ngữ / Language offers Tiếng Việt and English (`en`), including before sign-in. Switching updates the interface, accessibility labels, current alerts and the document's `lang` immediately. It preserves task state and drafts. The renderer stores only the locale under `tro.desktop.locale` in local storage; the choice survives app restarts on the same device. An absent, unsupported or unreadable preference falls back to Vietnamese. If saving fails, switching still works for the current window and Settings explains that the preference was not saved.
 
 `localization/English.ts` owns the canonical translation keys and parameter contracts. `Vietnamese.ts` implements the same `TranslationCatalog`. Import `useLocale` from `localization/UseLocale.ts` and use its `messages` in screens and hooks instead of embedding UI copy. Keep whole sentences in the catalog and use typed functions for interpolation, such as `messages.welcome(name)`, so translators can change word order. User names, email addresses, task messages and model answers are content and are displayed as received; the UI language does not set the model's response language.
 
@@ -51,6 +51,6 @@ The existing IPC protocol reports English error text. `BridgeErrors.ts` maps kno
 
 The packages are already included in `package.json`: `@mantine/core`, matching `@mantine/hooks`, and `@tabler/icons-react` for icons. Run `pnpm install`, then use the desktop startup commands in [Development.md](Development.md). The same renderer is bundled for installed apps.
 
-Renderer tests use a typed fake preload bridge and require no Google account, model calls, or database. They cover the sidebar account, navigation preserving conversation/draft/task state, successful sign-out clearing local state, disabled sign-out during a task, authentication failures, default/saved locales, switching without clearing content, inaccessible storage, and localized errors. Follow the repository's final validation commands after completing edits.
+Renderer tests use a typed fake preload bridge and require no Google account, model calls, or database. They cover the sidebar account, dialog and tab navigation preserving the mounted workspace and conversation/draft/task state, nested microphone dismissal and current selection summaries, successful sign-out clearing local state, disabled sign-out during a task, authentication failures, default/saved locales, switching without clearing content, inaccessible storage, and localized errors. Follow the repository's final validation commands after completing edits.
 
 References: [Mantine with Vite](https://mantine.dev/guides/vite/), [Mantine theme](https://mantine.dev/theming/theme-object/), [AppShell](https://mantine.dev/core/app-shell/).

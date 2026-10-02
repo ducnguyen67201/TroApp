@@ -121,6 +121,16 @@ The earlier exploratory options remain in [ArchitecturePrevious.md](Architecture
 
 ## Voice input
 
+### Microphone selection
+
+The app-owned microphone picker persists a local device ID and makes explainable device-name suggestions. Each hold snapshots that choice; exact device constraints prevent silent substitution for a missing explicit input. Inventory access and device changes do not open streams.
+
+`UseMicrophones` owns app-level discovery and storage, `Microphones` owns deterministic suggestion rules, and `MicrophonePicker` renders the choices. `UseVoiceInput` passes one selected ID into `VoiceAudioCapture` per hold. Electron main owns the trusted-frame audio permission policy and the existing capture controller owns admission and relay transport. Device names/IDs stay local; held-key audio follows the existing remote transcription path. Selection, suggestion and the input of an active capture are separate values. Selection needs no backend, database or HTTP API change. Local comparison adds only narrow validated test start/stop operations and cancellation events to preload.
+
+See [MicrophoneSelection.md](MicrophoneSelection.md) for the ownership map, data lifetimes, sequence diagram, failure recovery, recommendation rules and implemented sound-comparison architecture. `MicrophoneTestLease` coordinates main-owned exclusive test admission with voice. A separate renderer worklet emits only scalar measurements, with no relay or agent calls. `MicrophoneRanking` stores an independent device order and never switches the selected route. Signed hardware checks remain a release requirement; see [MicrophoneHardwareChecks.md](MicrophoneHardwareChecks.md).
+
+### Transcription
+
 The desktop captures held-key microphone audio in an AudioWorklet, sends bounded PCM frames through validated preload operations, and uses a scoped authenticated WebSocket relay in the backend. The existing locale hook supplies each capture’s language. Main admits one final instruction and its capture locale into the existing agent controller and reports submission/result events to the in-memory UI. Typed instructions also carry the current locale. The worker builds each task's agent instructions in that reply language while reusing its Cua connection. Prisma owns atomic audio quota reservations and single-use stream claims. See [VoiceInputSpec.md](VoiceInputSpec.md) for module ownership, limits, native packaging, and release evidence.
 
 ## Native V2 teaching guidance
