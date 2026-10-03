@@ -698,7 +698,8 @@ ERD drops and physical click/drag/Esc checks on the student's machine.
 Verified on October 3, 2026:
 
 - `pnpm typecheck`, `pnpm lint` and `pnpm format:check` passed.
-- `pnpm test`: 74 files, 468 tests passed.
+- `pnpm test`: 78 files, 486 tests passed after integrating the current app-update
+  changes from `main` and moving their tests into the mirrored test tree.
 - `pnpm build`, `pnpm test:worker` and `pnpm test:integration` passed; integration
   used disposable local PostgreSQL (4 files, 7 tests).
 - `pnpm build:cua` built and installed `0.30.4-tro.14`, including native contract,

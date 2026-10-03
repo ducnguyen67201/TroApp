@@ -9,6 +9,26 @@ const desktopEnvSource = {
 };
 
 describe('desktop configuration boundary', () => {
+  it('accepts only public HTTPS update feeds and leaves updates off without one', () => {
+    const source = { ...desktopEnvSource, bundledApiUrl: undefined };
+    expect(readDesktopEnv(source).UPDATE_FEED_URL).toBeUndefined();
+    expect(
+      readDesktopEnv({ ...source, bundledUpdateUrl: 'https://downloads.example.test/tro/' })
+        .UPDATE_FEED_URL,
+    ).toBe('https://downloads.example.test/tro/');
+    for (const url of [
+      'http://localhost/updates',
+      'file:///tmp/update',
+      'https://user:secret@example.test',
+      'https://example.test?token=secret',
+      'https://example.test/#fragment',
+      123,
+    ]) {
+      expect(() => readDesktopEnv({ ...source, bundledUpdateUrl: url })).toThrow(
+        'Desktop configuration is invalid.',
+      );
+    }
+  });
   it('rejects non-local plaintext URLs and embedded credentials', () => {
     expect(() =>
       readDesktopEnv({ ...desktopEnvSource, bundledApiUrl: 'http://example.test' }),

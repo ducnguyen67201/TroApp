@@ -18,6 +18,14 @@ import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
 import {
+  AppUpdateCommand,
+  AppUpdateFailure,
+  AppUpdateReplySchema,
+  AppUpdateSnapshotSchema,
+  AppUpdateState,
+  type AppUpdateReply,
+} from '#contracts/AppUpdate.js';
+import {
   AgentCommandSchema,
   AgentResultSchema,
   type AgentResult,
@@ -45,6 +53,27 @@ const bridge: DesktopBridge = {
     ipcRenderer.on('tro:agent-progress', receive);
     return () => {
       ipcRenderer.removeListener('tro:agent-progress', receive);
+    };
+  },
+  async readAppUpdate() {
+    const reply = await requestAppUpdate(AppUpdateCommand.STATUS);
+    return reply.kind === 'ok'
+      ? reply.snapshot
+      : { revision: 0, status: { state: AppUpdateState.DISABLED } };
+  },
+  checkAppUpdate: () => requestAppUpdate(AppUpdateCommand.CHECK),
+  downloadAppUpdate: () => requestAppUpdate(AppUpdateCommand.DOWNLOAD),
+  restartForAppUpdate: () => requestAppUpdate(AppUpdateCommand.RESTART),
+  subscribeAppUpdate(listener) {
+    const receive = (_event: Electron.IpcRendererEvent, raw: unknown): void => {
+      const parsed = AppUpdateSnapshotSchema.safeParse(raw);
+      if (parsed.success) {
+        listener(parsed.data);
+      }
+    };
+    ipcRenderer.on('tro:update-event', receive);
+    return () => {
+      ipcRenderer.removeListener('tro:update-event', receive);
     };
   },
   async controlMicrophoneTest(command) {
@@ -221,5 +250,15 @@ const bridge: DesktopBridge = {
     }
   },
 };
+
+async function requestAppUpdate(
+  kind: (typeof AppUpdateCommand)[keyof typeof AppUpdateCommand],
+): Promise<AppUpdateReply> {
+  try {
+    return AppUpdateReplySchema.parse(await ipcRenderer.invoke('tro:update-command', { kind }));
+  } catch {
+    return { kind: 'failed', reason: AppUpdateFailure.UNAVAILABLE };
+  }
+}
 
 contextBridge.exposeInMainWorld('tro', bridge);

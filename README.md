@@ -8,6 +8,8 @@ Read [Architecture](docs/Architecture.md) for the local/cloud split, [Developmen
 
 ## Quick start
 
+Installed macOS/Windows builds support a sidebar update button above Settings: click to download, then restart when ready. Updates require a configured HTTPS release feed and signed release artifacts; they stay disabled in development and without a feed. See [App updates](docs/AppUpdates.md) for packaging and release setup.
+
 Use Node.js 24 LTS and pnpm 11. Install the Doppler CLI and make sure the shared development
 PostgreSQL container is already running.
 

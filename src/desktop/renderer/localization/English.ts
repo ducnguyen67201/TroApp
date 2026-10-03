@@ -1,5 +1,21 @@
 /** Canonical desktop copy. Other catalogs must implement every key and parameter. */
 export const english = {
+  updateTro: 'Update Tro',
+  updateAvailable: (version: string): string => `Version ${version} available`,
+  updateDownloading: 'Downloading…',
+  updateKeepUsing: 'Keep using Tro',
+  updateRestart: 'Restart to update',
+  updateReady: (version: string): string => `Version ${version} is ready`,
+  updateRestarting: 'Restarting Tro…',
+  updateInstalling: 'Installing the update',
+  updateRetry: 'Retry update',
+  updateRetryRestart: 'Retry restart',
+  updateCheckFailed: 'Could not check for updates.',
+  updateDownloadFailed: 'Download failed. Try again.',
+  updateInstallFailed: 'Could not install. Try again.',
+  updateProgress: 'Update download',
+  updateBusy: 'Wait for the current task or recording to finish.',
+  updateUnavailable: 'Could not start the update. Try again.',
   microphone: 'Microphone',
   microphoneDescription:
     'Choose the microphone Tro uses for voice instructions. Voice instructions are captured while you hold the talk shortcut. You can also start a local sound test below.',

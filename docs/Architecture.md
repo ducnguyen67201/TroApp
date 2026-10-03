@@ -23,6 +23,8 @@ The desktop and API share the `dev | stage | prod` application environment vocab
 
 ## The full system
 
+Desktop updates run in Electron main through `electron-updater`, using a build-configured public HTTPS feed. Validated state crosses preload to a full-width sidebar action above Settings. Checks run only in configured installed macOS/Windows builds; downloads and restart require clicks. Main blocks restart during active work and cleans up local workers and the embedded driver before installation. The backend does not serve updates. See [AppUpdates.md](AppUpdates.md) for release setup and installed-app verification limits.
+
 ```mermaid
 flowchart LR
   subgraph User[User's Windows or Mac]

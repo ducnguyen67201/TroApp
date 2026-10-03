@@ -8,6 +8,7 @@ import type { AuthUser } from '#contracts/AuthSession.js';
 import type { AgentResult } from '#contracts/AgentSession.js';
 import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import type { VoiceReply } from '#contracts/VoiceInput.js';
+import { AppUpdateState, type AppUpdateSnapshot } from '#contracts/AppUpdate.js';
 import { CompletionMode, TaskOutcomeStatus } from '#contracts/TaskOutcome.js';
 import { microphoneStorageKey } from '../../../src/desktop/renderer/voice/Microphones.js';
 import { App } from '../../../src/desktop/renderer/App.js';
@@ -23,6 +24,19 @@ const sessionId = 'a8f6d44a-5c18-4ce3-9237-44624549f63f';
 
 function createDesktopBridge() {
   return {
+    readAppUpdate: vi
+      .fn<DesktopBridge['readAppUpdate']>()
+      .mockResolvedValue({ revision: 0, status: { state: AppUpdateState.DISABLED } }),
+    checkAppUpdate: vi
+      .fn<DesktopBridge['checkAppUpdate']>()
+      .mockResolvedValue({ kind: 'failed', reason: 'unavailable' }),
+    downloadAppUpdate: vi
+      .fn<DesktopBridge['downloadAppUpdate']>()
+      .mockResolvedValue({ kind: 'failed', reason: 'unavailable' }),
+    restartForAppUpdate: vi
+      .fn<DesktopBridge['restartForAppUpdate']>()
+      .mockResolvedValue({ kind: 'failed', reason: 'unavailable' }),
+    subscribeAppUpdate: vi.fn<DesktopBridge['subscribeAppUpdate']>().mockReturnValue(() => {}),
     controlMicrophoneTest: vi
       .fn<DesktopBridge['controlMicrophoneTest']>()
       .mockResolvedValue({ kind: 'ok' }),
@@ -1045,4 +1059,209 @@ it('answers a retained lesson through the narrow bridge while the original task 
     });
   });
   expect(await screen.findByText('The whole ERD is ready.')).toBeTruthy();
+});
+
+describe('sidebar app updates', () => {
+  it('stays hidden without an update and shows above Settings even before sign-in', async () => {
+    const bridge = createDesktopBridge();
+    bridge.readAuthSession.mockResolvedValue({ kind: 'signed-out' });
+    let receive: ((snapshot: AppUpdateSnapshot) => void) | undefined;
+    bridge.subscribeAppUpdate.mockImplementation((listener) => {
+      receive = listener;
+      return () => {};
+    });
+    window.tro = bridge;
+    renderDesktop();
+    await screen.findByRole('button', { name: 'Continue with Google' });
+    expect(screen.queryByRole('button', { name: /Update Tro/ })).toBeNull();
+    act(() => {
+      receive?.({ revision: 1, status: { state: AppUpdateState.AVAILABLE, version: '0.2.0' } });
+    });
+    const button = await screen.findByRole('button', { name: /Update Tro/ });
+    const settings = screen.getByRole('button', { name: 'Settings' });
+    expect(button.parentElement?.parentElement).toBe(settings.parentElement);
+    expect(
+      button.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(bridge.downloadAppUpdate).not.toHaveBeenCalled();
+    act(() => {
+      receive?.({ revision: 2, status: { state: AppUpdateState.CURRENT } });
+    });
+    expect(screen.queryByRole('button', { name: /Update Tro/ })).toBeNull();
+  });
+
+  it('starts only the clicked action, shows live progress and unsubscribes', async () => {
+    const bridge = createDesktopBridge();
+    let receive: ((snapshot: AppUpdateSnapshot) => void) | undefined;
+    const unsubscribe = vi.fn<() => void>();
+    bridge.subscribeAppUpdate.mockImplementation((listener) => {
+      receive = listener;
+      return unsubscribe;
+    });
+    bridge.readAppUpdate.mockResolvedValue({
+      revision: 1,
+      status: { state: AppUpdateState.AVAILABLE, version: '0.2.0' },
+    });
+    bridge.downloadAppUpdate.mockResolvedValue({
+      kind: 'ok',
+      snapshot: {
+        revision: 2,
+        status: { state: AppUpdateState.DOWNLOADING, version: '0.2.0', percent: 0 },
+      },
+    });
+    bridge.restartForAppUpdate.mockResolvedValue({
+      kind: 'ok',
+      snapshot: { revision: 5, status: { state: AppUpdateState.RESTARTING, version: '0.2.0' } },
+    });
+    window.tro = bridge;
+    renderDesktop();
+    fireEvent.click(await screen.findByRole('button', { name: /Update Tro/ }));
+    await waitFor(() => {
+      expect(bridge.downloadAppUpdate).toHaveBeenCalledOnce();
+    });
+    const download = await screen.findByRole('button', { name: /Downloading/ });
+    expect(download).toHaveProperty('disabled', true);
+    act(() => {
+      receive?.({
+        revision: 3,
+        status: { state: AppUpdateState.DOWNLOADING, version: '0.2.0', percent: 48 },
+      });
+    });
+    expect(screen.getByRole('progressbar', { name: 'Update download' })).toHaveProperty(
+      'value',
+      48,
+    );
+    act(() => {
+      receive?.({ revision: 4, status: { state: AppUpdateState.READY, version: '0.2.0' } });
+    });
+    expect(bridge.restartForAppUpdate).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('button', { name: /Restart to update/ }));
+    await waitFor(() => {
+      expect(bridge.restartForAppUpdate).toHaveBeenCalledOnce();
+    });
+    expect(await screen.findByRole('button', { name: /Restarting Tro/ })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    cleanup();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('ignores stale initial reads and translates the existing update when language changes', async () => {
+    const bridge = createDesktopBridge();
+    let finishRead: ((snapshot: AppUpdateSnapshot) => void) | undefined;
+    let receive: ((snapshot: AppUpdateSnapshot) => void) | undefined;
+    bridge.readAppUpdate.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishRead = resolve;
+        }),
+    );
+    bridge.subscribeAppUpdate.mockImplementation((listener) => {
+      receive = listener;
+      return () => {};
+    });
+    window.tro = bridge;
+    renderDesktop();
+    await screen.findByRole('textbox', { name: 'Your message' });
+    act(() => {
+      receive?.({ revision: 3, status: { state: AppUpdateState.READY, version: '0.2.0' } });
+    });
+    await act(() => {
+      finishRead?.({ revision: 1, status: { state: AppUpdateState.AVAILABLE, version: '0.2.0' } });
+      return Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: /Restart to update/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Language' }), {
+      target: { value: 'vi' },
+    });
+    expect(
+      screen.getByRole('button', { name: /Khởi động lại để cập nhật/, hidden: true }),
+    ).toBeTruthy();
+    expect(bridge.readAppUpdate).toHaveBeenCalledOnce();
+  });
+
+  it('retries the correct failure phase and shows a rejected restart without losing readiness', async () => {
+    const bridge = createDesktopBridge();
+    let receive: ((snapshot: AppUpdateSnapshot) => void) | undefined;
+    bridge.subscribeAppUpdate.mockImplementation((listener) => {
+      receive = listener;
+      return () => {};
+    });
+    bridge.readAppUpdate.mockResolvedValue({
+      revision: 1,
+      status: { state: AppUpdateState.ERROR, phase: 'check', version: null },
+    });
+    bridge.checkAppUpdate.mockResolvedValue({
+      kind: 'ok',
+      snapshot: { revision: 2, status: { state: AppUpdateState.AVAILABLE, version: '0.2.0' } },
+    });
+    bridge.restartForAppUpdate.mockResolvedValue({ kind: 'failed', reason: 'busy' });
+    window.tro = bridge;
+    renderDesktop();
+    fireEvent.click(await screen.findByRole('button', { name: /Retry update/ }));
+    await waitFor(() => {
+      expect(bridge.checkAppUpdate).toHaveBeenCalledOnce();
+    });
+    expect(await screen.findByRole('button', { name: /Update Tro/ })).toBeTruthy();
+    act(() => {
+      receive?.({
+        revision: 3,
+        status: { state: AppUpdateState.ERROR, phase: 'download', version: '0.2.0' },
+      });
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Retry update/ }));
+    await waitFor(() => {
+      expect(bridge.downloadAppUpdate).toHaveBeenCalledOnce();
+    });
+    act(() => {
+      receive?.({ revision: 4, status: { state: AppUpdateState.READY, version: '0.2.0' } });
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Restart to update/ }));
+    expect(
+      await screen.findByText('Wait for the current task or recording to finish.'),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Restart to update/ })).toBeTruthy();
+  });
+
+  it('disables restarting during an active task without interrupting it', async () => {
+    const bridge = createDesktopBridge();
+    bridge.readAppUpdate.mockResolvedValue({
+      revision: 1,
+      status: { state: AppUpdateState.READY, version: '0.2.0' },
+    });
+    let finish: ((result: AgentResult) => void) | undefined;
+    bridge.sendAgentMessage.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    window.tro = bridge;
+    renderDesktop();
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Your message' }), {
+      target: { value: 'Do this task' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send to Tro' }));
+    await waitFor(() => {
+      expect(bridge.sendAgentMessage).toHaveBeenCalledOnce();
+    });
+    expect(screen.getByRole('button', { name: /Restart to update/ })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Restart to update/ }));
+    expect(bridge.restartForAppUpdate).not.toHaveBeenCalled();
+    await act(() => {
+      finish?.({ kind: 'completed', completion: { kind: 'response' }, answer: 'Finished' });
+      return Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Restart to update/ })).toHaveProperty(
+        'disabled',
+        false,
+      );
+    });
+  });
 });
