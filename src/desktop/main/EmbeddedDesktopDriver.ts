@@ -5,7 +5,7 @@ import {
   type DesktopDriverConnection,
 } from '#contracts/DesktopDriver.js';
 import { DesktopPermissionState } from '#contracts/DesktopPermissions.js';
-import { chooseCuaDriverCommand } from '../worker/ChooseCuaDriverCommand.js';
+import { chooseCuaDriverCommand } from '../worker/cua/ChooseCuaDriverCommand.js';
 import { DesktopPermissions } from './DesktopPermissions.js';
 import { loadCuaSdk, type DesktopDriverHost } from './LoadCuaSdk.js';
 import type { DesktopDriverPort } from './DesktopDriverPort.js';

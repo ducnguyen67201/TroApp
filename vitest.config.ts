@@ -3,5 +3,5 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   resolve: { alias: { '#contracts': resolve('src/contracts') } },
-  test: { include: ['src/**/*.test.ts'], exclude: ['src/**/*.integration.test.ts'] },
+  test: { include: ['test/**/*.test.ts'], exclude: ['test/**/*.integration.test.ts'] },
 });

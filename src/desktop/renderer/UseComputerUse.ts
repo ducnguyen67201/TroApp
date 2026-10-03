@@ -1,7 +1,8 @@
+import { AgentProgressPhase } from '#contracts/CompanionHud.js';
 import { VoiceState, type VoiceEvent } from '#contracts/VoiceInput.js';
 import { useEffect, useRef, useState } from 'react';
 import { describeTeachingResult } from './TeachingResultPresentation.js';
-import { AgentTaskMode, type TeachingOutcome } from '#contracts/CursorCompanion.js';
+import { AgentTaskMode, TeachingOutcome } from '#contracts/CursorCompanion.js';
 import { useLocale } from './localization/UseLocale.js';
 import { resolveBridgeError } from './localization/BridgeErrors.js';
 import type { TranslationKey } from './localization/English.js';
@@ -25,6 +26,9 @@ export interface ComputerUseController {
   isSending: boolean;
   isResetting: boolean;
   taskMode: AgentTaskMode;
+  teachingStep: string | null;
+  teachingPhase: AgentProgressPhase | null;
+  canAnswerLesson: boolean;
   setTaskMode: (mode: AgentTaskMode) => void;
   stopTask: () => Promise<void>;
   messageInput: string;
@@ -52,12 +56,48 @@ export function useComputerUse(): ComputerUseController {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [taskMode, setTaskMode] = useState<AgentTaskMode>(AgentTaskMode.TEACH);
   const [messageInput, setMessageInput] = useState('');
+  const [answerLessonId, setAnswerLessonId] = useState<string | null>(null);
+  const [teachingPhase, setTeachingPhase] = useState<AgentProgressPhase | null>(null);
+  const [teachingStep, setTeachingStep] = useState<string | null>(null);
   const [messages, setMessages] = useState<TaskMessage[]>([]);
   const [message, setMessage] = useState<TranslationKey | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isVoiceLessonActive, setIsVoiceLessonActive] = useState(false);
   const [isVoiceBusy, setIsVoiceBusy] = useState(false);
   const voiceCaptureId = useRef<string | null>(null);
+
+  useEffect(() => {
+    const sessionId = currentSessionId.current;
+    if (sessionId) {
+      void window.tro.updateTeachingLocale?.(sessionId, locale).catch(() => {});
+    }
+  }, [locale]);
+
+  useEffect(
+    () =>
+      window.tro.subscribeAgentProgress((progress) => {
+        if (progress.sessionId === currentSessionId.current) {
+          setTeachingPhase(progress.phase);
+        }
+        if (
+          progress.sessionId === currentSessionId.current &&
+          progress.phase === AgentProgressPhase.THINKING
+        ) {
+          setAnswerLessonId(null);
+        }
+        if (progress.sessionId === currentSessionId.current && progress.teachingStep) {
+          setTeachingStep(progress.teachingStep);
+          setAnswerLessonId(
+            progress.phase === AgentProgressPhase.NEEDS_INPUT ||
+              progress.phase === AgentProgressPhase.PAUSED
+              ? (progress.lessonId ?? null)
+              : null,
+          );
+        }
+      }),
+    [],
+  );
 
   useEffect(() => {
     const effectState = { active: true };
@@ -156,7 +196,7 @@ export function useComputerUse(): ComputerUseController {
   }
 
   async function startNewTask(): Promise<void> {
-    if (isSending || isVoiceBusy || isSigningOut || isResetting) {
+    if (isSending || isVoiceBusy || isVoiceLessonActive || isSigningOut || isResetting) {
       return;
     }
     setIsResetting(true);
@@ -186,12 +226,58 @@ export function useComputerUse(): ComputerUseController {
   }
 
   async function sendMessage(instruction: string = messageInput): Promise<void> {
-    if (!user || isSending || isVoiceBusy || isSigningOut || isResetting || !instruction.trim()) {
+    const sessionId = currentSessionId.current;
+    if (
+      user &&
+      sessionId &&
+      answerLessonId &&
+      instruction.trim() &&
+      !isVoiceBusy &&
+      !isResetting &&
+      !isSigningOut
+    ) {
+      const submittedAnswer = instruction.trim();
+      let result: Awaited<ReturnType<typeof window.tro.answerTeachingLesson>>;
+      try {
+        result = await window.tro.answerTeachingLesson(
+          sessionId,
+          answerLessonId,
+          submittedAnswer,
+          locale,
+        );
+      } catch {
+        setMessage('errorContactAgent');
+        return;
+      }
+      if (currentSessionId.current !== sessionId) {
+        return;
+      }
+      if (result.kind === 'accepted') {
+        setAnswerLessonId(null);
+        setMessageInput('');
+        setMessages((current) => [...current, { role: MessageRole.USER, text: submittedAnswer }]);
+      } else if (result.kind === 'failed') {
+        setMessage(resolveBridgeError(result.message, 'errorCompleteTask'));
+      }
+      return;
+    }
+    if (
+      !user ||
+      isSending ||
+      isVoiceBusy ||
+      isVoiceLessonActive ||
+      isSigningOut ||
+      isResetting ||
+      !instruction.trim()
+    ) {
       return;
     }
     const submittedMessage = instruction.trim();
     const generation = taskGeneration.current;
     setIsSending(true);
+    setTeachingStep(null);
+    setTeachingPhase(null);
+    setAnswerLessonId(null);
     setMessage(null);
     try {
       let activeId = currentSessionId.current;
@@ -212,6 +298,7 @@ export function useComputerUse(): ComputerUseController {
         currentSessionId.current = activeId;
       }
       setMessageInput('');
+      setMessages((current) => [...current, { role: MessageRole.USER, text: submittedMessage }]);
       const result = await window.tro.sendAgentMessage(
         activeId,
         submittedMessage,
@@ -224,13 +311,11 @@ export function useComputerUse(): ComputerUseController {
       if (result.kind === 'completed') {
         setMessages((current) => [
           ...current,
-          { role: MessageRole.USER, text: submittedMessage },
           { role: MessageRole.AGENT, text: result.answer, completion: result.completion },
         ]);
       } else if (result.kind === 'teaching') {
         setMessages((current) => [
           ...current,
-          { role: MessageRole.USER, text: submittedMessage },
           {
             role: MessageRole.AGENT,
             text: describeTeachingResult(result.result, translations),
@@ -252,6 +337,9 @@ export function useComputerUse(): ComputerUseController {
       }
     } finally {
       setIsSending(false);
+      setTeachingStep(null);
+      setTeachingPhase(null);
+      setAnswerLessonId(null);
     }
   }
 
@@ -261,6 +349,10 @@ export function useComputerUse(): ComputerUseController {
       return;
     }
     taskGeneration.current += 1;
+    setIsVoiceLessonActive(false);
+    setTeachingStep(null);
+    setTeachingPhase(null);
+    setAnswerLessonId(null);
     setIsResetting(true);
     /* Invalidate the pending reply before awaiting stop, so cancellation
        cannot append a late answer or restore the canceled message. */
@@ -279,8 +371,23 @@ export function useComputerUse(): ComputerUseController {
     }
   }
 
+  useEffect(() => {
+    if ((!isSending && !isVoiceBusy && !isVoiceLessonActive) || taskMode !== AgentTaskMode.TEACH) {
+      return;
+    }
+    const cancelOnEscape = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape' && !event.repeat) {
+        void stopTask();
+      }
+    };
+    window.addEventListener('keydown', cancelOnEscape);
+    return () => {
+      window.removeEventListener('keydown', cancelOnEscape);
+    };
+  }, [isSending, isVoiceBusy, isVoiceLessonActive, taskMode, stopTask]);
+
   async function signOut(): Promise<void> {
-    if (isSending || isVoiceBusy || isSigningOut || isResetting) {
+    if (isSending || isVoiceBusy || isVoiceLessonActive || isSigningOut || isResetting) {
       return;
     }
     setIsSigningOut(true);
@@ -307,21 +414,43 @@ export function useComputerUse(): ComputerUseController {
   }
 
   function receiveVoiceEvent(event: VoiceEvent): void {
+    if (
+      event.kind === 'result' &&
+      event.result.kind === 'accepted' &&
+      event.sessionId === currentSessionId.current
+    ) {
+      voiceCaptureId.current = null;
+      return;
+    }
     if (event.kind === 'status') {
       const busy =
         event.status.state !== VoiceState.IDLE && event.status.state !== VoiceState.DISABLED;
       setIsVoiceBusy(busy);
     } else if (event.kind === 'submitted') {
+      if (!isSending) {
+        setIsVoiceLessonActive(true);
+      }
+      setTeachingStep(null);
+      setTeachingPhase(null);
+      setAnswerLessonId(null);
       voiceCaptureId.current = event.captureId;
       currentSessionId.current = event.sessionId;
       setMessage(null);
       setMessages((current) => [...current, { role: MessageRole.USER, text: event.text }]);
     } else if (
       event.kind === 'result' &&
-      voiceCaptureId.current === event.captureId &&
+      (voiceCaptureId.current === event.captureId ||
+        (event.result.kind === 'teaching' &&
+          (event.result.result.outcome === TeachingOutcome.GOAL_REACHED ||
+            event.result.result.outcome === TeachingOutcome.FAILED ||
+            event.result.result.outcome === TeachingOutcome.CANCELED))) &&
       currentSessionId.current === event.sessionId
     ) {
       voiceCaptureId.current = null;
+      setIsVoiceLessonActive(false);
+      setTeachingStep(null);
+      setTeachingPhase(null);
+      setAnswerLessonId(null);
       if (event.result.kind === 'completed') {
         const result = event.result;
         setMessages((current) => [
@@ -353,9 +482,12 @@ export function useComputerUse(): ComputerUseController {
     isLoading,
     isSigning,
     isSigningOut,
-    isSending: isSending || isVoiceBusy,
+    isSending: isSending || isVoiceBusy || isVoiceLessonActive,
     isResetting,
     taskMode,
+    teachingStep,
+    teachingPhase,
+    canAnswerLesson: answerLessonId !== null,
     setTaskMode,
     stopTask,
     messageInput,

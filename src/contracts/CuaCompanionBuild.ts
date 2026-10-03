@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const CuaCompanionBuild = {
-  VERSION: '0.30.4-tro.4',
+  VERSION: '0.30.4-tro.14',
   SOURCE_COMMIT: 'bf6c76786d938070f4ecf1e44004752f69f518b8',
 } as const;
 

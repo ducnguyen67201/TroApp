@@ -14,6 +14,7 @@ export interface AgentChatAuth {
 
 /** Owns the local worker's lifetime and exchanges typed task results. */
 export interface AgentChatWorker {
+  updateTeachingLocale?: (sessionId: string, locale: DesktopLocale) => Promise<AgentResult>;
   isRunning(): boolean;
   startCompanion(sessionId: string): Promise<AgentResult>;
   start(sessionId: string, gatewayToken: string, gatewayBaseUrl: string): Promise<AgentResult>;
@@ -23,6 +24,17 @@ export interface AgentChatWorker {
     locale: DesktopLocale,
     mode?: AgentTaskMode,
   ): Promise<AgentResult>;
+  answerLesson?(
+    sessionId: string,
+    lessonId: string,
+    message: string,
+    locale: DesktopLocale,
+  ): Promise<AgentResult>;
+  refreshCredential?(
+    sessionId: string,
+    gatewayToken: string,
+    gatewayBaseUrl: string,
+  ): Promise<AgentResult>;
   stop(sessionId: string): Promise<AgentResult>;
   dispose(): void;
 }
@@ -30,4 +42,10 @@ export interface AgentChatWorker {
 /** Reads the desktop grants required before a task can start. */
 export interface AgentChatPermissions {
   readStatus(): Promise<DesktopPermissionStatus>;
+}
+
+/** The active lesson temporarily owns Esc; idle app shortcuts are untouched. */
+export interface AgentCancelShortcut {
+  enable(cancel: () => void): boolean;
+  disable(): void;
 }

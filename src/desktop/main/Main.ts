@@ -1,3 +1,4 @@
+import { GlobalStudentInput } from './input/GlobalStudentInput.js';
 import {
   MicrophoneTestCommandSchema,
   type MicrophoneTestReply,
@@ -9,10 +10,12 @@ import { DesktopCompanion } from './companion/DesktopCompanion.js';
 import { CompanionHudClient } from './companion/CompanionHudClient.js';
 import {
   app,
+  globalShortcut,
   BrowserWindow,
   ipcMain,
   nativeImage,
   powerMonitor,
+  screen,
   systemPreferences,
 } from 'electron';
 import troIconPath from '../assets/TroIcon.png?asset';
@@ -30,7 +33,8 @@ import { sendVoiceEventToWindow } from './voice/VoiceEventDelivery.js';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { AppEnvironment } from '#contracts/AppEnvironment.js';
-import { AgentCommandSchema, type AgentResult } from '#contracts/AgentSession.js';
+import type { AgentResult } from '#contracts/AgentSession.js';
+import { executeAgentCommand } from './ExecuteAgentCommand.js';
 import { AuthCommandSchema, type AuthResult } from '#contracts/AuthSession.js';
 import {
   PermissionCommandSchema,
@@ -40,6 +44,7 @@ import {
 import { readDesktopEnv } from './Env.js';
 import { AgentWorkerClient } from './AgentWorkerClient.js';
 import { AgentChatController } from './AgentChatController.js';
+import { GlobalTaskCancelShortcut } from './GlobalTaskCancelShortcut.js';
 import { AuthClient } from './AuthClient.js';
 import { DesktopPermissions } from './DesktopPermissions.js';
 import { EmbeddedDesktopDriver } from './EmbeddedDesktopDriver.js';
@@ -84,8 +89,12 @@ async function startDesktop(): Promise<void> {
     desktopDriver,
     process.platform === 'darwin' ? hudClient.group : undefined,
     (progress) => {
+      chat?.receiveProgress(progress);
+      voice?.setLessonAnswerAllowed(!chat?.isBusy());
       desktopCompanion?.hud.receiveProgress(progress);
+      mainWindow?.webContents.send('tro:agent-progress', progress);
     },
+    new GlobalStudentInput(() => screen.getPrimaryDisplay().bounds),
   );
   const rendererFile = join(mainDirectory, '../renderer/index.html');
   const developmentUrl = app.isPackaged ? undefined : environment.RENDERER_URL;
@@ -147,6 +156,7 @@ async function startDesktop(): Promise<void> {
     agentWorker,
     `${environment.API_BASE_URL}/api/v1/model`,
     permissions,
+    new GlobalTaskCancelShortcut(globalShortcut),
   );
 
   const companionChat = chat;
@@ -427,45 +437,26 @@ async function startDesktop(): Promise<void> {
       return { kind: 'failed', message: 'This window cannot control an agent session.' };
     }
 
-    const parsed = AgentCommandSchema.safeParse(rawCommand);
-    if (!parsed.success) {
-      return { kind: 'failed', message: 'The agent request is invalid.' };
-    }
-
-    switch (parsed.data.kind) {
-      case 'follow': {
-        if (process.platform !== 'darwin') {
-          return { kind: 'stopped' };
-        }
-        return companion.startFollowing();
-      }
-      case 'start': {
-        return chat.startTaskSession();
-      }
-      case 'turn': {
-        if (
-          voice &&
-          ![VoiceState.IDLE, VoiceState.DISABLED].some(
-            (state) => state === voice?.readStatus().state,
-          )
-        ) {
-          return { kind: 'failed', message: 'Wait for the current task to finish.' };
-        }
-        companion.hud.startTask(parsed.data.sessionId, parsed.data.locale);
-        const result = await chat.sendMessage(
-          parsed.data.sessionId,
-          parsed.data.message,
-          parsed.data.locale,
-          parsed.data.mode,
-        );
-        companion.hud.finishTask(result, parsed.data.sessionId);
-        return result;
-      }
-      case 'stop':
+    return executeAgentCommand(rawCommand, {
+      chat,
+      startFollowing: () =>
+        process.platform === 'darwin'
+          ? companion.startFollowing()
+          : Promise.resolve({ kind: 'stopped' }),
+      canSendMessage: () =>
+        !voice ||
+        [VoiceState.IDLE, VoiceState.DISABLED].some((state) => state === voice?.readStatus().state),
+      startTask: (sessionId, locale) => {
+        companion.hud.startTask(sessionId, locale);
+      },
+      finishTask: (result, sessionId) => {
+        companion.hud.finishTask(result, sessionId);
+      },
+      cancelPresentation: () => {
         voice?.cancelVoiceCapture();
         companion.reset();
-        return chat.stopSession(parsed.data.sessionId);
-    }
+      },
+    });
   });
 
   async function openWindow(): Promise<void> {

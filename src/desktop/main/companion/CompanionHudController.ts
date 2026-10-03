@@ -1,3 +1,4 @@
+import { AgentProgressPhase } from '#contracts/CompanionHud.js';
 import { CompletionMode, TaskOutcomeStatus } from '#contracts/TaskOutcome.js';
 import { TeachingOutcome } from '#contracts/CursorCompanion.js';
 import {
@@ -9,6 +10,8 @@ import {
 import { DesktopLocale, type DesktopLocale as Locale } from '#contracts/DesktopLocale.js';
 import { VoiceState, type VoiceEvent } from '#contracts/VoiceInput.js';
 import { AgentFailureCode, type AgentResult } from '#contracts/AgentSession.js';
+import { randomUUID } from 'node:crypto';
+import { TeachingMessageKind, TeachingPresentationLimits } from '#contracts/TeachingStep.js';
 
 export interface CompanionHudPort {
   showSnapshot(snapshot: CompanionHudSnapshot): void;
@@ -53,7 +56,11 @@ export class CompanionHudController {
   receiveVoiceEvent(event: VoiceEvent): void {
     switch (event.kind) {
       case 'prepare':
-        this.reset();
+        if (!this.snapshot.message || !this.sessionId) {
+          this.reset();
+        }
+        this.sequence = -1;
+        this.lastMeterAt = -Infinity;
         this.captureId = event.captureId;
         this.acceptsMeter = true;
         this.showPhase(CompanionHudPhase.PREPARING);
@@ -79,13 +86,22 @@ export class CompanionHudController {
         }
         break;
       case 'result':
-        if (event.captureId === this.captureId && event.sessionId === this.sessionId) {
+        if (
+          event.sessionId === this.sessionId &&
+          (event.captureId === this.captureId || event.result.kind === 'teaching')
+        ) {
           this.finishTask(event.result);
         }
         break;
       case 'cancel':
         if (event.captureId === this.captureId) {
-          this.finishPresentation(CompanionHudPhase.CANCELED, 500);
+          if (this.snapshot.message && this.sessionId) {
+            this.captureId = null;
+            this.acceptsMeter = false;
+            this.showPhase(CompanionHudPhase.WAITING);
+          } else {
+            this.finishPresentation(CompanionHudPhase.CANCELED, 500);
+          }
         }
         break;
       case 'failed':
@@ -135,7 +151,54 @@ export class CompanionHudController {
 
   receiveProgress(progress: AgentProgress): void {
     if (progress.sessionId === this.sessionId) {
-      this.showPhase(progress.phase);
+      const message = progress.teachingMessage;
+      const current = this.snapshot.message;
+      if (
+        message &&
+        current &&
+        message.lessonId === current.lessonId &&
+        (message.sequence < current.sequence ||
+          (message.sequence === current.sequence &&
+            (message.stepId !== current.stepId ||
+              message.text !== current.text ||
+              message.kind !== current.kind)))
+      ) {
+        return;
+      }
+      if (progress.locale) {
+        this.setLocale(progress.locale);
+      }
+      if (message) {
+        this.snapshot = { ...this.snapshot, message };
+      } else if (
+        progress.teachingStep &&
+        progress.lessonId &&
+        progress.teachingStep !== current?.text
+      ) {
+        this.snapshot = {
+          ...this.snapshot,
+          message: {
+            lessonId: progress.lessonId,
+            stepId: randomUUID(),
+            sequence: (current?.sequence ?? 0) + 1,
+            kind:
+              progress.phase === AgentProgressPhase.NEEDS_INPUT ||
+              progress.phase === AgentProgressPhase.PAUSED
+                ? TeachingMessageKind.QUESTION
+                : TeachingMessageKind.INSTRUCTION,
+            text: progress.teachingStep.slice(0, TeachingPresentationLimits.MAX_CHARACTERS),
+          },
+        };
+      }
+      this.showPhase(
+        message?.kind === TeachingMessageKind.COMPLETION
+          ? CompanionHudPhase.DONE
+          : progress.phase === AgentProgressPhase.WAITING
+            ? CompanionHudPhase.WAITING
+            : progress.phase === AgentProgressPhase.PAUSED
+              ? CompanionHudPhase.NEEDS_INPUT
+              : progress.phase,
+      );
     }
   }
 
@@ -143,15 +206,30 @@ export class CompanionHudController {
     if (sessionId && sessionId !== this.sessionId) {
       return;
     }
+    if (result.kind === 'accepted') {
+      return;
+    }
     const phase = this.readResultPhase(result);
-    this.finishPresentation(phase, phase === CompanionHudPhase.DONE ? 650 : 1800);
+    const message = this.snapshot.message;
+    const delayMs =
+      phase === CompanionHudPhase.DONE && message?.kind === TeachingMessageKind.COMPLETION
+        ? message.text.split(/\s+/).length * TeachingPresentationLimits.WORD_MS +
+          TeachingPresentationLimits.HOLD_MS +
+          TeachingPresentationLimits.FADE_MS
+        : phase === CompanionHudPhase.DONE
+          ? 650
+          : 1800;
+    if (phase !== CompanionHudPhase.DONE) {
+      this.snapshot = { ...this.snapshot, message: null };
+    }
+    this.finishPresentation(phase, delayMs);
   }
 
   private readResultPhase(result: AgentResult): CompanionHudSnapshot['phase'] {
     if (result.kind === 'teaching') {
       switch (result.result.outcome) {
+        case TeachingOutcome.GOAL_REACHED:
         case TeachingOutcome.DEMONSTRATED:
-        case TeachingOutcome.EXPLAINED:
           return CompanionHudPhase.DONE;
         case TeachingOutcome.CANCELED:
           return CompanionHudPhase.CANCELED;
@@ -189,6 +267,7 @@ export class CompanionHudController {
     this.acceptsMeter = false;
     this.sequence = -1;
     this.lastMeterAt = -Infinity;
+    this.snapshot = { phase: CompanionHudPhase.IDLE, locale: this.snapshot.locale, level: 0 };
     this.showPhase(CompanionHudPhase.IDLE);
   }
 

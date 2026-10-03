@@ -1,3 +1,4 @@
+import type { StudentInputPort } from './input/GlobalStudentInput.js';
 import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { randomUUID } from 'node:crypto';
 import { utilityProcess, type UtilityProcess } from 'electron';
@@ -14,7 +15,7 @@ import type { DesktopDriverConnection } from '#contracts/DesktopDriver.js';
 
 interface PendingRequest {
   resolve(result: AgentResult): void;
-  timeout: NodeJS.Timeout;
+  timeout: NodeJS.Timeout | null;
 }
 
 const turnTimeoutMs = 120_000;
@@ -36,6 +37,7 @@ export class AgentWorkerClient implements AgentChatWorker {
     private readonly desktopDriver: DesktopDriverPort,
     private readonly hudGroup?: string,
     private readonly receiveProgress?: (progress: AgentProgress) => void,
+    private readonly studentInput?: StudentInputPort,
   ) {}
 
   isRunning(): boolean {
@@ -114,7 +116,9 @@ export class AgentWorkerClient implements AgentChatWorker {
 
       const pending = this.pending.get(parsed.data.requestId);
       if (pending) {
-        clearTimeout(pending.timeout);
+        if (pending.timeout) {
+          clearTimeout(pending.timeout);
+        }
         this.pending.delete(parsed.data.requestId);
         pending.resolve(parsed.data.result);
       }
@@ -155,6 +159,33 @@ export class AgentWorkerClient implements AgentChatWorker {
     return this.send({ kind: 'turn', sessionId, message, locale, mode });
   }
 
+  answerLesson(
+    sessionId: string,
+    lessonId: string,
+    message: string,
+    locale: DesktopLocale,
+  ): Promise<AgentResult> {
+    return this.send({ kind: 'answer', sessionId, lessonId, message, locale });
+  }
+
+  updateTeachingLocale(sessionId: string, locale: DesktopLocale): Promise<AgentResult> {
+    return this.send({ kind: 'locale', sessionId, locale });
+  }
+
+  refreshCredential(
+    sessionId: string,
+    gatewayToken: string,
+    gatewayBaseUrl: string,
+  ): Promise<AgentResult> {
+    return this.send({
+      kind: 'credential',
+      sessionId,
+      gatewayToken,
+      gatewayBaseUrl,
+      debugEnabled: this.debugEnabled,
+    });
+  }
+
   async stop(sessionId: string): Promise<AgentResult> {
     if (this.worker === null) {
       return { kind: 'stopped' };
@@ -166,6 +197,7 @@ export class AgentWorkerClient implements AgentChatWorker {
   }
 
   dispose(): void {
+    this.studentInput?.stop();
     this.generation += 1;
     this.failPending('The agent session ended.');
     this.worker?.kill();
@@ -184,19 +216,57 @@ export class AgentWorkerClient implements AgentChatWorker {
       let timeoutMs = turnTimeoutMs;
       if (command.kind === 'start' || command.kind === 'follow') {
         timeoutMs = startTimeoutMs;
+      } else if (command.kind === 'turn' && command.mode === AgentTaskMode.TEACH) {
+        timeoutMs = 0;
       } else if (command.kind === 'stop') {
         timeoutMs = stopTimeoutMs;
       }
-      const timeout = setTimeout(() => {
-        this.pending.delete(requestId);
-        resolve({ kind: 'failed', message: 'The agent request timed out.' });
-        this.dispose();
-      }, timeoutMs);
-      this.pending.set(requestId, { resolve, timeout });
+      const timeout =
+        timeoutMs === 0
+          ? null
+          : setTimeout(() => {
+              this.pending.delete(requestId);
+              resolve({ kind: 'failed', message: 'The agent request timed out.' });
+              this.dispose();
+            }, timeoutMs);
+      this.pending.set(requestId, {
+        resolve: (result) => {
+          if (command.kind === 'turn' && command.mode === AgentTaskMode.TEACH) {
+            this.studentInput?.stop();
+          }
+          resolve(result);
+        },
+        timeout,
+      });
+      if (command.kind === 'turn' && command.mode === AgentTaskMode.TEACH) {
+        void this.studentInput
+          ?.start((activity) => {
+            if (this.worker === child && this.pending.has(requestId)) {
+              try {
+                child.postMessage({
+                  requestId,
+                  command: {
+                    kind: 'activity',
+                    sessionId: command.sessionId,
+                    taskRequestId: requestId,
+                    activity,
+                  },
+                });
+              } catch {
+                this.studentInput?.stop();
+              }
+            }
+          })
+          .catch(() => {
+            /* Native input counters still drive observation if position tracking is unavailable. */
+          });
+      }
       try {
         child.postMessage({ requestId, command });
       } catch {
-        clearTimeout(timeout);
+        if (timeout) {
+          clearTimeout(timeout);
+        }
         this.pending.delete(requestId);
         resolve({ kind: 'failed', message: 'The local agent worker is unavailable.' });
         this.dispose();
@@ -206,7 +276,9 @@ export class AgentWorkerClient implements AgentChatWorker {
 
   private failPending(message: string): void {
     for (const pending of this.pending.values()) {
-      clearTimeout(pending.timeout);
+      if (pending.timeout) {
+        clearTimeout(pending.timeout);
+      }
       pending.resolve({ kind: 'failed', message });
     }
     this.pending.clear();

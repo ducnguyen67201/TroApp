@@ -3,7 +3,7 @@ import type {
   MicrophoneTestEvent,
   MicrophoneTestReply,
 } from './MicrophoneTest.js';
-import type { VoiceMeter } from './CompanionHud.js';
+import type { VoiceMeter, AgentProgress } from './CompanionHud.js';
 import type { VoiceAudioFrame, VoiceCommand, VoiceEvent, VoiceReply } from './VoiceInput.js';
 import type { AgentTaskMode } from './CursorCompanion.js';
 import type { AgentResult } from './AgentSession.js';
@@ -21,6 +21,7 @@ import type { AppUpdateReply, AppUpdateSnapshot } from './AppUpdate.js';
  * turns and controls the worker lifecycle.
  */
 export interface DesktopBridge {
+  updateTeachingLocale?: (sessionId: string, locale: DesktopLocale) => Promise<AgentResult>;
   readAppUpdate(): Promise<AppUpdateSnapshot>;
   checkAppUpdate(): Promise<AppUpdateReply>;
   downloadAppUpdate(): Promise<AppUpdateReply>;
@@ -32,6 +33,7 @@ export interface DesktopBridge {
   controlVoiceInput(command: VoiceCommand): Promise<VoiceReply>;
   appendVoiceAudio(frame: VoiceAudioFrame): Promise<VoiceReply>;
   subscribeVoiceInput(listener: (event: VoiceEvent) => void): () => void;
+  subscribeAgentProgress(listener: (event: AgentProgress) => void): () => void;
   readAuthSession(): Promise<AuthResult>;
   signInWithGoogle(): Promise<AuthResult>;
   signOut(): Promise<AuthResult>;
@@ -45,6 +47,12 @@ export interface DesktopBridge {
     message: string,
     locale: DesktopLocale,
     mode?: AgentTaskMode,
+  ): Promise<AgentResult>;
+  answerTeachingLesson(
+    sessionId: string,
+    lessonId: string,
+    message: string,
+    locale: DesktopLocale,
   ): Promise<AgentResult>;
   stopAgentSession(sessionId: string): Promise<AgentResult>;
 }

@@ -61,7 +61,7 @@ The native addon is external to the JavaScript bundle. Desktop preparation copie
 
 `src/contracts/DesktopLocale.ts` owns the existing locale vocabulary and its validator. Renderer `localization/Locale.ts` re-exports it and retains the language registry, Vietnamese default, catalog selection and local storage. The voice hook reads the existing locale context directly through a current-value ref, avoiding locale-driven subscription churn.
 
-Main retains that capture locale and passes it alongside the final instruction through `AgentChatController` and the validated worker turn contract. The Agents SDK instructions use the same locale for its reply and any recovery continuation. Typed tasks read the same hook at submission. A language change applies to the next task without restarting the app or adding a separate setting; see [ComputerUseSpec.md](ComputerUseSpec.md).
+Main retains that capture locale and passes it alongside the final instruction through `AgentChatController` and the validated worker turn contract. The Agents SDK instructions use the same locale for its reply and any recovery continuation. Typed tasks read the same hook at submission. A language change applies to the next task without restarting the app or adding a separate setting; see [ComputerUseSpec.md](agent/ComputerUseSpec.md).
 
 `VoiceInput.ts` defines named desktop commands, status/events, capture identity, bounded PCM bytes and sequence numbers. `Transcription.ts` defines relay credentials, commands, normalized provider-independent results, and audio limits. Unknown IPC, HTTP, socket and provider data is validated at the owning boundary. Raw OpenAI events do not cross preload.
 

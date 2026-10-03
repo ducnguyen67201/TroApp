@@ -22,5 +22,5 @@
     },
     "types": ["node", "vite/client"]
   },
-  "include": ["src", "scripts", "prisma/Env.ts", "*.config.ts"]
+  "include": ["src", "test", "scripts", "prisma/Env.ts", "*.config.ts"]
 }

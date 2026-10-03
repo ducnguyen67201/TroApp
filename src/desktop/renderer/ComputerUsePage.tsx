@@ -1,3 +1,4 @@
+import { AgentProgressPhase } from '#contracts/CompanionHud.js';
 import {
   Button,
   Group,
@@ -129,6 +130,16 @@ export function ComputerUsePage({ controller }: ComputerUsePageProps): ReactElem
               ))}
             </ol>
           )}
+          {controller.teachingStep && (
+            <Paper withBorder p="md" role="status" aria-live="polite">
+              <Text size="xs" fw={600} mb={8}>
+                Tro
+              </Text>
+              <Text size="sm" className="message-text">
+                {controller.teachingStep}
+              </Text>
+            </Paper>
+          )}
           <div className="composer-area">
             <Group justify="space-between" mb="sm">
               <SegmentedControl
@@ -149,7 +160,9 @@ export function ComputerUsePage({ controller }: ComputerUsePageProps): ReactElem
                   loading={isResetting}
                   onClick={() => void controller.stopTask()}
                 >
-                  {translations.stopTask}
+                  {controller.taskMode === AgentTaskMode.TEACH
+                    ? translations.cancelLesson
+                    : translations.stopTask}
                 </Button>
               )}
             </Group>
@@ -171,19 +184,29 @@ export function ComputerUsePage({ controller }: ComputerUsePageProps): ReactElem
                   minRows={2}
                   maxRows={6}
                   maxLength={8000}
-                  disabled={isSending || isSigningOut || isResetting}
+                  disabled={
+                    (isSending && !controller.canAnswerLesson) || isSigningOut || isResetting
+                  }
                   required
                   variant="unstyled"
                 />
                 <Group justify="space-between" mt="sm" gap="sm">
                   <Text size="xs" c="dimmed" role="status">
-                    {isSending ? translations.working : translations.freshStart}
+                    {controller.teachingPhase === AgentProgressPhase.WAITING
+                      ? translations.guidanceWaiting
+                      : controller.teachingPhase === AgentProgressPhase.NEEDS_INPUT
+                        ? translations.guidanceAwaitingAnswer
+                        : controller.teachingPhase === AgentProgressPhase.PAUSED
+                          ? translations.guidancePaused
+                          : isSending
+                            ? translations.working
+                            : translations.freshStart}
                   </Text>
                   <Button
                     type="submit"
                     aria-label={translations.sendToTro}
                     className="send-button"
-                    loading={isSending}
+                    loading={isSending && !controller.canAnswerLesson}
                     disabled={isSigningOut || isResetting || !controller.messageInput.trim()}
                     rightSection={<IconArrowUp size={16} />}
                   >

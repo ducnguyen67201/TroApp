@@ -29,3 +29,11 @@ Desktop updates start in `src/desktop/main/updates/AppUpdateController.ts` and `
 [MicrophoneSelection.md](MicrophoneSelection.md) maps microphone selection, recommendations, capture ownership and permission boundaries. Device selection belongs in the desktop voice feature; the server receives only the existing transcription protocol.
 
 Local comparison starts in `UseMicrophoneTests.ts` and `MicrophoneTestCapture.ts`; `MicrophoneMeasurementCollector.ts` owns pure statistics; `MicrophoneMeasurements.ts` validates the worklet contract. `MicrophoneTestLease.ts` owns main-process exclusivity; `src/contracts/MicrophoneTest.ts` owns its narrow bridge. Use `scripts/CheckMicrophonePackage.ts` for artifact inspection and `docs/MicrophoneHardwareChecks.md` for signed hardware release checks.
+
+## Worker and test navigation
+
+Start with [worker ownership](../src/desktop/worker/README.md). Teaching business rules live in `worker/teaching`, screen-change scheduling in `worker/observation`, action verification in `worker/execution`, SDK composition in `worker/agent`, and native adapters in `worker/cua`. Worker entry points stay at the root.
+
+Tests mirror each production folder under `test/`; for example `src/desktop/worker/teaching/TeachingPresenter.ts` is covered by `test/desktop/worker/teaching/TeachingPresenter.test.ts`. Teaching-flow fixtures are in `test/desktop/worker/teaching/flow`. Vitest runs unit and integration tests separately; TypeScript and ESLint cover both trees.
+
+Browse the [documentation index](README.md) for grouped agent, teaching, and companion specs.

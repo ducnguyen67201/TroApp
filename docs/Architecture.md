@@ -75,19 +75,25 @@ Use PascalCase hand-written filenames, specific action names, strict TypeScript,
 
 Use `#contracts/SystemStatus.js` for shared contract imports across desktop and backend; keep feature-local imports relative. The package import resolves to source in the API development process and to compiled files in production Node; Electron and test builds also resolve to source. The `.js` suffix is required by the backend's ESM output.
 
+Tests live under `test/`, mirroring the production folders in `src/`. Unit and integration discovery is configured separately in Vitest. Teaching-flow fixtures live under `test/desktop/worker/teaching/flow`; `scripts/CheckTeachingFlow.ts` remains the command entry point. Production code never imports the test tree.
+
+The worker is grouped by responsibility: `agent` composes SDK runs, `teaching` owns lesson progression, `observation` owns screen-change admission, `execution` owns action completion and verification, and `cua` adapts native tools. The worker startup entry points remain at the root to preserve bundle names. See the [worker ownership map](../src/desktop/worker/README.md).
+
+Feature documentation is grouped under `docs/agent`, `docs/teaching`, and `docs/companion`; the [documentation index](README.md) links the current specs and supporting artifacts.
+
 ## Local agent orchestration
 
 The Agents SDK runs in a separate Electron utility process on the user's machine so automation does not block the UI. On macOS, Electron main starts a local companion-only worker after permission setup without a model credential. A task replaces that connection with a credentialed worker; following resumes after the task. Sign-out and window close stop it. Other platforms start on demand and stop after 15 idle minutes. [OpenAI Agents SDK](https://developers.openai.com/api/docs/guides/agents/sdk)
 
-The first implemented agent feature is a general computer-use text chat, specified in [ComputerUseSpec.md](ComputerUseSpec.md). The Agents SDK discovers Cua Driver's MCP tools directly; Tro does not copy each action into an OpenAI `Computer` adapter. [ComputerUseInstructions.ts](../src/desktop/worker/ComputerUseInstructions.ts) is the single place to edit the agent's standing instruction. General GUI actions can change content in any accessible app. Tro has no per-action approval UI; Cua's own runtime permission mode still applies. Voice input submits finalized instructions through the same controller; class context remains a later integration.
+The first implemented agent feature is a general computer-use text chat, specified in [ComputerUseSpec.md](agent/ComputerUseSpec.md). The Agents SDK discovers Cua Driver's MCP tools directly; Tro does not copy each action into an OpenAI `Computer` adapter. [ComputerUseInstructions.ts](../src/desktop/worker/agent/ComputerUseInstructions.ts) is the single place to edit the agent's standing instruction. General GUI actions can change content in any accessible app. Tro has no per-action approval UI; Cua's own runtime permission mode still applies. Voice input submits finalized instructions through the same controller; class context remains a later integration.
 
 The worker owns the loop and tool execution. Model requests normally still go over the network. Screenshots or tool outputs sent to the model leave the machine; local orchestration is not an offline or all-local privacy guarantee.
 
-Tro now signs users in with Google through backend Better Auth/Prisma. Better Auth's Electron client stores the Tro cookie with OS `safeStorage` when available, and main obtains a 15-minute model-only token from the backend. The local worker uses that token to call Tro's Responses gateway; the product OpenAI key and Google client secret remain on the backend. The gateway restricts the model and output tokens; it has no model request count cap and no longer writes per-account request counters. The companion keeps the macOS worker connected while the signed-in window is open; other platforms start on demand and stop after 15 idle minutes. Each message starts a fresh SDK run with no `Session` or previous message history. React displays messages in memory until the window closes; screenshots and tool outputs are not persisted. See [ComputerUseSpec.md](ComputerUseSpec.md) for limits and release work.
+Tro now signs users in with Google through backend Better Auth/Prisma. Better Auth's Electron client stores the Tro cookie with OS `safeStorage` when available, and main obtains a 15-minute model-only token from the backend. The local worker uses that token to call Tro's Responses gateway; the product OpenAI key and Google client secret remain on the backend. The gateway restricts the model and output tokens; it has no model request count cap and no longer writes per-account request counters. The companion keeps the macOS worker connected while the signed-in window is open; other platforms start on demand and stop after 15 idle minutes. Each message starts a fresh SDK run with no `Session` or previous message history. React displays messages in memory until the window closes; screenshots and tool outputs are not persisted. See [ComputerUseSpec.md](agent/ComputerUseSpec.md) for limits and release work.
 
 The selected product direction remains a local worker. Desktop control needs Windows/macOS validation and permissions; a separate process alone does not make arbitrary model-generated GUI actions harmless.
 
-[CursorCompanion.md](CursorCompanion.md) describes the Cua-owned teaching companion,
+[CursorCompanion.md](companion/CursorCompanion.md) describes the Cua-owned teaching companion,
 requested through MCP by the Agents SDK. Tro's validated task mode gates observation,
 previews and existing-window focus separately from ordinary desktop actions. The native
 patch and reproducible build support macOS's primary display; other displays and native
@@ -137,26 +143,43 @@ The desktop captures held-key microphone audio in an AudioWorklet, sends bounded
 
 ## Native V2 teaching guidance
 
+The implemented [teaching observation design](teaching/TeachingObservationDesign.md) describes
+goal-driven lessons across multiple SDK runs. It keeps suggesting the next reachable
+step until fresh evidence supports the original goal, retaining context through
+waiting, clarification and resource pauses. The document includes controller flow,
+native observer contracts and code ownership. A session-owned native observer
+now wakes the lesson for screen-content changes as well as student input.
+
 Show me uses host-bound V2 cursor guidance. The native companion approaches,
 traces, holds and clears one cue at a time, then returns to pointer following.
-Passive pointer movement is allowed. Click/key/scroll takeover is terminal for
-the task; teaching has no automatic recovery continuation. A typed `teaching`
-result carries demonstrated, explained, needs_input, canceled or failed status through the
+Passive pointer movement is allowed. Click/key/scroll input interrupts the current
+preview segment; the host releases its epoch, observes again, and continues the
+same lesson. Only the student’s Esc key or workspace Esc control cancels a
+lesson. Presentation/transport failures end it with failed status. A typed `teaching`
+result carries demonstrated, needs_input, canceled or failed status through the
 existing main/preload and voice boundaries. Demonstrated requires native receipt
 evidence, independent of desktop-action verification. Host lifecycle tools remain
 private and the model cannot omit V2 to select legacy behavior. See
-[CursorCompanionEngineering.md](CursorCompanionEngineering.md) for implemented
+[CursorCompanionEngineering.md](companion/CursorCompanionEngineering.md) for implemented
 modules, timings, compositor evidence and primary-display limits.
 
-Teaching accepts structured explanatory replies for general how-to questions
-without requiring cursor playback. The worker validates the reply purpose and
-preserves a specific question or student action in `needs_input` replies. Native
-receipts still determine `demonstrated`; model prose cannot clear pending, failed
-or canceled guidance. Show me forces `get_desktop_state` as the first tool choice
-and releases that choice after the call. Questions about the interface "here"
-prompt a tour of observed controls through the cursor companion, rather than
-assumptions about an API chat or generic coding assistant. Follow-up messages
-still start fresh tasks.
+Show me keeps the original requested outcome and guides one reachable checkpoint
+at a time. The host captures the initial desktop before each SDK segment; the model
+defines or explicitly revises its teaching goal and proposes one typed action through
+`present_teaching_step`. The presenter derives drawing geometry and input targets
+from that same action. Spatial steps require a correlated native acknowledgement
+for the localized bubble and a visible drawing; keyboard, focused typing and loading
+steps use an explicit text-only acknowledgement. The final model decision references
+the presentation instead of supplying a second instruction.
+
+Teaching watches settled student input locally, with on-demand screenshots. Passive
+pointer movement and unrelated animation do not schedule model calls. Failed target
+comparisons remain feedback in the same SDK conversation within a shared repair
+budget. Questions retain the current lesson, while follow-up messages after settlement
+start fresh tasks. Goal completion requires current capture references for every
+current criterion. These contracts validate provenance and wiring, not the correctness
+of model interpretation. See [TeachingLoopEngineeringSpec.md](teaching/TeachingLoopEngineeringSpec.md)
+for ownership, retired behavior and manual acceptance limits.
 
 ## Companion presentation
 
@@ -164,4 +187,6 @@ still start fresh tasks.
 
 ## Task completion
 
-The utility worker creates a TaskHarness for each original request, immutable natural-language goal and task locale. The harness owns lifecycle, explicit verification scheduling, one continuation and final settlement. MainAgentRunner owns actor SDK history; a bounded evidence store retains actual text/images from both agents in memory. When the main agent believes its work is finished, its `verify_task` tool invokes a separate read-only SDK agent sequentially. That agent judges the request against actual observations and can make targeted read-only checks. CompletionGate validates one consistent decision, criterion coverage, evidence provenance, capture age and supersession, then accepts final output only when it references that current stored verdict. Response mode cannot bypass verification after any desktop tool use. One optional continuation retains the original history, goal and locale. Both agents share deadlines and tool limits, with bounded verifier attempts and model turns. Public contracts carry outcome counts and a limitation for typed and voice results. See [AgentHarnessSpec.md](AgentHarnessSpec.md) and [TaskCompletionSpec.md](TaskCompletionSpec.md) for file ownership, model-versus-code responsibilities and validation limits.
+The utility worker creates a TaskHarness for each original request, immutable natural-language goal and task locale. The harness owns lifecycle, explicit verification scheduling, one continuation and final settlement. MainAgentRunner owns actor SDK history; a bounded evidence store retains actual text/images from both agents in memory. When the main agent believes its work is finished, its `verify_task` tool invokes a separate read-only SDK agent sequentially. That agent judges the request against actual observations and can make targeted read-only checks. CompletionGate validates one consistent decision, criterion coverage, evidence provenance, capture age and supersession, then accepts final output only when it references that current stored verdict. Response mode cannot bypass verification after any desktop tool use. One optional continuation retains the original history, goal and locale. Both agents share deadlines and tool limits, with bounded verifier attempts and model turns. Public contracts carry outcome counts and a limitation for typed and voice results. See [AgentHarnessSpec.md](agent/AgentHarnessSpec.md) and [TaskCompletionSpec.md](agent/TaskCompletionSpec.md) for file ownership, model-versus-code responsibilities and validation limits.
+
+The executable [teaching flow contract](teaching/TeachingFlowContract.md) checks the production renderer, preload, main dispatcher, worker, SDK, and MCP flow with local fixtures, plus an explicit native boundary check.

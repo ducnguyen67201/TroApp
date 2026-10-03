@@ -9,6 +9,5 @@
     "allowImportingTsExtensions": false,
     "types": ["node"]
   },
-  "include": ["src/server/**/*.ts", "src/contracts/**/*.ts"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.integration.test.ts"]
+  "include": ["src/server/**/*.ts", "src/contracts/**/*.ts"]
 }

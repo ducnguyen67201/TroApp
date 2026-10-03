@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DesktopLocaleSchema } from './DesktopLocale.js';
+import { TeachingMessageSchema } from './TeachingStep.js';
 
 export const CompanionHudPhase = {
   IDLE: 'idle',
@@ -9,6 +10,7 @@ export const CompanionHudPhase = {
   SENDING: 'sending',
   THINKING: 'thinking',
   SHOWING: 'showing',
+  WAITING: 'waiting',
   WORKING: 'working',
   DONE: 'done',
   CANCELED: 'canceled',
@@ -24,11 +26,12 @@ export const CompanionHudTool = {
   BIND_CURSOR: 'bind_companion_hud_cursor',
 } as const;
 
-/** Presentation contains no audio, transcript, tool arguments, or model credential. */
+/** Presentation carries bounded teaching text, but no audio, tool arguments, or model credential. */
 export const CompanionHudSnapshotSchema = z.strictObject({
   phase: z.enum(CompanionHudPhase),
   locale: DesktopLocaleSchema,
   level: z.number().min(0).max(1),
+  message: TeachingMessageSchema.nullable().optional(),
 });
 
 export type CompanionHudSnapshot = z.infer<typeof CompanionHudSnapshotSchema>;
@@ -42,6 +45,9 @@ export const VoiceMeterSchema = z.strictObject({
 export type VoiceMeter = z.infer<typeof VoiceMeterSchema>;
 
 export const AgentProgressPhase = {
+  WAITING: 'waiting',
+  NEEDS_INPUT: 'needs_input',
+  PAUSED: 'paused',
   THINKING: 'thinking',
   SHOWING: 'showing',
   WORKING: 'working',
@@ -54,6 +60,10 @@ export const AgentProgressSchema = z.strictObject({
   requestId: z.uuid(),
   sessionId: z.uuid(),
   phase: z.enum(AgentProgressPhase),
+  teachingStep: z.string().trim().min(1).max(4000).optional(),
+  lessonId: z.uuid().optional(),
+  teachingMessage: TeachingMessageSchema.optional(),
+  locale: DesktopLocaleSchema.optional(),
 });
 
 export type AgentProgress = z.infer<typeof AgentProgressSchema>;

@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
+import { ModelGatewayDiagnosticsSchema } from '#contracts/ModelGatewayError.js';
 import type { ServerEnv } from '../Env.js';
 import type { createAuthDatabase } from '../persistence/AuthDatabase.js';
 import { fetchModelResponse, ModelGatewayRetry } from './FetchModelResponse.js';
@@ -156,6 +157,20 @@ export function registerModelGateway(
       if (!reply.raw.writableEnded) disconnect.abort();
     });
     let upstream: Response;
+    let attemptNumber = 0;
+    const sendModelFailure = (details: unknown) => {
+      const diagnostics = ModelGatewayDiagnosticsSchema.parse(details);
+      return reply.code(502).send({
+        message: 'The model service could not complete the request.',
+        diagnostics,
+        error: {
+          message: 'The model service could not complete the request.',
+          type: 'api_error',
+          code: 'tro_model_gateway_failed',
+          diagnostics,
+        },
+      });
+    };
     logger.debug(
       {
         ...context,
@@ -185,6 +200,25 @@ export function registerModelGateway(
             'Retrying the model request after a temporary socket failure.',
           );
         },
+        (attempt) => {
+          attemptNumber = attempt.attemptNumber;
+          const fields = {
+            ...context,
+            event: ModelGatewayEvent.ATTEMPT,
+            attemptNumber: attempt.attemptNumber,
+            phase: attempt.phase,
+            attemptDurationMs: attempt.durationMs,
+            aborted: attempt.aborted,
+            requestBytes: Buffer.byteLength(requestBody),
+            responseHeadersReceived: attempt.phase === 'headers_received',
+            ...attempt.failure,
+          };
+          if (attempt.phase === 'failed') {
+            logger.warn(fields, 'Model provider attempt failed before response headers.');
+          } else {
+            logger.debug(fields, 'Model provider attempt progress.');
+          }
+        },
       );
     } catch (error) {
       logger.error(
@@ -200,7 +234,16 @@ export function registerModelGateway(
         },
         'Could not obtain a model response from OpenAI.',
       );
-      return reply.code(502).send({ message: 'The model service could not complete the request.' });
+      return sendModelFailure({
+        ...context,
+        reason: disconnect.signal.aborted
+          ? ModelGatewayFailure.CLIENT_DISCONNECTED
+          : ModelGatewayFailure.NETWORK_FAILED,
+        attemptNumber,
+        durationMs: Math.round(performance.now() - startedAt),
+        timedOut: timeout.aborted,
+        ...describeNetworkFailure(error),
+      });
     }
     const providerContext = {
       ...context,
@@ -208,6 +251,7 @@ export function registerModelGateway(
       providerRequestId: readProviderRequestId(upstream.headers),
     };
     if (!upstream.ok || !upstream.body) {
+      const providerFailure = await readProviderFailure(upstream);
       logger.error(
         {
           ...providerContext,
@@ -215,14 +259,22 @@ export function registerModelGateway(
           reason: upstream.ok
             ? ModelGatewayFailure.BODY_MISSING
             : ModelGatewayFailure.PROVIDER_REJECTED,
-          ...(await readProviderFailure(upstream)),
+          ...providerFailure,
           durationMs: Math.round(performance.now() - startedAt),
         },
         upstream.ok
           ? 'OpenAI returned an empty model response.'
           : 'OpenAI rejected the model request.',
       );
-      return reply.code(502).send({ message: 'The model service could not complete the request.' });
+      return sendModelFailure({
+        ...providerContext,
+        reason: upstream.ok
+          ? ModelGatewayFailure.BODY_MISSING
+          : ModelGatewayFailure.PROVIDER_REJECTED,
+        attemptNumber,
+        durationMs: Math.round(performance.now() - startedAt),
+        ...providerFailure,
+      });
     }
     logger.debug(
       {
