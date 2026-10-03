@@ -59,7 +59,7 @@ it.each([false, true])(
     });
     const receipt = await presenter.presentStep(proposal, DesktopLocale.ENGLISH);
     expect(receipt).toMatchObject({ admitted: true, drawingPresented: true, interrupted });
-    expect(publish).toHaveBeenCalledOnce();
+    expect(publish).toHaveBeenCalledTimes(interrupted ? 0 : 1);
     expect(lesson.readCurrentStep()?.receipt.presentationId).toBe(receipt['presentationId']);
     expect(tracker.readEvidence().expected).toEqual({ kind: 'click', target: bounds });
     presenter.beginSegment();

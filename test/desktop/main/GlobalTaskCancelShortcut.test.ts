@@ -31,6 +31,11 @@ describe('lesson Esc shortcut', () => {
     shortcut.disable();
     expect(cancel).not.toHaveBeenCalled();
     expect(unregister).not.toHaveBeenCalled();
+    shortcut.enable(cancel);
+    shortcut.cancelGuidance();
+    expect(cancel).toHaveBeenCalledOnce();
+    shortcut.disable();
+    expect(unregister).not.toHaveBeenCalled();
   });
 
   it('retiring an old listener cannot cancel a later lesson', () => {
@@ -45,5 +50,27 @@ describe('lesson Esc shortcut', () => {
     register.mock.calls[1]?.[1]();
     expect(newCancel).toHaveBeenCalledOnce();
     shortcut.disable();
+  });
+
+  it('cancels task and speech together and keeps Esc until completion narration ends', () => {
+    const register = vi.fn<GlobalShortcutPort['register']>().mockReturnValue(true);
+    const unregister = vi.fn<GlobalShortcutPort['unregister']>();
+    const shortcut = new GlobalTaskCancelShortcut({ register, unregister });
+    const cancelTask = vi.fn<() => void>();
+    const cancelSpeech = vi.fn<() => void>();
+    shortcut.enable(cancelTask);
+    shortcut.setVoiceoverCancel(cancelSpeech);
+    register.mock.calls.at(-1)?.[1]();
+    expect(cancelTask).toHaveBeenCalledOnce();
+    expect(cancelSpeech).toHaveBeenCalledOnce();
+
+    shortcut.disable();
+    const cancelCompletion = register.mock.calls.at(-1)?.[1];
+    cancelCompletion?.();
+    expect(cancelTask).toHaveBeenCalledOnce();
+    expect(cancelSpeech).toHaveBeenCalledTimes(2);
+    shortcut.setVoiceoverCancel(null);
+    cancelCompletion?.();
+    expect(cancelSpeech).toHaveBeenCalledTimes(2);
   });
 });

@@ -44,7 +44,7 @@ export interface AgentChatPermissions {
   readStatus(): Promise<DesktopPermissionStatus>;
 }
 
-/** The active lesson temporarily owns Esc; idle app shortcuts are untouched. */
+/** The lesson owns one Esc callback; narration can retain its own callback after settlement. */
 export interface AgentCancelShortcut {
   enable(cancel: () => void): boolean;
   disable(): void;

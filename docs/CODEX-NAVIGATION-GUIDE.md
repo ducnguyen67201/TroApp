@@ -37,3 +37,9 @@ Start with [worker ownership](../src/desktop/worker/README.md). Teaching busines
 Tests mirror each production folder under `test/`; for example `src/desktop/worker/teaching/TeachingPresenter.ts` is covered by `test/desktop/worker/teaching/TeachingPresenter.test.ts`. Teaching-flow fixtures are in `test/desktop/worker/teaching/flow`. Vitest runs unit and integration tests separately; TypeScript and ESLint cover both trees.
 
 Browse the [documentation index](README.md) for grouped agent, teaching, and companion specs.
+
+HUD voiceover is composed through `AgentChatController` and
+`main/voiceover/VoiceoverController.ts`. `Main.ts` owns authenticated streaming,
+playback acknowledgments and microphone interruption. The backend feature is
+`server/features/voiceover`, with allowance in `PrismaVoiceoverAllowance.ts`.
+See [HUD voiceover engineering](companion/HudVoiceoverEngineering.md).

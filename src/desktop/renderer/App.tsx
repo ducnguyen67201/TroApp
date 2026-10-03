@@ -1,3 +1,4 @@
+import { useVoiceover } from './voiceover/UseVoiceover.js';
 import { useFocusReturn } from '@mantine/hooks';
 import { useMicrophoneTests } from './voice/UseMicrophoneTests.js';
 import { useMicrophones } from './voice/UseMicrophones.js';
@@ -54,6 +55,7 @@ export function App(): ReactElement {
   });
   const controller = useComputerUse();
   const { user } = controller;
+  const voiceover = useVoiceover(user?.id ?? null);
   const microphones = useMicrophones(Boolean(user));
   const voice = useVoiceInput(
     user?.id ?? null,
@@ -115,6 +117,7 @@ export function App(): ReactElement {
           user={user}
           microphones={microphones}
           voiceStatus={voice.status}
+          voiceover={voiceover}
           onChooseMicrophone={() => {
             dialogs.open(DesktopDialog.MICROPHONE);
           }}

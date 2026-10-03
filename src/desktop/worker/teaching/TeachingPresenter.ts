@@ -29,6 +29,7 @@ export class TeachingPresenter {
     private readonly log: Logger,
     private readonly publish: (message: TeachingMessage) => void,
     private readonly assertCanCommit: () => void = () => {},
+    private readonly prepareMessage: (message: TeachingMessage) => void = () => {},
   ) {}
 
   beginSegment(): void {
@@ -62,6 +63,7 @@ export class TeachingPresenter {
     // Input may arrive while native rendering is pending. Stage the matcher for
     // this action; history records approximate attempts, not proof of visibility.
     this.tracker.registerStep(message.stepId, geometry.interaction);
+    this.prepareMessage(message);
     const native = await this.server.showTeachingCue(
       {
         capture_id: proposal.captureId,
@@ -109,7 +111,9 @@ export class TeachingPresenter {
     this.tracker.registerStep(message.stepId, geometry.interaction);
     this.receipt = receipt;
     this.budget.confirm();
-    this.publish(message);
+    if (!interrupted) {
+      this.publish(message);
+    }
     this.log.debug(
       { ...describeTeachingProposal(proposal), ...receipt },
       'agent.teaching.presentation.acknowledged',

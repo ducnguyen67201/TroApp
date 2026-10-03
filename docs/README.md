@@ -14,3 +14,10 @@ Start with [Architecture](Architecture.md), [Development](Development.md) and [V
 The proposed [teaching loop engineering spec](teaching/TeachingLoopEngineeringSpec.md)
 maps the next refactor to current files, identifies removals and preserves paired
 instruction/drawing presentation. It is a plan, not a delivered runtime change.
+
+The ElevenLabs HUD voiceover feature has a
+[specification](companion/HudVoiceoverSpec.md),
+[engineering design](companion/HudVoiceoverEngineering.md) and
+[delivery plan](companion/HudVoiceoverPlan.md). These cover localized narration,
+backend streaming and usage limits, presentation timing and cancellation.
+Local wiring is implemented; live provider and signed hardware acceptance remain.

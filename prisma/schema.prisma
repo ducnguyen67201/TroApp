@@ -33,6 +33,8 @@ model User {
   modelUsage    ModelUsage[]
   transcriptionUsage TranscriptionUsage[]
   transcriptionCaptures TranscriptionCapture[]
+  voiceoverUsage VoiceoverUsage[]
+  voiceoverUtterances VoiceoverUtterance[]
 
   @@map("user")
 }
@@ -114,4 +116,27 @@ model TranscriptionCapture {
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
+}
+
+model VoiceoverUsage {
+  userId String
+  day DateTime @db.Date
+  characters Int @default(0)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([userId, day])
+}
+
+model VoiceoverDailyBudget {
+  day DateTime @id @db.Date
+  characters Int @default(0)
+}
+
+model VoiceoverUtterance {
+  id String @id @db.Uuid
+  userId String
+  activeUserId String? @unique
+  characters Int
+  expiresAt DateTime
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([expiresAt])
 }

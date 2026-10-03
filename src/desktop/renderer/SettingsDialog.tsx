@@ -1,4 +1,6 @@
-import { Badge, Button, Modal, NativeSelect, Tabs, Text, Title } from '@mantine/core';
+import { Badge, Button, Modal, NativeSelect, Switch, Tabs, Text, Title } from '@mantine/core';
+import type { VoiceoverView } from './voiceover/UseVoiceover.js';
+import { VoiceoverState } from '#contracts/Voiceover.js';
 import { IconSettings, IconUser } from '@tabler/icons-react';
 import { useId, type ReactElement, type ReactNode } from 'react';
 import { VoiceShortcut, type VoiceStatus } from '#contracts/VoiceInput.js';
@@ -24,6 +26,7 @@ interface SettingsDialogProps {
   user: AuthUser | null;
   microphones: MicrophoneView;
   voiceStatus: VoiceStatus;
+  voiceover?: VoiceoverView;
   onChooseMicrophone: () => void;
 }
 
@@ -58,6 +61,7 @@ export function SettingsDialog({
   user,
   microphones,
   voiceStatus,
+  voiceover,
   onChooseMicrophone,
 }: SettingsDialogProps): ReactElement {
   const { locale, messages, changeLocale, isLocaleSaved } = useLocale();
@@ -182,6 +186,36 @@ export function SettingsDialog({
                 }))}
               />
             </SettingsRow>
+            {voiceover && (
+              <SettingsRow
+                label={messages.voiceover}
+                description={
+                  voiceover.status.state === VoiceoverState.UNAVAILABLE
+                    ? messages.voiceoverUnavailable
+                    : messages.voiceoverDescription
+                }
+              >
+                <Switch
+                  aria-label={messages.voiceover}
+                  checked={voiceover.enabled}
+                  onChange={(event) => {
+                    voiceover.changeEnabled(event.currentTarget.checked);
+                  }}
+                />
+                <Button
+                  variant="subtle"
+                  onClick={() => {
+                    voiceover.stopSpeaking();
+                  }}
+                  disabled={
+                    voiceover.status.state !== VoiceoverState.PREPARING &&
+                    voiceover.status.state !== VoiceoverState.SPEAKING
+                  }
+                >
+                  {messages.voiceoverStop}
+                </Button>
+              </SettingsRow>
+            )}
             <SettingsRow label={messages.appearance} description={messages.appearanceDescription}>
               <Text size="sm">{messages.light}</Text>
             </SettingsRow>

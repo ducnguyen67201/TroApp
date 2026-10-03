@@ -1,3 +1,11 @@
+import { VoiceoverController } from './voiceover/VoiceoverController.js';
+import {
+  VoiceoverAckSchema,
+  VoiceoverPreferenceSchema,
+  VoiceoverLimits,
+  VoiceoverState,
+  type VoiceoverPlayback,
+} from '#contracts/Voiceover.js';
 import { GlobalStudentInput } from './input/GlobalStudentInput.js';
 import {
   MicrophoneTestCommandSchema,
@@ -54,6 +62,8 @@ import { AppUpdateState, AppUpdatePhase, type AppUpdateReply } from '#contracts/
 import { AppUpdateController } from './updates/AppUpdateController.js';
 import { runAppUpdateCommand } from './updates/AppUpdateCommand.js';
 
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
 const mainDirectory = dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | undefined;
 let chat: AgentChatController | undefined;
@@ -82,6 +92,9 @@ async function startDesktop(): Promise<void> {
   const hudClient = new CompanionHudClient(
     join(mainDirectory, 'StartCompanionHudWorker.js'),
     desktopDriver,
+    (message) => {
+      chat?.receivePresentedMessage(message);
+    },
   );
   const agentWorker = new AgentWorkerClient(
     join(mainDirectory, 'StartAgentWorker.js'),
@@ -90,6 +103,9 @@ async function startDesktop(): Promise<void> {
     process.platform === 'darwin' ? hudClient.group : undefined,
     (progress) => {
       chat?.receiveProgress(progress);
+      if (progress.presentationPending) {
+        return;
+      }
       voice?.setLessonAnswerAllowed(!chat?.isBusy());
       desktopCompanion?.hud.receiveProgress(progress);
       mainWindow?.webContents.send('tro:agent-progress', progress);
@@ -151,12 +167,152 @@ async function startDesktop(): Promise<void> {
   ipcMain.handle('tro:update-command', (event, rawCommand: unknown): Promise<AppUpdateReply> =>
     runAppUpdateCommand(updateController, rawCommand, isTrustedSender(event)),
   );
+  let isStartingMicrophone = false;
+  const cancelShortcut = new GlobalTaskCancelShortcut(globalShortcut);
+  const cancelVoiceover = (): void => {
+    voiceEnableGeneration += 1;
+    voiceKeysReleased = true;
+    voiceShortcut.reset();
+    narration.clearTask();
+    desktopCompanion?.reset();
+    voice?.cancelVoiceCapture();
+    microphoneTests?.cancelTest();
+  };
+  const playbackReplies = new Map<string, (accepted: boolean) => void>();
+
+  function sendPlayback(command: VoiceoverPlayback): Promise<boolean> {
+    const window = mainWindow;
+    if (
+      !window ||
+      window.isDestroyed() ||
+      window.webContents.isDestroyed() ||
+      !isTrustedFrameUrl(window.webContents.getURL(), documentUrl)
+    ) {
+      return Promise.resolve(false);
+    }
+    return new Promise((resolve) => {
+      const key = `${command.utteranceId}:${String(command.sequence)}`;
+      playbackReplies.get(key)?.(false);
+      const timeoutMs =
+        command.kind === 'stop'
+          ? VoiceoverLimits.STOP_TIMEOUT_MS
+          : command.kind === 'start'
+            ? VoiceoverLimits.START_TIMEOUT_MS
+            : VoiceoverLimits.MAX_DURATION_MS;
+      const timer = setTimeout(() => {
+        finish(false);
+      }, timeoutMs);
+      const finish = (accepted: boolean): void => {
+        clearTimeout(timer);
+        playbackReplies.delete(key);
+        resolve(accepted);
+      };
+      playbackReplies.set(key, finish);
+      window.webContents.send('tro:voiceover', command);
+    });
+  }
+
+  const narration = new VoiceoverController({
+    canSpeak: () => {
+      const state = voice?.readStatus().state;
+      return (
+        !isStartingMicrophone &&
+        !microphoneTests?.isActive() &&
+        state !== VoiceState.PREPARING &&
+        state !== VoiceState.RECORDING &&
+        state !== VoiceState.FINALIZING
+      );
+    },
+    async fetchSpeech(request, signal) {
+      const cookie = auth.readCookie();
+      if (!cookie) {
+        throw new Error('Sign in required.');
+      }
+      const response = await fetch(`${environment.API_BASE_URL}/api/v1/voiceover/stream`, {
+        method: 'POST',
+        headers: { cookie, 'content-type': 'application/json' },
+        body: JSON.stringify(request),
+        signal,
+      });
+      if (
+        !response.ok ||
+        !response.body ||
+        response.headers.get('x-tro-audio-format') !== 'pcm_s16le_24000_mono'
+      ) {
+        await response.body?.cancel();
+        throw new Error('Speech is unavailable.');
+      }
+      return response.body;
+    },
+    sendPlayback,
+    showStatus: (status) => {
+      cancelShortcut.setVoiceoverCancel(
+        status.state === VoiceoverState.PREPARING || status.state === VoiceoverState.SPEAKING
+          ? cancelVoiceover
+          : null,
+      );
+      mainWindow?.webContents.send('tro:voiceover', status);
+    },
+    holdMessage: (message) => {
+      desktopCompanion?.hud.setSpeakingMessage(message);
+    },
+    reportFailure: (stage) => {
+      console.warn('voiceover.failed', { stage });
+    },
+  });
+  ipcMain.handle('tro:voiceover-ack', (event, raw: unknown) => {
+    const parsed = VoiceoverAckSchema.safeParse(raw);
+    if (!isTrustedSender(event) || !parsed.success) {
+      return;
+    }
+    playbackReplies.get(`${parsed.data.utteranceId}:${String(parsed.data.sequence)}`)?.(
+      parsed.data.accepted,
+    );
+  });
+  ipcMain.handle('tro:voiceover-preference', (event, raw: unknown) => {
+    const parsed = VoiceoverPreferenceSchema.safeParse(raw);
+    if (isTrustedSender(event) && parsed.success) {
+      narration.setLocale(parsed.data.locale);
+      narration.setEnabled(parsed.data.enabled);
+    }
+  });
+  ipcMain.handle('tro:stop-speaking', (event) =>
+    isTrustedSender(event) ? narration.stopSpeaking() : false,
+  );
+  ipcMain.handle('tro:cancel-guidance', (event) => {
+    if (isTrustedSender(event)) {
+      cancelShortcut.cancelGuidance();
+    }
+  });
+
+  async function startCapture(requireHeldKeys = false): Promise<VoiceReply> {
+    if (isStartingMicrophone) {
+      return { kind: 'failed' };
+    }
+    isStartingMicrophone = true;
+    const generation = voiceEnableGeneration;
+    try {
+      const stopped = await narration.stopSpeaking();
+      if (
+        !stopped ||
+        generation !== voiceEnableGeneration ||
+        (requireHeldKeys && voiceKeysReleased)
+      ) {
+        return { kind: 'failed' };
+      }
+      return voice?.startVoiceCapture() ?? { kind: 'failed' };
+    } finally {
+      isStartingMicrophone = false;
+    }
+  }
+
   chat = new AgentChatController(
     auth,
     agentWorker,
     `${environment.API_BASE_URL}/api/v1/model`,
     permissions,
-    new GlobalTaskCancelShortcut(globalShortcut),
+    cancelShortcut,
+    narration,
   );
 
   const companionChat = chat;
@@ -240,13 +396,30 @@ async function startDesktop(): Promise<void> {
       if (!isTrustedSender(event) || !parsed.success || !microphoneTests) {
         return { kind: 'failed' };
       }
-      return parsed.data.kind === 'start'
-        ? microphoneTests.startTest(parsed.data.testId)
-        : microphoneTests.stopTest(parsed.data.testId);
+      if (parsed.data.kind === 'stop') {
+        return microphoneTests.stopTest(parsed.data.testId);
+      }
+      if (isStartingMicrophone) {
+        return { kind: 'failed' };
+      }
+      isStartingMicrophone = true;
+      const generation = voiceEnableGeneration;
+      try {
+        if (!(await narration.stopSpeaking()) || generation !== voiceEnableGeneration) {
+          return { kind: 'failed' };
+        }
+        return await microphoneTests.startTest(parsed.data.testId);
+      } finally {
+        isStartingMicrophone = false;
+      }
     },
   );
 
   function disableVoice(): void {
+    narration.clearTask();
+    for (const finish of [...playbackReplies.values()]) {
+      finish(false);
+    }
     microphoneTests?.cancelTest();
     voiceKeysReleased = true;
     voiceEnableGeneration += 1;
@@ -256,12 +429,14 @@ async function startDesktop(): Promise<void> {
   }
 
   powerMonitor.on('suspend', () => {
+    narration.clearTask();
     microphoneTests?.cancelTest();
     voiceShortcut.reset();
     voice?.cancelVoiceCapture();
     companion.reset();
   });
   powerMonitor.on('lock-screen', () => {
+    narration.clearTask();
     microphoneTests?.cancelTest();
     voiceShortcut.reset();
     voice?.cancelVoiceCapture();
@@ -284,7 +459,7 @@ async function startDesktop(): Promise<void> {
         disableVoice();
         return { kind: 'ok', status: controller.readStatus() };
       case 'press':
-        return controller.startVoiceCapture();
+        return startCapture();
       case 'release':
         return controller.releaseVoiceCapture();
       case 'cancel':
@@ -327,7 +502,7 @@ async function startDesktop(): Promise<void> {
             parsed.data.shortcut,
             () => {
               voiceKeysReleased = false;
-              controller.startVoiceCapture();
+              void startCapture(true);
             },
             () => {
               controller.releaseVoiceCapture();
@@ -489,6 +664,7 @@ async function startDesktop(): Promise<void> {
     });
     window.webContents.on('did-start-navigation', (_event, _url, _inPlace, isMainFrame) => {
       if (isMainFrame) {
+        narration.clearTask();
         microphoneTests?.cancelTest();
       }
     });

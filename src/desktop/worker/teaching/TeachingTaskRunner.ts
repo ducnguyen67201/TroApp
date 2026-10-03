@@ -44,6 +44,7 @@ export type ReceiveTeachingStep = (
   lessonId?: string,
   message?: TeachingMessage,
   locale?: DesktopLocale,
+  presentationPending?: boolean,
 ) => void;
 
 /** Local waits have no SDK request. Abort always removes their pending timer. */
@@ -140,6 +141,15 @@ export class TeachingTaskRunner {
           throw new Error('Teaching locale changed.');
         }
       },
+      (message) =>
+        receiveStep?.(
+          message.text,
+          TeachingLessonPhase.OBSERVING,
+          lesson.id,
+          message,
+          this.locale,
+          true,
+        ),
     );
     this.server.setTeachingPresenterRequired(true);
     this.server.setObservationListener((result) => {

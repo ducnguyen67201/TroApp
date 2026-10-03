@@ -7,7 +7,7 @@ continuations on the primary macOS display.
 The native V2 implementation follows the reviewed
 [guidance specification](CursorCompanionGuidanceSpec.md). Tro ships the pinned
 Cua source plus `driver-patches/CursorCompanion.patch`; no sibling source or
-Electron presentation window is used. The local build version is `0.30.4-tro.14`.
+Electron presentation window is used. The local build version is `0.30.4-tro.15`.
 
 See [TeachingCompanionPlan](../teaching/TeachingCompanionPlan.md) for the implemented message
 presenter, frozen goal criteria, local student waits and locale changes.
@@ -32,6 +32,14 @@ playback path retain V1 compatibility for clients outside Tro's teaching mode.
 These modules do not import desktop input executors.
 
 ## Desktop composition
+
+The [voiceover engineering record](HudVoiceoverEngineering.md)
+describes the chat-composed voiceover controller, private native installed-message
+reader, authenticated Tro-to-ElevenLabs streaming and bounded renderer audio
+playback. Provider credentials and usage admission stay on the backend. Snapshot
+renewals and final drawing receipts never trigger another speech generation.
+Audio interruption and microphone admission use a confirmed local playback stop.
+Voiceover is wired locally; live provider and signed playback acceptance remain.
 
 `DesktopCompanion` is the Electron main entry point with `readonly cursor` and
 `readonly hud`. It composes explicit presentation ports; `AgentChatController`

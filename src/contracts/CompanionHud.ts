@@ -24,6 +24,7 @@ export type CompanionHudPhase = (typeof CompanionHudPhase)[keyof typeof Companio
 export const CompanionHudTool = {
   SET_STATE: 'set_companion_hud',
   BIND_CURSOR: 'bind_companion_hud_cursor',
+  READ_MESSAGE: 'read_companion_hud_message',
 } as const;
 
 /** Presentation carries bounded teaching text, but no audio, tool arguments, or model credential. */
@@ -32,6 +33,7 @@ export const CompanionHudSnapshotSchema = z.strictObject({
   locale: DesktopLocaleSchema,
   level: z.number().min(0).max(1),
   message: TeachingMessageSchema.nullable().optional(),
+  speakingSequence: z.number().int().nonnegative().nullable().optional(),
 });
 
 export type CompanionHudSnapshot = z.infer<typeof CompanionHudSnapshotSchema>;
@@ -63,6 +65,7 @@ export const AgentProgressSchema = z.strictObject({
   teachingStep: z.string().trim().min(1).max(4000).optional(),
   lessonId: z.uuid().optional(),
   teachingMessage: TeachingMessageSchema.optional(),
+  presentationPending: z.boolean().optional(),
   locale: DesktopLocaleSchema.optional(),
 });
 

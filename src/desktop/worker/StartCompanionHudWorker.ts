@@ -1,10 +1,14 @@
 import { MCPServerStdio } from '@openai/agents';
+import type { TeachingMessage } from '#contracts/TeachingStep.js';
 import {
   CompanionHudAckSchema,
   CompanionHudTool,
   type CompanionHudSnapshot,
 } from '#contracts/CompanionHud.js';
-import { CompanionHudWorkerCommandSchema } from '#contracts/CompanionHudWorker.js';
+import {
+  CompanionHudMessageSchema,
+  CompanionHudWorkerCommandSchema,
+} from '#contracts/CompanionHudWorker.js';
 
 const parentPort = process.parentPort;
 let server: MCPServerStdio | null = null;
@@ -70,6 +74,34 @@ parentPort.on('message', (event) => {
       await publishLatest();
       if (sentRevision >= 0) {
         parentPort.postMessage({ ready: true });
+        let reading = false;
+        let previousMessage = '';
+        const reportMessage = (message: TeachingMessage | null): void => {
+          const identity = JSON.stringify(message);
+          if (identity !== previousMessage) {
+            previousMessage = identity;
+            parentPort.postMessage({ kind: 'message', message });
+          }
+        };
+        const readingTimer = setInterval(() => {
+          if (reading || !server || !group) {
+            return;
+          }
+          reading = true;
+          void server
+            .callToolResult(CompanionHudTool.READ_MESSAGE, { group })
+            .then((result) => {
+              const parsed = CompanionHudMessageSchema.safeParse(result.structuredContent);
+              reportMessage(result.isError || !parsed.success ? null : parsed.data.message);
+            })
+            .catch(() => {
+              reportMessage(null);
+            })
+            .finally(() => {
+              reading = false;
+            });
+        }, 150);
+        readingTimer.unref();
         const renewal = setInterval(() => {
           revision += 1;
           void publishLatest();

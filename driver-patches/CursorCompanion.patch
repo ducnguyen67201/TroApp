@@ -1,5 +1,5 @@
 diff --git a/libs/cua-driver/rust/Cargo.lock b/libs/cua-driver/rust/Cargo.lock
-index 74051d8..f06a14d 100644
+index 74051d8..ad62513 100644
 --- a/libs/cua-driver/rust/Cargo.lock
 +++ b/libs/cua-driver/rust/Cargo.lock
 @@ -1205,7 +1205,7 @@ dependencies = [
@@ -7,7 +7,7 @@ index 74051d8..f06a14d 100644
  [[package]]
  name = "cua-driver"
 -version = "0.30.4"
-+version = "0.30.4-tro.14"
++version = "0.30.4-tro.15"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -16,7 +16,7 @@ index 74051d8..f06a14d 100644
  [[package]]
  name = "cua-driver-bindgen"
 -version = "0.30.4"
-+version = "0.30.4-tro.14"
++version = "0.30.4-tro.15"
  dependencies = [
   "cbindgen",
   "uniffi",
@@ -25,7 +25,7 @@ index 74051d8..f06a14d 100644
  [[package]]
  name = "cua-driver-contract"
 -version = "0.30.4"
-+version = "0.30.4-tro.14"
++version = "0.30.4-tro.15"
  dependencies = [
   "schemars",
   "serde",
@@ -34,7 +34,7 @@ index 74051d8..f06a14d 100644
  [[package]]
  name = "cua-driver-core"
 -version = "0.30.4"
-+version = "0.30.4-tro.14"
++version = "0.30.4-tro.15"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -43,7 +43,7 @@ index 74051d8..f06a14d 100644
  [[package]]
  name = "cua-driver-e2e"
 -version = "0.30.4"
-+version = "0.30.4-tro.14"
++version = "0.30.4-tro.15"
  dependencies = [
   "base64",
   "core-foundation",
@@ -52,7 +52,7 @@ index 74051d8..f06a14d 100644
  [[package]]
  name = "cua-driver-sdk"
 -version = "0.30.4"
-+version = "0.30.4-tro.14"
++version = "0.30.4-tro.15"
  dependencies = [
   "async-trait",
   "core-foundation",
@@ -61,7 +61,7 @@ index 74051d8..f06a14d 100644
  [[package]]
  name = "cua-driver-testkit"
 -version = "0.30.4"
-+version = "0.30.4-tro.14"
++version = "0.30.4-tro.15"
  dependencies = [
   "arbitrary",
   "async-trait",
@@ -70,7 +70,7 @@ index 74051d8..f06a14d 100644
  [[package]]
  name = "cua-driver-uia"
 -version = "0.30.4"
-+version = "0.30.4-tro.14"
++version = "0.30.4-tro.15"
  dependencies = [
   "anyhow",
   "cua-driver-core",
@@ -79,7 +79,7 @@ index 74051d8..f06a14d 100644
  [[package]]
  name = "cursor-overlay"
 -version = "0.30.4"
-+version = "0.30.4-tro.14"
++version = "0.30.4-tro.15"
  dependencies = [
   "anyhow",
   "cua-driver-contract",
@@ -88,7 +88,7 @@ index 74051d8..f06a14d 100644
  [[package]]
  name = "cursor-theme-cli"
 -version = "0.30.4"
-+version = "0.30.4-tro.14"
++version = "0.30.4-tro.15"
  dependencies = [
   "anyhow",
   "cursor-overlay",
@@ -97,7 +97,7 @@ index 74051d8..f06a14d 100644
  [[package]]
  name = "pip-preview"
 -version = "0.30.4"
-+version = "0.30.4-tro.14"
++version = "0.30.4-tro.15"
  dependencies = [
   "serde_json",
  ]
@@ -106,7 +106,7 @@ index 74051d8..f06a14d 100644
  [[package]]
  name = "platform-linux"
 -version = "0.30.4"
-+version = "0.30.4-tro.14"
++version = "0.30.4-tro.15"
  dependencies = [
   "anyhow",
   "ashpd",
@@ -115,7 +115,7 @@ index 74051d8..f06a14d 100644
  [[package]]
  name = "platform-macos"
 -version = "0.30.4"
-+version = "0.30.4-tro.14"
++version = "0.30.4-tro.15"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -124,12 +124,12 @@ index 74051d8..f06a14d 100644
  [[package]]
  name = "platform-windows"
 -version = "0.30.4"
-+version = "0.30.4-tro.14"
++version = "0.30.4-tro.15"
  dependencies = [
   "anyhow",
   "async-trait",
 diff --git a/libs/cua-driver/rust/Cargo.toml b/libs/cua-driver/rust/Cargo.toml
-index 53edeb0..757e472 100644
+index 53edeb0..a790540 100644
 --- a/libs/cua-driver/rust/Cargo.toml
 +++ b/libs/cua-driver/rust/Cargo.toml
 @@ -19,7 +19,7 @@ members = [
@@ -137,7 +137,7 @@ index 53edeb0..757e472 100644
  
  [workspace.package]
 -version = "0.30.4"
-+version = "0.30.4-tro.14"
++version = "0.30.4-tro.15"
  edition = "2021"
  authors = ["trycua"]
  license = "MIT"
@@ -756,10 +756,10 @@ index 0000000..0df370c
 +}
 diff --git a/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs
 new file mode 100644
-index 0000000..ec1e28e
+index 0000000..ef8d7d4
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs
-@@ -0,0 +1,164 @@
+@@ -0,0 +1,193 @@
 +//! Host-only content-free presentation vocabulary; no desktop action semantics.
 +use crate::{Platform, SchemaMode, ToolAnnotations, ToolContract, ToolInput, ToolOutput};
 +use schemars::JsonSchema;
@@ -829,6 +829,8 @@ index 0000000..ec1e28e
 +    pub level: f64,
 +    #[serde(default)]
 +    pub message: Option<CompanionTeachingMessage>,
++    #[serde(default, rename = "speakingSequence")]
++    pub speaking_sequence: Option<u64>,
 +}
 +impl ToolInput for SetCompanionHudInput {
 +    const TOOL_NAME: &'static str = "set_companion_hud";
@@ -859,6 +861,21 @@ index 0000000..ec1e28e
 +        Ok(())
 +    }
 +}
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct ReadCompanionHudMessageInput {
++    pub session: Option<String>,
++    pub group: String,
++}
++impl ToolInput for ReadCompanionHudMessageInput {
++    const TOOL_NAME: &'static str = "read_companion_hud_message";
++    fn validate(&self) -> Result<(), String> {
++        if !valid_group(&self.group) {
++            return Err("Invalid HUD group.".into());
++        }
++        Ok(())
++    }
++}
 +fn valid_group(group: &str) -> bool {
 +    group.len() == 36
 +        && group.chars().enumerate().all(|(index, ch)| {
@@ -875,10 +892,21 @@ index 0000000..ec1e28e
 +    pub applied: bool,
 +}
 +impl ToolOutput for CompanionHudOutput {}
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct CompanionHudMessageOutput {
++    pub message: Option<CompanionTeachingMessage>,
++}
++impl ToolOutput for CompanionHudMessageOutput {}
 +pub fn contracts() -> Vec<ToolContract> {
 +    vec![
 +        contract::<SetCompanionHudInput>(),
 +        contract::<BindCompanionHudCursorInput>(),
++        ToolContract {
++            success_output_schema: Some(CompanionHudMessageOutput::output_schema()),
++            output_validator: crate::validate_typed_output::<CompanionHudMessageOutput>,
++            ..contract::<ReadCompanionHudMessageInput>()
++        },
 +    ]
 +}
 +fn contract<I: ToolInput>() -> ToolContract {
@@ -915,6 +943,7 @@ index 0000000..ec1e28e
 +            locale: CompanionHudLocale::English,
 +            level: 0.5,
 +            message: None,
++            speaking_sequence: None,
 +        };
 +        assert!(input.validate().is_ok());
 +        input.level = f64::NAN;
@@ -925,7 +954,7 @@ index 0000000..ec1e28e
 +    }
 +}
 diff --git a/libs/cua-driver/rust/crates/cua-driver-contract/src/lib.rs b/libs/cua-driver/rust/crates/cua-driver-contract/src/lib.rs
-index 5dceca8..377c527 100644
+index 5dceca8..f787402 100644
 --- a/libs/cua-driver/rust/crates/cua-driver-contract/src/lib.rs
 +++ b/libs/cua-driver/rust/crates/cua-driver-contract/src/lib.rs
 @@ -14,9 +14,16 @@ use serde_json::Value;
@@ -935,7 +964,7 @@ index 5dceca8..377c527 100644
 +mod companion;
 +mod companion_hud;
 +pub use companion_hud::{
-+    BindCompanionHudCursorInput, CompanionHudLocale, CompanionHudOutput, CompanionHudPhase,
++    BindCompanionHudCursorInput, ReadCompanionHudMessageInput, CompanionHudLocale, CompanionHudOutput, CompanionHudPhase,
 +    SetCompanionHudInput, CompanionTeachingMessage, TeachingMessageKind,
 +};
  pub mod compatibility;
@@ -955,7 +984,7 @@ index 5dceca8..377c527 100644
      tools.extend(visual::contracts());
      tools.sort_by(|left, right| left.name.cmp(&right.name));
 diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs
-index b0902a0..ab99148 100644
+index b0902a0..2956296 100644
 --- a/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs
 +++ b/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs
 @@ -870,6 +870,9 @@ pub fn advertised_risk_for(tool: &str) -> RiskAssessment {
@@ -968,7 +997,7 @@ index b0902a0..ab99148 100644
          | "get_agent_cursor_state"
          | "get_recording_state"
          | "check_for_update"
-@@ -898,6 +901,14 @@ pub fn advertised_risk_for(tool: &str) -> RiskAssessment {
+@@ -898,6 +901,15 @@ pub fn advertised_risk_for(tool: &str) -> RiskAssessment {
          | "set_window_frame"
          | "start_session"
          | "end_session"
@@ -976,6 +1005,7 @@ index b0902a0..ab99148 100644
 +        | "set_cursor_companion_mode"
 +        | "set_companion_hud"
 +        | "bind_companion_hud_cursor"
++        | "read_companion_hud_message"
 +        | "cancel_cursor_sequence"
 +        | "begin_cursor_guidance_task"
 +        | "end_cursor_guidance_task"
@@ -983,7 +1013,7 @@ index b0902a0..ab99148 100644
          | "set_agent_cursor_enabled"
          | "set_agent_cursor_motion"
          | "set_agent_cursor_theme" => RiskClass::R1,
-@@ -918,6 +929,8 @@ pub fn advertised_risk_for(tool: &str) -> RiskAssessment {
+@@ -918,6 +930,8 @@ pub fn advertised_risk_for(tool: &str) -> RiskAssessment {
          | "set_config"
          | "escalate_session"
          | "start_recording"
@@ -992,7 +1022,7 @@ index b0902a0..ab99148 100644
          | "get_browser_state"
          | "browser_prepare"
          | "browser_navigate"
-@@ -1516,6 +1529,40 @@ mod tests {
+@@ -1516,6 +1530,40 @@ mod tests {
              .contains("no reviewed risk classification"));
      }
  
@@ -2167,10 +2197,10 @@ index 0000000..9516cb4
 +}
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/companion_message.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_message.rs
 new file mode 100644
-index 0000000..1013023
+index 0000000..d6d3c14
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_message.rs
-@@ -0,0 +1,260 @@
+@@ -0,0 +1,276 @@
 +//! One bounded passive teaching message. Timing is independent of HUD meter frames.
 +use cua_driver_contract::{CompanionTeachingMessage, TeachingMessageKind};
 +use fontdue::{
@@ -2184,6 +2214,7 @@ index 0000000..1013023
 +pub struct MessagePainter {
 +    pub message: Option<CompanionTeachingMessage>,
 +    elapsed: f32,
++    speaking: Option<(u64, std::time::Instant)>,
 +    identity: Option<(String, String, u64, u64)>,
 +}
 +fn font() -> Option<&'static Font> {
@@ -2227,8 +2258,23 @@ index 0000000..1013023
 +        self.message = message;
 +        self.elapsed = 0.0;
 +    }
++    pub fn set_speaking(&mut self, sequence: Option<u64>) {
++        if self.speaking.map(|(sequence, _)| sequence) == sequence {
++            return;
++        }
++        self.speaking = sequence.map(|sequence| (sequence, std::time::Instant::now()));
++    }
++
 +    pub fn tick(&mut self, dt: f32, reduced: bool) {
 +        self.elapsed += dt;
++        if self.speaking.is_some_and(|(sequence, started)| {
++            self.message
++                .as_ref()
++                .is_some_and(|message| message.sequence == sequence)
++                && started.elapsed().as_secs() < 60
++        }) {
++            self.elapsed = self.elapsed.min(self.reveal_duration(reduced) + 1.0);
++        }
 +        if self
 +            .message
 +            .as_ref()
@@ -3163,10 +3209,10 @@ index 264c427..58e3a34 100644
          for swift in [false, true] {
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/cursor/companion_hud.rs b/libs/cua-driver/rust/crates/platform-macos/src/cursor/companion_hud.rs
 new file mode 100644
-index 0000000..f8f2cca
+index 0000000..145382b
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/platform-macos/src/cursor/companion_hud.rs
-@@ -0,0 +1,208 @@
+@@ -0,0 +1,261 @@
 +//! Independent presentation lease bound only to explicitly registered cursor sessions.
 +use cua_driver_contract::{CompanionHudLocale, CompanionHudPhase, SetCompanionHudInput};
 +use cursor_overlay::companion_hud::CompanionHudPainter;
@@ -3218,7 +3264,14 @@ index 0000000..f8f2cca
 +        self.group = Some(input.group);
 +        self.sequence = Some(input.sequence);
 +        self.expires = Some(Instant::now() + Duration::from_secs(25));
++        if self.painter.message.message != input.message {
++            self.message_frame = input.message.clone().map(|message| MessageFrame {
++                message,
++                rendered: Arc::new(AtomicBool::new(false)),
++            });
++        }
 +        self.painter.update_message(input.message);
++        self.painter.message.set_speaking(input.speaking_sequence);
 +        self.painter
 +            .update(input.phase, input.locale, input.level as f32);
 +        true
@@ -3258,6 +3311,26 @@ index 0000000..f8f2cca
 +        self.message_frame = None;
 +        true
 +    }
++    pub fn read_message(
++        &self,
++        session: &str,
++        group: &str,
++    ) -> Option<cua_driver_contract::CompanionTeachingMessage> {
++        if self.owner.as_deref() != Some(session)
++            || self.group.as_deref() != Some(group)
++            || !self.expires.is_some_and(|expires| expires > Instant::now())
++        {
++            return None;
++        }
++        self.message_frame
++            .as_ref()
++            .filter(|frame| {
++                frame.rendered.load(std::sync::atomic::Ordering::Acquire)
++                    && self.painter.message.message.as_ref() == Some(&frame.message)
++            })
++            .map(|frame| frame.message.clone())
++    }
++
 +    pub fn bind(&mut self, session: &str, group: &str) -> bool {
 +        if self.group.as_deref() != Some(group)
 +            || !self.expires.is_some_and(|expires| expires > Instant::now())
@@ -3317,7 +3390,33 @@ index 0000000..f8f2cca
 +            locale: CompanionHudLocale::English,
 +            level: 0.0,
 +            message: None,
++            speaking_sequence: None,
 +        }
++    }
++    #[test]
++    fn companion_hud_reads_only_installed_messages_for_its_owner() {
++        let mut state = HudState::default();
++        let mut snapshot = input(0);
++        let group = snapshot.group.clone();
++        snapshot.message = Some(cua_driver_contract::CompanionTeachingMessage {
++            lesson_id: group.clone(),
++            step_id: group.clone(),
++            sequence: 1,
++            kind: cua_driver_contract::TeachingMessageKind::Instruction,
++            text: "Open Chrome".into(),
++        });
++        assert!(state.update("host", snapshot));
++        assert!(state.read_message("host", &group).is_none());
++        state
++            .message_frame
++            .as_ref()
++            .unwrap()
++            .rendered
++            .store(true, std::sync::atomic::Ordering::Release);
++        assert!(state.read_message("host", &group).is_some());
++        assert!(state.read_message("foreign", &group).is_none());
++        state.retire("host", false);
++        assert!(state.read_message("host", &group).is_none());
 +    }
 +    #[test]
 +    fn companion_hud_fences_ownership_sequence_and_foreign_binding() {
@@ -3388,10 +3487,10 @@ index cb5012c..37247b6 100644
  /// System cursor shape reporting (what the OS draws, not what Cua draws).
  pub mod shape;
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs b/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
-index 8a4c547..41dc168 100644
+index 8a4c547..9dfe7cb 100644
 --- a/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
 +++ b/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
-@@ -40,6 +40,84 @@ use cursor_overlay::{
+@@ -40,6 +40,88 @@ use cursor_overlay::{
      OverlayCommand, OverlayMsg, RenderEntry, RenderStateCore, ScreenFrame, ZOrderEnforcer,
  };
  
@@ -3439,6 +3538,10 @@ index 8a4c547..41dc168 100644
 +    }
 +    false
 +}
++pub fn read_companion_hud_message(session: &str, group: &str) -> Option<cua_driver_contract::CompanionTeachingMessage> {
++    super::companion_hud::state().lock().unwrap().read_message(session, group)
++}
++
 +pub fn clear_companion_message(
 +    session: &str,
 +    group: &str,
@@ -3476,7 +3579,7 @@ index 8a4c547..41dc168 100644
  // ── Arrival-signal channels (one waiter slot per cursor key) ──────────────
  //
  // Each session's `animate_cursor_to` registers an arrival oneshot keyed by its
-@@ -163,6 +241,47 @@ fn apply_msg(map: &mut RenderMap, msg: OverlayMsg) -> Option<CursorKey> {
+@@ -163,6 +245,47 @@ fn apply_msg(map: &mut RenderMap, msg: OverlayMsg) -> Option<CursorKey> {
      outcome.applied_key().cloned()
  }
  
@@ -3524,7 +3627,7 @@ index 8a4c547..41dc168 100644
  /// Initialise global overlay state (call once, before run_on_main_thread).
  pub fn init(cfg: CursorConfig) {
      static INITIALIZED: OnceLock<()> = OnceLock::new();
-@@ -232,6 +351,18 @@ pub fn send_command(key: CursorKey, cmd: OverlayCommand) {
+@@ -232,6 +355,18 @@ pub fn send_command(key: CursorKey, cmd: OverlayCommand) {
      }
  }
  
@@ -3543,7 +3646,7 @@ index 8a4c547..41dc168 100644
  /// Convenience for callsites not yet threaded with a session key: drives the
  /// seeded `"default"` cursor (the anonymous / one-shot identity).
  pub fn send_command_default(cmd: OverlayCommand) {
-@@ -541,6 +672,10 @@ unsafe fn run_appkit(_cfg: CursorConfig, rx: std::sync::mpsc::Receiver<OverlayMs
+@@ -541,6 +676,10 @@ unsafe fn run_appkit(_cfg: CursorConfig, rx: std::sync::mpsc::Receiver<OverlayMs
      use objc2::{class, msg_send};
      use objc2_foundation::NSRect;
  
@@ -3554,7 +3657,7 @@ index 8a4c547..41dc168 100644
      // ---- NSApplication ----
      // Verify main thread (MainThreadMarker is a zero-size compile-time token).
      let _mtm = objc2_foundation::MainThreadMarker::new()
-@@ -745,6 +880,19 @@ fn render_loop(
+@@ -745,6 +884,19 @@ fn render_loop(
                              last_key = Some(k);
                          }
                      }
@@ -3574,7 +3677,7 @@ index 8a4c547..41dc168 100644
                      // Tick every cursor while an animation/fade is in progress
                      // or immediately after a command changed render state. The
                      // latter lets a just-created path/click/focus rect start on
-@@ -779,7 +927,11 @@ fn render_loop(
+@@ -779,7 +931,11 @@ fn render_loop(
                          .and_then(|k| map.cursors.get(k))
                          .is_some_and(cursor_is_externally_visible)
                          && pinned.is_none();
@@ -3587,7 +3690,7 @@ index 8a4c547..41dc168 100644
                      let next_hover_poll_needed = map
                          .cursors
                          .values()
-@@ -815,7 +967,13 @@ fn render_loop(
+@@ -815,7 +971,13 @@ fn render_loop(
              if pinned_wid.is_some() && (pin_changed || repin_frames >= 60) {
                  MacZOrderEnforcer { win_ptr }.reassert(pinned_wid);
                  repin_frames = 0;
@@ -3602,7 +3705,7 @@ index 8a4c547..41dc168 100644
                  // A direct move_cursor has no target window to pin against.
                  // Raise the normal-level, click-through overlay without
                  // activating the driver so a later foreground application
-@@ -832,7 +990,7 @@ fn render_loop(
+@@ -832,7 +994,7 @@ fn render_loop(
          // change pixels. A final frame is emitted as animations/fades finish so
          // the layer is left in the completed/cleared state before blocking.
          if had_msg || hover_changed || frame_tick_needed || next_frame_tick_needed {
@@ -3611,7 +3714,7 @@ index 8a4c547..41dc168 100644
                  let guard = RENDER.lock().unwrap();
                  if let Some(map) = guard.as_ref() {
                      // Allocate the pixmap at the screen's PHYSICAL pixel
-@@ -843,8 +1001,9 @@ fn render_loop(
+@@ -843,8 +1005,9 @@ fn render_loop(
                      let scale = map.platform.backing_scale.max(1.0);
                      let w = (win_w * scale).max(1.0) as u32;
                      let h = (win_h * scale).max(1.0) as u32;
@@ -3623,7 +3726,7 @@ index 8a4c547..41dc168 100644
                      let backing_scale_f32 = scale as f32;
                      note_overlay_frame(map.cursors.values().any(cursor_may_paint));
                      for (_k, rs) in &map.cursors {
-@@ -861,14 +1020,72 @@ fn render_loop(
+@@ -861,14 +1024,72 @@ fn render_loop(
                              backing_scale_f32,
                          );
                      }
@@ -3698,7 +3801,7 @@ index 8a4c547..41dc168 100644
          }
  
          frame_tick_needed = next_frame_tick_needed;
-@@ -905,24 +1122,55 @@ fn cursor_is_externally_visible(state: &RenderState) -> bool {
+@@ -905,24 +1126,55 @@ fn cursor_is_externally_visible(state: &RenderState) -> bool {
  
  /// Convert a `tiny_skia::Pixmap` to a `CGImage` and set it as the contents
  /// of the given `CALayer` via `dispatch_async(main_queue, ...)`.
@@ -3768,7 +3871,7 @@ index 8a4c547..41dc168 100644
          static _dispatch_main_q: u8;
          fn dispatch_async_f(
              queue: *const c_void,
-@@ -930,28 +1178,67 @@ fn dispatch_set_layer_contents(layer_ptr: usize, pixmap: tiny_skia::Pixmap) {
+@@ -930,28 +1182,67 @@ fn dispatch_set_layer_contents(layer_ptr: usize, pixmap: tiny_skia::Pixmap) {
              work: unsafe extern "C" fn(*mut c_void),
          );
      }
@@ -5014,13 +5117,15 @@ index 0000000..b0d168c
 +}
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_hud_tools.rs b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_hud_tools.rs
 new file mode 100644
-index 0000000..b9d723f
+index 0000000..bf480e7
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_hud_tools.rs
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,88 @@
 +use super::{cursor_tools::resolve_cursor_key, ToolState};
 +use async_trait::async_trait;
-+use cua_driver_contract::{BindCompanionHudCursorInput, SetCompanionHudInput, ToolInput};
++use cua_driver_contract::{
++    BindCompanionHudCursorInput, ReadCompanionHudMessageInput, SetCompanionHudInput, ToolInput,
++};
 +use cua_driver_core::{
 +    protocol::ToolResult,
 +    tool::{Tool, ToolDef, ToolRegistry},
@@ -5042,6 +5147,19 @@ index 0000000..b9d723f
 +            return super::cursor_overlay_unavailable();
 +        }
 +        let session = resolve_cursor_key(&args);
++        if self.definition.name == ReadCompanionHudMessageInput::TOOL_NAME {
++            let input = match parse_typed_input::<ReadCompanionHudMessageInput>(
++                &self.definition.name,
++                args,
++            ) {
++                Ok(input) => input,
++                Err(error) => return error,
++            };
++            if let Err(error) = input.validate() {
++                return ToolResult::error(error);
++            }
++            return ToolResult::text("message").with_structured(json!({"message":crate::cursor::overlay::read_companion_hud_message(&session, &input.group)}));
++        }
 +        let applied = if self.definition.name == SetCompanionHudInput::TOOL_NAME {
 +            let input = match parse_typed_input::<SetCompanionHudInput>(&self.definition.name, args)
 +            {
@@ -5074,6 +5192,7 @@ index 0000000..b9d723f
 +    for name in [
 +        SetCompanionHudInput::TOOL_NAME,
 +        BindCompanionHudCursorInput::TOOL_NAME,
++        ReadCompanionHudMessageInput::TOOL_NAME,
 +    ] {
 +        let contract = cua_driver_contract::tool_contract(name).expect("HUD canonical contract");
 +        registry.register(Box::new(HudTool {
