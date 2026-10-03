@@ -137,6 +137,12 @@ Keep shared OpenAI and try-on provider keys on the backend. A future local Agent
 
 Never log credentials, raw configuration, or sensitive validation details. Formatting and helper refactors must preserve existing authorization and validation behavior.
 
+## Diagnose uncertainty with targeted logs
+
+When a failure's cause is unknown or uncertain, add a bounded structured log at the owning boundary before guessing at a fix. Record the operation/stage, safe input fields, validated output, rejection reason, timing and relevant correlation IDs. For visual guidance, include cue geometry and local comparison measurements so a rejected drawing can be traced to the failing region. Distinguish facts from hypotheses and missing diagnostics from proof that nothing happened.
+
+Use the existing development exchange logger for content traces and concise warning/error events for failures. Never log screenshots, raw pixels, typed key contents, credentials, raw configuration or hidden model reasoning. Keep logs event-driven; do not dump repeated observer polls. Test the diagnostics and document how to read the new event. Logging adds evidence; do not silently change behavior while instrumenting a failure.
+
 ## Verification — final step only
 
 Finish the entire requested implementation before running validation. Complete all related code, imports, tests, and documentation edits first, including updates required by helper renames. Do not run lint, formatting checks, type checks, tests, builds, or integration checks between intermediate implementation edits.

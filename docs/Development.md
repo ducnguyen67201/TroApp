@@ -41,6 +41,20 @@ The gateway retries a rejected model fetch once after 250 ms only for `UND_ERR_S
 
 Cua diagnostics recognize the pinned driver's nested `refusal.code`, browser binding/setup/consent codes and focus/window codes. Focus results report only supplied boolean flags such as `request_accepted`, `process_activated`, `focused` and `front_in_process_on_display`, excluding titles and raw messages. Response counters reflect the post-call task state; `recordedObservationCount` reports new captures from that call separately from the retained observation count.
 
+Teaching failures emit an error-level `agent.teaching.failed` record in the desktop
+console before the public result is reduced to its guidance reason. The record
+identifies the failed stage and precise local error code. In particular,
+`observation_ready_timeout` means watch admission succeeded but no usable native
+frame became ready within 10 seconds. It includes the owned error message and
+stack, elapsed time, poll count, and last validated observation metadata, excluding
+the watch ID. It does not establish why ScreenCaptureKit produced no usable frame.
+Native tool errors, invalid snapshots, foreign watch snapshots, and missing model
+capture baselines have distinct diagnostics. Failed host calls log at error level;
+successful routine metadata polls remain quiet. Esc is cancellation and emits no
+teaching failure record. Operational worker errors remain enabled outside dev.
+Arbitrary SDK exception messages and raw payloads are excluded because they can
+contain prompts, screen content, tokens, or credentials.
+
 Backend settings and provider keys belong in Doppler, not `.env`. Copy `.env.example` to
 `.env.local` only when overriding the two public desktop settings.
 
@@ -61,7 +75,7 @@ doppler run -- pnpm db:migrate
 `pnpm db:stop` stops the local database while preserving its volume. Always confirm that the saved
 Doppler selection points to the intended development database before running a migration.
 
-The development API requires the database to be reachable for migrations. `pnpm dev:desktop` can still run independently. The desktop has no connection-check control; `/health/ready` remains available for operational readiness. `pnpm dev:desktop` downloads a checksum-verified Cua Driver release into Tro's local development cache when needed. On macOS, grant Screen Recording and Accessibility to Tro; the OS cannot grant those automatically. Sign in with Google in the system browser. Chat requires the database and backend model key. The first message starts a local agent worker and a private `cua-driver mcp` connection. Edit `src/desktop/worker/ComputerUseInstructions.ts` to change the agent's standing instruction.
+The development API requires the database to be reachable for migrations. `pnpm dev:desktop` can still run independently. The desktop has no connection-check control; `/health/ready` remains available for operational readiness. `pnpm dev:desktop` downloads a checksum-verified Cua Driver release into Tro's local development cache when needed. On macOS, grant Screen Recording and Accessibility to Tro; the OS cannot grant those automatically. Sign in with Google in the system browser. Chat requires the database and backend model key. The first message starts a local agent worker and a private `cua-driver mcp` connection. Edit `src/desktop/worker/agent/ComputerUseInstructions.ts` to change the agent's standing instruction.
 
 To see the exact schema Cua publishes and the tool parameters produced by the
 OpenAI Agents SDK, run `pnpm inspect:cua:mcp browser_click`. Use
@@ -82,15 +96,27 @@ appear; they indicate fallback to a non-strict tool schema.
 
 Teaching finalization emits `agent.teaching.settled` with the host task ID,
 validated reply purpose, outcome, reason, answer presence and duration. This
-distinguishes an explanation from a guide without receipts without logging the
+distinguishes a question from a guide without receipts without logging the
 answer itself.
 
 For Show me, the first model request selects `get_desktop_state` explicitly.
 Expect `openai.response` to list that tool, followed by its `cua.request` and
 `cua.response`, then another model request containing the screenshot and capture
 metadata. A visual tour subsequently calls `show_cursor_sequence`; an
-`agent.teaching.settled` outcome of `explained` alone does not prove that a cursor
-cue appeared. A live model check is still needed for cue choice and placement.
+`agent.teaching.settled` outcome of `demonstrated` requires a validated native
+receipt; prose-only replies cannot settle as successful guidance. A live model check is still needed for cue choice and placement.
+
+Before each grounded `show_cursor_sequence`, the host calls the private native
+`refresh_cursor_guidance_capture` tool. `cua.guidance.capture_refreshed` reports
+capture age, comparison duration and a safe `validationReason`. Stable target
+regions renew the capture ID despite unrelated animation; changed targets and
+geometry refuse playback. This local comparison returns no image to the model.
+Input and geometry are checked before and after comparison. Native comparison
+errors produce an error-level `cua.guidance.refresh_failed` with
+`capture_refresh_failed`, and abort the SDK segment without a model retry.
+Screen bytes and capture IDs stay out of logs. Native guidance reasons such as
+`target_invalidated`, `invalid_request` and `render_timeout` appear as recognized
+`reasonCode` values in `cua.response`.
 
 ## Doppler configuration
 
@@ -180,3 +206,16 @@ Tro’s main process owns the native host, permission checks and private endpoin
 for both idle following and credentialed tasks. Enable Tro in System Settings;
 the standard development launcher uses a separate Tro development identity. Rebuild an older companion cache
 with this command before restarting the desktop.
+
+### Teaching click continuation smoke check
+
+After rebuilding the native companion (`pnpm build:cua`) and restarting Tro,
+select Show me and ask to open YouTube. Follow a browser-icon cue with a real
+click, including a click before the preview finishes or while the model composes
+its reply. Tro should observe the browser and cue its address bar in the same
+request. Enter youtube.com, press Enter, and confirm the next observation can
+finish the lesson. The chat shows each current instruction during input waiting.
+Move the pointer without clicking: this must not advance the lesson. Press Esc while the browser is in front, or click the workspace Esc control
+while waiting: no later cue or instruction may appear. An unchanged screen remains in local waiting without another model request;
+there is no sixty-second lesson timeout. This live check uses
+model requests and is separate from synthetic unit/integration validation.

@@ -1,3 +1,4 @@
+import { acquirePhysicalInputHook } from '../input/PhysicalInputHook.js';
 import { VoiceShortcut } from '#contracts/VoiceInput.js';
 
 const Key = {
@@ -74,6 +75,7 @@ export class VoiceChord {
 
 /** Load the native addon after signed-in startup and permission checks. */
 export class GlobalVoiceShortcut {
+  private generation = 0;
   private stopListening: (() => void) | null = null;
   private chord: VoiceChord | null = null;
 
@@ -85,7 +87,13 @@ export class GlobalVoiceShortcut {
     allReleased: () => void,
   ): Promise<void> {
     this.disableShortcut();
+    const generation = this.generation;
     const { uIOhook } = await import('uiohook-napi');
+    const releaseHook = await acquirePhysicalInputHook();
+    if (generation !== this.generation) {
+      releaseHook();
+      return;
+    }
     const chord = new VoiceChord(shortcut, press, release, cancel, allReleased);
     const keyDown = (event: { keycode: number }): void => {
       chord.updateKey(event.keycode, true);
@@ -100,17 +108,11 @@ export class GlobalVoiceShortcut {
       uIOhook.removeListener('keydown', keyDown);
       uIOhook.removeListener('keyup', keyUp);
       try {
-        uIOhook.stop();
+        releaseHook();
       } finally {
         chord.reset();
       }
     };
-    try {
-      uIOhook.start();
-    } catch (error) {
-      this.disableShortcut();
-      throw error;
-    }
   }
 
   reset(): void {
@@ -118,6 +120,7 @@ export class GlobalVoiceShortcut {
   }
 
   disableShortcut(): void {
+    this.generation += 1;
     const stopListening = this.stopListening;
     this.stopListening = null;
     this.chord = null;

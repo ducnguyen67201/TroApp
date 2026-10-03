@@ -1,0 +1,1026 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tro · A guide you can follow</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #292a27;
+        background: #f6f4ed;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+      }
+      button:focus-visible {
+        outline: 3px solid #80b7ff;
+        outline-offset: 4px;
+      }
+      .shell {
+        max-width: 1240px;
+        margin: auto;
+        padding: 30px 38px 24px;
+      }
+      .masthead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 38px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 650;
+        font-size: 19px;
+      }
+      .brand-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 10px;
+        background: #292a27;
+        color: #fff;
+        display: grid;
+        place-items: center;
+      }
+      .prototype {
+        font-size: 12px;
+        color: #88897f;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .intro {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 24px;
+        margin-bottom: 25px;
+      }
+      .eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        color: #6d776b;
+        font-weight: 650;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+      }
+      h1 {
+        font-size: clamp(28px, 3.4vw, 43px);
+        line-height: 1.1;
+        letter-spacing: -0.04em;
+        margin: 0 0 12px;
+        font-weight: 550;
+      }
+      .intro p {
+        color: #75786e;
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+      .control {
+        border: 1px solid #dedfd5;
+        background: #fffef9;
+        color: #4f554b;
+        border-radius: 9px;
+        padding: 11px 16px;
+        font-size: 13px;
+      }
+      .primary {
+        background: #2c382d;
+        color: #fff;
+        border-color: #2c382d;
+      }
+      .desktop {
+        height: clamp(470px, 61vh, 670px);
+        min-height: 470px;
+        border-radius: 18px;
+        overflow: hidden;
+        position: relative;
+        background: #dfe6df;
+        border: 1px solid #cbd4c9;
+        box-shadow: 0 22px 65px #32413613;
+      }
+      .system-bar {
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 17px;
+        background: #e7ede4;
+        font-size: 10px;
+        color: #4c5849;
+      }
+      .system-bar span {
+        margin-right: 17px;
+      }
+      .browser {
+        position: absolute;
+        inset: 48px 23px 70px;
+        background: #fffefa;
+        border: 1px solid #cad1c5;
+        border-radius: 11px;
+        overflow: hidden;
+        box-shadow: 0 14px 30px #37473312;
+      }
+      .browser-bar {
+        height: 43px;
+        background: #f2f3ed;
+        display: flex;
+        align-items: center;
+        padding: 0 15px;
+        gap: 18px;
+        border-bottom: 1px solid #e3e5db;
+      }
+      .traffic {
+        display: flex;
+        gap: 6px;
+      }
+      .traffic i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #e99a8b;
+      }
+      .traffic i:nth-child(2) {
+        background: #dfc282;
+      }
+      .traffic i:nth-child(3) {
+        background: #abc2a0;
+      }
+      .address {
+        margin: auto;
+        width: 42%;
+        text-align: center;
+        color: #8a8f81;
+        border-radius: 5px;
+        background: #e8ebe2;
+        padding: 5px;
+        font-size: 10px;
+      }
+      .workspace {
+        display: flex;
+        height: calc(100% - 43px);
+      }
+      .sidebar {
+        width: 165px;
+        padding: 23px 15px;
+        flex-shrink: 0;
+        background: #f7f8f2;
+        border-right: 1px solid #e9ecdf;
+      }
+      .workspace-brand {
+        font-size: 14px;
+        font-weight: 600;
+        color: #59664d;
+        margin-bottom: 27px;
+      }
+      .nav-item {
+        font-size: 11px;
+        color: #8b9282;
+        margin-bottom: 8px;
+        padding: 9px 10px;
+        border-radius: 6px;
+      }
+      .nav-item.selected {
+        background: #e9eedf;
+        color: #576647;
+      }
+      .project-name {
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #a0a795;
+        margin: 25px 10px 10px;
+      }
+      .content {
+        flex: 1;
+        min-width: 0;
+      }
+      .page-bar {
+        height: 53px;
+        border-bottom: 1px solid #eaece4;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 26px;
+      }
+      .breadcrumb {
+        font-size: 11px;
+        color: #8e9586;
+      }
+      .share {
+        border: 1px solid #d4ddc9;
+        color: #566c40;
+        background: #edf2e7;
+        padding: 7px 13px;
+        border-radius: 6px;
+        font-size: 11px;
+      }
+      .document {
+        padding: 28px 30px;
+        max-width: 800px;
+        margin: auto;
+      }
+      .document-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      h2 {
+        font-weight: 550;
+        font-size: 23px;
+        margin: 0 0 5px;
+        letter-spacing: -0.025em;
+      }
+      .document-header p {
+        font-size: 11px;
+        color: #959b8a;
+        margin: 0;
+      }
+      .export {
+        border: 1px solid #dce2d3;
+        background: #fffefa;
+        color: #58634d;
+        padding: 9px 14px;
+        border-radius: 6px;
+        font-size: 11px;
+      }
+      .cover {
+        background: #e8eddf;
+        padding: 21px;
+        border-radius: 8px;
+        margin-top: 25px;
+        position: relative;
+        overflow: hidden;
+      }
+      .cover::after {
+        content: '';
+        position: absolute;
+        width: 160px;
+        height: 160px;
+        border: 22px solid #d5dfc8;
+        border-radius: 50%;
+        right: -35px;
+        top: -55px;
+      }
+      .cover small {
+        color: #869473;
+        font-size: 9px;
+        letter-spacing: 0.12em;
+      }
+      .cover h3 {
+        font-family: Georgia, serif;
+        font-size: 24px;
+        color: #596b42;
+        margin: 9px 0;
+        font-weight: 400;
+      }
+      .cover p {
+        font-size: 11px;
+        color: #8b987b;
+        margin: 0;
+      }
+      .rows {
+        margin-top: 22px;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        border-bottom: 1px solid #edf0e6;
+        padding: 12px 0;
+        font-size: 11px;
+        color: #808974;
+      }
+      .row-icon {
+        width: 24px;
+        height: 24px;
+        background: #f0f3e9;
+        color: #b0bba2;
+        border-radius: 5px;
+        display: grid;
+        place-items: center;
+      }
+      .row small {
+        margin-left: auto;
+        color: #b4bba8;
+        font-size: 9px;
+      }
+      .coach {
+        position: absolute;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        background: #fffffbed;
+        border: 1px solid #dce2d4;
+        border-radius: 13px;
+        padding: 11px 15px;
+        box-shadow: 0 5px 20px #36412a0d;
+        min-width: 300px;
+        max-width: calc(100% - 36px);
+      }
+      .coach-icon {
+        width: 29px;
+        height: 29px;
+        color: #5394ec;
+        background: #edf5ff;
+        display: grid;
+        place-items: center;
+        border-radius: 9px;
+      }
+      .coach-copy {
+        flex: 1;
+      }
+      .coach strong {
+        display: block;
+        font-size: 12px;
+        font-weight: 550;
+      }
+      .coach small {
+        display: block;
+        color: #969d8d;
+        font-size: 10px;
+        margin-top: 3px;
+      }
+      .live-dot {
+        width: 6px;
+        height: 6px;
+        background: #8dc389;
+        border-radius: 50%;
+      }
+      .guide-layer {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 3;
+        overflow: visible;
+      }
+      .mark {
+        fill: none;
+        stroke: #6caeff;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        filter: drop-shadow(0 0 5px #70acff55);
+      }
+      .companion {
+        position: absolute;
+        width: 14px;
+        height: 16px;
+        left: 0;
+        top: 0;
+        z-index: 5;
+        pointer-events: none;
+        will-change: transform;
+        opacity: 0;
+      }
+      .companion::before {
+        content: '';
+        position: absolute;
+        width: 58px;
+        height: 58px;
+        top: -22px;
+        left: -23px;
+        border-radius: 50%;
+        background: radial-gradient(circle, #73aaff75 0%, #79b2ff32 36%, #80b7ff00 70%);
+      }
+      .companion svg {
+        position: relative;
+        width: 14px;
+        height: 16px;
+        filter: drop-shadow(0 1px 2px #3a85de40);
+      }
+      .companion-tag {
+        position: absolute;
+        top: 22px;
+        left: -4px;
+        padding: 3px 6px;
+        border-radius: 5px;
+        color: #4983c7;
+        background: #f1f7ffed;
+        border: 1px solid #b5d7ff;
+        font-size: 9px;
+        white-space: nowrap;
+      }
+      .desktop.guiding .companion-tag {
+        visibility: hidden;
+      }
+      .student {
+        position: absolute;
+        z-index: 4;
+        pointer-events: none;
+        width: 13px;
+        height: 19px;
+      }
+      .student svg {
+        width: 13px;
+        height: 19px;
+        filter: drop-shadow(0 1px 1px #0003);
+      }
+      .student-tag {
+        position: absolute;
+        top: 23px;
+        left: -3px;
+        font-size: 9px;
+        color: #6e7665;
+        padding: 3px 6px;
+        background: #fffffbef;
+        border: 1px solid #dbe0d3;
+        border-radius: 5px;
+        white-space: nowrap;
+      }
+      .desktop.mouse-inside {
+        cursor: none;
+      }
+      .desktop.mouse-inside button {
+        cursor: none;
+      }
+      .footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 20px;
+        margin-top: 21px;
+      }
+      .phase-list {
+        display: flex;
+        gap: 19px;
+        flex-wrap: wrap;
+      }
+      .phase-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: #adb1a4;
+        transition: color 0.2s;
+      }
+      .phase-item i {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #d4d8ca;
+      }
+      .phase-item.active {
+        color: #548dd2;
+      }
+      .phase-item.active i {
+        background: #6fa9f0;
+        box-shadow: 0 0 0 3px #74aaff16;
+      }
+      .hint {
+        text-align: right;
+        font-size: 11px;
+        color: #8e9586;
+        line-height: 1.7;
+        margin: 0;
+      }
+      .bottom-note {
+        font-size: 10px;
+        color: #a7ac9e;
+        margin-top: 22px;
+      }
+      @media (max-width: 760px) {
+        .shell {
+          padding: 22px 18px;
+        }
+        .masthead {
+          margin-bottom: 26px;
+        }
+        .intro {
+          align-items: start;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .desktop {
+          height: 530px;
+        }
+        .sidebar {
+          width: 108px;
+          padding: 20px 9px;
+        }
+        .document {
+          padding: 23px 16px;
+        }
+        .page-bar {
+          padding: 0 16px;
+        }
+        .browser {
+          inset: 44px 10px 75px;
+        }
+        .footer {
+          flex-direction: column;
+          gap: 14px;
+        }
+        .hint {
+          text-align: left;
+        }
+        .phase-list {
+          gap: 13px;
+        }
+        .cover h3 {
+          font-size: 20px;
+        }
+        h2 {
+          font-size: 20px;
+        }
+        .row small {
+          display: none;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          scroll-behavior: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <div class="masthead">
+        <div class="brand">
+          <img class="brand-icon" src="../../src/desktop/assets/TroMark.png" alt="" /> Tro
+        </div>
+        <span class="prototype">Companion · interactive preview</span>
+      </div>
+      <div class="intro">
+        <div>
+          <div class="eyebrow">Show me</div>
+          <h1>A guide you can follow.</h1>
+          <p>Tro leads your attention. You keep control of your cursor.</p>
+        </div>
+        <div class="controls">
+          <button class="control primary" id="replay">▶ Play guide</button
+          ><button class="control" id="pause" disabled>Pause</button>
+        </div>
+      </div>
+      <section class="desktop" id="desktop" aria-label="Interactive desktop demonstration">
+        <div class="system-bar">
+          <div>
+            <span>●</span><span><b>Workspace</b></span
+            ><span>File</span><span>Edit</span><span>View</span>
+          </div>
+          <div>Thu · 10:24</div>
+        </div>
+        <div class="browser">
+          <div class="browser-bar">
+            <div class="traffic"><i></i><i></i><i></i></div>
+            <div class="address">⌕ &nbsp; workspace.example / field-notes</div>
+            <span style="color: #a8af9c; font-size: 12px">＋</span>
+          </div>
+          <div class="workspace">
+            <aside class="sidebar">
+              <div class="workspace-brand">◈ &nbsp; Fieldwork</div>
+              <div class="nav-item">⌂ &nbsp; Home</div>
+              <div class="nav-item selected">▤ &nbsp; My workspace</div>
+              <div class="nav-item">◇ &nbsp; Shared with me</div>
+              <div class="project-name">Your projects</div>
+              <div class="nav-item">Field notes</div>
+              <div class="nav-item">Ideas & inspiration</div>
+            </aside>
+            <div class="content">
+              <div class="page-bar">
+                <div class="breadcrumb">My workspace &nbsp; / &nbsp; Field notes</div>
+                <button class="share" id="share">↗ &nbsp; Share</button>
+              </div>
+              <div class="document">
+                <div class="document-header">
+                  <div>
+                    <h2>Field notes</h2>
+                    <p>A little space for your next idea.</p>
+                  </div>
+                  <button class="export" id="export">↓ &nbsp; Export</button>
+                </div>
+                <div class="cover">
+                  <small>A NEW CHAPTER</small>
+                  <h3>Make room for a good idea.</h3>
+                  <p>Collect, explore, and share what you discover.</p>
+                </div>
+                <div class="rows">
+                  <div class="row">
+                    <span class="row-icon">▤</span>Getting started<small>Updated today</small>
+                  </div>
+                  <div class="row">
+                    <span class="row-icon">▤</span>Notes from the studio<small
+                      >Updated yesterday</small
+                    >
+                  </div>
+                  <div class="row">
+                    <span class="row-icon">▤</span>A few things worth keeping<small
+                      >Updated Sep 28</small
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <svg class="guide-layer" id="guide" aria-hidden="true">
+          <path class="mark" id="circle-mark"></path>
+          <path class="mark" id="arrow-mark"></path>
+        </svg>
+        <div class="student" id="student" aria-hidden="true">
+          <svg viewBox="0 0 13 19">
+            <path
+              d="M1 1L1 15L4.5 11.6L7.4 17.7L9.6 16.7L6.8 10.8L11.5 10.8Z"
+              fill="#292d27"
+              stroke="#fff"
+              stroke-width="1.2"
+              stroke-linejoin="round"
+            /></svg
+          ><span class="student-tag">You</span>
+        </div>
+        <div class="companion" id="companion" aria-hidden="true">
+          <svg viewBox="0 0 14 16">
+            <path
+              d="M1.5 1.3L4.4 14.3Q4.7 15.1 5.2 14.3L8 9.5L12.8 8.5Q13.7 8.3 12.8 7.8L2.2 1Q1.4 .5 1.5 1.3Z"
+              fill="white"
+              stroke="#539eff"
+              stroke-width="1.15"
+              stroke-linejoin="round"
+            /></svg
+          ><span class="companion-tag">Tro</span>
+        </div>
+        <div class="coach" role="status" aria-live="polite">
+          <img class="coach-icon" src="../../src/desktop/assets/TroMark.png" alt="" />
+          <div class="coach-copy">
+            <strong id="caption">Let me show you where to look.</strong
+            ><small id="detail">First Export, then Share.</small>
+          </div>
+          <span class="live-dot"></span>
+        </div>
+      </section>
+      <div class="footer">
+        <div class="phase-list">
+          <span class="phase-item" data-phase="approach"><i></i>Approach</span
+          ><span class="phase-item" data-phase="circle"><i></i>Circle</span
+          ><span class="phase-item" data-phase="hold"><i></i>Hold</span
+          ><span class="phase-item" data-phase="arrow"><i></i>Arrow</span
+          ><span class="phase-item" data-phase="return"><i></i>Return</span>
+        </div>
+        <p class="hint">
+          Move your cursor into the desktop and follow Tro.<br />Moving keeps the guide playing.
+          Clicking lets you take over.
+        </p>
+      </div>
+      <div class="bottom-note">Visual prototype · Export and Share are demonstration targets.</div>
+    </main>
+    <script>
+      /** @param {string} id @returns {HTMLElement} */
+      function element(id) {
+        const node = document.getElementById(id);
+        if (!node) {
+          throw new Error('Missing preview element.');
+        }
+        return node;
+      }
+      const desktop = element('desktop');
+      const companion = element('companion');
+      const student = element('student');
+      const replay = element('replay');
+      const pause = element('pause');
+      const caption = element('caption');
+      const detail = element('detail');
+      const guide = element('guide');
+      const circleMark = element('circle-mark');
+      const arrowMark = element('arrow-mark');
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      /** @typedef {{x: number, y: number}} Point */
+      /** @typedef {{phase: string, duration: number, title: string, detail: string, draw: (progress: number) => void}} Segment */
+      /** @type {Point} */
+      let mouse = { x: 170, y: 380 };
+      /** @type {Point} */
+      let position = { x: 194, y: 404 };
+      /** @type {Segment[]} */
+      let segments = [];
+      let segmentIndex = 0;
+      let elapsed = 0;
+      let lastTime = 0;
+      let playing = false;
+      let paused = false;
+      let inside = false;
+      let initialized = false;
+      /** @param {Point} point */
+      function placeCompanion(point) {
+        position = point;
+        companion.style.transform = `translate(${point.x}px, ${point.y}px)`;
+        companion.style.opacity = '1';
+      }
+      /** @returns {Point} */
+      function followTarget() {
+        return {
+          x: Math.min(mouse.x + 24, desktop.clientWidth - 25),
+          y: Math.min(mouse.y + 24, desktop.clientHeight - 30),
+        };
+      }
+      /** @param {Point} from @param {Point} to @param {number} progress @returns {Point} */
+      function interpolate(from, to, progress) {
+        return { x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress };
+      }
+      /** @param {number} progress @returns {number} */
+      function ease(progress) {
+        return progress * progress * (3 - 2 * progress);
+      }
+      /** @param {string} phase @param {string} title @param {string} description */
+      function showPhase(phase, title, description) {
+        caption.textContent = title;
+        detail.textContent = description;
+        document.querySelectorAll('[data-phase]').forEach((node) => {
+          if (node instanceof HTMLElement) {
+            node.classList.toggle('active', node.dataset.phase === phase);
+          }
+        });
+      }
+      /** @param {string} id @returns {{center: Point, width: number, height: number}} */
+      function target(id) {
+        const bounds = element(id).getBoundingClientRect();
+        const surface = desktop.getBoundingClientRect();
+        return {
+          center: {
+            x: bounds.left - surface.left + bounds.width / 2,
+            y: bounds.top - surface.top + bounds.height / 2,
+          },
+          width: bounds.width,
+          height: bounds.height,
+        };
+      }
+      /** @param {Point[]} points @returns {string} */
+      function pathData(points) {
+        return points
+          .map(
+            (point, index) =>
+              `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`,
+          )
+          .join(' ');
+      }
+      /** @param {string} phase @param {Point} from @param {Point} to @param {number} duration @param {string} title @returns {Segment} */
+      function travel(phase, from, to, duration, title) {
+        return {
+          phase,
+          duration,
+          title,
+          detail: 'Follow the blue glow. Your cursor stays yours.',
+          draw(progress) {
+            placeCompanion(interpolate(from, to, reducedMotion ? 1 : ease(progress)));
+          },
+        };
+      }
+      /** @param {string} title @param {number} duration @returns {Segment} */
+      function hold(title, duration) {
+        return {
+          phase: 'hold',
+          duration,
+          title,
+          detail: 'A moment to find it. You can move your cursor here.',
+          draw() {},
+        };
+      }
+      function startGuide() {
+        circleMark.setAttribute('d', '');
+        circleMark.style.opacity = '1';
+        arrowMark.setAttribute('d', '');
+        guide.style.opacity = '1';
+        desktop.classList.add('guiding');
+        const exportTarget = target('export');
+        const shareTarget = target('share');
+        const center = exportTarget.center;
+        const radius = Math.max(exportTarget.width / 2 + 12, 33);
+        const circleStart = { x: center.x, y: center.y + radius };
+        const arrowStart = {
+          x: Math.max(24, shareTarget.center.x - 95),
+          y: shareTarget.center.y + shareTarget.height / 2 + 92,
+        };
+        const arrowEnd = {
+          x: shareTarget.center.x - 13,
+          y: shareTarget.center.y + shareTarget.height / 2 + 14,
+        };
+        let returnStart = arrowEnd;
+        segments = [
+          travel('approach', { ...position }, circleStart, 1300, 'First, look for Export.'),
+          {
+            phase: 'circle',
+            duration: 2200,
+            title: 'Right here — Export.',
+            detail: 'Tro traces the circle, so your eyes can follow.',
+            draw(progress) {
+              const amount = reducedMotion ? 1 : progress;
+              const points = [];
+              for (let index = 0; index <= Math.ceil(amount * 90); index += 1) {
+                const angle = Math.PI / 2 + Math.min(index / 90, amount) * Math.PI * 2;
+                points.push({
+                  x: center.x + Math.cos(angle) * radius,
+                  y: center.y + Math.sin(angle) * radius,
+                });
+              }
+              circleMark.setAttribute('d', pathData(points));
+              const end = points.at(-1);
+              if (end) {
+                placeCompanion(end);
+              }
+            },
+          },
+          hold('This is the Export button.', 1400),
+          /* Each teaching step owns its mark. Retire it before the next cue. */
+          {
+            phase: 'approach',
+            duration: 350,
+            title: 'Next, I’ll point you toward Share.',
+            detail: 'One cue at a time. The circle fades before the arrow begins.',
+            draw(progress) {
+              circleMark.style.opacity = String(reducedMotion ? 0 : 1 - progress);
+              if (progress === 1) {
+                circleMark.setAttribute('d', '');
+              }
+            },
+          },
+          travel('approach', circleStart, arrowStart, 700, 'Next, I’ll point you toward Share.'),
+          {
+            phase: 'arrow',
+            duration: 1700,
+            title: 'Follow me to Share.',
+            detail: 'The pointer leads. The arrow follows behind.',
+            draw(progress) {
+              const amount = reducedMotion ? 1 : ease(progress);
+              const tip = interpolate(arrowStart, arrowEnd, amount);
+              const points = [arrowStart, tip];
+              if (amount > 0.88) {
+                const angle = Math.atan2(arrowEnd.y - arrowStart.y, arrowEnd.x - arrowStart.x);
+                const length = 11 * Math.min(1, (amount - 0.88) / 0.12);
+                points.push(
+                  {
+                    x: tip.x - length * Math.cos(angle - 0.55),
+                    y: tip.y - length * Math.sin(angle - 0.55),
+                  },
+                  tip,
+                  {
+                    x: tip.x - length * Math.cos(angle + 0.55),
+                    y: tip.y - length * Math.sin(angle + 0.55),
+                  },
+                );
+              }
+              arrowMark.setAttribute('d', pathData(points));
+              placeCompanion(tip);
+            },
+          },
+          hold('Share is up here.', 1400),
+          {
+            phase: 'return',
+            duration: 1000,
+            title: 'All yours. I’m back beside you.',
+            detail: 'Tro returns to following your cursor.',
+            draw(progress) {
+              if (progress === 0) {
+                returnStart = { ...position };
+              }
+              guide.style.opacity = String(1 - progress);
+              placeCompanion(
+                interpolate(returnStart, followTarget(), reducedMotion ? 1 : ease(progress)),
+              );
+            },
+          },
+        ];
+        segmentIndex = 0;
+        elapsed = 0;
+        playing = true;
+        paused = false;
+        pause.removeAttribute('disabled');
+        pause.textContent = 'Pause';
+        replay.textContent = '↻ Replay guide';
+        activateSegment();
+      }
+      function activateSegment() {
+        const segment = segments[segmentIndex];
+        if (segment) {
+          showPhase(segment.phase, segment.title, segment.detail);
+          segment.draw(0);
+        }
+      }
+      function finishGuide() {
+        playing = false;
+        paused = false;
+        desktop.classList.remove('guiding');
+        pause.setAttribute('disabled', '');
+        pause.textContent = 'Pause';
+        guide.style.opacity = '0';
+        showPhase(
+          '',
+          'Your cursor, with a companion.',
+          'Move around. Tro follows until the next guide.',
+        );
+      }
+      /** @param {number} time */
+      function animate(time) {
+        const delta = Math.min(time - lastTime, 80);
+        lastTime = time;
+        if (playing && !paused) {
+          const segment = segments[segmentIndex];
+          if (segment) {
+            elapsed += delta;
+            segment.draw(Math.min(elapsed / segment.duration, 1));
+            if (elapsed >= segment.duration) {
+              segmentIndex += 1;
+              elapsed = 0;
+              if (segmentIndex >= segments.length) {
+                finishGuide();
+              } else {
+                activateSegment();
+              }
+            }
+          }
+        } else if (!playing) {
+          const destination = followTarget();
+          placeCompanion(
+            interpolate(position, destination, reducedMotion ? 1 : 1 - Math.exp(-delta / 65)),
+          );
+        }
+        requestAnimationFrame(animate);
+      }
+      replay.addEventListener('click', startGuide);
+      pause.addEventListener('click', () => {
+        if (!playing) {
+          return;
+        }
+        paused = !paused;
+        pause.textContent = paused ? 'Resume' : 'Pause';
+        if (paused) {
+          caption.textContent = 'Take your time. I’ll wait here.';
+        } else {
+          const segment = segments[segmentIndex];
+          if (segment) {
+            showPhase(segment.phase, segment.title, segment.detail);
+          }
+        }
+      });
+      desktop.addEventListener('pointermove', (event) => {
+        const bounds = desktop.getBoundingClientRect();
+        mouse = {
+          x: Math.max(0, event.clientX - bounds.left),
+          y: Math.max(0, event.clientY - bounds.top),
+        };
+        student.style.transform = `translate(${mouse.x}px, ${mouse.y}px)`;
+      });
+      desktop.addEventListener('pointerenter', () => {
+        inside = true;
+        desktop.classList.add('mouse-inside');
+        student.style.opacity = '1';
+      });
+      desktop.addEventListener('pointerleave', () => {
+        inside = false;
+        desktop.classList.remove('mouse-inside');
+        student.style.opacity = '.45';
+      });
+      desktop.addEventListener('pointerdown', () => {
+        if (playing) {
+          finishGuide();
+          showPhase(
+            '',
+            'You’ve taken over.',
+            'The guide stopped. Tro is following your cursor again.',
+          );
+        }
+      });
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && playing) {
+          finishGuide();
+          showPhase('', 'Guide stopped.', 'Replay whenever you’re ready.');
+        }
+      });
+      const observer = new ResizeObserver(() => {
+        if (playing) {
+          finishGuide();
+        }
+        guide.setAttribute('viewBox', `0 0 ${desktop.clientWidth} ${desktop.clientHeight}`);
+        if (!inside) {
+          mouse = { x: desktop.clientWidth * 0.25, y: desktop.clientHeight * 0.72 };
+          student.style.transform = `translate(${mouse.x}px, ${mouse.y}px)`;
+          position = followTarget();
+        }
+        if (!initialized) {
+          initialized = true;
+          requestAnimationFrame(animate);
+        }
+      });
+      observer.observe(desktop);
+    </script>
+  </body>
+</html>

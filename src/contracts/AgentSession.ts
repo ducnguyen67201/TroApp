@@ -1,3 +1,4 @@
+import { StudentActivitySchema } from './StudentActivity.js';
 import { z } from 'zod';
 import { DesktopLocaleSchema } from './DesktopLocale.js';
 import { AgentTaskMode, AgentTaskModeSchema, TeachingResultSchema } from './CursorCompanion.js';
@@ -8,6 +9,7 @@ export const AgentFailureCode = { DAILY_LIMIT: 'daily_limit' } as const;
 
 /** Lifecycle and chat messages crossing renderer, main, and the local agent worker. */
 export const AgentCommandSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('locale'), sessionId: z.uuid(), locale: DesktopLocaleSchema }),
   z.strictObject({ kind: z.literal('start') }),
   z.strictObject({ kind: z.literal('follow') }),
   z.strictObject({
@@ -17,6 +19,13 @@ export const AgentCommandSchema = z.discriminatedUnion('kind', [
     locale: DesktopLocaleSchema,
     mode: AgentTaskModeSchema.default(AgentTaskMode.EXECUTE),
   }),
+  z.strictObject({
+    kind: z.literal('answer'),
+    sessionId: z.uuid(),
+    lessonId: z.uuid(),
+    message: z.string().trim().min(1).max(8000),
+    locale: DesktopLocaleSchema,
+  }),
   z.strictObject({ kind: z.literal('stop'), sessionId: z.uuid() }),
 ]);
 
@@ -24,6 +33,20 @@ export type AgentCommand = z.infer<typeof AgentCommandSchema>;
 
 /** Main supplies a scoped model credential only over its private worker port. */
 export const AgentWorkerCommandSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('activity'),
+    sessionId: z.uuid(),
+    taskRequestId: z.uuid(),
+    activity: StudentActivitySchema,
+  }),
+  z.strictObject({ kind: z.literal('locale'), sessionId: z.uuid(), locale: DesktopLocaleSchema }),
+  z.strictObject({
+    kind: z.literal('credential'),
+    sessionId: z.uuid(),
+    gatewayToken: z.string().min(1),
+    gatewayBaseUrl: z.url(),
+    debugEnabled: z.boolean(),
+  }),
   z.strictObject({
     kind: z.literal('follow'),
     sessionId: z.uuid(),
@@ -47,12 +70,20 @@ export const AgentWorkerCommandSchema = z.discriminatedUnion('kind', [
     locale: DesktopLocaleSchema,
     mode: AgentTaskModeSchema.default(AgentTaskMode.EXECUTE),
   }),
+  z.strictObject({
+    kind: z.literal('answer'),
+    sessionId: z.uuid(),
+    lessonId: z.uuid(),
+    message: z.string().trim().min(1).max(8000),
+    locale: DesktopLocaleSchema,
+  }),
   z.strictObject({ kind: z.literal('stop'), sessionId: z.uuid() }),
 ]);
 
 export type AgentWorkerCommand = z.infer<typeof AgentWorkerCommandSchema>;
 
 export const AgentResultSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('accepted'), lessonId: z.uuid() }),
   z.strictObject({ kind: z.literal('started'), sessionId: z.uuid() }),
   z.strictObject({
     kind: z.literal('completed'),

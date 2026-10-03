@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  ProviderErrorCodeSchema,
+  ProviderErrorTypeSchema,
+  NetworkErrorCodeSchema,
+} from '#contracts/ModelGatewayError.js';
 
 export const ModelGatewayFailure = {
   PROVIDER_NOT_CONFIGURED: 'provider_not_configured',
@@ -17,56 +22,18 @@ export const ModelGatewayEvent = {
   REJECTED: 'model.gateway.rejected',
   DISPATCH: 'model.gateway.dispatch',
   RETRY: 'model.gateway.retry',
+  ATTEMPT: 'model.gateway.attempt',
   RESPONSE: 'model.gateway.response',
   FAILED: 'model.gateway.failed',
   COMPLETED: 'model.gateway.completed',
 } as const;
 
 /* Provider-owned vocabulary: unknown codes/messages must never become log content. */
-const ProviderErrorCodes = new Set([
-  'invalid_api_key',
-  'insufficient_quota',
-  'rate_limit_exceeded',
-  'context_length_exceeded',
-  'invalid_value',
-  'invalid_image',
-  'invalid_image_format',
-  'invalid_image_url',
-  'invalid_base64',
-  'unknown_parameter',
-  'missing_required_parameter',
-  'invalid_request',
-  'invalid_request_error',
-  'server_error',
-  'model_not_found',
-  'content_policy_violation',
-  'unsupported_value',
-  'invalid_json',
-]);
+const ProviderErrorCodes = new Set<string>(ProviderErrorCodeSchema.options);
 
-const ProviderErrorTypes = new Set([
-  'invalid_request_error',
-  'authentication_error',
-  'permission_error',
-  'rate_limit_error',
-  'server_error',
-  'api_error',
-  'insufficient_quota',
-]);
+const ProviderErrorTypes = new Set<string>(ProviderErrorTypeSchema.options);
 
-const NetworkErrorCodes = new Set([
-  'ECONNRESET',
-  'EPIPE',
-  'ECONNREFUSED',
-  'ETIMEDOUT',
-  'ENOTFOUND',
-  'EAI_AGAIN',
-  'CERT_HAS_EXPIRED',
-  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
-  'UND_ERR_CONNECT_TIMEOUT',
-  'UND_ERR_HEADERS_TIMEOUT',
-  'UND_ERR_SOCKET',
-]);
+const NetworkErrorCodes = new Set<string>(NetworkErrorCodeSchema.options);
 
 const ProviderErrorSchema = z.looseObject({
   error: z.looseObject({
@@ -75,8 +42,6 @@ const ProviderErrorSchema = z.looseObject({
     param: z.unknown().optional(),
   }),
 });
-
-const NetworkErrorSchema = z.looseObject({ code: z.unknown().optional() });
 
 /** Accept only schema field paths; arbitrary provider params can contain user content. */
 function readProviderParameter(value: unknown): string | null {
@@ -98,17 +63,56 @@ export function readProviderRequestId(headers: Headers): string | null {
 export function describeNetworkFailure(error: unknown): {
   errorType: string;
   networkCode: string | null;
+  networkSyscall: string | null;
+  networkErrno: number | null;
+  causeDepth: number | null;
 } {
-  const nested = error instanceof Error && error.cause !== undefined ? error.cause : error;
-  const parsed = NetworkErrorSchema.safeParse(nested);
-  const code = parsed.success ? parsed.data.code : null;
+  let current: unknown = error;
+  for (let depth = 0; depth < 6; depth += 1) {
+    const parsed = z
+      .object({
+        code: z.unknown().optional(),
+        syscall: z.unknown().optional(),
+        errno: z.unknown().optional(),
+        cause: z.unknown().optional(),
+      })
+      .safeParse(current);
+    if (!parsed.success) {
+      break;
+    }
+    const { code, syscall, errno } = parsed.data;
+    if (typeof code === 'string' && NetworkErrorCodes.has(code)) {
+      return {
+        errorType: readNetworkErrorType(error),
+        networkCode: code,
+        networkSyscall:
+          typeof syscall === 'string' &&
+          ['write', 'read', 'connect', 'getaddrinfo'].includes(syscall)
+            ? syscall
+            : null,
+        networkErrno:
+          typeof errno === 'number' && Number.isSafeInteger(errno) && Math.abs(errno) <= 65535
+            ? errno
+            : null,
+        causeDepth: depth,
+      };
+    }
+    current = parsed.data.cause;
+  }
   return {
-    errorType:
-      error instanceof Error && ['AbortError', 'TimeoutError', 'TypeError'].includes(error.name)
-        ? error.name
-        : 'unknown',
-    networkCode: typeof code === 'string' && NetworkErrorCodes.has(code) ? code : null,
+    errorType: readNetworkErrorType(error),
+    networkCode: null,
+    networkSyscall: null,
+    networkErrno: null,
+    causeDepth: null,
   };
+}
+
+function readNetworkErrorType(error: unknown): string {
+  return error instanceof Error &&
+    ['AbortError', 'TimeoutError', 'TypeError', 'AggregateError'].includes(error.name)
+    ? error.name
+    : 'unknown';
 }
 
 interface ProviderFailureDiagnostics {

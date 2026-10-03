@@ -106,6 +106,7 @@ export const vietnamese = {
   showMe: 'Hướng dẫn tôi',
   doIt: 'Làm giúp tôi',
   stopTask: 'Dừng',
+  cancelLesson: 'Esc',
   teachingDisclosure:
     'Tro hiển thị hướng dẫn; bạn điều khiển chuột và bàn phím. Tro có thể đưa ứng dụng đang mở lên trước. Nội dung màn hình gửi đến OpenAI sẽ rời khỏi máy tính. Hiện hướng dẫn hỗ trợ màn hình chính trên macOS.',
   errorCompanionUnavailable:
@@ -145,16 +146,21 @@ export const vietnamese = {
   errorAgentActive: 'Một phiên trợ lý đang hoạt động.',
   errorAgentStopped: 'Phiên trợ lý đã kết thúc. Hãy bắt đầu tác vụ mới.',
   errorAgentTimeout: 'Yêu cầu gửi đến trợ lý đã hết thời gian chờ. Vui lòng thử lại.',
+  guidanceWaiting: 'Đang chờ bạn thực hiện bước tiếp theo',
+  guidanceAwaitingAnswer: 'Trả lời để tiếp tục',
+  guidancePaused: 'Yêu cầu chưa hoàn tất; đang tạm dừng',
+  guidanceGoalReached: 'Đã hoàn tất yêu cầu',
   guidanceDemonstrated: 'Đã hiển thị hướng dẫn',
-  guidanceExplained: 'Giải thích',
   guidanceNeedsInput: 'Cần bạn hỗ trợ',
   guidanceCanceled: 'Đã dừng hướng dẫn',
   guidanceFailed: 'Chưa hoàn tất hướng dẫn',
   guidanceNeedsInputMessage:
-    'Tro chưa thể minh họa bước này. Hãy kiểm tra mục tiêu hiển thị trên màn hình chính, rồi gửi yêu cầu mới.',
+    'Bạn muốn mình chỉ trong ứng dụng hay màn hình nào? Hãy mở trên màn hình chính và cho mình biết bạn muốn thử làm gì.',
   guidanceCanceledMessage: 'Hướng dẫn đã dừng. Hãy gửi yêu cầu mới khi bạn muốn tiếp tục.',
   guidanceFailedMessage:
     'Tro chưa thể hoàn tất hướng dẫn trực quan. Hãy gửi yêu cầu mới để thử lại.',
+  guidanceTargetChangedMessage:
+    'Màn hình đã thay đổi hoặc ảnh chụp hết hạn trước khi mình kịp minh họa. Bạn có thể giữ mục tiêu hiển thị trên màn hình chính và yêu cầu mình chỉ lại bước đó không?',
   errorDesktopPermissions:
     'Không thể bắt đầu điều khiển máy tính. Hãy cấp quyền Ghi màn hình và Trợ năng cho Tro trong Cài đặt hệ thống, rồi thử lại.',
   errorDesktopStart:

@@ -1,16 +1,111 @@
-import { AgentTaskMode } from '#contracts/CursorCompanion.js';
+import { AgentTaskMode, GuidanceReason, TeachingOutcome } from '#contracts/CursorCompanion.js';
+import { AgentProgressPhase, type AgentProgress } from '#contracts/CompanionHud.js';
 import { randomUUID } from 'node:crypto';
 import type { AgentResult } from '#contracts/AgentSession.js';
 import type { DesktopLocale } from '#contracts/DesktopLocale.js';
 import type { AuthResult } from '#contracts/AuthSession.js';
 import { DesktopPermissionState } from '#contracts/DesktopPermissions.js';
-import type { AgentChatAuth, AgentChatPermissions, AgentChatWorker } from './AgentChatPorts.js';
+import type {
+  AgentChatAuth,
+  AgentChatPermissions,
+  AgentChatWorker,
+  AgentCancelShortcut,
+} from './AgentChatPorts.js';
 
 const idleMs = 15 * 60_000;
 const credentialBufferMs = 60_000;
 
-/** Main owns login and the one warm worker; agent turns do not share history. */
+/** Main owns login and one warm worker; an active lesson retains its goal across SDK runs. */
 export class AgentChatController {
+  private waitingLessonId: string | null = null;
+  private credentialTimer: NodeJS.Timeout | null = null;
+  private refreshingCredential = false;
+
+  receiveProgress(progress: AgentProgress): void {
+    if (progress.sessionId !== this.pendingSessionId || !this.turnInProgress) {
+      return;
+    }
+    this.waitingLessonId =
+      progress.phase === AgentProgressPhase.NEEDS_INPUT ||
+      progress.phase === AgentProgressPhase.PAUSED
+        ? (progress.lessonId ?? null)
+        : null;
+  }
+
+  async updateTeachingLocale(sessionId: string, locale: DesktopLocale): Promise<AgentResult> {
+    if (
+      sessionId !== this.pendingSessionId ||
+      !this.turnInProgress ||
+      !this.worker.updateTeachingLocale
+    ) {
+      return { kind: 'failed', message: 'No active teaching lesson.' };
+    }
+    return this.worker.updateTeachingLocale(sessionId, locale);
+  }
+
+  async answerLesson(
+    sessionId: string,
+    lessonId: string,
+    message: string,
+    locale: DesktopLocale,
+  ): Promise<AgentResult> {
+    if (
+      sessionId !== this.pendingSessionId ||
+      lessonId !== this.waitingLessonId ||
+      !this.worker.answerLesson
+    ) {
+      return { kind: 'failed', message: 'This lesson is not waiting for an answer.' };
+    }
+    const generation = this.taskGeneration;
+    const failure = await this.checkTaskAccess();
+    if (generation !== this.taskGeneration || this.waitingLessonId !== lessonId) {
+      return { kind: 'failed', message: 'The lesson changed.' };
+    }
+    if (failure) {
+      return failure;
+    }
+    return this.worker.answerLesson(sessionId, lessonId, message, locale);
+  }
+
+  private startCredentialRenewal(): void {
+    this.credentialTimer = setInterval(() => {
+      const sessionId = this.activeSessionId;
+      if (
+        !sessionId ||
+        this.refreshingCredential ||
+        Date.now() + credentialBufferMs < this.credentialExpiresAt ||
+        !this.worker.refreshCredential
+      ) {
+        return;
+      }
+      const generation = this.taskGeneration;
+      this.refreshingCredential = true;
+      void (async () => {
+        const credential = await this.auth.fetchModelCredential();
+        if (
+          generation !== this.taskGeneration ||
+          this.activeSessionId !== sessionId ||
+          !this.worker.refreshCredential
+        ) {
+          return;
+        }
+        const result = await this.worker.refreshCredential(
+          sessionId,
+          credential.token,
+          this.gatewayBaseUrl,
+        );
+        if (result.kind === 'started' && generation === this.taskGeneration) {
+          this.credentialExpiresAt = Date.parse(credential.expiresAt);
+        }
+      })()
+        .catch(() => {})
+        .finally(() => {
+          this.refreshingCredential = false;
+        });
+    }, 30000);
+    this.credentialTimer.unref();
+  }
+
   private activeSessionId: string | null = null;
   private credentialExpiresAt = 0;
   private idleTimer: NodeJS.Timeout | null = null;
@@ -26,10 +121,11 @@ export class AgentChatController {
     private readonly worker: AgentChatWorker,
     private readonly gatewayBaseUrl: string,
     private readonly permissions: AgentChatPermissions,
+    private readonly cancelShortcut?: AgentCancelShortcut,
   ) {}
 
   isBusy(): boolean {
-    return this.turnInProgress;
+    return this.turnInProgress && this.waitingLessonId === null;
   }
 
   async readAuthSession(): Promise<AuthResult> {
@@ -101,7 +197,11 @@ export class AgentChatController {
     const accessFailure = await this.checkTaskAccess();
     if (accessFailure) return accessFailure;
 
-    return { kind: 'started', sessionId: randomUUID() };
+    return {
+      kind: 'started',
+      sessionId:
+        this.waitingLessonId && this.pendingSessionId ? this.pendingSessionId : randomUUID(),
+    };
   }
 
   async sendMessage(
@@ -111,20 +211,39 @@ export class AgentChatController {
     mode: AgentTaskMode = AgentTaskMode.EXECUTE,
   ): Promise<AgentResult> {
     if (this.turnInProgress) {
+      if (this.waitingLessonId && sessionId === this.pendingSessionId) {
+        return this.answerLesson(sessionId, this.waitingLessonId, message, locale);
+      }
       return { kind: 'failed', message: 'Wait for the current task to finish.' };
     }
     this.turnInProgress = true;
     this.pendingSessionId = sessionId;
     const generation = this.taskGeneration;
     this.clearIdleTimer();
+    const escapeCancellation = { requested: false };
+    const readInterruptedResult = (): AgentResult =>
+      escapeCancellation.requested
+        ? {
+            kind: 'teaching',
+            result: { outcome: TeachingOutcome.CANCELED, reason: GuidanceReason.EXPLICIT_STOP },
+          }
+        : { kind: 'failed', message: 'The agent session ended.' };
     try {
+      if (mode === AgentTaskMode.TEACH) {
+        this.cancelShortcut?.enable(() => {
+          if (!escapeCancellation.requested) {
+            escapeCancellation.requested = true;
+            void this.stopSession(sessionId).catch(() => {});
+          }
+        });
+      }
       await this.companionStartup;
       if (generation !== this.taskGeneration) {
-        return { kind: 'failed', message: 'The agent session ended.' };
+        return readInterruptedResult();
       }
       const accessFailure = await this.checkTaskAccess();
       if (generation !== this.taskGeneration) {
-        return { kind: 'failed', message: 'The agent session ended.' };
+        return readInterruptedResult();
       }
       if (accessFailure) return accessFailure;
 
@@ -135,25 +254,38 @@ export class AgentChatController {
       ) {
         await this.stopWorker();
         if (generation !== this.taskGeneration) {
-          return { kind: 'failed', message: 'The agent session ended.' };
+          return readInterruptedResult();
         }
         const credential = await this.auth.fetchModelCredential();
         if (generation !== this.taskGeneration) {
-          return { kind: 'failed', message: 'The agent session ended.' };
+          return readInterruptedResult();
         }
         const result = await this.worker.start(sessionId, credential.token, this.gatewayBaseUrl);
         if (generation !== this.taskGeneration) {
-          return { kind: 'failed', message: 'The agent session ended.' };
+          return readInterruptedResult();
         }
         if (result.kind !== 'started') return result;
         this.activeSessionId = sessionId;
         this.credentialExpiresAt = Date.parse(credential.expiresAt);
       }
 
-      return await this.worker.sendMessage(sessionId, message, locale, mode);
+      if (mode === AgentTaskMode.TEACH) {
+        this.startCredentialRenewal();
+      }
+      const result = await this.worker.sendMessage(sessionId, message, locale, mode);
+      return escapeCancellation.requested ? readInterruptedResult() : result;
     } catch {
+      if (escapeCancellation.requested) {
+        return readInterruptedResult();
+      }
       return { kind: 'failed', message: 'Could not complete this task. Try again.' };
     } finally {
+      if (this.credentialTimer) {
+        clearInterval(this.credentialTimer);
+        this.credentialTimer = null;
+      }
+      this.waitingLessonId = null;
+      this.cancelShortcut?.disable();
       this.turnInProgress = false;
       this.pendingSessionId = null;
       if (this.companionRequested) {
@@ -166,6 +298,7 @@ export class AgentChatController {
 
   async stopSession(sessionId: string): Promise<AgentResult> {
     if (this.activeSessionId === sessionId || this.pendingSessionId === sessionId) {
+      this.cancelShortcut?.disable();
       this.taskGeneration += 1;
       await this.stopWorker();
     }
@@ -174,6 +307,12 @@ export class AgentChatController {
   }
 
   dispose(): void {
+    if (this.credentialTimer) {
+      clearInterval(this.credentialTimer);
+      this.credentialTimer = null;
+    }
+    this.waitingLessonId = null;
+    this.cancelShortcut?.disable();
     this.companionRequested = false;
     this.taskGeneration += 1;
     this.pendingSessionId = null;
@@ -214,6 +353,11 @@ export class AgentChatController {
   }
 
   private async stopWorker(): Promise<void> {
+    this.waitingLessonId = null;
+    if (this.credentialTimer) {
+      clearInterval(this.credentialTimer);
+      this.credentialTimer = null;
+    }
     this.clearIdleTimer();
     const sessionId = this.activeSessionId;
     this.activeSessionId = null;

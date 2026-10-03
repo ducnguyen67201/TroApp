@@ -79,6 +79,10 @@ try {
   await cp(join(targetDirectory, 'release', 'cua-driver'), executablePath);
   /* Local ad-hoc signature; Tro's embedded host owns macOS attribution. */
   await runFile('/usr/bin/codesign', ['--force', '--sign', '-', executablePath]);
+  const executableVersion = await runFile(executablePath, ['--version'], { maxBuffer: 4096 });
+  if (executableVersion.stdout.trim().split(/\s+/).at(-1) !== CuaCompanionBuild.VERSION) {
+    throw new Error('Native executable version does not match the companion build contract.');
+  }
   const executable = await readFile(executablePath);
   const metadata = CuaCompanionBuildSchema.parse({
     version: CuaCompanionBuild.VERSION,

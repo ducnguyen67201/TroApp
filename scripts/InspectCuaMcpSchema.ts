@@ -1,8 +1,8 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { MCPServerStdio, mcpToFunctionTool } from '@openai/agents';
-import { chooseCuaDriverCommand } from '../src/desktop/worker/ChooseCuaDriverCommand.js';
-import { prepareCuaToolForAgent } from '../src/desktop/worker/LoggedCuaServer.js';
+import { chooseCuaDriverCommand } from '../src/desktop/worker/cua/ChooseCuaDriverCommand.js';
+import { prepareCuaToolForAgent } from '../src/desktop/worker/cua/LoggedCuaServer.js';
 
 /** Print the MCP tool schema and the actual Agents SDK conversion locally.
  * This inspects tool definitions only; it never calls a desktop action. */

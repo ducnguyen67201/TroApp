@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { AgentProgressPhase, AgentProgressSchema } from '#contracts/CompanionHud.js';
+import { TeachingLessonPhase } from '#contracts/DesktopObservation.js';
 import { AgentFailureCode } from '#contracts/AgentSession.js';
 import { setDefaultOpenAIClient, setTracingDisabled } from '@openai/agents';
 import OpenAI from 'openai';
@@ -9,8 +10,8 @@ import {
   type AgentWorkerCommand,
   type AgentResult,
 } from '#contracts/AgentSession.js';
-import { ComputerUseTaskRunner } from './ComputerUseTaskRunner.js';
-import { createAgentDebugLogger, createLoggedModelFetch } from './AgentDebugLog.js';
+import { ComputerUseTaskRunner } from './agent/ComputerUseTaskRunner.js';
+import { createAgentDebugLogger, createLoggedModelFetch } from './agent/AgentDebugLog.js';
 
 const parentPort = process.parentPort;
 
@@ -47,8 +48,62 @@ function sendResult(requestId: string, result: AgentResult): void {
   parentPort.postMessage(AgentWorkerResponseSchema.parse({ requestId, result }));
 }
 
+function configureModelCredential(
+  gatewayToken: string,
+  gatewayBaseUrl: string,
+  debugEnabled: boolean,
+): void {
+  const log = createAgentDebugLogger(debugEnabled);
+  const modelFetch = createLoggedModelFetch(log);
+  setDefaultOpenAIClient(
+    new OpenAI({
+      apiKey: gatewayToken,
+      baseURL: gatewayBaseUrl,
+      maxRetries: 0,
+      fetch: async (input, init) => {
+        reportThinking();
+        const response = await modelFetch(input, init);
+        if (response.status === 429) {
+          try {
+            const raw: unknown = await response.clone().json();
+            const parsed = z.object({ message: z.string() }).safeParse(raw);
+            dailyLimitReached ||=
+              parsed.success && parsed.data.message === 'Daily model allowance reached.';
+          } catch {
+            /* Failure classification is optional. */
+          }
+        }
+        return response;
+      },
+    }),
+  );
+}
+
 async function runCommand(command: AgentWorkerCommand, requestId: string): Promise<AgentResult> {
+  if (command.kind === 'activity') {
+    return { kind: 'failed', message: 'Activity is a one-way worker signal.' };
+  }
+  if (command.kind === 'locale') {
+    return runner && sessionId === command.sessionId && runner.updateTeachingLocale(command.locale)
+      ? { kind: 'started', sessionId: command.sessionId }
+      : { kind: 'failed', message: 'No active teaching lesson.' };
+  }
   switch (command.kind) {
+    case 'credential': {
+      if (!runner || sessionId !== command.sessionId) {
+        return { kind: 'failed', message: 'The agent session ended.' };
+      }
+      configureModelCredential(command.gatewayToken, command.gatewayBaseUrl, command.debugEnabled);
+      return { kind: 'started', sessionId: command.sessionId };
+    }
+    case 'answer': {
+      if (!runner || sessionId !== command.sessionId || !activeRun) {
+        return { kind: 'failed', message: 'The teaching lesson ended.' };
+      }
+      return runner.submitTeachingAnswer(command.lessonId, command.message)
+        ? { kind: 'accepted', lessonId: command.lessonId }
+        : { kind: 'failed', message: 'The lesson is not waiting for an answer.' };
+    }
     case 'follow':
     case 'start': {
       if (runner !== null) {
@@ -59,28 +114,10 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
          product's OpenAI provider key stays on the backend. */
       const log = createAgentDebugLogger(command.debugEnabled);
       if (command.kind === 'start') {
-        const modelFetch = createLoggedModelFetch(log);
-        setDefaultOpenAIClient(
-          new OpenAI({
-            apiKey: command.gatewayToken,
-            baseURL: command.gatewayBaseUrl,
-            maxRetries: 0,
-            fetch: async (input, init) => {
-              reportThinking();
-              const response = await modelFetch(input, init);
-              if (response.status === 429) {
-                try {
-                  const raw: unknown = await response.clone().json();
-                  const parsed = z.object({ message: z.string() }).safeParse(raw);
-                  dailyLimitReached ||=
-                    parsed.success && parsed.data.message === 'Daily model allowance reached.';
-                } catch {
-                  /* Failure classification is optional. */
-                }
-              }
-              return response;
-            },
-          }),
+        configureModelCredential(
+          command.gatewayToken,
+          command.gatewayBaseUrl,
+          command.debugEnabled,
         );
       }
       try {
@@ -129,6 +166,29 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
             }),
           );
         },
+        (instruction, phase, lessonId, teachingMessage, locale) => {
+          parentPort.postMessage(
+            AgentProgressSchema.parse({
+              kind: 'progress',
+              requestId,
+              sessionId: command.sessionId,
+              phase:
+                phase === TeachingLessonPhase.WAITING
+                  ? AgentProgressPhase.WAITING
+                  : phase === TeachingLessonPhase.NEEDS_INPUT
+                    ? AgentProgressPhase.NEEDS_INPUT
+                    : phase === TeachingLessonPhase.PAUSED
+                      ? AgentProgressPhase.PAUSED
+                      : phase === TeachingLessonPhase.OBSERVING
+                        ? AgentProgressPhase.THINKING
+                        : AgentProgressPhase.SHOWING,
+              ...(lessonId ? { lessonId } : {}),
+              teachingStep: instruction,
+              ...(teachingMessage ? { teachingMessage } : {}),
+              ...(locale ? { locale } : {}),
+            }),
+          );
+        },
       );
       activeRun = run;
       try {
@@ -174,6 +234,14 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
 parentPort.on('message', (event) => {
   const parsed = AgentWorkerRequestSchema.safeParse(event.data);
   if (!parsed.success) {
+    return;
+  }
+
+  const command = parsed.data.command;
+  if (command.kind === 'activity') {
+    if (command.sessionId === sessionId && command.taskRequestId === activeRequestId) {
+      runner?.recordStudentActivity(command.activity);
+    }
     return;
   }
 

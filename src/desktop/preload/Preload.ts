@@ -3,7 +3,7 @@ import {
   MicrophoneTestEventSchema,
   MicrophoneTestReplySchema,
 } from '#contracts/MicrophoneTest.js';
-import { VoiceMeterSchema, type VoiceMeter } from '#contracts/CompanionHud.js';
+import { AgentProgressSchema, VoiceMeterSchema, type VoiceMeter } from '#contracts/CompanionHud.js';
 import {
   VoiceCommandSchema,
   VoiceAudioFrameSchema,
@@ -35,6 +35,18 @@ import {
 /* Expose named session operations, not generic IPC or direct computer tools.
    Validate IPC data before it enters the renderer. */
 const bridge: DesktopBridge = {
+  subscribeAgentProgress(listener) {
+    const receive = (_event: Electron.IpcRendererEvent, raw: unknown): void => {
+      const parsed = AgentProgressSchema.safeParse(raw);
+      if (parsed.success) {
+        listener(parsed.data);
+      }
+    };
+    ipcRenderer.on('tro:agent-progress', receive);
+    return () => {
+      ipcRenderer.removeListener('tro:agent-progress', receive);
+    };
+  },
   async controlMicrophoneTest(command) {
     try {
       return MicrophoneTestReplySchema.parse(
@@ -180,6 +192,24 @@ const bridge: DesktopBridge = {
     } catch {
       return { kind: 'failed', message: 'Could not send the message to the agent.' };
     }
+  },
+  async answerTeachingLesson(sessionId, lessonId, message, locale): Promise<AgentResult> {
+    const command = AgentCommandSchema.parse({
+      kind: 'answer',
+      sessionId,
+      lessonId,
+      message,
+      locale,
+    });
+    const result: unknown = await ipcRenderer.invoke('tro:agent-command', command);
+    return AgentResultSchema.parse(result);
+  },
+  async updateTeachingLocale(sessionId, locale): Promise<AgentResult> {
+    const result: unknown = await ipcRenderer.invoke(
+      'tro:agent-command',
+      AgentCommandSchema.parse({ kind: 'locale', sessionId, locale }),
+    );
+    return AgentResultSchema.parse(result);
   },
   async stopAgentSession(sessionId: string): Promise<AgentResult> {
     try {

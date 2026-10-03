@@ -43,6 +43,8 @@ for (const file of await collectFiles(root)) {
   const fileName = basename(file);
   const filePath = relative(root, file).split(sep).join('/');
   const isConfig = fileName.includes('.config.') || specialNames.has(fileName);
+  // Mirrored tests retain the import restrictions of their production owner.
+  const ownerPath = filePath.startsWith('test/') ? `src/${filePath.slice(5)}` : filePath;
 
   if (
     /\.(?:tsx?|md|css)$/.test(fileName) &&
@@ -77,38 +79,42 @@ for (const file of await collectFiles(root)) {
             .join('/')
         : specifier;
 
+      if (filePath.startsWith('src/') && importPath.startsWith('test/')) {
+        failures.push(`${filePath}: production code cannot import test implementation.`);
+      }
+
       if (
-        filePath.startsWith('src/desktop/') &&
+        ownerPath.startsWith('src/desktop/') &&
         (importPath.startsWith('src/server/') || /prisma/.test(specifier))
       ) {
         failures.push(`${filePath}: desktop cannot import backend/database implementation.`);
       }
 
       if (
-        (filePath.startsWith('src/desktop/renderer/') ||
-          filePath.startsWith('src/desktop/preload/')) &&
+        (ownerPath.startsWith('src/desktop/renderer/') ||
+          ownerPath.startsWith('src/desktop/preload/')) &&
         importPath.startsWith('src/desktop/main/')
       ) {
         failures.push(`${filePath}: renderer/preload cannot import main-process implementation.`);
       }
 
       if (
-        filePath.startsWith('src/contracts/') &&
+        ownerPath.startsWith('src/contracts/') &&
         /^(?:src\/(?:server|desktop)\/|@prisma)/.test(importPath)
       ) {
         failures.push(`${filePath}: contracts cannot import application implementation.`);
       }
 
       if (
-        filePath.startsWith('src/') &&
-        !filePath.startsWith('src/server/persistence/') &&
+        ownerPath.startsWith('src/') &&
+        !ownerPath.startsWith('src/server/persistence/') &&
         /(?:^@prisma|generated\/prisma)/.test(specifier)
       ) {
         failures.push(`${filePath}: Prisma belongs in persistence adapters.`);
       }
 
       if (
-        filePath.includes('/domain/') &&
+        ownerPath.includes('/domain/') &&
         /^(?:node:|fastify|zod|react|electron|@prisma)|\/persistence\//.test(importPath)
       ) {
         failures.push(`${filePath}: domain must be framework-free and I/O-free.`);

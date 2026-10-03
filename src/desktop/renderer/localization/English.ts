@@ -103,6 +103,7 @@ export const english = {
   showMe: 'Show me',
   doIt: 'Do it for me',
   stopTask: 'Stop',
+  cancelLesson: 'Esc',
   teachingDisclosure:
     'Tro shows visual previews while you control your mouse and keyboard. It may focus an existing app. Screen observations sent to OpenAI leave your computer. Guidance currently supports the main display on macOS.',
   errorCompanionUnavailable:
@@ -140,15 +141,20 @@ export const english = {
   errorAgentActive: 'An agent session is already active.',
   errorAgentStopped: 'The agent session ended. Start a new task.',
   errorAgentTimeout: 'The agent request timed out. Please try again.',
+  guidanceWaiting: 'Waiting for your next action',
+  guidanceAwaitingAnswer: 'Reply to continue',
+  guidancePaused: 'Task unfinished; paused',
+  guidanceGoalReached: 'Task finished',
   guidanceDemonstrated: 'Guide finished',
-  guidanceExplained: 'Explanation',
   guidanceNeedsInput: 'Your input is needed',
   guidanceCanceled: 'Guide stopped',
   guidanceFailed: 'Guide could not finish',
   guidanceNeedsInputMessage:
-    'Tro could not show this step. Check that the target is visible on your primary display, then send a new request.',
+    'Which app or screen should I show you? Open it on your main display and tell me what you want to try.',
   guidanceCanceledMessage: 'The guide stopped. Send a new request when you want to continue.',
   guidanceFailedMessage: 'Tro could not finish the visual guide. Send a new request to try again.',
+  guidanceTargetChangedMessage:
+    'The screen changed or the capture expired before I could show this step. Can you keep the target visible on your main display and ask me to show that step again?',
   errorDesktopPermissions:
     'Desktop control could not start. Allow Tro Screen Recording and Accessibility in System Settings, then try again.',
   errorDesktopStart:

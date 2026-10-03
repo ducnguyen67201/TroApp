@@ -1,0 +1,1457 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tro · Teaching companion demo</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #213129;
+        background: #f5f6f2;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+      button,
+      select {
+        cursor: pointer;
+      }
+      button:focus-visible,
+      select:focus-visible {
+        outline: 3px solid #83b791;
+        outline-offset: 3px;
+      }
+      button {
+        border: 1px solid #dce2d9;
+        background: white;
+        border-radius: 10px;
+        padding: 10px 15px;
+        color: #33463b;
+      }
+      button:hover {
+        background: #f1f5ef;
+      }
+      .primary {
+        background: #244c37;
+        color: white;
+        border-color: #244c37;
+      }
+      .primary:hover {
+        background: #326448;
+      }
+      header {
+        max-width: 1480px;
+        margin: auto;
+        padding: 27px 36px 22px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 19px;
+        font-weight: 650;
+      }
+      .mark {
+        display: grid;
+        place-items: center;
+        background: #244c37;
+        color: #d6ecc8;
+        width: 35px;
+        height: 35px;
+        border-radius: 12px;
+      }
+      .tag {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        background: #e7ece3;
+        padding: 6px 9px;
+        border-radius: 6px;
+        font-weight: 600;
+      }
+      .toolbar {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+      }
+      select {
+        background: white;
+        border: 1px solid #dce2d9;
+        border-radius: 10px;
+        padding: 10px;
+        color: #33463b;
+      }
+      main {
+        max-width: 1480px;
+        padding: 0 36px 28px;
+        margin: auto;
+      }
+      .intro {
+        padding: 10px 0 24px;
+      }
+      .eyebrow {
+        color: #718471;
+        font-size: 11px;
+        font-weight: 650;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+      h1 {
+        font-size: clamp(27px, 3vw, 40px);
+        font-weight: 550;
+        letter-spacing: -0.04em;
+        margin: 9px 0 10px;
+      }
+      .intro p {
+        color: #718071;
+        font-size: 14px;
+        margin: 0;
+        line-height: 1.6;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 298px;
+        gap: 22px;
+      }
+      .desktop {
+        position: relative;
+        height: 570px;
+        overflow: hidden;
+        border-radius: 17px;
+        background:
+          radial-gradient(ellipse at 13% 15%, #c7d8ce, transparent 50%),
+          radial-gradient(ellipse at 80% 90%, #aac5b6, transparent 60%), #d7e0d5;
+        border: 1px solid #c8d5c7;
+        box-shadow: 0 10px 40px #273e2910;
+      }
+      .menu {
+        height: 30px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 0 17px;
+        background: #ffffff4a;
+        font-size: 11px;
+        color: #385342;
+      }
+      .menu strong {
+        font-size: 13px;
+      }
+      .menu span:last-child {
+        margin-left: auto;
+      }
+      .request {
+        position: absolute;
+        top: 53px;
+        left: 24px;
+        padding: 13px 17px;
+        background: #ffffffb0;
+        border: 1px solid #ffffffab;
+        border-radius: 13px;
+        font-size: 13px;
+        max-width: calc(100% - 48px);
+      }
+      .request small {
+        display: block;
+        margin-bottom: 6px;
+        color: #708174;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+      }
+      .empty {
+        position: absolute;
+        top: 230px;
+        width: 100%;
+        text-align: center;
+        color: #6d8b76;
+        pointer-events: none;
+      }
+      .empty .leaf {
+        font-size: 49px;
+        margin-bottom: 10px;
+        opacity: 0.5;
+      }
+      .empty p {
+        font-size: 12px;
+      }
+      .dock {
+        position: absolute;
+        left: 50%;
+        bottom: 17px;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 12px;
+        padding: 10px 15px;
+        background: #ffffff70;
+        border: 1px solid #ffffffa0;
+        backdrop-filter: blur(12px);
+        border-radius: 19px;
+      }
+      .app {
+        padding: 0;
+        background: transparent;
+        border: 0;
+        border-radius: 12px;
+        width: 46px;
+        height: 46px;
+        display: grid;
+        place-items: center;
+        position: relative;
+      }
+      .app:hover {
+        background: #ffffff65;
+        transform: translateY(-3px);
+      }
+      .chrome {
+        width: 37px;
+        height: 37px;
+        border-radius: 50%;
+        background: conic-gradient(#df685f 0 120deg, #edcc6c 120deg 240deg, #71a67d 240deg 360deg);
+        display: grid;
+        place-items: center;
+      }
+      .chrome:after {
+        content: '';
+        width: 15px;
+        height: 15px;
+        background: #6b9fb5;
+        border: 3px solid #edf0e9;
+        border-radius: 50%;
+      }
+      .notes {
+        width: 36px;
+        height: 36px;
+        background: repeating-linear-gradient(to bottom, #fff 0 7px, #e3e4de 8px 9px);
+        border-radius: 7px;
+        border-top: 10px solid #edd071;
+        box-shadow: 0 2px 5px #36563820;
+      }
+      .finder {
+        background: linear-gradient(90deg, #86b7d2 50%, #c3dfe8 50%);
+        width: 37px;
+        height: 37px;
+        border-radius: 9px;
+        color: #285976;
+        font-size: 24px;
+      }
+      .app.cued:before {
+        content: '';
+        position: absolute;
+        inset: -7px;
+        border: 2px solid #365f46;
+        border-radius: 50%;
+        box-shadow: 0 0 0 6px #ffffff50;
+        animation: cue 1s ease-out 3;
+      }
+      @keyframes cue {
+        50% {
+          box-shadow: 0 0 0 11px #ffffff20;
+        }
+      }
+      .window {
+        position: absolute;
+        top: 136px;
+        left: 24px;
+        right: 24px;
+        height: 337px;
+        background: #fbfcfa;
+        border: 1px solid #bbcabe;
+        border-radius: 12px;
+        box-shadow: 0 18px 30px #27442f20;
+        overflow: visible;
+      }
+      .window-top {
+        height: 43px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 0 13px;
+        background: #f0f2ed;
+        border-radius: 12px 12px 0 0;
+      }
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #e28b83;
+      }
+      .dot:nth-child(2) {
+        background: #e1c276;
+      }
+      .dot:nth-child(3) {
+        background: #91b79b;
+      }
+      .tab {
+        margin-left: 14px;
+        font-size: 11px;
+        padding: 9px 18px;
+        background: white;
+        border-radius: 8px 8px 0 0;
+        align-self: end;
+        min-width: 130px;
+      }
+      .address-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 9px 15px;
+        border-bottom: 1px solid #ebeee8;
+      }
+      .nav {
+        font-size: 15px;
+        color: #87968a;
+      }
+      #address {
+        width: 100%;
+        background: #eef1ec;
+        border: 1px solid transparent;
+        outline: none;
+        border-radius: 18px;
+        padding: 8px 14px;
+        font-size: 12px;
+        color: #2d4836;
+      }
+      #address:focus {
+        background: white;
+        border-color: #80a88c;
+        box-shadow: 0 0 0 2px #80a88c20;
+      }
+      #address.cued {
+        outline: 2px solid #365f46;
+        outline-offset: 4px;
+      }
+      .browser-body {
+        padding: 22px;
+        height: 240px;
+        overflow: hidden;
+      }
+      .new-tab {
+        text-align: center;
+        padding-top: 28px;
+        color: #8f9f91;
+      }
+      .new-tab strong {
+        font-size: 27px;
+        font-weight: 500;
+        color: #758f7c;
+      }
+      .search-placeholder {
+        margin: 20px auto;
+        background: #f0f3ed;
+        border-radius: 18px;
+        width: 70%;
+        padding: 11px;
+        font-size: 11px;
+      }
+      .loading {
+        display: grid;
+        place-items: center;
+        height: 185px;
+        color: #64806c;
+        font-size: 12px;
+      }
+      .spinner {
+        width: 25px;
+        height: 25px;
+        border: 2px solid #d8e1d5;
+        border-top-color: #456d50;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: auto auto 14px;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .youtube-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 22px;
+      }
+      .youtube-logo {
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        font-size: 20px;
+        color: #303530;
+      }
+      .youtube-logo span {
+        background: #dd6964;
+        border-radius: 6px;
+        color: white;
+        font-size: 13px;
+        padding: 4px 8px;
+        margin-right: 5px;
+      }
+      .fake-search {
+        border: 1px solid #e0e4dc;
+        border-radius: 16px;
+        color: #98a091;
+        padding: 7px 23px;
+        font-size: 11px;
+      }
+      .videos {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 13px;
+      }
+      .thumbnail {
+        height: 78px;
+        background: #b7c8b3;
+        border-radius: 9px;
+        display: grid;
+        place-items: center;
+        font-size: 27px;
+      }
+      .video:nth-child(2) .thumbnail {
+        background: #ddd0b4;
+      }
+      .video:nth-child(3) .thumbnail {
+        background: #b9ccce;
+      }
+      .video p {
+        margin: 8px 0 0;
+        font-size: 10px;
+        color: #6d7d6b;
+      }
+      .notes-body {
+        padding: 20px;
+        font-size: 13px;
+        color: #78836d;
+      }
+      .companion {
+        position: absolute;
+        z-index: 5;
+        width: 220px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        pointer-events: none;
+        transition:
+          left 0.25s ease,
+          top 0.25s ease;
+      }
+      .hud {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        width: 88px;
+        height: 22px;
+        background: rgba(8, 13, 19, 0.95);
+        border: 0.8px solid rgba(120, 188, 243, 0.7);
+        color: #d7e8f5;
+        padding: 0 7px;
+        border-radius: 11px;
+        font-size: 9.5px;
+        white-space: nowrap;
+        box-shadow: 0 2px 8px #08131d25;
+      }
+      html[lang='vi'] .hud {
+        width: 98px;
+      }
+      .hud-icon {
+        width: 10px;
+        height: 14px;
+        color: #8ac8fa;
+        flex-shrink: 0;
+      }
+      .message {
+        margin-top: 5px;
+        width: 220px;
+        max-width: 220px;
+        background: rgba(12, 20, 29, 0.95);
+        border: 1px solid rgba(120, 188, 243, 0.25);
+        border-radius: 9px;
+        padding: 8px 10px;
+        box-shadow: 0 4px 12px #08131d20;
+        opacity: 1;
+        transition: opacity 2.8s ease;
+      }
+      .message.faded {
+        opacity: 0;
+      }
+      #instruction {
+        font-size: 11.5px;
+        line-height: 1.45;
+        margin: 0;
+        color: #e5edf4;
+        text-align: left;
+        display: grid;
+      }
+      #instruction::after {
+        content: attr(data-message);
+        visibility: hidden;
+        grid-area: 1 / 1;
+      }
+      #instruction span {
+        grid-area: 1 / 1;
+      }
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 13px;
+      }
+      .card {
+        background: #fffefa;
+        border: 1px solid #e1e5da;
+        border-radius: 14px;
+        padding: 19px;
+      }
+      .card h2 {
+        font-size: 12px;
+        margin: 0 0 14px;
+        font-weight: 600;
+      }
+      .goal {
+        font-size: 15px;
+        margin: 0 0 14px;
+        line-height: 1.5;
+      }
+      .badge {
+        font-size: 10px;
+        padding: 5px 9px;
+        border-radius: 20px;
+        display: inline-block;
+        background: #f0eadb;
+        color: #8b784a;
+      }
+      .badge.done {
+        background: #e2edda;
+        color: #416b42;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        margin-top: 13px;
+        font-size: 11px;
+        color: #87907f;
+      }
+      .row strong {
+        color: #4d654f;
+        font-weight: 500;
+        text-align: right;
+      }
+      .expectation {
+        font-size: 12px;
+        line-height: 1.6;
+        color: #687c65;
+        border-top: 1px solid #ecefe6;
+        padding-top: 13px;
+        margin-top: 13px;
+      }
+      .timeline {
+        display: grid;
+        gap: 12px;
+      }
+      .milestone {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 11px;
+        color: #94a08c;
+      }
+      .milestone .number {
+        display: grid;
+        place-items: center;
+        width: 23px;
+        height: 23px;
+        border-radius: 50%;
+        background: #eff2e9;
+        font-size: 10px;
+        flex-shrink: 0;
+      }
+      .milestone.active {
+        color: #34583d;
+        font-weight: 600;
+      }
+      .milestone.active .number {
+        background: #d8e7cc;
+      }
+      .milestone.complete .number {
+        background: #e3eddb;
+        color: #4e7145;
+      }
+      .metrics {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 13px;
+      }
+      .metric strong {
+        display: block;
+        font-size: 22px;
+        font-weight: 500;
+        margin-bottom: 4px;
+      }
+      .metric span {
+        font-size: 9px;
+        color: #8b9582;
+      }
+      #events {
+        font-size: 10px;
+        line-height: 1.6;
+        color: #72806b;
+        height: 62px;
+        overflow: auto;
+        border-top: 1px solid #ecefe6;
+        padding-top: 8px;
+      }
+      .controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        padding: 17px 0;
+      }
+      .hint {
+        color: #78876f;
+        font-size: 12px;
+        line-height: 1.6;
+      }
+      .controls button {
+        font-size: 11px;
+      }
+      .footnote {
+        border-top: 1px solid #e1e6da;
+        padding-top: 16px;
+        display: flex;
+        justify-content: space-between;
+        gap: 15px;
+        color: #8b9682;
+        font-size: 10px;
+        line-height: 1.6;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      @media (max-width: 1000px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+        .sidebar {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+        }
+        .desktop {
+          height: 570px;
+        }
+      }
+      @media (max-width: 650px) {
+        header {
+          padding: 20px 16px;
+          flex-wrap: wrap;
+        }
+        main {
+          padding: 0 16px 20px;
+        }
+        .tag {
+          display: none;
+        }
+        .sidebar {
+          grid-template-columns: 1fr;
+        }
+        .controls,
+        .footnote {
+          align-items: start;
+          flex-direction: column;
+        }
+        .window {
+          left: 12px;
+          right: 12px;
+        }
+        .companion {
+          width: 220px;
+        }
+        .fake-search {
+          display: none;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *:before {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <span class="mark">t</span> Tro <span class="tag" data-i18n="prototype"></span>
+      </div>
+      <div class="toolbar">
+        <select id="locale" aria-label="Language">
+          <option value="en">English</option>
+          <option value="vi">Tiếng Việt</option>
+        </select>
+        <button id="restart" data-i18n="restart"></button>
+      </div>
+    </header>
+    <main>
+      <div class="intro">
+        <div class="eyebrow" data-i18n="eyebrow"></div>
+        <h1 data-i18n="title"></h1>
+        <p data-i18n="subtitle"></p>
+      </div>
+      <div class="layout">
+        <section class="desktop" id="desktop" aria-label="Simulated desktop">
+          <div class="menu">
+            <strong>●</strong><b id="app-name">Finder</b><span data-i18n="file"></span
+            ><span data-i18n="edit"></span><span>09:41</span>
+          </div>
+          <div class="request">
+            <small data-i18n="requestLabel"></small><span id="request-text"></span>
+          </div>
+          <div class="empty" id="empty">
+            <div class="leaf">✳</div>
+            <p data-i18n="desktopHint"></p>
+          </div>
+          <div class="window" id="browser" hidden>
+            <div class="window-top">
+              <i class="dot"></i><i class="dot"></i><i class="dot"></i
+              ><span class="tab" id="tab-name"></span>
+            </div>
+            <div class="address-row">
+              <span class="nav">←</span><span class="nav">↻</span
+              ><input
+                id="address"
+                autocomplete="off"
+                spellcheck="false"
+                aria-label="Browser address bar"
+              />
+            </div>
+            <div class="browser-body">
+              <div class="new-tab" id="new-tab">
+                <strong data-i18n="newTab"></strong>
+                <div class="search-placeholder" data-i18n="searchHint"></div>
+              </div>
+              <div class="loading" id="loading" hidden>
+                <div>
+                  <div class="spinner"></div>
+                  <span data-i18n="loadingPage"></span>
+                </div>
+              </div>
+              <div id="youtube" hidden>
+                <div class="youtube-head">
+                  <div class="youtube-logo"><span>▶</span>YouTube</div>
+                  <div class="fake-search" data-i18n="search"></div>
+                </div>
+                <div class="videos">
+                  <div class="video">
+                    <div class="thumbnail">◒</div>
+                    <p data-i18n="video1"></p>
+                  </div>
+                  <div class="video">
+                    <div class="thumbnail">♫</div>
+                    <p data-i18n="video2"></p>
+                  </div>
+                  <div class="video">
+                    <div class="thumbnail">⌘</div>
+                    <p data-i18n="video3"></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="window" id="notes-window" hidden>
+            <div class="window-top">
+              <i class="dot"></i><i class="dot"></i><i class="dot"></i
+              ><span class="tab" data-i18n="notes"></span>
+            </div>
+            <div class="notes-body" data-i18n="notesContent"></div>
+          </div>
+          <div class="dock">
+            <button class="app" id="finder" aria-label="Finder">
+              <span class="finder">☺</span></button
+            ><button class="app" id="chrome" aria-label="Open Chrome">
+              <span class="chrome"></span></button
+            ><button class="app" id="notes" aria-label="Open Notes">
+              <span class="notes"></span>
+            </button>
+          </div>
+          <div class="companion" id="companion">
+            <div class="hud">
+              <svg
+                class="hud-icon"
+                viewBox="0 0 10 14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1"
+                aria-hidden="true"
+              >
+                <rect x="3" y="1" width="4" height="7" rx="2" />
+                <path d="M1 6v1a4 4 0 0 0 8 0V6M5 11v2" /></svg
+              ><span id="hud-status"></span>
+            </div>
+            <div class="message">
+              <p id="instruction"></p>
+            </div>
+          </div>
+        </section>
+        <aside class="sidebar">
+          <section class="card">
+            <h2 data-i18n="goalLabel"></h2>
+            <p class="goal" id="goal-title"></p>
+            <span class="badge" id="goal-status"></span>
+            <div class="row">
+              <span data-i18n="currentStep"></span><strong id="step-status"></strong>
+            </div>
+            <div class="expectation" id="expected"></div>
+          </section>
+          <section class="card">
+            <h2 data-i18n="route"></h2>
+            <div class="timeline">
+              <div class="milestone" data-step="launch">
+                <span class="number">1</span><span data-i18n="milestone1"></span>
+              </div>
+              <div class="milestone" data-step="focus">
+                <span class="number">2</span><span data-i18n="milestone2"></span>
+              </div>
+              <div class="milestone" data-step="type">
+                <span class="number">3</span><span data-i18n="milestone3"></span>
+              </div>
+              <div class="milestone" data-step="done">
+                <span class="number">4</span><span data-i18n="milestone4"></span>
+              </div>
+            </div>
+          </section>
+          <section class="card">
+            <h2 data-i18n="observer"></h2>
+            <div class="metrics">
+              <div class="metric">
+                <strong id="observations">1</strong><span data-i18n="observations"></span>
+              </div>
+              <div class="metric"><strong>0</strong><span data-i18n="realCalls"></span></div>
+            </div>
+            <div id="events" aria-live="polite"></div>
+          </section>
+        </aside>
+      </div>
+      <div class="controls">
+        <div class="hint" id="hint"></div>
+        <div class="toolbar">
+          <select id="goal-choice" aria-label="Goal">
+            <option value="youtube" data-i18n="goalYoutube"></option>
+            <option value="focus" data-i18n="goalFocus"></option></select
+          ><button id="noise" data-i18n="noise"></button>
+        </div>
+      </div>
+      <div class="footnote">
+        <span data-i18n="disclaimer"></span><span data-i18n="principle"></span>
+      </div>
+    </main>
+    <script>
+      /** Local interaction prototype. No capture, model calls or real navigation. */
+      const translations = {
+        en: {
+          prototype: 'Interactive concept',
+          eyebrow: 'Companion · Teaching flow',
+          title: 'A little guidance. The next reachable step.',
+          subtitle:
+            'Try the desktop below. The message stays with you while you click, type and navigate.',
+          restart: 'Restart demo',
+          file: 'File',
+          edit: 'Edit',
+          requestLabel: 'Your request',
+          requestYoutube: 'How do I open YouTube?',
+          requestFocus: 'Show me how to focus the address bar.',
+          desktopHint: 'Your desktop. You control the pointer.',
+          newTab: 'A fresh start',
+          searchHint: 'Search or enter an address',
+          search: 'Search',
+          loadingPage: 'Loading the destination…',
+          video1: 'A moment outdoors',
+          video2: 'Music for your afternoon',
+          video3: 'Learn something new',
+          notes: 'Notes',
+          notesContent: 'A different app opened. Tro will guide you back toward the same goal.',
+          stop: 'stop',
+          goalLabel: 'The original goal',
+          goalYoutube: 'Open YouTube',
+          goalFocus: 'Focus the address bar only',
+          currentStep: 'Current step',
+          route: 'The reachable route',
+          milestone1: 'Open the browser',
+          milestone2: 'Focus the address bar',
+          milestone3: 'Type the address & press Enter',
+          milestone4: 'Verify the destination',
+          observer: 'Behind the guidance',
+          observations: 'Simulated observations',
+          realCalls: 'Real model calls',
+          noise: 'Simulate irrelevant change',
+          disclaimer:
+            'Interactive prototype · Deterministic simulated observations · No screen capture or network requests',
+          principle: 'Activity asks us to look. Evidence decides what is done.',
+          waiting: 'Waiting for you',
+          observing: 'Checking the result',
+          finished: 'Goal reached',
+          canceled: 'Guidance stopped',
+          incomplete: 'Not finished yet',
+          complete: 'Complete',
+          stopped: 'Canceled with Escape',
+          instructionLabel: 'Your next step',
+          doneLabel: 'You’re there',
+          waitingLabel: 'Same step · waiting',
+          step: 'Step',
+          expectedLaunch: 'Expected: a browser window becomes visible.',
+          expectedFocus: 'Expected: the address field has keyboard focus.',
+          expectedType: 'Expected: YouTube loads after you submit its address.',
+          expectedLoading: 'Typing is progress. The destination still needs to load.',
+          expectedDone: 'Fresh page evidence satisfies the original goal.',
+          expectedFocusDone: 'The field is focused. That is the whole requested goal.',
+          expectedCanceled: 'Ordinary clicks do not cancel. Escape does.',
+          launch: 'Click Chrome in the Dock to open your browser.',
+          focus: 'Click the address bar at the top of the browser.',
+          type: 'Type youtube.com, then press Enter.',
+          loading: 'The address is submitted. Wait for YouTube to load.',
+          done: 'YouTube is open. You’re all set!',
+          focusDone: 'The address bar is focused. You can type here now.',
+          wrong: 'That opened Notes. Click Chrome in the Dock to open the browser.',
+          wrongAddress:
+            'That address does not lead to YouTube. Type youtube.com, then press Enter.',
+          cancelMessage: 'Guidance stopped. Restart whenever you want to try again.',
+          hintLaunch: 'Click Chrome to begin. Try Notes to see how Tro recovers from a wrong app.',
+          hintFocus:
+            'Click inside the address bar. Watch the instruction advance without repeating the cue.',
+          hintType: 'Type youtube.com and press Enter. Partial typing keeps the same step active.',
+          hintLoading: 'Loading is not completion. The observer waits for the destination.',
+          hintDone:
+            'The goal is verified. Try the one-action goal to compare how completion works.',
+          hintCanceled: 'Use Restart demo to begin a new lesson.',
+          eventInitial: 'Initial state observed. Goal and first step defined.',
+          eventBrowser: 'Browser visible → step reached; goal incomplete.',
+          eventFocus: 'Address field focused → step reached.',
+          eventInput: 'Settled typing observed → current step still pending.',
+          eventNavigation: 'Navigation started → awaiting destination evidence.',
+          eventLoaded: 'YouTube visible → original goal reached.',
+          eventWrong: 'Notes visible → deviated; recovery admitted.',
+          eventWrongAddress: 'Different address → goal incomplete; correction shown.',
+          eventNoise: 'Unrelated change → no step advance, no repeated cue.',
+          eventCancel: 'Escape → lesson canceled; pending timers cleared.',
+          eventLocale: 'Locale changed → same goal and step retained.',
+          eventFocusGoal: 'Focused field → single-action goal reached.',
+          progressPending: 'Pending',
+          progressReached: 'Reached',
+          progressRecovery: 'Recovery',
+          progressLoading: 'Waiting for page',
+        },
+        vi: {
+          prototype: 'Bản mẫu tương tác',
+          eyebrow: 'Người bạn đồng hành · Hướng dẫn',
+          title: 'Một lời chỉ dẫn. Từng bước vừa tầm.',
+          subtitle:
+            'Thử màn hình bên dưới. Lời hướng dẫn luôn ở cạnh bạn khi bấm, nhập và chuyển trang.',
+          restart: 'Thử lại từ đầu',
+          file: 'Tệp',
+          edit: 'Sửa',
+          requestLabel: 'Yêu cầu của bạn',
+          requestYoutube: 'Làm sao để mở YouTube?',
+          requestFocus: 'Chỉ mình cách chọn thanh địa chỉ.',
+          desktopHint: 'Màn hình của bạn. Bạn điều khiển con trỏ.',
+          newTab: 'Bắt đầu nào',
+          searchHint: 'Tìm kiếm hoặc nhập địa chỉ',
+          search: 'Tìm kiếm',
+          loadingPage: 'Đang tải trang…',
+          video1: 'Một chút thiên nhiên',
+          video2: 'Nhạc cho buổi chiều',
+          video3: 'Học điều mới',
+          notes: 'Ghi chú',
+          notesContent: 'Bạn vừa mở ứng dụng khác. Tro sẽ chỉ lại đường đến mục tiêu ban đầu.',
+          stop: 'dừng',
+          goalLabel: 'Mục tiêu ban đầu',
+          goalYoutube: 'Mở YouTube',
+          goalFocus: 'Chỉ chọn thanh địa chỉ',
+          currentStep: 'Bước hiện tại',
+          route: 'Từng bước đến mục tiêu',
+          milestone1: 'Mở trình duyệt',
+          milestone2: 'Chọn thanh địa chỉ',
+          milestone3: 'Nhập địa chỉ rồi nhấn Enter',
+          milestone4: 'Kiểm tra trang đích',
+          observer: 'Phía sau lời hướng dẫn',
+          observations: 'Lượt quan sát mô phỏng',
+          realCalls: 'Lượt gọi mô hình thật',
+          noise: 'Mô phỏng thay đổi không liên quan',
+          disclaimer:
+            'Bản mẫu tương tác · Quan sát được mô phỏng · Không chụp màn hình hay gửi yêu cầu mạng',
+          principle: 'Thao tác báo hiệu cần nhìn lại. Kết quả cho biết đã xong chưa.',
+          waiting: 'Đang chờ bạn',
+          observing: 'Đang kiểm tra kết quả',
+          finished: 'Đã đạt mục tiêu',
+          canceled: 'Đã dừng hướng dẫn',
+          incomplete: 'Chưa hoàn tất',
+          complete: 'Hoàn tất',
+          stopped: 'Đã dừng bằng Escape',
+          instructionLabel: 'Bước tiếp theo của bạn',
+          doneLabel: 'Xong rồi!',
+          waitingLabel: 'Vẫn bước này · đang chờ',
+          step: 'Bước',
+          expectedLaunch: 'Kết quả cần thấy: cửa sổ trình duyệt xuất hiện.',
+          expectedFocus: 'Kết quả cần thấy: thanh địa chỉ nhận bàn phím.',
+          expectedType: 'Kết quả cần thấy: trang YouTube mở sau khi gửi địa chỉ.',
+          expectedLoading: 'Nhập địa chỉ là tiến bộ. Vẫn cần chờ trang tải xong.',
+          expectedDone: 'Trang hiện tại đáp ứng mục tiêu ban đầu.',
+          expectedFocusDone: 'Thanh địa chỉ đã được chọn. Đó là toàn bộ yêu cầu.',
+          expectedCanceled: 'Bấm chuột không hủy hướng dẫn. Escape mới hủy.',
+          launch: 'Bấm vào Chrome ở Dock để mở trình duyệt nhé.',
+          focus: 'Bấm vào thanh địa chỉ ở phía trên trình duyệt.',
+          type: 'Nhập youtube.com rồi nhấn Enter nhé.',
+          loading: 'Đã gửi địa chỉ. Chờ YouTube tải xong nhé.',
+          done: 'YouTube đã mở rồi. Xong nhé!',
+          focusDone: 'Thanh địa chỉ đã được chọn. Bạn có thể nhập ở đây.',
+          wrong: 'Bạn vừa mở Ghi chú. Bấm Chrome ở Dock để mở trình duyệt nhé.',
+          wrongAddress: 'Địa chỉ đó chưa dẫn đến YouTube. Nhập youtube.com rồi nhấn Enter nhé.',
+          cancelMessage: 'Hướng dẫn đã dừng. Bạn có thể thử lại bất cứ lúc nào.',
+          hintLaunch: 'Bấm Chrome để bắt đầu. Thử Ghi chú để xem Tro chỉ lại khi mở nhầm ứng dụng.',
+          hintFocus: 'Bấm vào thanh địa chỉ. Lời hướng dẫn tiến tiếp mà không lặp lại vòng tròn.',
+          hintType:
+            'Nhập youtube.com rồi nhấn Enter. Khi chưa nhập xong, bước hiện tại vẫn được giữ.',
+          hintLoading: 'Đang tải chưa có nghĩa là xong. Tro chờ kết quả trang đích.',
+          hintDone: 'Mục tiêu đã được kiểm tra. Thử mục tiêu một bước để so sánh khi nào hoàn tất.',
+          hintCanceled: 'Bấm Thử lại từ đầu để bắt đầu hướng dẫn mới.',
+          eventInitial: 'Đã quan sát ban đầu. Xác định mục tiêu và bước đầu.',
+          eventBrowser: 'Thấy trình duyệt → xong một bước; chưa đạt mục tiêu.',
+          eventFocus: 'Thanh địa chỉ được chọn → hoàn tất một bước.',
+          eventInput: 'Quan sát sau khi nhập → bước hiện tại vẫn đang chờ.',
+          eventNavigation: 'Bắt đầu chuyển trang → chờ kết quả trang đích.',
+          eventLoaded: 'Thấy YouTube → đạt mục tiêu ban đầu.',
+          eventWrong: 'Thấy Ghi chú → đi lệch; chỉ bước sửa lại.',
+          eventWrongAddress: 'Địa chỉ khác → chưa đạt mục tiêu; chỉ cách sửa.',
+          eventNoise: 'Thay đổi không liên quan → không tiến bước, không lặp vòng tròn.',
+          eventCancel: 'Escape → dừng hướng dẫn; xóa lịch chờ.',
+          eventLocale: 'Đổi ngôn ngữ → giữ nguyên mục tiêu và bước.',
+          eventFocusGoal: 'Thanh địa chỉ được chọn → đạt mục tiêu một bước.',
+          progressPending: 'Đang chờ',
+          progressReached: 'Đã đạt',
+          progressRecovery: 'Chỉ lại',
+          progressLoading: 'Chờ tải trang',
+        },
+      };
+      /** @param {string} id @returns {HTMLElement} */
+      function element(id) {
+        const found = document.getElementById(id);
+        if (!found) {
+          throw new Error(`Missing demo element: ${id}`);
+        }
+        return found;
+      }
+      const address = element('address');
+      const localeControl = element('locale');
+      const goalControl = element('goal-choice');
+      if (
+        !(address instanceof HTMLInputElement) ||
+        !(localeControl instanceof HTMLSelectElement) ||
+        !(goalControl instanceof HTMLSelectElement)
+      ) {
+        throw new Error('Invalid demo controls');
+      }
+      let locale = 'en';
+      let state = 'launch';
+      let goal = 'youtube';
+      let recovery = false;
+      let wrongAddress = false;
+      let observations = 1;
+      let generation = 0;
+      let currentMessage = '';
+      /** @type {number | undefined} */ let revealTimer;
+      /** @type {number | undefined} */ let fadeTimer;
+      /** @type {number | undefined} */ let inputTimer;
+      /** @type {number | undefined} */ let navigationTimer;
+      /** @type {string[]} */ let eventKeys = ['eventInitial'];
+      /** @param {string} key @returns {string} */
+      function text(key) {
+        const dictionary = locale === 'vi' ? translations.vi : translations.en;
+        return Object.prototype.hasOwnProperty.call(dictionary, key)
+          ? Reflect.get(dictionary, key)
+          : key;
+      }
+      /** @param {string} key @returns {void} */
+      function logEvent(key) {
+        eventKeys.push(key);
+        eventKeys = eventKeys.slice(-6);
+        renderEvents();
+      }
+      /** Reveal only new messages; ordinary progress updates never restart the text. */
+      /** @param {string} message @returns {void} */
+      function showInstruction(message) {
+        if (message === currentMessage) {
+          return;
+        }
+        currentMessage = message;
+        window.clearInterval(revealTimer);
+        window.clearTimeout(fadeTimer);
+        const bubble = element('instruction').parentElement;
+        bubble?.classList.remove('faded');
+        const paragraph = element('instruction');
+        paragraph.dataset.message = message;
+        paragraph.setAttribute('aria-label', message);
+        const visibleText = document.createElement('span');
+        visibleText.setAttribute('aria-hidden', 'true');
+        paragraph.replaceChildren(visibleText);
+        const words = message.split(/\s+/);
+        let count = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? words.length
+          : 1;
+        visibleText.textContent = words.slice(0, count).join(' ');
+        if (count < words.length) {
+          revealTimer = window.setInterval(() => {
+            count += 1;
+            visibleText.textContent = words.slice(0, count).join(' ');
+            if (count >= words.length) {
+              window.clearInterval(revealTimer);
+            }
+          }, 90);
+        }
+        if (state === 'done') {
+          const revealDurationMs = (words.length - count) * 90;
+          const completionGeneration = generation;
+          fadeTimer = window.setTimeout(() => {
+            if (
+              state === 'done' &&
+              completionGeneration === generation &&
+              currentMessage === message
+            ) {
+              bubble?.classList.add('faded');
+            }
+          }, revealDurationMs + 2000);
+        }
+      }
+
+      function renderEvents() {
+        element('events').replaceChildren(
+          ...eventKeys.map((key) => {
+            const line = document.createElement('div');
+            line.textContent = `· ${text(key)}`;
+            return line;
+          }),
+        );
+        element('events').scrollTop = element('events').scrollHeight;
+        element('observations').textContent = String(observations);
+      }
+      /** @param {string} next @returns {void} */
+      function transition(next) {
+        state = next;
+        render();
+      }
+      function positionCompanion() {
+        const desktop = element('desktop');
+        const panel = element('companion');
+        const bounds = desktop.getBoundingClientRect();
+        const target = (
+          state === 'launch' ? element('chrome') : element('browser')
+        ).getBoundingClientRect();
+        let left = state === 'launch' ? target.left - bounds.left + 65 : 46;
+        let top = state === 'launch' ? target.top - bounds.top - panel.offsetHeight - 23 : 244;
+        if (state === 'done' || state === 'canceled') {
+          left = (bounds.width - panel.offsetWidth) / 2;
+          top = 305;
+        }
+        panel.style.left = `${Math.max(12, Math.min(left, bounds.width - panel.offsetWidth - 12))}px`;
+        panel.style.top = `${Math.max(115, Math.min(top, bounds.height - panel.offsetHeight - 14))}px`;
+      }
+      function render() {
+        document.documentElement.lang = locale;
+        document.querySelectorAll('[data-i18n]').forEach((node) => {
+          if (node instanceof HTMLElement) {
+            node.textContent = text(node.dataset.i18n ?? '');
+          }
+        });
+        const finished = state === 'done';
+        const canceled = state === 'canceled';
+        const active = !finished && !canceled;
+        const stepNumber =
+          state === 'launch'
+            ? 1
+            : state === 'focus'
+              ? 2
+              : state === 'done'
+                ? goal === 'focus'
+                  ? 2
+                  : 4
+                : 3;
+        element('request-text').textContent = text(
+          goal === 'focus' ? 'requestFocus' : 'requestYoutube',
+        );
+        element('goal-title').textContent = text(goal === 'focus' ? 'goalFocus' : 'goalYoutube');
+        element('goal-status').textContent = text(
+          finished ? 'complete' : canceled ? 'stopped' : 'incomplete',
+        );
+        element('goal-status').classList.toggle('done', finished);
+        element('hud-status').textContent =
+          locale === 'vi'
+            ? finished
+              ? 'Xong'
+              : canceled
+                ? 'Đã dừng'
+                : state === 'loading'
+                  ? 'Suy nghĩ…'
+                  : 'Chờ bạn…'
+            : finished
+              ? 'Done'
+              : canceled
+                ? 'Stopped'
+                : state === 'loading'
+                  ? 'Thinking…'
+                  : 'Waiting…';
+        showInstruction(
+          text(
+            canceled
+              ? 'cancelMessage'
+              : finished
+                ? goal === 'focus'
+                  ? 'focusDone'
+                  : 'done'
+                : recovery
+                  ? 'wrong'
+                  : wrongAddress
+                    ? 'wrongAddress'
+                    : state,
+          ),
+        );
+        element('expected').textContent = text(
+          canceled
+            ? 'expectedCanceled'
+            : finished
+              ? goal === 'focus'
+                ? 'expectedFocusDone'
+                : 'expectedDone'
+              : state === 'launch'
+                ? 'expectedLaunch'
+                : state === 'focus'
+                  ? 'expectedFocus'
+                  : state === 'loading'
+                    ? 'expectedLoading'
+                    : 'expectedType',
+        );
+        element('step-status').textContent = text(
+          finished
+            ? 'progressReached'
+            : state === 'loading'
+              ? 'progressLoading'
+              : recovery || wrongAddress
+                ? 'progressRecovery'
+                : 'progressPending',
+        );
+        element('hint').textContent = text(
+          canceled
+            ? 'hintCanceled'
+            : finished
+              ? 'hintDone'
+              : state === 'launch'
+                ? 'hintLaunch'
+                : state === 'focus'
+                  ? 'hintFocus'
+                  : state === 'loading'
+                    ? 'hintLoading'
+                    : 'hintType',
+        );
+        element('chrome').classList.toggle('cued', state === 'launch' && active);
+        address.classList.toggle('cued', state === 'focus' && active);
+        element('tab-name').textContent =
+          finished && goal === 'youtube' ? 'YouTube' : text('newTab');
+        address.placeholder = text('searchHint');
+        address.setAttribute(
+          'aria-label',
+          locale === 'vi' ? 'Thanh địa chỉ trình duyệt' : 'Browser address bar',
+        );
+        localeControl.setAttribute('aria-label', locale === 'vi' ? 'Ngôn ngữ' : 'Language');
+        goalControl.setAttribute('aria-label', text('goalLabel'));
+        element('chrome').setAttribute('aria-label', locale === 'vi' ? 'Mở Chrome' : 'Open Chrome');
+        element('notes').setAttribute('aria-label', text('notes'));
+        document.querySelectorAll('.milestone').forEach((node, index) => {
+          if (node instanceof HTMLElement) {
+            const reached =
+              !canceled && (finished ? index < (goal === 'focus' ? 2 : 4) : index < stepNumber - 1);
+            node.classList.toggle('complete', reached);
+            node.classList.toggle('active', active && index === stepNumber - 1);
+            const number = node.querySelector('.number');
+            if (number) {
+              number.textContent = reached ? '✓' : String(index + 1);
+            }
+            node.hidden = goal === 'focus' && index > 1;
+          }
+        });
+        renderEvents();
+        positionCompanion();
+      }
+      function reset() {
+        window.clearTimeout(fadeTimer);
+        element('instruction').parentElement?.classList.remove('faded');
+        generation += 1;
+        window.clearTimeout(inputTimer);
+        window.clearTimeout(navigationTimer);
+        address.blur();
+        address.value = '';
+        address.disabled = false;
+        state = 'launch';
+        recovery = false;
+        wrongAddress = false;
+        observations = 1;
+        eventKeys = ['eventInitial'];
+        element('browser').hidden = true;
+        element('notes-window').hidden = true;
+        element('empty').hidden = false;
+        element('new-tab').hidden = false;
+        element('youtube').hidden = true;
+        element('loading').hidden = true;
+        element('app-name').textContent = 'Finder';
+        render();
+      }
+      function openBrowser() {
+        if (state === 'done' || state === 'canceled' || state === 'loading') {
+          return;
+        }
+        if (!element('browser').hidden && !recovery) {
+          return;
+        }
+        element('browser').hidden = false;
+        element('notes-window').hidden = true;
+        element('empty').hidden = true;
+        element('app-name').textContent = 'Chrome';
+        recovery = false;
+        observations += 1;
+        logEvent('eventBrowser');
+        transition('focus');
+      }
+      element('chrome').addEventListener('click', openBrowser);
+      function openWrongApp() {
+        if (state === 'done' || state === 'canceled' || state === 'loading') {
+          return;
+        }
+        window.clearTimeout(inputTimer);
+        element('browser').hidden = true;
+        element('notes-window').hidden = false;
+        element('empty').hidden = true;
+        element('app-name').textContent = text('notes');
+        recovery = true;
+        wrongAddress = false;
+        observations += 1;
+        logEvent('eventWrong');
+        transition('launch');
+      }
+      element('notes').addEventListener('click', openWrongApp);
+      element('finder').addEventListener('click', () => {
+        if (state !== 'done' && state !== 'canceled') {
+          logEvent('eventNoise');
+        }
+      });
+      address.addEventListener('focus', () => {
+        if (state !== 'focus') {
+          return;
+        }
+        observations += 1;
+        logEvent('eventFocus');
+        if (goal === 'focus') {
+          logEvent('eventFocusGoal');
+          transition('done');
+        } else {
+          transition('type');
+        }
+      });
+      address.addEventListener('input', () => {
+        if (state !== 'type') {
+          return;
+        }
+        window.clearTimeout(inputTimer);
+        wrongAddress = false;
+        render();
+        const currentGeneration = generation;
+        inputTimer = window.setTimeout(() => {
+          if (currentGeneration !== generation || state !== 'type') {
+            return;
+          }
+          observations += 1;
+          logEvent('eventInput');
+        }, 500);
+      });
+      address.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' || state !== 'type') {
+          return;
+        }
+        event.preventDefault();
+        window.clearTimeout(inputTimer);
+        observations += 1;
+        const destination = address.value.trim().toLowerCase();
+        if (
+          ![
+            'youtube.com',
+            'www.youtube.com',
+            'https://youtube.com',
+            'https://www.youtube.com',
+            'https://www.youtube.com/',
+          ].includes(destination)
+        ) {
+          wrongAddress = true;
+          logEvent('eventWrongAddress');
+          render();
+          return;
+        }
+        wrongAddress = false;
+        address.disabled = true;
+        element('new-tab').hidden = true;
+        element('loading').hidden = false;
+        logEvent('eventNavigation');
+        transition('loading');
+        const currentGeneration = generation;
+        navigationTimer = window.setTimeout(() => {
+          if (currentGeneration !== generation || state !== 'loading') {
+            return;
+          }
+          element('loading').hidden = true;
+          element('youtube').hidden = false;
+          address.value = 'https://www.youtube.com';
+          address.disabled = false;
+          observations += 1;
+          logEvent('eventLoaded');
+          transition('done');
+        }, 1800);
+      });
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape' || state === 'done' || state === 'canceled') {
+          return;
+        }
+        generation += 1;
+        window.clearTimeout(inputTimer);
+        window.clearTimeout(navigationTimer);
+        address.disabled = false;
+        element('loading').hidden = true;
+        if (element('youtube').hidden) {
+          element('new-tab').hidden = false;
+        }
+        logEvent('eventCancel');
+        transition('canceled');
+      });
+      element('noise').addEventListener('click', () => {
+        logEvent('eventNoise');
+      });
+      element('restart').addEventListener('click', reset);
+      localeControl.addEventListener('change', () => {
+        locale = localeControl.value === 'vi' ? 'vi' : 'en';
+        logEvent('eventLocale');
+        render();
+      });
+      goalControl.addEventListener('change', () => {
+        goal = goalControl.value === 'focus' ? 'focus' : 'youtube';
+        reset();
+      });
+      window.addEventListener('resize', positionCompanion);
+      render();
+    </script>
+  </body>
+</html>

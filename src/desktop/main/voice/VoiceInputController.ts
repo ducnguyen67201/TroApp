@@ -56,7 +56,15 @@ export class VoiceInputController {
   private capture: ActiveCapture | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private generation = 0;
-  private running = false;
+  private running = 0;
+  private lessonAnswerAllowed = false;
+
+  setLessonAnswerAllowed(allowed: boolean): void {
+    this.lessonAnswerAllowed = allowed;
+    if (this.running > 0 && !this.capture && this.status.state === VoiceState.RUNNING && allowed) {
+      this.setState(VoiceState.IDLE);
+    }
+  }
 
   constructor(
     private readonly dependencies: VoiceDependencies,
@@ -96,7 +104,7 @@ export class VoiceInputController {
     if (
       this.status.state !== VoiceState.IDLE ||
       this.capture ||
-      this.running ||
+      (this.running > 0 && !this.lessonAnswerAllowed) ||
       this.dependencies.isAgentBusy()
     ) {
       return { kind: 'failed' };
@@ -310,7 +318,7 @@ export class VoiceInputController {
       }
       return;
     }
-    this.running = true;
+    this.running += 1;
     this.setState(VoiceState.RUNNING);
     this.dependencies.emit({ kind: 'admitting', captureId: capture.id });
     try {
@@ -355,9 +363,11 @@ export class VoiceInputController {
         this.dependencies.emit({ kind: 'failed' });
       }
     } finally {
-      this.running = false;
+      this.running -= 1;
       if (this.status.state !== VoiceState.DISABLED) {
-        this.setState(VoiceState.IDLE);
+        this.setState(
+          this.running > 0 && !this.lessonAnswerAllowed ? VoiceState.RUNNING : VoiceState.IDLE,
+        );
       }
     }
   }
