@@ -20,6 +20,13 @@ display scan-out. Live hardware presentation still requires a desktop smoke chec
 
 ## Product behavior and rules
 
+[HUD voiceover](HudVoiceoverSpec.md) reads accepted instructions,
+questions and completion bubbles using ElevenLabs in the same application locale.
+Speech begins when audio is available after a matching message-visible signal;
+the bubble remains visible during narration. It is optional presentation and does
+not change drawing admission, receipts or teaching completion. Microphone capture
+and relevant preview interruption stop narration. Live provider and signed playback acceptance remain unverified.
+
 The bright companion leads the student's attention across the desktop. The
 student keeps control of the real cursor and can move it to follow the guide.
 While idle, the companion follows beside that cursor. While teaching, it leaves

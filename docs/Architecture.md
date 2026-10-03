@@ -185,6 +185,17 @@ for ownership, retired behavior and manual acceptance limits.
 
 `DesktopCompanion` is the main-process entry point for desktop presentation. It composes `cursor` (the authenticated chat controller’s following port) and `hud` (`CompanionHudController`) through explicit injected ports. It checks presentation access, registers the HUD before cursor binding, and fences pending startup on disposal. The chat controller retains ownership of its shared cursor/task worker; the facade owns presentation cleanup. `CompanionHudController` reduces capture and worker progress events in Electron main. A narrow meter IPC accepts finite, capture-bound levels from the existing PCM stream. `CompanionHudClient` owns a persistent presentation utility worker, separate from task orchestration, and coalesces snapshots through Cua MCP. Both workers receive the same main-owned `DesktopDriverConnection` from `EmbeddedDesktopDriver`; neither starts an independent daemon. The embedded host survives task-worker replacement and stops when main quits, while both sessions clear on sign-out or window close. The native compositor owns the passive 88 × 22 pill, waveform smoothing, crossfades and primary-display placement. Private group registration binds only Tro cursors; bounded leases and native session cleanup prevent orphaned presentation. The model cannot discover or call HUD host tools. VoiceInputController remains the sole final-transcript submitter.
 
+## HUD voiceover
+
+HUD narration uses ElevenLabs through an authenticated backend voiceover
+feature, with keys, model/voice selection and paid usage admission owned by the
+backend. A dedicated desktop voiceover controller composes with chat; private
+native installed-message reads coordinate bounded renderer audio playback with
+visible localized guidance. Speech does not supply completion evidence. See the
+[voiceover specification](companion/HudVoiceoverSpec.md) and
+[engineering design](companion/HudVoiceoverEngineering.md). Local wiring is implemented; live provider and signed
+hardware acceptance remain unverified.
+
 ## Task completion
 
 The utility worker creates a TaskHarness for each original request, immutable natural-language goal and task locale. The harness owns lifecycle, explicit verification scheduling, one continuation and final settlement. MainAgentRunner owns actor SDK history; a bounded evidence store retains actual text/images from both agents in memory. When the main agent believes its work is finished, its `verify_task` tool invokes a separate read-only SDK agent sequentially. That agent judges the request against actual observations and can make targeted read-only checks. CompletionGate validates one consistent decision, criterion coverage, evidence provenance, capture age and supersession, then accepts final output only when it references that current stored verdict. Response mode cannot bypass verification after any desktop tool use. One optional continuation retains the original history, goal and locale. Both agents share deadlines and tool limits, with bounded verifier attempts and model turns. Public contracts carry outcome counts and a limitation for typed and voice results. See [AgentHarnessSpec.md](agent/AgentHarnessSpec.md) and [TaskCompletionSpec.md](agent/TaskCompletionSpec.md) for file ownership, model-versus-code responsibilities and validation limits.

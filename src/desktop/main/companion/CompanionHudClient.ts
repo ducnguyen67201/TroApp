@@ -1,3 +1,4 @@
+import type { TeachingMessage } from '#contracts/TeachingStep.js';
 import { randomUUID } from 'node:crypto';
 import { utilityProcess, type UtilityProcess } from 'electron';
 import { CompanionHudPhase, type CompanionHudSnapshot } from '#contracts/CompanionHud.js';
@@ -29,6 +30,7 @@ export class CompanionHudClient implements CompanionPresentationPort {
   constructor(
     private readonly workerEntryPath: string,
     private readonly desktopDriver: DesktopDriverPort,
+    private readonly receiveMessage?: (message: TeachingMessage | null) => void,
   ) {}
 
   start(): Promise<void> {
@@ -87,7 +89,11 @@ export class CompanionHudClient implements CompanionPresentationPort {
           return;
         }
         const reply = CompanionHudWorkerReplySchema.safeParse(message);
-        if (reply.success) {
+        if (reply.success && 'kind' in reply.data) {
+          this.receiveMessage?.(reply.data.message);
+          return;
+        }
+        if (reply.success && 'ready' in reply.data) {
           if (reply.data.ready) {
             this.attempts = 0;
             child.postMessage({ kind: 'snapshot', snapshot: this.latest });
@@ -100,6 +106,7 @@ export class CompanionHudClient implements CompanionPresentationPort {
       child.once('exit', () => {
         finish();
         if (this.worker === child) {
+          this.receiveMessage?.(null);
           this.worker = null;
           this.scheduleReconnect();
         }
@@ -128,6 +135,7 @@ export class CompanionHudClient implements CompanionPresentationPort {
   }
 
   dispose(): void {
+    this.receiveMessage?.(null);
     this.enabled = false;
     this.generation += 1;
     this.attempts = 0;

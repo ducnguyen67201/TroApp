@@ -12,6 +12,11 @@ export interface ServerEnv {
   GOOGLE_CLIENT_ID?: string | undefined;
   GOOGLE_CLIENT_SECRET?: string | undefined;
   OPENAI_API_KEY?: string | undefined;
+  ELEVENLABS_API_KEY?: string | undefined;
+  ELEVENLABS_MODEL_ID: string;
+  VOICEOVER_DAILY_CHARACTERS: number;
+  VOICEOVER_GLOBAL_DAILY_CHARACTERS: number;
+  VOICEOVER_GLOBAL_STREAMS: number;
 }
 
 /** Startup owns loading .env; this module only validates supplied values. */
@@ -27,6 +32,16 @@ export function readServerEnv(environment: NodeJS.ProcessEnv): ServerEnv {
       GOOGLE_CLIENT_ID: z.string().min(1).optional(),
       GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
       OPENAI_API_KEY: z.string().min(20).optional(),
+      ELEVENLABS_API_KEY: z.string().min(1).optional(),
+      ELEVENLABS_MODEL_ID: z.enum(['eleven_flash_v2_5', 'eleven_v3']).default('eleven_flash_v2_5'),
+      VOICEOVER_DAILY_CHARACTERS: z.coerce.number().int().positive().max(1000000).default(30000),
+      VOICEOVER_GLOBAL_DAILY_CHARACTERS: z.coerce
+        .number()
+        .int()
+        .positive()
+        .max(100000000)
+        .default(1000000),
+      VOICEOVER_GLOBAL_STREAMS: z.coerce.number().int().positive().max(1000).default(20),
     },
     runtimeEnv: environment,
     onValidationError: () => {

@@ -15,12 +15,20 @@ import type {
   PermissionArea,
 } from './DesktopPermissions.js';
 import type { AppUpdateReply, AppUpdateSnapshot } from './AppUpdate.js';
+import type { VoiceoverAck, VoiceoverPlayback, VoiceoverStatus } from './Voiceover.js';
 
 /** Named capabilities available to React through Electron preload.
  * The agent chooses computer actions inside its worker; React only sends chat
  * turns and controls the worker lifecycle.
  */
 export interface DesktopBridge {
+  subscribeVoiceover?: (
+    listener: (event: VoiceoverPlayback | VoiceoverStatus) => void,
+  ) => () => void;
+  acknowledgeVoiceover?: (ack: VoiceoverAck) => Promise<void>;
+  setVoiceoverEnabled?: (enabled: boolean, locale: DesktopLocale) => Promise<void>;
+  stopSpeaking?: () => Promise<boolean>;
+  cancelGuidance?: () => Promise<void>;
   updateTeachingLocale?: (sessionId: string, locale: DesktopLocale) => Promise<AgentResult>;
   readAppUpdate(): Promise<AppUpdateSnapshot>;
   checkAppUpdate(): Promise<AppUpdateReply>;

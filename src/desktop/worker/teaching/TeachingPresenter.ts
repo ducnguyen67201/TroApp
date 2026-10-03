@@ -29,6 +29,8 @@ export class TeachingPresenter {
     private readonly log: Logger,
     private readonly publish: (message: TeachingMessage) => void,
     private readonly assertCanCommit: () => void = () => {},
+    private readonly prepareMessage: (message: TeachingMessage) => void = () => {},
+    private readonly revokeMessage: (message: TeachingMessage) => void = () => {},
   ) {}
 
   beginSegment(): void {
@@ -62,65 +64,77 @@ export class TeachingPresenter {
     // Input may arrive while native rendering is pending. Stage the matcher for
     // this action; history records approximate attempts, not proof of visibility.
     this.tracker.registerStep(message.stepId, geometry.interaction);
-    const native = await this.server.showTeachingCue(
-      {
-        capture_id: proposal.captureId,
-        presentation_version: 2,
-        presentation_id: presentationId,
-        text_only: textOnly,
-        steps: geometry.steps,
-        targets: geometry.targets,
-      },
-      message,
-      locale,
-    );
-    this.assertCanCommit();
-    const parsed = CursorGuidanceResultSchema.safeParse(native.structuredContent);
-    if (
-      native.isError ||
-      !parsed.success ||
-      parsed.data.status !== 'presented' ||
-      parsed.data.receipt.presentation_id !== presentationId ||
-      parsed.data.receipt.lesson_id !== this.lesson.id ||
-      parsed.data.receipt.step_id !== message.stepId ||
-      parsed.data.receipt.text_only !== textOnly ||
-      (!textOnly && !parsed.data.receipt.drawing_presented)
-    ) {
-      this.tracker.invalidateTarget();
-      const refusal = z.object({ code: z.string().max(160) }).safeParse(native.structuredContent);
-      return this.refuse(
-        proposal,
-        refusal.success ? refusal.data.code : 'paired_presentation_missing',
+    this.prepareMessage(message);
+    let published = false;
+    try {
+      const native = await this.server.showTeachingCue(
+        {
+          capture_id: proposal.captureId,
+          presentation_version: 2,
+          presentation_id: presentationId,
+          text_only: textOnly,
+          steps: geometry.steps,
+          targets: geometry.targets,
+        },
+        message,
+        locale,
       );
+      this.assertCanCommit();
+      const parsed = CursorGuidanceResultSchema.safeParse(native.structuredContent);
+      if (
+        native.isError ||
+        !parsed.success ||
+        parsed.data.status !== 'presented' ||
+        parsed.data.receipt.presentation_id !== presentationId ||
+        parsed.data.receipt.lesson_id !== this.lesson.id ||
+        parsed.data.receipt.step_id !== message.stepId ||
+        parsed.data.receipt.text_only !== textOnly ||
+        (!textOnly && !parsed.data.receipt.drawing_presented)
+      ) {
+        this.tracker.invalidateTarget();
+        const refusal = z.object({ code: z.string().max(160) }).safeParse(native.structuredContent);
+        return this.refuse(
+          proposal,
+          refusal.success ? refusal.data.code : 'paired_presentation_missing',
+        );
+      }
+      const interrupted = parsed.data.receipt.interrupted;
+      const receipt = TeachingPresentationReceiptSchema.parse({
+        lessonId: this.lesson.id,
+        stepId: message.stepId,
+        presentationId,
+        goalRevisionId: proposal.goalRevisionId,
+        captureId: proposal.captureId,
+        messagePresented: true,
+        drawingPresented: !textOnly,
+        textOnly,
+        interrupted,
+      });
+      this.lesson.commitPresentedStep(proposal, receipt, message);
+      this.tracker.registerStep(message.stepId, geometry.interaction);
+      this.receipt = receipt;
+      this.budget.confirm();
+      if (!interrupted) {
+        this.publish(message);
+        published = true;
+      }
+      this.log.debug(
+        { ...describeTeachingProposal(proposal), ...receipt },
+        'agent.teaching.presentation.acknowledged',
+      );
+      logAgentExchange(this.log, {
+        operation: 'teaching.presentation',
+        context: { lessonId: this.lesson.id },
+        input: proposal,
+        output: receipt,
+      });
+      return { admitted: true, ...receipt };
+    } finally {
+      // Pending narration may already be playing before the final receipt arrives.
+      if (!published) {
+        this.revokeMessage(message);
+      }
     }
-    const interrupted = parsed.data.receipt.interrupted;
-    const receipt = TeachingPresentationReceiptSchema.parse({
-      lessonId: this.lesson.id,
-      stepId: message.stepId,
-      presentationId,
-      goalRevisionId: proposal.goalRevisionId,
-      captureId: proposal.captureId,
-      messagePresented: true,
-      drawingPresented: !textOnly,
-      textOnly,
-      interrupted,
-    });
-    this.lesson.commitPresentedStep(proposal, receipt, message);
-    this.tracker.registerStep(message.stepId, geometry.interaction);
-    this.receipt = receipt;
-    this.budget.confirm();
-    this.publish(message);
-    this.log.debug(
-      { ...describeTeachingProposal(proposal), ...receipt },
-      'agent.teaching.presentation.acknowledged',
-    );
-    logAgentExchange(this.log, {
-      operation: 'teaching.presentation',
-      context: { lessonId: this.lesson.id },
-      input: proposal,
-      output: receipt,
-    });
-    return { admitted: true, ...receipt };
   }
 
   private refuse(proposal: PresentTeachingStep, reason: string): Record<string, unknown> {

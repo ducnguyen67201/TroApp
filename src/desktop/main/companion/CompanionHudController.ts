@@ -11,7 +11,11 @@ import { DesktopLocale, type DesktopLocale as Locale } from '#contracts/DesktopL
 import { VoiceState, type VoiceEvent } from '#contracts/VoiceInput.js';
 import { AgentFailureCode, type AgentResult } from '#contracts/AgentSession.js';
 import { randomUUID } from 'node:crypto';
-import { TeachingMessageKind, TeachingPresentationLimits } from '#contracts/TeachingStep.js';
+import {
+  TeachingMessageKind,
+  TeachingPresentationLimits,
+  type TeachingMessage,
+} from '#contracts/TeachingStep.js';
 
 export interface CompanionHudPort {
   showSnapshot(snapshot: CompanionHudSnapshot): void;
@@ -41,6 +45,24 @@ export class CompanionHudController {
     private readonly port: CompanionHudPort,
     private readonly clock: CompanionHudClock,
   ) {}
+
+  setSpeakingMessage(message: TeachingMessage | null): void {
+    this.snapshot = {
+      ...this.snapshot,
+      ...(message ? { message } : {}),
+      speakingSequence: message?.sequence ?? null,
+    };
+    if (message) {
+      this.cancelHide?.();
+      this.cancelHide = null;
+    }
+    this.publish();
+    if (!message && !this.sessionId && this.snapshot.phase === CompanionHudPhase.DONE) {
+      this.cancelHide = this.clock.schedule(() => {
+        this.reset();
+      }, 2000);
+    }
+  }
 
   setLocale(locale: Locale): void {
     this.snapshot = { ...this.snapshot, locale };
@@ -278,6 +300,9 @@ export class CompanionHudController {
     this.cancelHide?.();
     this.showPhase(phase);
     this.cancelHide = this.clock.schedule(() => {
+      if (this.snapshot.speakingSequence !== null && this.snapshot.speakingSequence !== undefined) {
+        return;
+      }
       this.reset();
     }, delayMs);
   }

@@ -1,4 +1,10 @@
 import {
+  VoiceoverPlaybackSchema,
+  VoiceoverStatusSchema,
+  VoiceoverAckSchema,
+  VoiceoverPreferenceSchema,
+} from '#contracts/Voiceover.js';
+import {
   MicrophoneTestCommandSchema,
   MicrophoneTestEventSchema,
   MicrophoneTestReplySchema,
@@ -43,6 +49,39 @@ import {
 /* Expose named session operations, not generic IPC or direct computer tools.
    Validate IPC data before it enters the renderer. */
 const bridge: DesktopBridge = {
+  subscribeVoiceover(listener) {
+    const receive = (_event: Electron.IpcRendererEvent, raw: unknown): void => {
+      const status = VoiceoverStatusSchema.safeParse(raw);
+      if (status.success) {
+        listener(status.data);
+        return;
+      }
+      const command = VoiceoverPlaybackSchema.safeParse(raw);
+      if (command.success) {
+        listener(command.data);
+      }
+    };
+    ipcRenderer.on('tro:voiceover', receive);
+    return () => {
+      ipcRenderer.removeListener('tro:voiceover', receive);
+    };
+  },
+  async acknowledgeVoiceover(ack) {
+    await ipcRenderer.invoke('tro:voiceover-ack', VoiceoverAckSchema.parse(ack));
+  },
+  async setVoiceoverEnabled(enabled, locale) {
+    await ipcRenderer.invoke(
+      'tro:voiceover-preference',
+      VoiceoverPreferenceSchema.parse({ enabled, locale }),
+    );
+  },
+  async stopSpeaking() {
+    const result: unknown = await ipcRenderer.invoke('tro:stop-speaking');
+    return result === true;
+  },
+  async cancelGuidance() {
+    await ipcRenderer.invoke('tro:cancel-guidance');
+  },
   subscribeAgentProgress(listener) {
     const receive = (_event: Electron.IpcRendererEvent, raw: unknown): void => {
       const parsed = AgentProgressSchema.safeParse(raw);

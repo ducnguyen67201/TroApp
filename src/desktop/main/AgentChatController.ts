@@ -1,3 +1,5 @@
+import type { VoiceoverController } from './voiceover/VoiceoverController.js';
+import type { TeachingMessage } from '#contracts/TeachingStep.js';
 import { AgentTaskMode, GuidanceReason, TeachingOutcome } from '#contracts/CursorCompanion.js';
 import { AgentProgressPhase, type AgentProgress } from '#contracts/CompanionHud.js';
 import { randomUUID } from 'node:crypto';
@@ -25,11 +27,19 @@ export class AgentChatController {
     if (progress.sessionId !== this.pendingSessionId || !this.turnInProgress) {
       return;
     }
+    this.voiceover?.receiveProgress(progress);
+    if (progress.presentationPending || progress.presentationRevoked) {
+      return;
+    }
     this.waitingLessonId =
       progress.phase === AgentProgressPhase.NEEDS_INPUT ||
       progress.phase === AgentProgressPhase.PAUSED
         ? (progress.lessonId ?? null)
         : null;
+  }
+
+  receivePresentedMessage(message: TeachingMessage | null): void {
+    this.voiceover?.receiveVisibleMessage(message);
   }
 
   async updateTeachingLocale(sessionId: string, locale: DesktopLocale): Promise<AgentResult> {
@@ -40,6 +50,7 @@ export class AgentChatController {
     ) {
       return { kind: 'failed', message: 'No active teaching lesson.' };
     }
+    this.voiceover?.setLocale(locale);
     return this.worker.updateTeachingLocale(sessionId, locale);
   }
 
@@ -122,6 +133,7 @@ export class AgentChatController {
     private readonly gatewayBaseUrl: string,
     private readonly permissions: AgentChatPermissions,
     private readonly cancelShortcut?: AgentCancelShortcut,
+    private readonly voiceover?: VoiceoverController,
   ) {}
 
   isBusy(): boolean {
@@ -133,6 +145,7 @@ export class AgentChatController {
   }
 
   async signInWithGoogle(): Promise<AuthResult> {
+    this.voiceover?.clearTask();
     this.authChangeInProgress = true;
     this.companionRequested = false;
     this.taskGeneration += 1;
@@ -145,6 +158,7 @@ export class AgentChatController {
   }
 
   async signOut(): Promise<AuthResult> {
+    this.voiceover?.clearTask();
     this.authChangeInProgress = true;
     this.companionRequested = false;
     this.taskGeneration += 1;
@@ -216,6 +230,7 @@ export class AgentChatController {
       }
       return { kind: 'failed', message: 'Wait for the current task to finish.' };
     }
+    this.voiceover?.startTask(sessionId, locale);
     this.turnInProgress = true;
     this.pendingSessionId = sessionId;
     const generation = this.taskGeneration;
@@ -273,8 +288,19 @@ export class AgentChatController {
         this.startCredentialRenewal();
       }
       const result = await this.worker.sendMessage(sessionId, message, locale, mode);
+      if (
+        result.kind === 'failed' ||
+        result.kind === 'stopped' ||
+        (result.kind === 'teaching' &&
+          [TeachingOutcome.CANCELED, TeachingOutcome.FAILED].some(
+            (outcome) => outcome === result.result.outcome,
+          ))
+      ) {
+        this.voiceover?.clearTask();
+      }
       return escapeCancellation.requested ? readInterruptedResult() : result;
     } catch {
+      this.voiceover?.clearTask();
       if (escapeCancellation.requested) {
         return readInterruptedResult();
       }
@@ -298,6 +324,9 @@ export class AgentChatController {
 
   async stopSession(sessionId: string): Promise<AgentResult> {
     if (this.activeSessionId === sessionId || this.pendingSessionId === sessionId) {
+      this.voiceover?.clearTask();
+    }
+    if (this.activeSessionId === sessionId || this.pendingSessionId === sessionId) {
       this.cancelShortcut?.disable();
       this.taskGeneration += 1;
       await this.stopWorker();
@@ -307,6 +336,7 @@ export class AgentChatController {
   }
 
   dispose(): void {
+    this.voiceover?.clearTask();
     if (this.credentialTimer) {
       clearInterval(this.credentialTimer);
       this.credentialTimer = null;

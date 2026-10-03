@@ -40,6 +40,16 @@ Voice input starts automatically after signing in: hold Command + Control on Mac
 
 Choose an input from **Microphone** in the app header or Settings. Auto-detect follows your computer settings; a specific choice is saved locally. Tro suggests recognized wired or built-in inputs using device-name hints, with explanations for wireless/virtual inputs. Use **Edit ranking** to save your preferred order, or **Compare microphones** to run a six-second local quiet/speech test for each input. Tests show levels, clipping and startup time without uploading or saving audio. Ranking never changes the selected route. Missing explicit choices never silently switch to another microphone. See [MicrophoneSelection.md](docs/MicrophoneSelection.md) for engineering details and hardware checks.
 
+HUD teaching bubbles can be read aloud through ElevenLabs in the selected English
+or Vietnamese language. **Read guidance aloud** and **Stop speaking** are in Settings.
+Speech stops before microphone capture and leaves visual guidance usable if it
+fails. Set backend-only `ELEVENLABS_API_KEY` in Doppler. The locale-to-voice map lives
+in `src/server/features/voiceover/VoiceoverConfig.ts`; voiceover is unavailable
+without the key. Rebuild
+with `pnpm build:cua` for the `0.30.4-tro.15` native message reader. No live provider
+or signed playback acceptance has been completed. See the
+[voiceover engineering record](docs/companion/HudVoiceoverEngineering.md).
+
 ## Ownership
 
 | Folder          | Owns                                                               |

@@ -166,7 +166,15 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
             }),
           );
         },
-        (instruction, phase, lessonId, teachingMessage, locale) => {
+        (
+          instruction,
+          phase,
+          lessonId,
+          teachingMessage,
+          locale,
+          presentationPending,
+          presentationRevoked,
+        ) => {
           parentPort.postMessage(
             AgentProgressSchema.parse({
               kind: 'progress',
@@ -185,6 +193,8 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
               ...(lessonId ? { lessonId } : {}),
               teachingStep: instruction,
               ...(teachingMessage ? { teachingMessage } : {}),
+              ...(presentationPending ? { presentationPending } : {}),
+              ...(presentationRevoked ? { presentationRevoked } : {}),
               ...(locale ? { locale } : {}),
             }),
           );

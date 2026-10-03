@@ -1,5 +1,9 @@
 /** Canonical desktop copy. Other catalogs must implement every key and parameter. */
 export const english = {
+  voiceover: 'Read guidance aloud',
+  voiceoverDescription: 'Read HUD guidance in your selected language using cloud speech.',
+  voiceoverUnavailable: 'Speech is unavailable. Visual guidance will continue.',
+  voiceoverStop: 'Stop speaking',
   updateTro: 'Update Tro',
   updateAvailable: (version: string): string => `Version ${version} available`,
   updateDownloading: 'Downloading…',

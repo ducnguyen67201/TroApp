@@ -63,3 +63,14 @@ describe('backend application environment', () => {
     ).toBe('test-client-id');
   });
 });
+
+it('validates backend speech configuration without requiring it for ordinary startup', () => {
+  const base = { DATABASE_URL: databaseUrl, AUTH_SECRET: authSecret };
+  expect(readServerEnv(base).ELEVENLABS_API_KEY).toBeUndefined();
+  expect(
+    readServerEnv({
+      ...base,
+      ELEVENLABS_API_KEY: 'synthetic-key',
+    }).ELEVENLABS_MODEL_ID,
+  ).toBe('eleven_flash_v2_5');
+});

@@ -1,6 +1,10 @@
 import type { TranslationCatalog } from './English.js';
 
 export const vietnamese = {
+  voiceover: 'Đọc hướng dẫn thành tiếng',
+  voiceoverDescription: 'Đọc hướng dẫn HUD bằng ngôn ngữ đã chọn qua dịch vụ giọng nói trực tuyến.',
+  voiceoverUnavailable: 'Giọng nói không khả dụng. Hướng dẫn trực quan vẫn tiếp tục.',
+  voiceoverStop: 'Dừng đọc',
   updateTro: 'Cập nhật Tro',
   updateAvailable: (version: string): string => `Đã có phiên bản ${version}`,
   updateDownloading: 'Đang tải…',
