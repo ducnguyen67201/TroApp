@@ -131,4 +131,57 @@ describe('HUD narration', () => {
     expect(dependencies.fetchSpeech).toHaveBeenCalledOnce();
     controller.clearTask();
   });
+
+  it('revokes active speech and blocks late polls without stopping a newer instruction', async () => {
+    const { controller, dependencies, progress } = createHarness();
+    dependencies.fetchSpeech.mockImplementation(() =>
+      Promise.resolve(
+        new ReadableStream<Uint8Array>({
+          start(stream) {
+            stream.enqueue(new Uint8Array([1, 2]));
+          },
+        }),
+      ),
+    );
+    controller.receiveProgress(progress);
+    controller.receiveVisibleMessage(progress.teachingMessage);
+    await vi.waitFor(() => {
+      expect(dependencies.showStatus).toHaveBeenCalledWith({ state: VoiceoverState.SPEAKING });
+    });
+    const revoked = { ...progress, presentationPending: false, presentationRevoked: true };
+    controller.receiveProgress(revoked);
+    expect(dependencies.fetchSpeech.mock.calls[0]?.[1].aborted).toBe(true);
+    expect(dependencies.sendPlayback).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'stop' }),
+    );
+    expect(dependencies.holdMessage).toHaveBeenLastCalledWith(null);
+    controller.receiveVisibleMessage(progress.teachingMessage);
+    controller.receiveProgress({ ...progress, presentationPending: false });
+    expect(dependencies.fetchSpeech).toHaveBeenCalledOnce();
+
+    const next = { ...progress, teachingMessage: { ...progress.teachingMessage, sequence: 2 } };
+    controller.receiveProgress(next);
+    controller.receiveVisibleMessage(next.teachingMessage);
+    await vi.waitFor(() => {
+      expect(dependencies.fetchSpeech).toHaveBeenCalledTimes(2);
+    });
+    controller.receiveProgress(revoked);
+    controller.receiveProgress({
+      ...revoked,
+      sessionId: randomUUID(),
+      teachingMessage: next.teachingMessage,
+    });
+    expect(dependencies.fetchSpeech.mock.calls[1]?.[1].aborted).toBe(false);
+    controller.clearTask();
+  });
+
+  it('does not start a revoked candidate when its native frame is reported late', () => {
+    const { controller, dependencies, progress } = createHarness();
+    controller.receiveProgress(progress);
+    controller.receiveProgress({ ...progress, presentationRevoked: true });
+    controller.receiveVisibleMessage(progress.teachingMessage);
+    controller.receiveProgress(progress);
+    expect(dependencies.fetchSpeech).not.toHaveBeenCalled();
+    controller.clearTask();
+  });
 });

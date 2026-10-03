@@ -19,6 +19,8 @@ function setup() {
   );
   const tracker = new StudentInteractionTracker();
   const publish = vi.fn<(message: TeachingMessage) => void>();
+  const prepare = vi.fn<(message: TeachingMessage) => void>();
+  const revoke = vi.fn<(message: TeachingMessage) => void>();
   const presenter = new TeachingPresenter(
     lesson,
     server,
@@ -26,14 +28,17 @@ function setup() {
     new TeachingPresentationBudget(),
     log,
     publish,
+    () => {},
+    prepare,
+    revoke,
   );
-  return { lesson, proposal, server, tracker, publish, presenter };
+  return { lesson, proposal, server, tracker, publish, prepare, revoke, presenter };
 }
 
 it.each([false, true])(
   'accepts a correlated native message/drawing acknowledgement with interrupted=%s',
   async (interrupted) => {
-    const { lesson, proposal, server, tracker, publish, presenter } = setup();
+    const { lesson, proposal, server, tracker, publish, prepare, revoke, presenter } = setup();
     vi.spyOn(server, 'showTeachingCue').mockImplementation(async (args, message) => {
       await Promise.resolve();
       return {
@@ -60,6 +65,7 @@ it.each([false, true])(
     const receipt = await presenter.presentStep(proposal, DesktopLocale.ENGLISH);
     expect(receipt).toMatchObject({ admitted: true, drawingPresented: true, interrupted });
     expect(publish).toHaveBeenCalledTimes(interrupted ? 0 : 1);
+    expect(revoke.mock.calls).toEqual(interrupted ? prepare.mock.calls : []);
     expect(lesson.readCurrentStep()?.receipt.presentationId).toBe(receipt['presentationId']);
     expect(tracker.readEvidence().expected).toEqual({ kind: 'click', target: bounds });
     presenter.beginSegment();
@@ -69,7 +75,7 @@ it.each([false, true])(
 it.each(['old_animation_receipt', 'foreign_presentation', 'chat_only'])(
   'refuses %s before committing checkpoint or host instruction',
   async (variant) => {
-    const { lesson, proposal, server, publish, presenter } = setup();
+    const { lesson, proposal, server, publish, prepare, revoke, presenter } = setup();
     vi.spyOn(server, 'showTeachingCue').mockImplementation(async (args, message) => {
       await Promise.resolve();
       return {
@@ -111,6 +117,8 @@ it.each(['old_animation_receipt', 'foreign_presentation', 'chat_only'])(
       admitted: false,
     });
     expect(lesson.readCurrentStep()).toBeNull();
+    expect(prepare).toHaveBeenCalledOnce();
+    expect(revoke.mock.calls).toEqual(prepare.mock.calls);
     expect(publish).not.toHaveBeenCalled();
   },
 );
@@ -136,7 +144,7 @@ it('uses one repair budget across mixed invalid, missing and refused presentatio
 });
 
 it('acknowledges explicit text-only steps and rejects a late receipt after Esc', async () => {
-  const { lesson, proposal, server, tracker, publish } = setup();
+  const { lesson, proposal, server, tracker, publish, prepare, revoke } = setup();
   const stopped = new AbortController();
   const presenter = new TeachingPresenter(
     lesson,
@@ -148,6 +156,8 @@ it('acknowledges explicit text-only steps and rejects a late receipt after Esc',
     () => {
       stopped.signal.throwIfAborted();
     },
+    prepare,
+    revoke,
   );
   const showNativeCue: typeof server.showTeachingCue = async (args, message) => {
     await Promise.resolve();
@@ -182,7 +192,9 @@ it('acknowledges explicit text-only steps and rejects a late receipt after Esc',
     textOnly: true,
   });
   expect(native.mock.calls[0]?.[0]).toMatchObject({ steps: [], text_only: true });
+  expect(revoke).not.toHaveBeenCalled();
   publish.mockClear();
+  prepare.mockClear();
   const previous = lesson.readCurrentStep();
   native.mockImplementationOnce((args, message) => {
     stopped.abort();
@@ -191,4 +203,15 @@ it('acknowledges explicit text-only steps and rejects a late receipt after Esc',
   await expect(presenter.presentStep(keyboard, DesktopLocale.ENGLISH)).rejects.toThrow();
   expect(publish).not.toHaveBeenCalled();
   expect(lesson.readCurrentStep()).toEqual(previous);
+  expect(revoke.mock.calls).toEqual(prepare.mock.calls);
+});
+
+it('revokes pending narration when the native presentation throws', async () => {
+  const { proposal, server, prepare, revoke, presenter } = setup();
+  vi.spyOn(server, 'showTeachingCue').mockRejectedValue(new Error('Transport failed'));
+  await expect(presenter.presentStep(proposal, DesktopLocale.ENGLISH)).rejects.toThrow(
+    'Transport failed',
+  );
+  expect(prepare).toHaveBeenCalledOnce();
+  expect(revoke.mock.calls).toEqual(prepare.mock.calls);
 });

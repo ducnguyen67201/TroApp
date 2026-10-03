@@ -76,6 +76,12 @@ export class VoiceoverController {
       void this.stopSpeaking();
     }
     this.candidate = progress;
+    if (progress.presentationRevoked) {
+      // Retain the identity so a late native poll or ordinary progress cannot replay it.
+      this.lastIdentity = this.readIdentity(progress.teachingMessage);
+      void this.stopSpeaking();
+      return;
+    }
     this.trySpeak();
   }
 

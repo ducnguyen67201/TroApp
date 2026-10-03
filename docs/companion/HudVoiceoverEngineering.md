@@ -44,7 +44,11 @@ admission, cancellation, audio drain and paid-request protection.
 
 The final teaching receipt arrives after drawing playback. `TeachingPresenter`
 therefore publishes a pending candidate before the native call. Pending progress
-is not yet rendered in the workspace or reduced into a HUD snapshot.
+is not yet rendered in the workspace or reduced into a HUD snapshot. Interrupted,
+refused or failed presentations revoke that candidate through scoped worker progress,
+abort active speech and release its HUD hold. The revoked identity remains consumed,
+so a late native poll or repeated progress cannot restart it; a stale revocation cannot
+stop a newer message.
 
 The persistent HUD worker reads `read_companion_hud_message` every 150 ms with one
 read in flight. It reports only changes to main. The private reader verifies the

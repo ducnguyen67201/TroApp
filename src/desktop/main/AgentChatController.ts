@@ -28,7 +28,7 @@ export class AgentChatController {
       return;
     }
     this.voiceover?.receiveProgress(progress);
-    if (progress.presentationPending) {
+    if (progress.presentationPending || progress.presentationRevoked) {
       return;
     }
     this.waitingLessonId =

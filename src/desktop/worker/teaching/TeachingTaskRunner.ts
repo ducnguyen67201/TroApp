@@ -45,6 +45,7 @@ export type ReceiveTeachingStep = (
   message?: TeachingMessage,
   locale?: DesktopLocale,
   presentationPending?: boolean,
+  presentationRevoked?: boolean,
 ) => void;
 
 /** Local waits have no SDK request. Abort always removes their pending timer. */
@@ -148,6 +149,16 @@ export class TeachingTaskRunner {
           lesson.id,
           message,
           this.locale,
+          true,
+        ),
+      (message) =>
+        receiveStep?.(
+          message.text,
+          TeachingLessonPhase.OBSERVING,
+          lesson.id,
+          message,
+          this.locale,
+          false,
           true,
         ),
     );

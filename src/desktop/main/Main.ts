@@ -103,7 +103,7 @@ async function startDesktop(): Promise<void> {
     process.platform === 'darwin' ? hudClient.group : undefined,
     (progress) => {
       chat?.receiveProgress(progress);
-      if (progress.presentationPending) {
+      if (progress.presentationPending || progress.presentationRevoked) {
         return;
       }
       voice?.setLessonAnswerAllowed(!chat?.isBusy());

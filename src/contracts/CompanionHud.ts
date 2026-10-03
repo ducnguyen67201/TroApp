@@ -66,6 +66,7 @@ export const AgentProgressSchema = z.strictObject({
   lessonId: z.uuid().optional(),
   teachingMessage: TeachingMessageSchema.optional(),
   presentationPending: z.boolean().optional(),
+  presentationRevoked: z.boolean().optional(),
   locale: DesktopLocaleSchema.optional(),
 });
 
