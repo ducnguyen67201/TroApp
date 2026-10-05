@@ -1,3 +1,5 @@
+import { PetGallery } from './pets/PetGallery.js';
+import { petMessages } from './pets/PetMessages.js';
 import { Badge, Button, Modal, NativeSelect, Switch, Tabs, Text, Title } from '@mantine/core';
 import type { VoiceoverView } from './voiceover/UseVoiceover.js';
 import { VoiceoverState } from '#contracts/Voiceover.js';
@@ -10,7 +12,7 @@ import { useLocale } from './localization/UseLocale.js';
 import { defaultMicrophoneId } from './voice/Microphones.js';
 import type { MicrophoneView } from './voice/UseMicrophones.js';
 
-const SettingsSection = { GENERAL: 'general', ACCOUNT: 'account' } as const;
+const SettingsSection = { GENERAL: 'general', ACCOUNT: 'account', PETS: 'pets' } as const;
 
 const shortcutLabels = {
   [VoiceShortcut.COMMAND_CONTROL]: 'Command + Control',
@@ -117,6 +119,7 @@ export function SettingsDialog({
           >
             {messages.settingsGeneral}
           </Tabs.Tab>
+          <Tabs.Tab value={SettingsSection.PETS}>{petMessages[locale].pets}</Tabs.Tab>
           <Tabs.Tab
             value={SettingsSection.ACCOUNT}
             leftSection={<IconUser size={18} stroke={1.6} />}
@@ -225,6 +228,9 @@ export function SettingsDialog({
               {messages.languageStorageWarning}
             </Text>
           )}
+        </Tabs.Panel>
+        <Tabs.Panel value={SettingsSection.PETS}>
+          <PetGallery accountId={user?.id ?? null} />
         </Tabs.Panel>
         <Tabs.Panel value={SettingsSection.ACCOUNT}>
           <Title order={3}>{messages.account}</Title>

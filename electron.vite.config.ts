@@ -44,8 +44,12 @@ export default defineConfig({
     plugins: [react()],
     server: { host: '127.0.0.1' },
     build: {
+      assetsInlineLimit: 0,
       rollupOptions: {
-        input: resolve('src/desktop/renderer/index.html'),
+        input: {
+          main: resolve('src/desktop/renderer/index.html'),
+          pet: resolve('src/desktop/renderer/Pet.html'),
+        },
         onwarn: reportBuildWarning,
       },
     },

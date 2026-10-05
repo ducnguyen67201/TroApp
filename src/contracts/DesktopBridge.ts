@@ -1,3 +1,4 @@
+import type { PetCommand, PetReply, PetSnapshot } from './Pet.js';
 import type {
   MicrophoneTestCommand,
   MicrophoneTestEvent,
@@ -22,6 +23,9 @@ import type { VoiceoverAck, VoiceoverPlayback, VoiceoverStatus } from './Voiceov
  * turns and controls the worker lifecycle.
  */
 export interface DesktopBridge {
+  readPets?: () => Promise<PetReply>;
+  controlPet?: (command: PetCommand) => Promise<PetReply>;
+  subscribePet?: (listener: (snapshot: PetSnapshot) => void) => () => void;
   subscribeVoiceover?: (
     listener: (event: VoiceoverPlayback | VoiceoverStatus) => void,
   ) => () => void;

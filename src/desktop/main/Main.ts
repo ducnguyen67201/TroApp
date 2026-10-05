@@ -1,3 +1,14 @@
+import { PetController } from './pets/PetController.js';
+import { PetWindow } from './pets/PetWindow.js';
+import { PetPreferences } from './pets/PetPreferences.js';
+import {
+  PetCommandSchema,
+  PetOverlayCommandSchema,
+  PetOverlayAction,
+  PetFailure,
+  PetReaction,
+  type PetReply,
+} from '#contracts/Pet.js';
 import { VoiceoverController } from './voiceover/VoiceoverController.js';
 import {
   VoiceoverAckSchema,
@@ -66,6 +77,8 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 const mainDirectory = dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | undefined;
+let pets: PetController | undefined;
+let petWindow: PetWindow | undefined;
 let chat: AgentChatController | undefined;
 let voice: VoiceInputController | undefined;
 let microphoneTests: MicrophoneTestLease | undefined;
@@ -109,6 +122,9 @@ async function startDesktop(): Promise<void> {
       voice?.setLessonAnswerAllowed(!chat?.isBusy());
       desktopCompanion?.hud.receiveProgress(progress);
       mainWindow?.webContents.send('tro:agent-progress', progress);
+      setImmediate(() => {
+        refreshPetSuppression();
+      });
     },
     new GlobalStudentInput(() => screen.getPrimaryDisplay().bounds),
   );
@@ -120,6 +136,114 @@ async function startDesktop(): Promise<void> {
   /* The OAuth protocol must be registered before Electron becomes ready. */
   auth.registerDeepLink(() => mainWindow);
   await app.whenReady();
+  let petAccessGeneration = 0;
+  const petRendererFile = join(mainDirectory, '../renderer/Pet.html');
+  const petDevelopmentUrl = developmentUrl ? new URL('Pet.html', developmentUrl).href : undefined;
+  const overlay = new PetWindow({
+    preloadFile: join(mainDirectory, '../preload/Preload.cjs'),
+    rendererFile: petRendererFile,
+    developmentUrl: petDevelopmentUrl,
+    documentUrl: petDevelopmentUrl ?? pathToFileURL(petRendererFile).href,
+    savePlacement: (placement) => {
+      void pets?.savePlacement(placement).then((reply) => {
+        if (reply.kind === 'failed') {
+          console.warn('pet.preferences.failed', { stage: 'placement' });
+        }
+      });
+    },
+    reportFailure: () => {
+      pets?.markPresentationFailed();
+    },
+  });
+  petWindow = overlay;
+  const petController = new PetController(
+    new PetPreferences(join(app.getPath('userData'), 'pets')),
+    overlay,
+    {
+      schedule: (callback, delayMs) => {
+        const timer = setTimeout(callback, delayMs);
+        timer.unref();
+        return () => {
+          clearTimeout(timer);
+        };
+      },
+    },
+    (snapshot) => {
+      if (
+        mainWindow &&
+        !mainWindow.isDestroyed() &&
+        isTrustedFrameUrl(mainWindow.webContents.getURL(), documentUrl)
+      ) {
+        mainWindow.webContents.send('tro:pet-snapshot', snapshot);
+      }
+    },
+  );
+  pets = petController;
+
+  async function canUsePets(event: Electron.IpcMainInvokeEvent): Promise<boolean> {
+    if (!isTrustedSender(event)) {
+      return false;
+    }
+    const generation = petAccessGeneration;
+    const session = await auth.readSession();
+    if (
+      !isTrustedSender(event) ||
+      generation !== petAccessGeneration ||
+      session.kind !== 'signed-in'
+    ) {
+      return false;
+    }
+    await petController.setAccount(session.user.id);
+    return isTrustedSender(event) && generation === petAccessGeneration;
+  }
+
+  ipcMain.handle('tro:pet-read', async (event): Promise<PetReply> => {
+    return (await canUsePets(event))
+      ? { kind: 'ok', snapshot: petController.readSnapshot() }
+      : { kind: 'failed', reason: PetFailure.UNAVAILABLE };
+  });
+  ipcMain.handle('tro:pet-command', async (event, raw: unknown): Promise<PetReply> => {
+    const parsed = PetCommandSchema.safeParse(raw);
+    if (!parsed.success) {
+      return { kind: 'failed', reason: PetFailure.INVALID };
+    }
+    if (!(await canUsePets(event))) {
+      return { kind: 'failed', reason: PetFailure.UNAVAILABLE };
+    }
+    return petController.executeCommand(parsed.data);
+  });
+  ipcMain.handle('tro:pet-overlay-read', (event) => {
+    if (!overlay.isTrustedSender(event)) {
+      throw new Error('Pet presentation is unavailable.');
+    }
+    return petController.readSnapshot();
+  });
+  ipcMain.on('tro:pet-overlay-command', (event, raw: unknown) => {
+    const parsed = PetOverlayCommandSchema.safeParse(raw);
+    if (isQuitting || !overlay.isTrustedSender(event) || !parsed.success) {
+      return;
+    }
+    if (parsed.data.kind === PetOverlayAction.PET || parsed.data.kind === PetOverlayAction.SLAP) {
+      if (overlay.canReact()) {
+        petController.reactToPet(
+          parsed.data.kind === PetOverlayAction.PET ? PetReaction.HAPPY : PetReaction.STARTLED,
+        );
+      }
+    } else {
+      overlay.receiveInteraction(parsed.data);
+    }
+  });
+
+  function refreshPetSuppression(): void {
+    const state = voice?.readStatus().state;
+    petController.setSuspended(
+      Boolean(chat?.isBusy()) ||
+        state === VoiceState.PREPARING ||
+        state === VoiceState.RECORDING ||
+        state === VoiceState.FINALIZING,
+    );
+  }
+
   const applicationIcon = nativeImage.createFromPath(troIconPath);
   if (applicationIcon.isEmpty()) {
     throw new Error('Tro application icon is missing.');
@@ -359,6 +483,9 @@ async function startDesktop(): Promise<void> {
       emit: (event) => {
         companion.hud.receiveVoiceEvent(event);
         sendVoiceEventToWindow(mainWindow, event);
+        setImmediate(() => {
+          refreshPetSuppression();
+        });
       },
     },
     process.platform === 'darwin' ? VoiceShortcut.COMMAND_CONTROL : VoiceShortcut.CONTROL_ALT,
@@ -559,12 +686,26 @@ async function startDesktop(): Promise<void> {
       return { kind: 'failed', message: 'The sign-in request is invalid.' };
     }
     switch (parsed.data.kind) {
-      case 'status':
-        return chat.readAuthSession();
+      case 'status': {
+        const generation = petAccessGeneration;
+        const result = await chat.readAuthSession();
+        if (isTrustedSender(event) && generation === petAccessGeneration) {
+          if (result.kind === 'signed-in' || result.kind === 'signed-out') {
+            await petController.setAccount(result.kind === 'signed-in' ? result.user.id : null);
+          }
+        }
+        return result;
+      }
       case 'sign-in-google':
+        petAccessGeneration += 1;
+        petController.dispose();
+        overlay.closePet();
         disableVoice();
         return chat.signInWithGoogle();
       case 'sign-out':
+        petAccessGeneration += 1;
+        petController.dispose();
+        overlay.closePet();
         disableVoice();
         return chat.signOut();
     }
@@ -612,26 +753,33 @@ async function startDesktop(): Promise<void> {
       return { kind: 'failed', message: 'This window cannot control an agent session.' };
     }
 
-    return executeAgentCommand(rawCommand, {
-      chat,
-      startFollowing: () =>
-        process.platform === 'darwin'
-          ? companion.startFollowing()
-          : Promise.resolve({ kind: 'stopped' }),
-      canSendMessage: () =>
-        !voice ||
-        [VoiceState.IDLE, VoiceState.DISABLED].some((state) => state === voice?.readStatus().state),
-      startTask: (sessionId, locale) => {
-        companion.hud.startTask(sessionId, locale);
-      },
-      finishTask: (result, sessionId) => {
-        companion.hud.finishTask(result, sessionId);
-      },
-      cancelPresentation: () => {
-        voice?.cancelVoiceCapture();
-        companion.reset();
-      },
-    });
+    petController.setSuspended(true);
+    try {
+      return await executeAgentCommand(rawCommand, {
+        chat,
+        startFollowing: () =>
+          process.platform === 'darwin'
+            ? companion.startFollowing()
+            : Promise.resolve({ kind: 'stopped' }),
+        canSendMessage: () =>
+          !voice ||
+          [VoiceState.IDLE, VoiceState.DISABLED].some(
+            (state) => state === voice?.readStatus().state,
+          ),
+        startTask: (sessionId, locale) => {
+          companion.hud.startTask(sessionId, locale);
+        },
+        finishTask: (result, sessionId) => {
+          companion.hud.finishTask(result, sessionId);
+        },
+        cancelPresentation: () => {
+          voice?.cancelVoiceCapture();
+          companion.reset();
+        },
+      });
+    } finally {
+      refreshPetSuppression();
+    }
   });
 
   async function openWindow(): Promise<void> {
@@ -660,6 +808,9 @@ async function startDesktop(): Promise<void> {
     });
     mainWindow = window;
     window.webContents.on('render-process-gone', () => {
+      petAccessGeneration += 1;
+      petController.dispose();
+      overlay.closePet();
       disableVoice();
     });
     window.webContents.on('did-start-navigation', (_event, _url, _inPlace, isMainFrame) => {
@@ -708,6 +859,9 @@ async function startDesktop(): Promise<void> {
       },
     );
     window.on('closed', () => {
+      petAccessGeneration += 1;
+      petController.dispose();
+      overlay.closePet();
       mainWindow = undefined;
       disableVoice();
       chat?.dispose();
@@ -757,6 +911,8 @@ app.on('before-quit', (event) => {
   voiceShortcut.disableShortcut();
   voice?.invalidateVoiceInput();
   desktopCompanion?.dispose();
+  pets?.dispose();
+  petWindow?.dispose();
   chat?.dispose();
   void desktopDriver
     .stop()

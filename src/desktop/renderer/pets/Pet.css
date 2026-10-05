@@ -1,0 +1,129 @@
+.pet-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.pet-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 16px;
+}
+.pet-card-preview {
+  display: grid;
+  place-items: center;
+  height: 116px;
+  background: #faf7f2;
+  border-radius: 12px;
+}
+.pet-sprite {
+  image-rendering: pixelated;
+  pointer-events: none;
+  user-select: none;
+  object-fit: contain;
+  animation: pet-breathe 3s ease-in-out infinite;
+  transform-origin: 50% 85%;
+}
+.pet-sprite[data-reaction='happy'] {
+  animation: pet-bounce 0.8s ease-out;
+}
+.pet-sprite[data-reaction='startled'] {
+  animation: pet-squash 0.8s ease-out;
+}
+.pet-sprite[data-motion='reduced'] {
+  animation: none;
+}
+.pet-sprite[data-motion='reduced'][data-reaction='happy'] {
+  transform: rotate(-5deg);
+}
+.pet-sprite[data-motion='reduced'][data-reaction='startled'] {
+  transform: scale(1.06, 0.94);
+}
+.pet-overlay {
+  width: 144px;
+  height: 160px;
+  position: relative;
+}
+.pet-hit-region {
+  position: absolute;
+  left: 24px;
+  top: 52px;
+  width: 96px;
+  height: 96px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  border-radius: 50%;
+  touch-action: none;
+  cursor: grab;
+}
+.pet-hit-region:active {
+  cursor: grabbing;
+}
+.pet-bubble {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 136px;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border-radius: 12px;
+  background: #fffaf2;
+  border: 1px solid #ded6ca;
+  font:
+    11px/1.3 system-ui,
+    sans-serif;
+  color: #3f3745;
+  text-align: center;
+  pointer-events: none;
+}
+body.pet-document {
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
+@keyframes pet-breathe {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+@keyframes pet-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-9px) rotate(-5deg);
+  }
+  65% {
+    transform: translateY(-4px) rotate(4deg);
+  }
+}
+@keyframes pet-squash {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.12, 0.82) rotate(5deg);
+  }
+  60% {
+    transform: scale(0.94, 1.06) rotate(-4deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pet-sprite {
+    animation: none;
+  }
+}
+@media (max-width: 760px) {
+  .pet-gallery {
+    grid-template-columns: 1fr;
+  }
+}

@@ -21,3 +21,10 @@ The ElevenLabs HUD voiceover feature has a
 [delivery plan](companion/HudVoiceoverPlan.md). These cover localized narration,
 backend streaming and usage limits, presentation timing and cancellation.
 Local wiring is implemented; live provider and signed hardware acceptance remain.
+
+The proposed student pet feature has an
+[engineering specification](companion/StudentPetSpec.md) and
+[implementation plan](companion/StudentPetPlan.md), covering bundled pets,
+desktop interactions, collections and prompt-generated appearances. The
+[initial local implementation](companion/StudentPetEngineering.md) provides bundled
+pets; generated pets remain planned and signed platform acceptance is pending.

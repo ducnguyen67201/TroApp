@@ -1,3 +1,5 @@
+import { petOverlayBridge } from './PetPreload.js';
+import { PetCommandSchema, PetReplySchema, PetSnapshotSchema, PetFailure } from '#contracts/Pet.js';
 import {
   VoiceoverPlaybackSchema,
   VoiceoverStatusSchema,
@@ -49,6 +51,37 @@ import {
 /* Expose named session operations, not generic IPC or direct computer tools.
    Validate IPC data before it enters the renderer. */
 const bridge: DesktopBridge = {
+  async readPets() {
+    try {
+      const value: unknown = await ipcRenderer.invoke('tro:pet-read');
+      return PetReplySchema.parse(value);
+    } catch {
+      return { kind: 'failed', reason: PetFailure.UNAVAILABLE };
+    }
+  },
+  async controlPet(command) {
+    try {
+      const value: unknown = await ipcRenderer.invoke(
+        'tro:pet-command',
+        PetCommandSchema.parse(command),
+      );
+      return PetReplySchema.parse(value);
+    } catch {
+      return { kind: 'failed', reason: PetFailure.UNAVAILABLE };
+    }
+  },
+  subscribePet(listener) {
+    const receive = (_event: Electron.IpcRendererEvent, value: unknown): void => {
+      const parsed = PetSnapshotSchema.safeParse(value);
+      if (parsed.success) {
+        listener(parsed.data);
+      }
+    };
+    ipcRenderer.on('tro:pet-snapshot', receive);
+    return () => {
+      ipcRenderer.removeListener('tro:pet-snapshot', receive);
+    };
+  },
   subscribeVoiceover(listener) {
     const receive = (_event: Electron.IpcRendererEvent, raw: unknown): void => {
       const status = VoiceoverStatusSchema.safeParse(raw);
@@ -300,4 +333,10 @@ async function requestAppUpdate(
   }
 }
 
-contextBridge.exposeInMainWorld('tro', bridge);
+/* One self-contained bundle avoids sandbox-incompatible shared CJS chunks.
+ * Only main can supply this argument; each window receives a distinct surface. */
+if (process.argv.includes('--tro-pet-overlay')) {
+  contextBridge.exposeInMainWorld('troPet', petOverlayBridge);
+} else {
+  contextBridge.exposeInMainWorld('tro', bridge);
+}
