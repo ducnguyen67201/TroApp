@@ -201,3 +201,13 @@ hardware acceptance remain unverified.
 The utility worker creates a TaskHarness for each original request, immutable natural-language goal and task locale. The harness owns lifecycle, explicit verification scheduling, one continuation and final settlement. MainAgentRunner owns actor SDK history; a bounded evidence store retains actual text/images from both agents in memory. When the main agent believes its work is finished, its `verify_task` tool invokes a separate read-only SDK agent sequentially. That agent judges the request against actual observations and can make targeted read-only checks. CompletionGate validates one consistent decision, criterion coverage, evidence provenance, capture age and supersession, then accepts final output only when it references that current stored verdict. Response mode cannot bypass verification after any desktop tool use. One optional continuation retains the original history, goal and locale. Both agents share deadlines and tool limits, with bounded verifier attempts and model turns. Public contracts carry outcome counts and a limitation for typed and voice results. See [AgentHarnessSpec.md](agent/AgentHarnessSpec.md) and [TaskCompletionSpec.md](agent/TaskCompletionSpec.md) for file ownership, model-versus-code responsibilities and validation limits.
 
 The executable [teaching flow contract](teaching/TeachingFlowContract.md) checks the production renderer, preload, main dispatcher, worker, SDK, and MCP flow with local fixtures, plus an explicit native boundary check.
+
+## Student pets
+
+The optional local pet is composed in Electron main separately from the cursor/HUD
+and agent worker. A sandboxed overlay receives a restricted preload surface and
+renders bundled raster pets; the Settings gallery owns selection and naming.
+Validated local preferences are scoped by account. The pet hides during agent work
+and voice capture, and uses no model requests or screen observation. See
+[StudentPetEngineering](companion/StudentPetEngineering.md) for ownership, behavior
+and pending signed macOS/Windows acceptance. Generated pets remain planned.

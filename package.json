@@ -31,6 +31,7 @@
     "build": "pnpm db:generate && pnpm build:api && pnpm build:desktop",
     "build:api": "tsc -p tsconfig.server.json",
     "build:desktop": "electron-vite build && tsx scripts/PrepareDesktopPackage.ts",
+    "check:pet-presentation": "tsx scripts/CheckPetPresentation.ts",
     "check:microphone-package": "tsx scripts/CheckMicrophonePackage.ts",
     "package:desktop": "pnpm build:desktop && tsx scripts/PackageDesktop.ts",
     "lint": "eslint . && tsx scripts/CheckBoundaries.ts",
