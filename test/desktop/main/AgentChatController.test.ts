@@ -9,8 +9,19 @@ import type {
 import { DesktopPermissionState, PermissionGrant } from '#contracts/DesktopPermissions.js';
 import type { ModelCredential } from '#contracts/AuthSession.js';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
+import {
+  VoiceoverController,
+  type VoiceoverDependencies,
+} from '../../../src/desktop/main/voiceover/VoiceoverController.js';
 
-function createController(cancelShortcut?: AgentCancelShortcut) {
+import type { ClassroomTaskContext } from '../../../src/desktop/main/classroom/ClassroomSessionController.js';
+import { createTeachingContext } from '../../server/features/classroom/ClassroomFixtures.js';
+
+function createController(
+  cancelShortcut?: AgentCancelShortcut,
+  classroom?: ClassroomTaskContext,
+  voiceover?: VoiceoverController,
+) {
   const auth = {
     readSession: vi.fn<AgentChatAuth['readSession']>().mockResolvedValue({
       kind: 'signed-in',
@@ -55,6 +66,8 @@ function createController(cancelShortcut?: AgentCancelShortcut) {
     'https://gateway.example.test',
     permissions,
     cancelShortcut,
+    voiceover,
+    classroom,
   );
   return { auth, worker, permissions, controller };
 }
@@ -332,4 +345,111 @@ it('renews expiring model access during a long lesson without replacing its work
   controller.dispose();
   await vi.advanceTimersByTimeAsync(120000);
   expect(worker.refreshCredential).toHaveBeenCalledOnce();
+});
+
+it.each([
+  [DesktopLocale.ENGLISH, 'The class context changed. Send your request again.'],
+  [DesktopLocale.VIETNAMESE, 'Nội dung buổi học đã thay đổi. Hãy gửi lại yêu cầu.'],
+] as const)(
+  'passes class context and localizes a stale result in %s',
+  async (locale, expectedMessage) => {
+    const context = createTeachingContext();
+    const voiceover = new VoiceoverController({
+      canSpeak: () => false,
+      fetchSpeech: vi.fn<VoiceoverDependencies['fetchSpeech']>(),
+      sendPlayback: vi.fn<VoiceoverDependencies['sendPlayback']>().mockResolvedValue(true),
+      showStatus: vi.fn<VoiceoverDependencies['showStatus']>(),
+      holdMessage: vi.fn<VoiceoverDependencies['holdMessage']>(),
+      reportFailure: vi.fn<VoiceoverDependencies['reportFailure']>(),
+    });
+    const clearNarration = vi.spyOn(voiceover, 'clearTask');
+    const startNarration = vi.spyOn(voiceover, 'startTask');
+    const isContextCurrent = vi
+      .fn<ClassroomTaskContext['isContextCurrent']>()
+      .mockReturnValue(false);
+    const { auth, worker, controller } = createController(
+      undefined,
+      {
+        readTeachingContext: () => Promise.resolve(context),
+        isContextCurrent,
+      },
+      voiceover,
+    );
+    auth.fetchModelCredential.mockResolvedValue({
+      token: 'test-token',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    });
+    try {
+      const reply = await controller.sendMessage(
+        'class-task',
+        'Help me with this',
+        locale,
+        'teach',
+      );
+      expect(worker.sendMessage).toHaveBeenCalledWith(
+        'class-task',
+        'Help me with this',
+        locale,
+        'teach',
+        context,
+      );
+      expect(reply.kind).toBe('failed');
+      if (reply.kind === 'failed') {
+        expect(reply.message).toBe(expectedMessage);
+      }
+      expect(startNarration).toHaveBeenCalledWith('class-task', locale);
+      expect(clearNarration).toHaveBeenCalledOnce();
+    } finally {
+      controller.dispose();
+    }
+  },
+);
+
+it.each([
+  [DesktopLocale.ENGLISH, 'In class, choose Show me so you perform the learning actions.'],
+  [DesktopLocale.VIETNAMESE, 'Trong lớp học, hãy chọn “Chỉ cho tôi” để tự thực hiện bài tập.'],
+] as const)(
+  'localizes the classroom mode restriction in %s without starting work',
+  async (locale, expectedMessage) => {
+    const readTeachingContext = vi
+      .fn<ClassroomTaskContext['readTeachingContext']>()
+      .mockResolvedValue(createTeachingContext());
+    const { worker, controller } = createController(undefined, {
+      readTeachingContext,
+      isContextCurrent: () => true,
+    });
+    try {
+      const execution = await controller.sendMessage('class-task', 'Do this', locale, 'execute');
+      expect(execution.kind).toBe('failed');
+      if (execution.kind === 'failed') {
+        expect(execution.message).toBe(expectedMessage);
+      }
+      readTeachingContext.mockRejectedValue(new Error('Classroom unavailable'));
+      expect(await controller.sendMessage('class-task', 'Help me', locale, 'teach')).toMatchObject({
+        kind: 'failed',
+      });
+      expect(worker.sendMessage).not.toHaveBeenCalled();
+      expect(worker.start).not.toHaveBeenCalled();
+    } finally {
+      controller.dispose();
+    }
+  },
+);
+
+it('disposes the old worker before switching credentials without signing the old user out', async () => {
+  const { controller, worker, auth } = createController();
+  worker.isRunning.mockReturnValue(true);
+  const nextUser = { id: 'other-user', name: 'Other', email: 'other@example.test' };
+  const switchIdentity = vi
+    .fn<() => Promise<import('#contracts/AuthSession.js').AuthResult>>()
+    .mockImplementation(() => {
+      expect(worker.dispose).toHaveBeenCalled();
+      return Promise.resolve({ kind: 'signed-in', user: nextUser });
+    });
+  expect(await controller.changeAccount(switchIdentity)).toEqual({
+    kind: 'signed-in',
+    user: nextUser,
+  });
+  expect(auth.signOut).not.toHaveBeenCalled();
+  expect(auth.signInWithGoogle).not.toHaveBeenCalled();
 });

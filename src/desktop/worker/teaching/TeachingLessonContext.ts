@@ -1,4 +1,6 @@
+import { ClassroomMaterialInstructions } from '../agent/ComputerUseInstructions.js';
 import { randomUUID } from 'node:crypto';
+import type { TeachingContext } from '#contracts/Classroom.js';
 import type { AgentInputItem, CallToolResult } from '@openai/agents';
 import { z } from 'zod';
 import {
@@ -12,6 +14,7 @@ import {
 import { EvidenceContentSchema } from '../cua/CuaTaskEvidence.js';
 import { DesktopCaptureSchema } from '../observation/TeachingCapture.js';
 import type { TeachingDecision } from './TeachingReply.js';
+import { countMaterialHistoryTokens, projectClassroomForAgent } from './MaterialEvidence.js';
 
 interface GoalRevision {
   id: string;
@@ -36,7 +39,10 @@ export class TeachingLessonContext {
   private question: string | null = null;
   private answer: string | null = null;
 
-  constructor(readonly originalRequest: string) {}
+  constructor(
+    readonly originalRequest: string,
+    private readonly classroom?: TeachingContext,
+  ) {}
 
   defineGoal(input: z.infer<typeof DefineTeachingGoalSchema>): Record<string, unknown> {
     if (this.goal) {
@@ -222,7 +228,9 @@ export class TeachingLessonContext {
     }
     while (
       this.exchanges.length > 2 ||
-      Buffer.byteLength(JSON.stringify(this.exchanges)) > 4000000
+      Buffer.byteLength(JSON.stringify(this.exchanges)) > 4000000 ||
+      (this.exchanges.length > 0 &&
+        countMaterialHistoryTokens(this.classroom, this.exchanges) > 8000)
     ) {
       this.exchanges.shift();
     }
@@ -236,6 +244,8 @@ export class TeachingLessonContext {
     const capture = this.capture;
     const packet = JSON.stringify({
       originalRequest: this.originalRequest,
+      classroom: projectClassroomForAgent(this.classroom),
+      classroomReferencePolicy: this.classroom ? ClassroomMaterialInstructions : null,
       goal: this.goal,
       revisions: this.revisions,
       checkpoint: this.current,

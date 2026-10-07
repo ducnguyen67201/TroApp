@@ -1,3 +1,6 @@
+import type { PracticeRecord } from '#contracts/PracticeCheck.js';
+import { createTeachingContext } from '../../../server/features/classroom/ClassroomFixtures.js';
+import { createPracticeCheckpoint } from '../../../server/features/classroom/PracticeFixtures.js';
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import {
   CompanionHudController,
@@ -253,4 +256,85 @@ it('keeps one message across meters and waits, rejects late revisions and lets c
   controller.startTask(captureId, 'en');
   vi.advanceTimersByTime(2000);
   expect(latest()?.phase).toBe(CompanionHudPhase.SENDING);
+});
+
+it('shows submission status only until a saved receipt, preserving locale and fencing late replies', () => {
+  const { controller, latest } = createHarness();
+  controller.setLocale('vi');
+  expect(controller.startPractice(captureId, 'submit-snapshot')).toBe(true);
+  expect(latest()).toMatchObject({ phase: 'submitting', locale: 'vi' });
+  controller.receivePracticeReply(sessionId, { kind: 'failed', code: 'unavailable' });
+  expect(latest()?.phase).toBe('submitting');
+  controller.receivePracticeReply(captureId, {
+    kind: 'submitted',
+    submission: {
+      id: captureId,
+      studentId: 'student',
+      attemptId: sessionId,
+      checkpointId: sessionId,
+      snapshotId: sessionId,
+      checkId: sessionId,
+      sequence: 1,
+      submittedAt: new Date().toISOString(),
+    },
+  });
+  expect(latest()?.phase).toBe('submitted');
+  vi.advanceTimersByTime(2200);
+  expect(latest()?.phase).toBe('idle');
+  controller.startPractice(captureId, 'check', 'en');
+  controller.receiveVoiceEvent({ kind: 'prepare', captureId: sessionId });
+  controller.receivePracticeReply(captureId, { kind: 'failed', code: 'unavailable' });
+  expect(latest()?.phase).toBe('preparing');
+  expect(controller.startPractice(captureId, 'check', 'en')).toBe(false);
+});
+
+it('keeps running check progress until matching history, then reports feedback without claiming a pass', () => {
+  const { controller, latest } = createHarness();
+  const context = createTeachingContext();
+  const record: PracticeRecord = {
+    id: sessionId,
+    requestId: captureId,
+    snapshotId: captureId,
+    attemptId: context.attempt.id,
+    checkpointId: captureId,
+    rubric: createPracticeCheckpoint(),
+    status: 'running',
+    finding: null,
+    results: [],
+    evaluator: 'test',
+    createdAt: new Date().toISOString(),
+    completedAt: null,
+    evidence: [],
+  };
+  controller.startPractice(captureId, 'check', 'vi');
+  controller.receivePracticeReply(captureId, { kind: 'check', check: record });
+  expect(latest()?.phase).toBe('checking');
+  controller.receivePracticeHistory({
+    kind: 'history',
+    checks: [{ ...record, id: captureId, status: 'completed', finding: 'met' }],
+    submissions: [],
+  });
+  expect(latest()?.phase).toBe('checking');
+  controller.receivePracticeHistory({
+    kind: 'history',
+    checks: [{ ...record, status: 'completed', finding: 'needs_changes' }],
+    submissions: [],
+  });
+  expect(latest()).toMatchObject({ phase: 'checked', locale: 'vi' });
+  controller.startTask(sessionId, 'en');
+  vi.advanceTimersByTime(2500);
+  expect(latest()?.phase).toBe('sending');
+});
+
+it('bounds practice presentation and never reports a failed request as a saved hand-in', () => {
+  const { controller, latest } = createHarness();
+  controller.startPractice(captureId, 'check', 'en');
+  vi.advanceTimersByTime(100_000);
+  expect(latest()?.phase).toBe('error');
+  controller.startPractice(captureId, 'submit-snapshot', 'vi');
+  controller.receivePracticeReply(captureId, { kind: 'failed', code: 'stale' });
+  expect(latest()?.phase).toBe('error');
+  controller.reset();
+  controller.receivePracticeReply(captureId, { kind: 'failed', code: 'unavailable' });
+  expect(latest()?.phase).toBe('idle');
 });

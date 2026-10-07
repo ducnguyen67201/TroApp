@@ -1,0 +1,1202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tro · Materials for your class</title>
+    <style>
+      :root {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #252422;
+        background: #f7f3e9;
+        font-size: 14px;
+        --line: #ded8cd;
+        --muted: #777168;
+        --paper: #fffcf2;
+        --orange: #eb5e28;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+        color: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:disabled {
+        cursor: default;
+        opacity: 0.45;
+      }
+      button,
+      input,
+      textarea,
+      select {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+      }
+      button {
+        padding: 10px 15px;
+      }
+      button:hover:not(:disabled) {
+        background: #f1ece2;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      textarea:focus-visible,
+      select:focus-visible {
+        outline: 2px solid var(--orange);
+        outline-offset: 3px;
+      }
+      button.primary {
+        background: #252422;
+        color: var(--paper);
+        border-color: #252422;
+      }
+      .primary:hover:not(:disabled) {
+        background: #403d39;
+      }
+      button.quiet {
+        border-color: transparent;
+        background: transparent;
+        padding: 6px 9px;
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        min-height: 100vh;
+      }
+      .sidebar {
+        padding: 30px 22px;
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+      }
+      .brand {
+        font-size: 24px;
+        font-weight: 650;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .mark {
+        background: #252422;
+        color: #eb5e28;
+        border-radius: 8px;
+        padding: 6px 9px;
+        font-size: 22px;
+      }
+      .badge {
+        display: inline-block;
+        font-size: 11px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 4px 9px;
+        margin-top: 7px;
+      }
+      .nav {
+        display: grid;
+        gap: 8px;
+      }
+      .nav div {
+        padding: 12px;
+        border-radius: 8px;
+        color: #777168;
+      }
+      .nav .selected {
+        background: #e9e4da;
+        color: #252422;
+      }
+      .account {
+        margin-top: auto;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .main {
+        background: var(--paper);
+        margin: 14px 14px 14px 0;
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        overflow: hidden;
+      }
+      header {
+        padding: 19px 30px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .prototype {
+        color: #9a563b;
+      }
+      .content {
+        max-width: 1100px;
+        margin: auto;
+        padding: 35px 40px 50px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .heading {
+        margin-bottom: 25px;
+      }
+      h1 {
+        font-size: 28px;
+        letter-spacing: -0.8px;
+        margin: 7px 0 10px;
+        font-weight: 600;
+      }
+      h2 {
+        font-size: 18px;
+        margin: 0 0 8px;
+        font-weight: 600;
+      }
+      h3 {
+        font-size: 14px;
+        margin: 0 0 7px;
+      }
+      p {
+        line-height: 1.6;
+        margin: 0 0 10px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .tiny {
+        font-size: 12px;
+      }
+      .eyebrow {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1.3px;
+        color: var(--muted);
+      }
+      .steps {
+        display: flex;
+        gap: 30px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 24px;
+        padding-bottom: 17px;
+      }
+      .step {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .step span {
+        border: 1px solid var(--line);
+        border-radius: 100%;
+        width: 23px;
+        height: 23px;
+        display: grid;
+        place-items: center;
+      }
+      .step.active {
+        color: #252422;
+      }
+      .step.active span {
+        background: #252422;
+        color: #fff;
+        border-color: #252422;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(260px, 0.9fr) minmax(340px, 1.25fr);
+        gap: 22px;
+        align-items: start;
+      }
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 22px;
+        margin-bottom: 16px;
+      }
+      .drop {
+        border: 1px dashed #c2b8a7;
+        border-radius: 10px;
+        text-align: center;
+        padding: 26px 18px;
+        background: #faf7ee;
+        margin: 18px 0;
+      }
+      .drop.drag {
+        outline: 2px solid var(--orange);
+        background: #fff1e7;
+      }
+      .drop-icon {
+        font-size: 23px;
+        margin-bottom: 8px;
+      }
+      .file {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid var(--line);
+        padding: 13px 0;
+      }
+      .file:last-child {
+        border: 0;
+      }
+      .file-icon {
+        width: 34px;
+        height: 38px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        display: grid;
+        place-items: center;
+        font-size: 10px;
+        font-weight: 650;
+        background: #f1ede4;
+        flex-shrink: 0;
+      }
+      .file-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .file-name {
+        overflow-wrap: anywhere;
+        font-weight: 500;
+      }
+      .file-status {
+        font-size: 11px;
+        margin-top: 4px;
+        color: var(--muted);
+      }
+      .file-status.warn {
+        color: #9a563b;
+      }
+      label {
+        display: block;
+        font-weight: 500;
+        margin: 18px 0 8px;
+      }
+      .optional {
+        font-weight: 400;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      textarea {
+        padding: 10px;
+        width: 100%;
+        resize: vertical;
+        line-height: 1.6;
+      }
+      input {
+        padding: 10px;
+        width: 100%;
+        min-width: 0;
+      }
+      .footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 20px;
+      }
+      .tag {
+        font-size: 11px;
+        color: #5d6656;
+        background: #eef0e8;
+        border-radius: 5px;
+        padding: 4px 7px;
+      }
+      .review-empty {
+        min-height: 380px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+      }
+      .empty-inner {
+        max-width: 275px;
+      }
+      .preview-lines {
+        display: grid;
+        gap: 10px;
+        margin: 22px auto 28px;
+        max-width: 180px;
+      }
+      .preview-lines i {
+        height: 5px;
+        background: #e5dfd3;
+        border-radius: 5px;
+      }
+      .preview-lines i:nth-child(2) {
+        width: 75%;
+      }
+      .preview-lines i:nth-child(3) {
+        width: 90%;
+      }
+      .tabs {
+        display: flex;
+        gap: 18px;
+        border-bottom: 1px solid var(--line);
+        margin: 20px 0;
+      }
+      .tabs button {
+        border: 0;
+        border-radius: 0;
+        padding: 8px 0 12px;
+        background: none;
+        color: var(--muted);
+      }
+      .tabs button.active {
+        border-bottom: 2px solid #252422;
+        color: #252422;
+      }
+      .section {
+        padding: 13px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .section:last-child {
+        border: 0;
+      }
+      .source {
+        font-size: 11px;
+        color: #8a8174;
+        display: block;
+        margin-top: 6px;
+      }
+      .suggestion {
+        background: #fbf1e6;
+        border: 1px solid #ebd7be;
+        border-radius: 9px;
+        padding: 12px;
+        margin: 18px 0;
+      }
+      .suggestion strong {
+        font-size: 12px;
+        color: #8d5434;
+      }
+      .suggestion p {
+        font-size: 12px;
+        margin: 7px 0 10px;
+      }
+      .status {
+        font-size: 12px;
+        line-height: 1.6;
+        min-height: 18px;
+        color: #716b60;
+      }
+      .notice {
+        font-size: 12px;
+        background: #f1eee5;
+        padding: 12px;
+        border-radius: 8px;
+        margin-top: 13px;
+      }
+      .progress {
+        height: 4px;
+        background: #eee8dc;
+        margin: 25px 0;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .progress i {
+        display: block;
+        width: 10%;
+        height: 100%;
+        background: var(--orange);
+        transition: width 0.6s;
+      }
+      .processing {
+        padding: 55px 8px;
+        min-height: 375px;
+      }
+      .success {
+        background: #f0f2e8;
+        border: 1px solid #d7ddcb;
+        padding: 17px;
+        border-radius: 10px;
+        margin-bottom: 18px;
+      }
+      .review-actions {
+        border-top: 1px solid var(--line);
+        padding-top: 18px;
+        margin-top: 18px;
+      }
+      .md {
+        min-height: 380px;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        font-size: 11px;
+        background: #f7f4ec;
+      }
+      .code {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        background: #f7f4ec;
+        border-radius: 8px;
+        padding: 15px;
+        font-size: 11px;
+        line-height: 1.6;
+        max-height: 400px;
+        overflow: auto;
+      }
+      .materials-note {
+        font-size: 11px;
+        margin-top: 14px;
+        color: var(--muted);
+      }
+      .student {
+        display: grid;
+        gap: 12px;
+        margin-top: 18px;
+      }
+      .student-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border: 1px solid var(--line);
+        padding: 12px;
+        border-radius: 8px;
+      }
+      .session-focus {
+        margin: 17px 0;
+      }
+      .session-focus select {
+        padding: 10px;
+        width: 100%;
+      }
+      .button-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        clip: rect(0, 0, 0, 0);
+        overflow: hidden;
+      }
+      .reset {
+        font-size: 12px;
+      }
+      .spinner {
+        font-size: 24px;
+        color: var(--orange);
+        display: inline-block;
+        animation: pulse 1.3s infinite;
+      }
+      @keyframes pulse {
+        50% {
+          opacity: 0.3;
+        }
+      }
+      [hidden] {
+        display: none !important;
+      }
+      @media (max-width: 1050px) {
+        .content {
+          padding: 28px 24px;
+        }
+        .app {
+          grid-template-columns: 170px 1fr;
+        }
+        .sidebar {
+          padding: 28px 16px;
+        }
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 650px) {
+        .app {
+          display: block;
+        }
+        .sidebar {
+          flex-direction: row;
+          align-items: center;
+          padding: 14px;
+          border-right: 0;
+          gap: 15px;
+        }
+        .brand {
+          font-size: 18px;
+        }
+        .nav {
+          display: none;
+        }
+        .account {
+          margin-left: auto;
+          margin-top: 0;
+        }
+        .main {
+          margin: 0;
+          border-radius: 0;
+          border-left: 0;
+          border-right: 0;
+        }
+        .content {
+          padding: 22px 17px;
+        }
+        header {
+          padding: 15px 17px;
+        }
+        .steps {
+          gap: 14px;
+        }
+        .heading.row {
+          align-items: flex-start;
+        }
+        .footer {
+          align-items: flex-start;
+        }
+        .grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        h1 {
+          font-size: 25px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+
+      .material-detail {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 12px;
+        margin-top: 14px;
+      }
+      .material-detail > summary {
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+        line-height: 1.6;
+        overflow-wrap: anywhere;
+      }
+      .material-detail > summary .optional {
+        margin-left: 6px;
+      }
+      .material-editor {
+        font-size: 12px;
+        margin: 12px 0;
+        background: #faf7ee;
+      }
+      .original-note {
+        margin-top: 12px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .original-note summary,
+      .edit-section summary {
+        cursor: pointer;
+        padding: 8px 0;
+      }
+      .original-text {
+        white-space: pre-wrap;
+        margin-top: 8px;
+      }
+      .edit-section {
+        margin-top: 8px;
+        font-size: 12px;
+      }
+      .edit-section label {
+        margin-top: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div>
+          <div class="brand"><span class="mark">✳</span>Tro</div>
+          <span class="badge">Teacher</span>
+        </div>
+        <nav class="nav" aria-label="Navigation">
+          <div>▤ &nbsp; Workspace</div>
+          <div class="selected">▦ &nbsp; Classroom</div>
+        </nav>
+        <div class="account">Duc Nguyen<br /><span class="tiny">Your teaching space</span></div>
+      </aside>
+      <main class="main">
+        <header>
+          <span>Classroom / Scratch beginners</span
+          ><span class="prototype">Interactive prototype · no uploads leave this page</span>
+        </header>
+        <div class="content">
+          <div class="heading row">
+            <div>
+              <div class="eyebrow">Scratch beginners</div>
+              <h1>Bring your materials. Teach your way.</h1>
+              <p class="muted">
+                Add what you already teach with. Review once, then start your class.
+              </p>
+            </div>
+            <button class="quiet reset" id="reset">Reset demo</button>
+          </div>
+          <div class="steps">
+            <div class="step active" id="step1"><span>1</span>Add materials</div>
+            <div class="step" id="step2"><span>2</span>Review materials</div>
+            <div class="step" id="step3"><span>3</span>Start class</div>
+          </div>
+          <div class="grid">
+            <section>
+              <div class="card">
+                <div class="row">
+                  <h2>Class materials</h2>
+                  <span class="tag" id="fileCount">2 materials</span>
+                </div>
+                <p class="tiny muted">Original files stay available for students to download.</p>
+                <div class="drop" id="drop">
+                  <div class="drop-icon">↥</div>
+                  <p>Drop your files here</p>
+                  <p class="tiny muted">PDF, slides, Python or Scratch projects</p>
+                  <button id="browse">Choose files</button
+                  ><input
+                    class="sr-only"
+                    type="file"
+                    id="fileInput"
+                    multiple
+                    accept=".pdf,.pptx,.py,.sb3,.txt,.md"
+                    aria-label="Add teaching files"
+                  />
+                </div>
+                <div id="files"></div>
+                <label for="link">Or add a material link</label>
+                <div class="row">
+                  <input id="link" type="url" placeholder="https://…" /><button id="addLink">
+                    Add
+                  </button>
+                </div>
+                <label for="notes"
+                  >Anything Tro should know? <span class="optional">Optional</span></label
+                ><textarea
+                  id="notes"
+                  rows="2"
+                  placeholder="For example: students are new to Scratch. Today, make the cat move and speak."
+                ></textarea>
+                <div class="footer">
+                  <span class="tiny muted" id="batchHint"
+                    >Add everything first. Prepare it together.</span
+                  ><button class="primary" id="prepare">Prepare materials</button>
+                </div>
+                <p class="materials-note">
+                  Demo preparation uses the two sample files below. Added files are listed locally;
+                  their content is not extracted.
+                </p>
+                <div class="status" id="materialStatus" role="status" aria-live="polite"></div>
+              </div>
+              <div class="card">
+                <div class="eyebrow">A simpler classroom</div>
+                <p style="margin-top: 10px">No lesson builder to fill out.</p>
+                <p class="tiny muted">
+                  Tro organizes your materials into readable notes and sections. You decide what the
+                  class works on today.
+                </p>
+              </div>
+            </section>
+            <section class="card" aria-label="Prepared materials">
+              <div class="row">
+                <h2 id="reviewTitle">Your lesson overview</h2>
+                <span class="tag" id="reviewBadge">Not prepared</span>
+              </div>
+              <div id="review"></div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script>
+      const sampleMaterials = [
+        {
+          id: 'slides',
+          name: 'Making the cat move.pdf',
+          type: 'PDF',
+          detail: 'Sample · 6 pages',
+          sample: true,
+        },
+        {
+          id: 'starter',
+          name: 'Starter cat.sb3',
+          type: 'SB3',
+          detail: 'Sample · Scratch project',
+          sample: true,
+        },
+      ];
+      const samplePages = [
+        {
+          id: 'page1',
+          materialId: 'slides',
+          source: 'Page 1',
+          title: 'Make the cat move and speak',
+          text: 'A first Scratch exercise: build a short script that moves the cat and makes it say Hello!\nThe lesson introduces the block palette, script workspace and stage.\nIllustration: the Scratch cat appears beside a blue movement block and a purple speech block.',
+        },
+        {
+          id: 'page2',
+          materialId: 'slides',
+          source: 'Page 2',
+          title: 'Get your project ready',
+          text: 'Open Scratch and select the cat sprite.\nFind the block palette on the left, the script workspace in the middle and the stage on the right.\nUse the provided starter project if your teacher has shared it.\nIllustration: the cat sprite is selected; the script workspace is empty.',
+        },
+        {
+          id: 'page3',
+          materialId: 'slides',
+          source: 'Page 3',
+          title: 'Add movement',
+          text: 'Choose Motion in the block palette.\nDrag “move 10 steps” into the script workspace.\nKeep the default number at 10 for the first attempt.\nIllustration: one blue “move 10 steps” block is in the workspace.',
+        },
+        {
+          id: 'page4',
+          materialId: 'slides',
+          source: 'Page 4',
+          title: 'Add speech',
+          text: 'Choose Looks in the block palette.\nDrag “say Hello! for 2 seconds” below the movement block and snap the blocks together.\nThe message is Hello! and the duration is 2 seconds.\nIllustration: the purple speech block is connected underneath the blue movement block.',
+        },
+        {
+          id: 'page5',
+          materialId: 'slides',
+          source: 'Page 5',
+          title: 'Run and check',
+          text: 'Run the script. The cat should move 10 steps, then display Hello! for two seconds.\nIf the blocks are separate, connect them so movement happens before speech.\nThe sample slide does not specify which event starts the script.\nIllustration: the cat on the stage has a Hello! speech bubble.',
+        },
+        {
+          id: 'page6',
+          materialId: 'slides',
+          source: 'Page 6',
+          title: 'Try a small change',
+          text: 'Change the movement distance and run the script again. Observe how far the cat moves.\nTry a different message or speech duration.\nDiscuss: what happens when you change the order of the two blocks?\nThis page contains extension activities, not additional required completion criteria.',
+        },
+        {
+          id: 'project',
+          materialId: 'starter',
+          source: 'Project · Cat sprite',
+          title: 'Starter project contents',
+          text: 'Scratch starter project with the cat sprite selected and one plain backdrop.\nThe script workspace is empty. No movement, speech or event blocks are installed.\nUse this as the student’s starting file, rather than an example of finished work.',
+        },
+      ];
+      const sampleSections = [
+        {
+          id: 'setup',
+          title: 'Open the project',
+          instruction:
+            'Open Scratch or the starter project and locate the palette, workspace and stage.',
+          pageIds: ['page1', 'page2', 'project'],
+        },
+        {
+          id: 'build',
+          title: 'Move, then speak',
+          instruction: 'Add movement and attach the speech block underneath it.',
+          pageIds: ['page3', 'page4'],
+        },
+        {
+          id: 'run',
+          title: 'Run and check the result',
+          instruction: 'Run the connected stack. Check movement and speech in that order.',
+          pageIds: ['page5'],
+        },
+        {
+          id: 'explore',
+          title: 'Try a small change',
+          instruction: 'Explore distance, message, duration or block order when there is time.',
+          pageIds: ['page6'],
+        },
+      ];
+      let materials = sampleMaterials.map((file) => ({ ...file }));
+      let pages = [];
+      let sections = [];
+      let state = 'draft';
+      let activeTab = 'summary';
+      let includeEvent = false;
+      let focus = 'build';
+      let preparationTimer;
+      let revision = 0;
+      const byId = (id) => document.getElementById(id);
+      const escapeHtml = (value) =>
+        String(value).replace(
+          /[&<>"']/g,
+          (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char],
+        );
+      function showMaterialStatus(message) {
+        byId('materialStatus').textContent = message;
+      }
+      function readPageText(page) {
+        return page.teacherText ?? page.text;
+      }
+      function readMaterialName(id) {
+        return materials.find((file) => file.id === id)?.name ?? 'Material';
+      }
+      function readSources(section) {
+        return section.pageIds
+          .map((id) => pages.find((page) => page.id === id))
+          .filter(Boolean)
+          .map((page) => `${readMaterialName(page.materialId)} · ${page.source}`)
+          .join('; ');
+      }
+      function invalidateContext() {
+        if (state !== 'draft') {
+          clearTimeout(preparationTimer);
+          state = 'draft';
+          activeTab = 'summary';
+          pages = [];
+          sections = [];
+          showMaterialStatus('Materials changed. Prepare a new draft before using it in class.');
+        }
+        render();
+      }
+      function renderFiles() {
+        byId('fileCount').textContent =
+          `${materials.length} material${materials.length === 1 ? '' : 's'}`;
+        byId('files').innerHTML = materials
+          .map(
+            (file) =>
+              `<div class="file"><span class="file-icon">${escapeHtml(file.type)}</span><div class="file-info"><div class="file-name">${escapeHtml(file.name)}</div><div class="file-status ${file.sample ? '' : 'warn'}">${escapeHtml(file.detail)}${file.sample ? '' : ' · not read in this demo'}</div></div><button class="quiet" data-remove="${escapeHtml(file.id)}" aria-label="Remove ${escapeHtml(file.name)}">×</button></div>`,
+          )
+          .join('');
+        byId('files')
+          .querySelectorAll('[data-remove]')
+          .forEach(
+            (button) =>
+              (button.onclick = () => {
+                materials = materials.filter((file) => file.id !== button.dataset.remove);
+                invalidateContext();
+              }),
+          );
+      }
+      function createDraft() {
+        const materialIds = new Set(materials.map((file) => file.id));
+        pages = samplePages
+          .filter((page) => materialIds.has(page.materialId))
+          .map((page) => ({ ...page, teacherText: null }));
+        for (const file of materials.filter((file) => !file.sample)) {
+          pages.push({
+            id: `note-${file.id}`,
+            materialId: file.id,
+            source: 'Teacher notes',
+            title: file.name,
+            text: 'This material has not been read by the demo. Add your own notes here, or try the sample files.',
+            teacherText: null,
+            unread: true,
+          });
+        }
+        sections = sampleSections
+          .map((section) => ({
+            ...section,
+            pageIds: section.pageIds.filter((id) => pages.some((page) => page.id === id)),
+          }))
+          .filter((section) => section.pageIds.length > 0);
+        focus = sections.some((section) => section.id === 'build')
+          ? 'build'
+          : (sections[0]?.id ?? 'materials');
+        revision += 1;
+      }
+      function exportNotes() {
+        const lines = [
+          '# Class material notes',
+          '',
+          '## Teacher instructions',
+          byId('notes').value.trim() || 'No additional instructions.',
+          '',
+          '## Sections',
+        ];
+        for (const section of sections) {
+          lines.push(
+            `### ${section.title}`,
+            section.instruction,
+            `Sources: ${readSources(section)}`,
+            '',
+          );
+        }
+        lines.push('## Material content');
+        for (const page of pages) {
+          lines.push(
+            `### ${readMaterialName(page.materialId)} — ${page.source}`,
+            `Original extracted notes (${page.unread ? 'unread; placeholder' : 'illustrative sample'}):`,
+            page.text,
+          );
+          if (page.teacherText !== null) lines.push('Teacher revision:', page.teacherText);
+          lines.push('');
+        }
+        if (includeEvent)
+          lines.push(
+            '## Teacher addition',
+            'Use green-flag playback. Add “when green flag clicked” above the movement/speech stack. This is a teacher addition, not an instruction extracted from the slides.',
+          );
+        lines.push(
+          '',
+          '## Preparation record',
+          `Draft version: ${revision}`,
+          'Sample extraction is illustrative. Real uploaded content is not parsed in this prototype.',
+        );
+        const url = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/markdown' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'ClassMaterialNotes.md';
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      function renderSummary() {
+        const hasSlides = materials.some((file) => file.id === 'slides');
+        const editedCount = pages.filter((page) => page.teacherText !== null).length;
+        return `<p class="tiny muted">A quick overview. Detailed notes remain available under Material notes.</p><div class="section"><h3>${hasSlides ? 'Build a short Scratch script' : 'Work with your class materials'}</h3><p class="tiny">${hasSlides ? 'Get the project ready, build the script, check the result and explore a small change.' : 'Review the material notes and add today’s instructions.'}</p></div><div class="section"><h3>Sections for today</h3>${sections.map((section, index) => `<p class="tiny">${index + 1}. ${escapeHtml(section.title)}</p>`).join('') || '<p class="tiny muted">No sections inferred from unread materials.</p>'}<span class="source">You can edit these in Sections.</span></div><div class="notice">${hasSlides ? '6 of 6 sample PDF pages retained, including examples and illustration descriptions.<br>' : ''}${materials.some((file) => file.id === 'starter') ? 'Starter project notes included.<br>' : ''}${editedCount ? `${editedCount} teacher revision${editedCount === 1 ? '' : 's'} included.<br>` : ''}This is a preview, not a replacement for the detailed material content.</div>${materials.some((file) => !file.sample) ? '<div class="notice">Some added materials are unread in this prototype. They are clearly marked in Material notes.</div>' : ''}${hasSlides ? `<div class="suggestion"><strong>${includeEvent ? 'Your teaching choice' : 'One thing to clarify'}</strong><p>${includeEvent ? 'Students will use the green flag. Your notes include the event block needed to start the script.' : 'The sample slides do not say how the script starts. If students use the green flag, add the matching event block.'}</p><button id="chooseEvent" ${state !== 'review' ? 'disabled' : ''}>${includeEvent ? '✓ Use green-flag playback' : 'Use green-flag playback'}</button><span class="source">Teacher choice · not an extracted slide instruction</span></div>` : ''}`;
+      }
+      function renderSections() {
+        return `<p class="tiny muted">A suggested order based on the materials. Change the wording to fit how you teach.</p>${sections.map((section, index) => `<div class="section"><h3>${index + 1}. ${escapeHtml(section.title)}</h3><p class="tiny">${escapeHtml(section.instruction)}</p><span class="source">${escapeHtml(readSources(section))}</span>${state === 'review' ? `<details class="edit-section"><summary>Edit section</summary><label for="title-${section.id}">Section name</label><input id="title-${section.id}" value="${escapeHtml(section.title)}"><label for="instruction-${section.id}">What students do</label><textarea id="instruction-${section.id}" rows="3">${escapeHtml(section.instruction)}</textarea><div class="footer"><span class="tiny muted">Original material notes stay available.</span><button data-save-section="${section.id}">Save section</button></div></details>` : ''}</div>`).join('') || '<div class="notice">The demo cannot infer sections from your added files. Use the sample materials to explore this view.</div>'}`;
+      }
+      function renderMaterialNotes() {
+        return `<p class="tiny muted">Review each page or project. Edit the prepared notes, add explanations, or restore the extracted version. Original download files stay as uploaded.</p>${materials
+          .map(
+            (file) =>
+              `<details class="material-detail" open><summary>${escapeHtml(file.name)} <span class="optional">${pages.filter((page) => page.materialId === file.id).length} note${pages.filter((page) => page.materialId === file.id).length === 1 ? '' : 's'}</span></summary>${pages
+                .filter((page) => page.materialId === file.id)
+                .map(
+                  (page) =>
+                    `<div class="section"><h3>${escapeHtml(page.source)} · ${escapeHtml(page.title)}</h3><span class="source">${page.unread ? 'Not extracted in this demo · manual notes only' : page.teacherText !== null ? 'Teacher revision · original extraction retained' : 'Illustrative sample extraction'}</span><textarea class="material-editor" data-page="${escapeHtml(page.id)}" aria-label="${escapeHtml(file.name)} ${escapeHtml(page.source)} notes" rows="6" ${state !== 'review' ? 'readonly' : ''}>${escapeHtml(readPageText(page))}</textarea>${state === 'review' ? `<div class="row"><span class="tiny muted" id="saved-${escapeHtml(page.id)}">${page.teacherText !== null ? 'Your revision is included.' : 'Ready to review.'}</span><button class="quiet" data-restore="${escapeHtml(page.id)}">Restore extracted notes</button></div>` : ''}<details class="original-note"><summary>Original extracted notes</summary><p class="tiny original-text">${escapeHtml(page.text)}</p></details></div>`,
+                )
+                .join('')}</details>`,
+          )
+          .join(
+            '',
+          )}<div class="footer"><span class="tiny muted">Includes detailed notes and teacher revisions.</span><button id="export">Download notes</button></div>`;
+      }
+      function bindReviewControls() {
+        byId('review')
+          .querySelectorAll('[data-tab]')
+          .forEach(
+            (button) =>
+              (button.onclick = () => {
+                activeTab = button.dataset.tab;
+                renderReview();
+              }),
+          );
+        byId('review')
+          .querySelectorAll('[data-save-section]')
+          .forEach(
+            (button) =>
+              (button.onclick = () => {
+                const section = sections.find((item) => item.id === button.dataset.saveSection);
+                const title = byId(`title-${section.id}`).value.trim();
+                const instruction = byId(`instruction-${section.id}`).value.trim();
+                if (!title || !instruction) {
+                  showMaterialStatus('Give the section a name and a short instruction.');
+                  return;
+                }
+                section.title = title;
+                section.instruction = instruction;
+                renderReview();
+                showMaterialStatus('Section saved in this draft.');
+              }),
+          );
+        byId('review')
+          .querySelectorAll('[data-page]')
+          .forEach(
+            (editor) =>
+              (editor.oninput = () => {
+                const page = pages.find((item) => item.id === editor.dataset.page);
+                page.teacherText = editor.value;
+                byId(`saved-${page.id}`).textContent =
+                  'Your revision is included. Original extraction retained.';
+              }),
+          );
+        byId('review')
+          .querySelectorAll('[data-restore]')
+          .forEach(
+            (button) =>
+              (button.onclick = () => {
+                const page = pages.find((item) => item.id === button.dataset.restore);
+                page.teacherText = null;
+                renderReview();
+              }),
+          );
+        if (byId('export')) byId('export').onclick = exportNotes;
+        if (byId('chooseEvent'))
+          byId('chooseEvent').onclick = () => {
+            includeEvent = !includeEvent;
+            renderReview();
+          };
+        if (byId('approve'))
+          byId('approve').onclick = () => {
+            state = 'approved';
+            render();
+          };
+        if (byId('editAgain'))
+          byId('editAgain').onclick = () => {
+            state = 'review';
+            render();
+          };
+        if (byId('focus')) {
+          byId('focus').value = focus;
+          byId('focus').onchange = (event) => {
+            focus = event.target.value;
+          };
+        }
+        if (byId('startSession'))
+          byId('startSession').onclick = () => {
+            state = 'live';
+            render();
+          };
+      }
+      function renderReview() {
+        const review = byId('review');
+        byId('reviewTitle').textContent =
+          state === 'draft'
+            ? 'Your lesson overview'
+            : state === 'processing'
+              ? 'Preparing your materials'
+              : state === 'live'
+                ? 'Class session started'
+                : 'Review your materials';
+        byId('reviewBadge').textContent =
+          state === 'draft'
+            ? 'Not prepared'
+            : state === 'processing'
+              ? 'Working'
+              : state === 'review'
+                ? `Draft · v${revision}`
+                : state === 'approved'
+                  ? `Reviewed · v${revision}`
+                  : 'Live · sample session';
+        if (state === 'draft') {
+          review.innerHTML =
+            '<div class="review-empty"><div class="empty-inner"><div class="preview-lines"><i></i><i></i><i></i></div><h3>Your materials, ready to teach with.</h3><p class="tiny muted">A brief overview, suggested sections and detailed notes from each page or project.</p><p class="tiny muted">Review and edit before using them in class.</p></div></div>';
+          return;
+        }
+        if (state === 'processing') {
+          review.innerHTML =
+            '<div class="processing"><span class="spinner">✳</span><h3 style="margin-top:20px" id="progressTitle">Reading each sample page…</h3><p class="tiny muted">Keeping the detailed content, examples and source references together.</p><div class="progress"><i id="progressBar"></i></div><p class="tiny muted">You can keep teaching while preparation finishes.</p></div>';
+          return;
+        }
+        if (state === 'live') {
+          review.innerHTML = `<div class="success"><h3>Your reviewed materials are ready</h3><p class="tiny">Students can download originals and ask Tro for help with today’s section.</p></div><div class="eyebrow">Current section</div><p style="margin-top:8px">${escapeHtml(sections.find((section) => section.id === focus)?.title ?? 'Class materials')}</p><div class="student"><h3>What a student sees</h3>${materials.map((file) => `<div class="student-item"><span>${escapeHtml(file.name)}</span><button class="quiet" data-download="${escapeHtml(file.id)}">${file.type === 'LINK' ? 'Open' : 'Download'}</button></div>`).join('')}<div class="notice">Ask Tro: “Help me with this exercise.”<br>Your reviewed notes help Tro explain the next step.</div></div><div class="footer"><span class="tiny muted">Demo session · no students connected</span><button id="endSession">End session</button></div>`;
+          review
+            .querySelectorAll('[data-download]')
+            .forEach(
+              (button) =>
+                (button.onclick = () =>
+                  showMaterialStatus(
+                    'Original downloads are placeholders in this demo. The sample files are not included.',
+                  )),
+            );
+          byId('endSession').onclick = () => {
+            state = 'approved';
+            render();
+          };
+          return;
+        }
+        review.innerHTML = `${state === 'approved' ? '<div class="success"><h3>Ready for your class</h3><p class="tiny">Your material notes and section edits are included.</p></div>' : ''}<div class="tabs" role="tablist" aria-label="Material review"><button role="tab" aria-selected="${activeTab === 'summary'}" data-tab="summary" class="${activeTab === 'summary' ? 'active' : ''}">Summary</button><button role="tab" aria-selected="${activeTab === 'sections'}" data-tab="sections" class="${activeTab === 'sections' ? 'active' : ''}">Sections</button><button role="tab" aria-selected="${activeTab === 'materials'}" data-tab="materials" class="${activeTab === 'materials' ? 'active' : ''}">Material notes</button></div><div role="tabpanel">${activeTab === 'summary' ? renderSummary() : activeTab === 'sections' ? renderSections() : renderMaterialNotes()}</div><div class="review-actions">${state === 'review' ? '<div class="row"><span class="tiny muted">Your edits stay with this draft.</span><button class="primary" id="approve">Use these materials</button></div>' : `<label class="session-focus" for="focus">Start with<select id="focus">${sections.map((section) => `<option value="${section.id}">${escapeHtml(section.title)}</option>`).join('') || '<option value="materials">Class materials</option>'}</select></label><div class="row"><button id="editAgain">Edit notes</button><button class="primary" id="startSession">Start session</button></div>`}</div>`;
+        bindReviewControls();
+      }
+      function render() {
+        renderFiles();
+        byId('prepare').disabled = state === 'processing' || materials.length === 0;
+        byId('prepare').textContent = state === 'draft' ? 'Prepare materials' : 'Prepare again';
+        byId('batchHint').textContent =
+          state === 'draft'
+            ? 'Add everything first. Prepare it together.'
+            : 'New materials need a new draft.';
+        byId('step1').classList.toggle('active', state === 'draft');
+        byId('step2').classList.toggle('active', state === 'processing' || state === 'review');
+        byId('step3').classList.toggle('active', state === 'approved' || state === 'live');
+        renderReview();
+      }
+      function addFiles(files) {
+        for (const file of files) {
+          materials.push({
+            id: crypto.randomUUID(),
+            name: file.name,
+            type: file.name.split('.').pop().toUpperCase(),
+            detail: `Local file · ${(file.size / 1024).toFixed(1)} KB`,
+            sample: false,
+          });
+        }
+        invalidateContext();
+        showMaterialStatus(
+          'Files listed locally. Their content is not read by this prototype. Add notes manually after preparation, or use the samples.',
+        );
+      }
+      byId('browse').onclick = () => byId('fileInput').click();
+      byId('fileInput').onchange = (event) => {
+        addFiles(event.target.files);
+        event.target.value = '';
+      };
+      byId('drop').ondragover = (event) => {
+        event.preventDefault();
+        byId('drop').classList.add('drag');
+      };
+      byId('drop').ondragleave = () => byId('drop').classList.remove('drag');
+      byId('drop').ondrop = (event) => {
+        event.preventDefault();
+        byId('drop').classList.remove('drag');
+        addFiles(event.dataTransfer.files);
+      };
+      byId('addLink').onclick = () => {
+        let url;
+        try {
+          url = new URL(byId('link').value);
+          if (url.protocol !== 'https:' || url.username || url.password) throw new Error();
+        } catch {
+          showMaterialStatus('Enter an HTTPS link without embedded credentials.');
+          return;
+        }
+        materials.push({
+          id: crypto.randomUUID(),
+          name: url.href,
+          type: 'LINK',
+          detail: 'Link',
+          sample: false,
+        });
+        byId('link').value = '';
+        invalidateContext();
+      };
+      byId('notes').oninput = () => {
+        if (state === 'approved') state = 'review';
+        if (state === 'live') {
+          state = 'review';
+          showMaterialStatus('Your instructions changed. Review them before starting again.');
+        }
+        if (state !== 'processing') renderReview();
+      };
+      byId('prepare').onclick = () => {
+        state = 'processing';
+        includeEvent = false;
+        activeTab = 'summary';
+        showMaterialStatus('');
+        render();
+        preparationTimer = setTimeout(() => {
+          byId('progressTitle').textContent = 'Organizing the sections without losing the details…';
+          byId('progressBar').style.width = '65%';
+          preparationTimer = setTimeout(() => {
+            createDraft();
+            state = 'review';
+            render();
+          }, 900);
+        }, 800);
+      };
+      byId('reset').onclick = () => {
+        clearTimeout(preparationTimer);
+        materials = sampleMaterials.map((file) => ({ ...file }));
+        pages = [];
+        sections = [];
+        revision = 0;
+        state = 'draft';
+        includeEvent = false;
+        activeTab = 'summary';
+        focus = 'build';
+        byId('notes').value = '';
+        byId('link').value = '';
+        showMaterialStatus('');
+        render();
+      };
+      render();
+    </script>
+  </body>
+</html>

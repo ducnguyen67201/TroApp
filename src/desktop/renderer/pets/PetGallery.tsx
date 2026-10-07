@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import {
   Alert,
   Badge,
@@ -30,13 +30,46 @@ function PetCard({ petId, preferences, view }: PetCardProps): ReactElement {
   const { locale } = useLocale();
   const messages = petMessages[locale];
   const [name, setName] = useState(preferences.names[petId]);
+  const [previewReaction, setPreviewReaction] = useState<PetReaction>(PetReaction.IDLE);
+  useEffect(() => {
+    if (previewReaction === PetReaction.IDLE) {
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      setPreviewReaction(PetReaction.IDLE);
+    }, 800);
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [previewReaction]);
   const isSelected = preferences.activePetId === petId;
   const label = isSelected ? (preferences.enabled ? messages.save : messages.show) : messages.adopt;
   return (
     <section className="pet-card" aria-label={messages[petId]}>
-      <div className="pet-card-preview">
-        <PetSprite petId={petId} reducedMotion={preferences.motion === PetMotion.REDUCED} />
-      </div>
+      <button
+        type="button"
+        className="pet-card-preview"
+        aria-label={`${messages.pet} ${preferences.names[petId]}`}
+        onClick={() => {
+          setPreviewReaction(PetReaction.HAPPY);
+        }}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setPreviewReaction(PetReaction.STARTLED);
+        }}
+      >
+        <PetSprite
+          petId={petId}
+          reaction={
+            previewReaction !== PetReaction.IDLE
+              ? previewReaction
+              : isSelected
+                ? (view.snapshot?.reaction ?? PetReaction.IDLE)
+                : PetReaction.IDLE
+          }
+          reducedMotion={preferences.motion === PetMotion.REDUCED}
+        />
+      </button>
       <Group justify="space-between">
         <Text fw={600}>{messages[petId]}</Text>
         {isSelected && (

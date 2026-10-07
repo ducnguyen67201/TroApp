@@ -7,7 +7,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cua-driver"
 -version = "0.30.4"
-+version = "0.30.4-tro.15"
++version = "0.30.4-tro.16"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -16,7 +16,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cua-driver-bindgen"
 -version = "0.30.4"
-+version = "0.30.4-tro.15"
++version = "0.30.4-tro.16"
  dependencies = [
   "cbindgen",
   "uniffi",
@@ -25,7 +25,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cua-driver-contract"
 -version = "0.30.4"
-+version = "0.30.4-tro.15"
++version = "0.30.4-tro.16"
  dependencies = [
   "schemars",
   "serde",
@@ -34,7 +34,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cua-driver-core"
 -version = "0.30.4"
-+version = "0.30.4-tro.15"
++version = "0.30.4-tro.16"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -43,7 +43,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cua-driver-e2e"
 -version = "0.30.4"
-+version = "0.30.4-tro.15"
++version = "0.30.4-tro.16"
  dependencies = [
   "base64",
   "core-foundation",
@@ -52,7 +52,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cua-driver-sdk"
 -version = "0.30.4"
-+version = "0.30.4-tro.15"
++version = "0.30.4-tro.16"
  dependencies = [
   "async-trait",
   "core-foundation",
@@ -61,7 +61,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cua-driver-testkit"
 -version = "0.30.4"
-+version = "0.30.4-tro.15"
++version = "0.30.4-tro.16"
  dependencies = [
   "arbitrary",
   "async-trait",
@@ -70,7 +70,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cua-driver-uia"
 -version = "0.30.4"
-+version = "0.30.4-tro.15"
++version = "0.30.4-tro.16"
  dependencies = [
   "anyhow",
   "cua-driver-core",
@@ -79,7 +79,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cursor-overlay"
 -version = "0.30.4"
-+version = "0.30.4-tro.15"
++version = "0.30.4-tro.16"
  dependencies = [
   "anyhow",
   "cua-driver-contract",
@@ -88,7 +88,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cursor-theme-cli"
 -version = "0.30.4"
-+version = "0.30.4-tro.15"
++version = "0.30.4-tro.16"
  dependencies = [
   "anyhow",
   "cursor-overlay",
@@ -97,7 +97,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "pip-preview"
 -version = "0.30.4"
-+version = "0.30.4-tro.15"
++version = "0.30.4-tro.16"
  dependencies = [
   "serde_json",
  ]
@@ -106,7 +106,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "platform-linux"
 -version = "0.30.4"
-+version = "0.30.4-tro.15"
++version = "0.30.4-tro.16"
  dependencies = [
   "anyhow",
   "ashpd",
@@ -115,7 +115,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "platform-macos"
 -version = "0.30.4"
-+version = "0.30.4-tro.15"
++version = "0.30.4-tro.16"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -124,7 +124,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "platform-windows"
 -version = "0.30.4"
-+version = "0.30.4-tro.15"
++version = "0.30.4-tro.16"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -137,7 +137,7 @@ index 53edeb0..a790540 100644
  
  [workspace.package]
 -version = "0.30.4"
-+version = "0.30.4-tro.15"
++version = "0.30.4-tro.16"
  edition = "2021"
  authors = ["trycua"]
  license = "MIT"
@@ -759,7 +759,7 @@ new file mode 100644
 index 0000000..ef8d7d4
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs
-@@ -0,0 +1,193 @@
+@@ -0,0 +1,197 @@
 +//! Host-only content-free presentation vocabulary; no desktop action semantics.
 +use crate::{Platform, SchemaMode, ToolAnnotations, ToolContract, ToolInput, ToolOutput};
 +use schemars::JsonSchema;
@@ -774,6 +774,10 @@ index 0000000..ef8d7d4
 +    Listening,
 +    Transcribing,
 +    Sending,
++    Checking,
++    Submitting,
++    Checked,
++    Submitted,
 +    Thinking,
 +    Showing,
 +    Waiting,
@@ -1745,7 +1749,7 @@ new file mode 100644
 index 0000000..9516cb4
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs
-@@ -0,0 +1,449 @@
+@@ -0,0 +1,472 @@
 +//! Compact host HUD in logical points. Never posts input or performs submission.
 +use cua_driver_contract::{CompanionHudLocale as Locale, CompanionHudPhase as Phase};
 +use fontdue::layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle};
@@ -1939,7 +1943,7 @@ index 0000000..9516cb4
 +        let blue = paint([138, 200, 250], alpha);
 +        let icon_x = x + 7.0;
 +        let mid = y + 11.0;
-+        if phase == Phase::Thinking || phase == Phase::Transcribing || phase == Phase::Preparing {
++        if matches!(phase, Phase::Thinking | Phase::Transcribing | Phase::Preparing | Phase::Checking | Phase::Submitting) {
 +            for index in 0..3 {
 +                let opacity = if reduced {
 +                    1.0
@@ -1959,7 +1963,7 @@ index 0000000..9516cb4
 +            }
 +        } else {
 +            let mut icon = PathBuilder::new();
-+            if phase == Phase::Done {
++            if matches!(phase, Phase::Done | Phase::Checked | Phase::Submitted) {
 +                icon.move_to(icon_x, mid);
 +                icon.line_to(icon_x + 3.0, mid + 3.0);
 +                icon.line_to(icon_x + 8.0, mid - 4.0);
@@ -2052,6 +2056,10 @@ index 0000000..9516cb4
 +            Phase::Listening => "Đang nghe",
 +            Phase::Transcribing => "Chuyển lời…",
 +            Phase::Sending => "Đang gửi…",
++            Phase::Checking => "Đang kiểm tra…",
++            Phase::Submitting => "Đang nộp…",
++            Phase::Checked => "Có phản hồi",
++            Phase::Submitted => "Đã nộp bài",
 +            Phase::Thinking => "Suy nghĩ…",
 +            Phase::Showing => "Hướng dẫn…",
 +            Phase::Waiting => "Chờ bạn…",
@@ -2069,6 +2077,10 @@ index 0000000..9516cb4
 +        Phase::Listening => "Listening",
 +        Phase::Transcribing => "Transcribing…",
 +        Phase::Sending => "Sending…",
++        Phase::Checking => "Checking work…",
++        Phase::Submitting => "Submitting…",
++        Phase::Checked => "Feedback ready",
++        Phase::Submitted => "Hand-in saved",
 +        Phase::Thinking => "Thinking…",
 +        Phase::Showing => "Showing…",
 +        Phase::Waiting => "Waiting…",
@@ -2167,6 +2179,21 @@ index 0000000..9516cb4
 +            painter.update(Phase::Idle, Locale::English, 0.0);
 +            painter.tick(0.3, false);
 +            assert!(!painter.is_visible());
++        }
++    }
++    #[test]
++    fn companion_hud_practice_labels_do_not_claim_a_passing_result() {
++        assert_eq!(label(Phase::Checking, Locale::English), "Checking work…");
++        assert_eq!(label(Phase::Submitting, Locale::Vietnamese), "Đang nộp…");
++        assert_eq!(label(Phase::Checked, Locale::English), "Feedback ready");
++        assert_eq!(label(Phase::Submitted, Locale::Vietnamese), "Đã nộp bài");
++        for phase in [Phase::Checking, Phase::Submitting, Phase::Checked, Phase::Submitted] {
++            let mut painter = CompanionHudPainter::default();
++            let mut pm = Pixmap::new(240, 100).unwrap();
++            painter.update(phase, Locale::English, 0.0);
++            painter.tick(0.2, false);
++            painter.paint(&mut pm, (80.0, 60.0), 1.0, false);
++            assert!(pm.data().chunks_exact(4).any(|pixel| pixel[3] > 0));
 +        }
 +    }
 +    #[test]

@@ -3,6 +3,7 @@ import type { AuthResult, ModelCredential } from '#contracts/AuthSession.js';
 import type { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import type { DesktopPermissionStatus } from '#contracts/DesktopPermissions.js';
 import type { DesktopLocale } from '#contracts/DesktopLocale.js';
+import type { TeachingContext } from '#contracts/Classroom.js';
 
 /** Authentication operations required by the chat controller. */
 export interface AgentChatAuth {
@@ -23,6 +24,7 @@ export interface AgentChatWorker {
     message: string,
     locale: DesktopLocale,
     mode?: AgentTaskMode,
+    classroomContext?: TeachingContext,
   ): Promise<AgentResult>;
   answerLesson?(
     sessionId: string,

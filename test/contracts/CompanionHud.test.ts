@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CompanionHudPhase,
   CompanionHudSnapshotSchema,
   AgentProgressSchema,
   VoiceMeterSchema,
@@ -27,4 +28,21 @@ describe('content-free companion boundaries', () => {
       }).success,
     ).toBe(false);
   });
+});
+
+it('accepts content-free practice progress without carrying student evidence', () => {
+  for (const phase of [
+    CompanionHudPhase.CHECKING,
+    CompanionHudPhase.SUBMITTING,
+    CompanionHudPhase.CHECKED,
+    CompanionHudPhase.SUBMITTED,
+  ]) {
+    expect(CompanionHudSnapshotSchema.safeParse({ phase, locale: 'vi', level: 0 }).success).toBe(
+      true,
+    );
+    expect(
+      CompanionHudSnapshotSchema.safeParse({ phase, locale: 'vi', level: 0, evidence: ['private'] })
+        .success,
+    ).toBe(false);
+  }
 });

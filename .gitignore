@@ -11,3 +11,4 @@ src/server/generated/
 !.env.example
 .DS_Store
 .tro-development/
+.gstack/

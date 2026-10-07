@@ -27,6 +27,7 @@ async function createLoggingFixture() {
     () => Promise.resolve('private-user-id'),
     environment,
     pino({ level: 'debug' }, output),
+    () => Promise.resolve(100),
   );
   const credential = await api.inject('/api/v1/model/credential');
   const body: unknown = credential.json();
@@ -234,7 +235,9 @@ describe('model gateway', () => {
           Promise.resolve(headers.cookie === 'tro-test=session' ? 'signed-in-user' : null),
         );
       const api = Fastify();
-      registerModelGateway(api, readSignedInUserId, environment);
+      registerModelGateway(api, readSignedInUserId, environment, api.log, () =>
+        Promise.resolve(100),
+      );
 
       try {
         const denied = await api.inject('/api/v1/model/credential');

@@ -1,8 +1,27 @@
+import { DesktopLocale } from '#contracts/DesktopLocale.js';
+import { readClassroomMessages } from '../../localization/ClassroomMessages.js';
 import type { TranslationKey } from './English.js';
 
-/* The existing bridge sends English messages. Keep this compatibility map at
-   the presentation boundary until the protocol supplies stable error codes. */
+/* Map main-process copy in either locale back to catalog keys so visible alerts
+   follow UI language changes until the protocol supplies stable error codes. */
+const englishClassroomMessages = readClassroomMessages(DesktopLocale.ENGLISH);
+const vietnameseClassroomMessages = readClassroomMessages(DesktopLocale.VIETNAMESE);
+
 const bridgeErrorKeys: Readonly<Record<string, TranslationKey>> = {
+  'Could not update saved accounts.': 'errorSavedAccounts',
+  'Secure account storage is unavailable.': 'errorAccountStorage',
+  'Saved account storage is unavailable.': 'errorAccountStorage',
+  'This saved account is unavailable.': 'errorSwitchAccount',
+  'The account changed. Try again.': 'errorSwitchAccount',
+  'Sign in to this account again.': 'errorAccountExpired',
+  'Saved account limit reached. Sign out an account first.': 'errorAccountLimit',
+  'An account change cannot start during active work.': 'errorAccountBusy',
+  'An account change is already in progress.': 'errorAccountBusy',
+  'Google sign-in did not finish. Please try again.': 'errorSignInTimeout',
+  [englishClassroomMessages.errorClassroomTeachMode]: 'errorClassroomTeachMode',
+  [vietnameseClassroomMessages.errorClassroomTeachMode]: 'errorClassroomTeachMode',
+  [englishClassroomMessages.errorClassroomContextChanged]: 'errorClassroomContextChanged',
+  [vietnameseClassroomMessages.errorClassroomContextChanged]: 'errorClassroomContextChanged',
   'Daily model allowance reached.': 'errorDailyModelLimit',
   'Could not start the cursor companion.': 'errorCompanionUnavailable',
   'Cursor companion is unavailable. Install the companion-enabled Cua Driver and restart Tro.':
@@ -12,6 +31,9 @@ const bridgeErrorKeys: Readonly<Record<string, TranslationKey>> = {
   'Could not reach the sign-in service.': 'errorSignInService',
   'Google sign-in is not configured on the backend yet.': 'errorGoogleConfiguration',
   'Could not open Google sign-in.': 'errorOpenGoogle',
+  'Tro could not register the sign-in callback. Restart the desktop launcher.':
+    'errorSignInCallback',
+  'Another Tro app is receiving sign-in. Restart this desktop launcher.': 'errorSignInCallback',
   'Could not sign out.': 'errorSignOut',
   'Sign in to use Tro.': 'errorSignInRequired',
   'Wait for the current task to finish.': 'errorTaskBusy',

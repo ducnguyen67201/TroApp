@@ -1,6 +1,38 @@
+import { DesktopLocale } from '#contracts/DesktopLocale.js';
+import { readClassroomMessages } from '../../localization/ClassroomMessages.js';
+
 import type { TranslationCatalog } from './English.js';
 
 export const vietnamese = {
+  ...readClassroomMessages(DesktopLocale.VIETNAMESE),
+  switchAccount: 'Chuyển tài khoản',
+  savedAccounts: 'Tài khoản trên máy này',
+  currentAccount: 'Hiện tại',
+  addAccount: 'Thêm tài khoản',
+  signOutCurrentAccount: 'Đăng xuất tài khoản này',
+  accountTeacher: 'Giáo viên',
+  accountStudent: 'Học sinh',
+  accountRoleUnknown: 'Tài khoản',
+  accountExpired: 'Đăng nhập lại',
+  accountSignInHeading: 'Thêm tài khoản',
+  accountSignInDescription:
+    'Đăng nhập bằng tài khoản Google khác. Tài khoản hiện tại vẫn được lưu trên máy này.',
+  accountContinueGoogle: 'Tiếp tục với Google',
+  accountWaitingGoogle: 'Hoàn tất đăng nhập trong trình duyệt.',
+  accountCancelSignIn: 'Hủy đăng nhập',
+  accountCancel: 'Hủy',
+  accountCloseMenu: 'Đóng danh sách tài khoản',
+  accountSwitching: 'Đang chuyển tài khoản…',
+  accountChoose: 'Chọn tài khoản đã lưu',
+  accountStorageHint: 'Phiên đăng nhập được mã hóa trên máy này.',
+  errorSavedAccounts: 'Không thể tải tài khoản đã lưu. Hãy thử lại.',
+  errorSwitchAccount: 'Không thể chuyển tài khoản. Hãy thử lại.',
+  errorAccountExpired: 'Phiên đăng nhập đã hết hạn. Thêm lại tài khoản bằng Google.',
+  errorAccountStorage:
+    'Không thể truy cập kho tài khoản bảo mật. Kiểm tra quyền truy cập chuỗi khóa hệ thống rồi khởi động lại Tro.',
+  errorAccountLimit:
+    'Có thể lưu tối đa 10 tài khoản. Đăng xuất một tài khoản trước khi thêm tài khoản khác.',
+  errorAccountBusy: 'Hoàn tất tác vụ, tải tài liệu hoặc kiểm tra micrô trước khi chuyển tài khoản.',
   voiceover: 'Đọc hướng dẫn thành tiếng',
   voiceoverDescription: 'Đọc hướng dẫn HUD bằng ngôn ngữ đã chọn qua dịch vụ giọng nói trực tuyến.',
   voiceoverUnavailable: 'Giọng nói không khả dụng. Hướng dẫn trực quan vẫn tiếp tục.',
@@ -98,7 +130,6 @@ export const vietnamese = {
   ownWorkspace: 'Không gian làm việc của riêng bạn',
   signInInvitation: 'Đăng nhập để bắt đầu.',
   signIn: 'Đăng nhập',
-  yourDesktop: 'MÁY TÍNH CỦA BẠN',
   attention: 'Có vấn đề cần xử lý',
   settingsGeneral: 'Chung',
   settingsNavigation: 'Nhóm cài đặt',
@@ -151,6 +182,8 @@ export const vietnamese = {
     'Tro có thể xem màn hình và sử dụng chuột hoặc bàn phím của bạn. Nội dung màn hình gửi đến OpenAI sẽ rời khỏi máy tính của bạn. Mỗi tin nhắn là một tác vụ mới; cuộc trò chuyện này sẽ được xóa khi bạn đóng ứng dụng.',
   errorCheckSignIn: 'Không thể kiểm tra đăng nhập. Vui lòng thử đăng nhập lại.',
   errorSignInTimeout: 'Đăng nhập Google chưa hoàn tất. Vui lòng thử lại.',
+  errorSignInCallback:
+    'Tro không thể nhận kết quả đăng nhập. Đóng các ứng dụng Tro khác và khởi động lại trình chạy này, rồi thử lại.',
   errorOpenGoogle: 'Không thể mở đăng nhập Google.',
   errorClearTask: 'Không thể xóa tác vụ. Vui lòng thử lại.',
   errorStartTask: 'Không thể bắt đầu tác vụ. Vui lòng thử lại.',

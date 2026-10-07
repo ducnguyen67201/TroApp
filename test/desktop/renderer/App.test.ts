@@ -1,8 +1,16 @@
+import { MaterialEditor } from '../../../src/desktop/renderer/classroom/MaterialEditor.js';
+import {
+  MaterialState,
+  type MaterialCollection,
+  type MaterialReply,
+} from '#contracts/ClassroomMaterials.js';
 // @vitest-environment happy-dom
 import { createElement } from 'react';
 import { MantineProvider } from '@mantine/core';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AccountRole } from '#contracts/AccountRole.js';
+import { createTeachingContext } from '../../server/features/classroom/ClassroomFixtures.js';
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
 import type { AuthUser } from '#contracts/AuthSession.js';
 import type { AgentResult } from '#contracts/AgentSession.js';
@@ -24,6 +32,10 @@ const sessionId = 'a8f6d44a-5c18-4ce3-9237-44624549f63f';
 
 function createDesktopBridge() {
   return {
+    controlClassroom: vi.fn<NonNullable<DesktopBridge['controlClassroom']>>().mockResolvedValue({
+      kind: 'home',
+      home: { role: AccountRole.STUDENT, courses: [], classes: [] },
+    }),
     readAppUpdate: vi
       .fn<DesktopBridge['readAppUpdate']>()
       .mockResolvedValue({ revision: 0, status: { state: AppUpdateState.DISABLED } }),
@@ -120,6 +132,7 @@ afterAll(() => {
 });
 
 beforeEach(() => {
+  window.location.hash = '#/workspace';
   window.localStorage.clear();
   window.localStorage.setItem(localeStorageKey, DesktopLocale.ENGLISH);
   window.tro = createDesktopBridge();
@@ -152,7 +165,7 @@ describe('desktop scaffold', () => {
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
   });
 
-  it('shows the signed-in account in the sidebar and only the two navigation choices', async () => {
+  it('shows the signed-in account in the sidebar and classroom navigation and account role', async () => {
     renderDesktop();
     const account = await screen.findByRole('region', { name: 'Your account' });
     await within(account).findByText(testUser.email);
@@ -560,6 +573,38 @@ describe('desktop language', () => {
     expect(screen.getByRole('alert').textContent).toContain('Could not reach the sign-in service.');
     expect(bridge.readAuthSession).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    [
+      'In class, choose Show me so you perform the learning actions.',
+      'Trong lớp học, hãy chọn “Chỉ cho tôi” để tự thực hiện bài tập.',
+    ],
+    [
+      'The class context changed. Send your request again.',
+      'Nội dung buổi học đã thay đổi. Hãy gửi lại yêu cầu.',
+    ],
+  ])(
+    'preserves the classroom error and translates it when locale changes: %s',
+    async (englishMessage, vietnameseMessage) => {
+      window.localStorage.clear();
+      const bridge = createDesktopBridge();
+      bridge.sendAgentMessage.mockResolvedValue({ kind: 'failed', message: vietnameseMessage });
+      window.tro = bridge;
+      renderDesktop();
+      await screen.findByRole('heading', { name: 'Chào mừng trở lại, Alex' });
+      fireEvent.change(screen.getByRole('textbox', { name: 'Tin nhắn của bạn' }), {
+        target: { value: 'Help with my class' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Gửi cho Tro' }));
+      expect((await screen.findByRole('alert')).textContent).toContain(vietnameseMessage);
+      fireEvent.click(screen.getByRole('button', { name: 'Cài đặt' }));
+      fireEvent.change(screen.getByRole('combobox', { name: 'Ngôn ngữ' }), {
+        target: { value: 'en' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Close settings' }));
+      expect(screen.getByRole('alert').textContent).toContain(englishMessage);
+    },
+  );
 
   it('uses a localized fallback for an unknown bridge error', async () => {
     window.localStorage.clear();
@@ -1264,4 +1309,518 @@ describe('sidebar app updates', () => {
       );
     });
   });
+});
+
+it('shows the student role and code enrollment page while preserving the workspace draft', async () => {
+  const bridge = createDesktopBridge();
+  window.tro = bridge;
+  renderDesktop();
+  const input = await screen.findByRole('textbox', { name: 'Your message' });
+  fireEvent.change(input, { target: { value: 'Keep my work' } });
+  await waitFor(() => {
+    expect(screen.getByLabelText('Account role').textContent).toBe('Student');
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Classroom' }));
+  expect(await screen.findByRole('heading', { name: /^Welcome/ })).toBeTruthy();
+  expect(screen.queryByRole('tab', { name: 'Class materials' })).toBeNull();
+  fireEvent.change(screen.getByRole('textbox', { name: 'Class code' }), {
+    target: { value: 'aabb-ccdd-eeff' },
+  });
+  bridge.controlClassroom.mockResolvedValueOnce({ kind: 'ok' });
+  fireEvent.click(screen.getByRole('button', { name: 'Join class' }));
+  await waitFor(() => {
+    expect(bridge.controlClassroom).toHaveBeenCalledWith({
+      kind: 'accept-invitation',
+      code: 'AABBCCDDEEFF',
+    });
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Workspace' }));
+  expect(screen.getByRole('textbox', { name: 'Your message' })).toHaveProperty(
+    'value',
+    'Keep my work',
+  );
+  expect(bridge.stopAgentSession).not.toHaveBeenCalled();
+});
+
+it('shows teacher preparation and invitation controls only with a server-provided teacher role', async () => {
+  const bridge = createDesktopBridge();
+  const context = createTeachingContext();
+  bridge.controlClassroom.mockResolvedValue({
+    kind: 'home',
+    home: {
+      role: AccountRole.TEACHER,
+      courses: [
+        {
+          id: context.courseRevisionId,
+          title: 'Scratch lesson',
+          activities: [{ id: context.activity.id, title: context.activity.title }],
+        },
+      ],
+      classes: [
+        {
+          schoolClass: {
+            id: context.meeting.classId,
+            teacherId: testUser.id,
+            name: 'Class A',
+            courseRevisionId: context.courseRevisionId,
+          },
+          meetings: [],
+        },
+      ],
+    },
+  });
+  window.tro = bridge;
+  renderDesktop();
+  await waitFor(() => {
+    expect(screen.getByLabelText('Account role').textContent).toBe('Teacher');
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Classroom' }));
+  expect(await screen.findByRole('tab', { name: 'Class materials' })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Create a class' }));
+  expect(screen.getByRole('button', { name: 'Create class' })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Manage Class A' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'Class settings' }));
+  expect(screen.getByRole('button', { name: 'Add student' })).toBeTruthy();
+  fireEvent.click(screen.getByText('Share an invitation code instead', { selector: 'summary' }));
+  expect(screen.getByRole('button', { name: 'Create invitation code' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Create a class' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'All classes' }));
+  expect(window.location.hash).toBe('#/classroom');
+  expect(screen.getByRole('button', { name: 'Manage Class A' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Create a class' })).toBeTruthy();
+});
+
+it.each([true, false])(
+  'reports the real result of adding a student by email (success=%s)',
+  async (succeeds) => {
+    const context = createTeachingContext();
+    const bridge = createDesktopBridge();
+    bridge.controlClassroom.mockImplementation((command) => {
+      if (command.kind === 'home') {
+        return Promise.resolve({
+          kind: 'home',
+          home: {
+            role: 'teacher',
+            courses: [],
+            classes: [
+              {
+                schoolClass: {
+                  id: context.meeting.classId,
+                  teacherId: testUser.id,
+                  name: 'Class A',
+                  courseRevisionId: context.courseRevisionId,
+                },
+                meetings: [],
+              },
+            ],
+          },
+        });
+      }
+      return Promise.resolve(succeeds ? { kind: 'ok' } : { kind: 'failed', code: 'not_found' });
+    });
+    window.tro = bridge;
+    renderDesktop();
+    await waitFor(() => {
+      expect(screen.getByLabelText('Account role').textContent).toBe('Teacher');
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Classroom' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Manage Class A' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Class settings' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Student email' }), {
+      target: { value: 'student@example.test' },
+    });
+    fireEvent.submit(screen.getByRole('form', { name: 'Add student' }));
+    await waitFor(() => {
+      expect(bridge.controlClassroom).toHaveBeenCalledWith({
+        kind: 'enroll',
+        classId: context.meeting.classId,
+        email: 'student@example.test',
+      });
+    });
+    if (succeeds) {
+      expect(
+        await screen.findByText('Student added. This class will appear in their classroom.'),
+      ).toBeTruthy();
+    } else {
+      expect(
+        await screen.findByText(
+          'No signed-in student was found for this email. Ask them to sign in first, or share an invitation code.',
+        ),
+      ).toBeTruthy();
+      expect(
+        screen.queryByText('Student added. This class will appear in their classroom.'),
+      ).toBeNull();
+    }
+  },
+);
+
+it('edits per-source notes, preserves original extraction, and saves the review before approval', async () => {
+  const context = createTeachingContext();
+  const sourceId = crypto.randomUUID();
+  const pageId = crypto.randomUUID();
+  const collection: MaterialCollection = {
+    classId: context.meeting.classId,
+    version: 4,
+    state: 'review',
+    teacherInstructions: '',
+    sources: [{ id: sourceId, name: 'Lesson.py', bytes: 20, digest: '', url: null }],
+    draft: {
+      summary: 'Explain the lesson.',
+      questions: ['How should it start?'],
+      sections: [
+        {
+          id: context.activity.id,
+          title: 'Build',
+          instruction: 'Build and test.',
+          sourcePageIds: [pageId],
+        },
+      ],
+      pages: [
+        {
+          id: pageId,
+          materialId: sourceId,
+          location: 'Lines 1–2',
+          extractedText: 'print("Hello")',
+          preparedNote: 'Explain the print statement.',
+          teacherNote: null,
+          warnings: [],
+        },
+      ],
+    },
+    issue: null,
+    leaseUntil: null,
+    preparedAt: new Date().toISOString(),
+    approvedCourseId: null,
+  };
+  const control = vi
+    .fn<NonNullable<DesktopBridge['controlClassMaterials']>>()
+    .mockImplementation((command) => {
+      if (command.kind === 'save-review') {
+        return Promise.resolve({
+          kind: 'collection',
+          collection: {
+            ...collection,
+            version: 5,
+            teacherInstructions: command.teacherInstructions,
+          },
+        });
+      }
+      return Promise.resolve({
+        kind: 'collection',
+        collection: {
+          ...collection,
+          ...(command.kind === 'approve' ? { version: 6, state: 'approved' as const } : {}),
+        },
+      });
+    });
+  window.tro = { ...createDesktopBridge(), controlClassMaterials: control };
+  const onApproved = vi.fn<() => Promise<void>>().mockResolvedValue();
+  render(
+    createElement(MantineProvider, {
+      children: createElement(LocaleProvider, {
+        children: createElement(MaterialEditor, {
+          classId: context.meeting.classId,
+          live: false,
+          t: (english) => english,
+          onApproved,
+        }),
+      }),
+    }),
+  );
+  await screen.findByRole('tab', { name: 'Sections' });
+  fireEvent.click(screen.getByRole('tab', { name: 'Sections' }));
+  expect(screen.getByText('Build and test.', { selector: 'p' })).toBeTruthy();
+  expect(screen.getByText('Edit section').closest('details')?.open).toBe(false);
+  fireEvent.click(screen.getByRole('tab', { name: 'Material notes' }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'Teaching notes' }), {
+    target: { value: 'Teacher correction: explain variables first.' },
+  });
+  expect(screen.getByText('print("Hello")')).toBeTruthy();
+  fireEvent.click(screen.getByRole('checkbox'));
+  fireEvent.click(screen.getByRole('button', { name: 'Use reviewed materials' }));
+  await waitFor(() => {
+    expect(onApproved).toHaveBeenCalledTimes(1);
+  });
+  expect(control).toHaveBeenCalledWith(
+    expect.objectContaining({
+      kind: 'save-review',
+      notes: [{ pageId, text: 'Teacher correction: explain variables first.' }],
+      resolvedQuestions: true,
+    }),
+  );
+  expect(control).toHaveBeenLastCalledWith({
+    kind: 'approve',
+    materialSchemaVersion: 2,
+    classId: context.meeting.classId,
+    version: 5,
+  });
+});
+
+it('keeps teacher instructions entered before adding materials and prepares with the selected locale', async () => {
+  const context = createTeachingContext();
+  const collection: MaterialCollection = {
+    classId: context.meeting.classId,
+    version: 0,
+    state: 'collecting',
+    sources: [],
+    teacherInstructions: '',
+    draft: null,
+    issue: null,
+    leaseUntil: null,
+    preparedAt: null,
+    approvedCourseId: null,
+  };
+  const control = vi
+    .fn<NonNullable<DesktopBridge['controlClassMaterials']>>()
+    .mockImplementation((command) =>
+      Promise.resolve({
+        kind: 'collection',
+        collection:
+          command.kind === 'add-link'
+            ? {
+                ...collection,
+                version: 1,
+                sources: [
+                  {
+                    id: crypto.randomUUID(),
+                    name: command.name,
+                    url: command.url,
+                    bytes: 0,
+                    digest: '',
+                  },
+                ],
+              }
+            : collection,
+      }),
+    );
+  window.tro = { ...createDesktopBridge(), controlClassMaterials: control };
+  render(
+    createElement(MantineProvider, {
+      children: createElement(LocaleProvider, {
+        children: createElement(MaterialEditor, {
+          classId: context.meeting.classId,
+          live: false,
+          t: (english) => english,
+          onApproved: () => Promise.resolve(),
+        }),
+      }),
+    }),
+  );
+  await waitFor(() => {
+    expect(screen.queryByText('Loading materials…')).toBeNull();
+  });
+  expect(screen.getByRole('region', { name: 'Review your materials' })).toBeTruthy();
+  expect(screen.getByText('Your materials, ready to teach with.')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Choose files' })).toBeTruthy();
+  fireEvent.change(screen.getByRole('textbox', { name: 'Anything Tro should know? (optional)' }), {
+    target: { value: 'Explain setup before practice.' },
+  });
+  fireEvent.change(screen.getByRole('textbox', { name: 'Material link (HTTPS)' }), {
+    target: { value: 'https://scratch.mit.edu/' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+  await screen.findByText('scratch.mit.edu');
+  fireEvent.click(screen.getByRole('button', { name: 'Process materials' }));
+  await waitFor(() => {
+    expect(control).toHaveBeenCalledWith({
+      kind: 'prepare',
+      materialSchemaVersion: 2,
+      classId: context.meeting.classId,
+      version: 1,
+      teacherInstructions: 'Explain setup before practice.',
+      locale: 'en',
+    });
+  });
+});
+
+it.each([MaterialState.COLLECTING, MaterialState.QUEUED, MaterialState.PREPARING])(
+  'shows preparation loading from the initial request through background work (%s)',
+  async (state) => {
+    const context = createTeachingContext();
+    const collection: MaterialCollection = {
+      classId: context.meeting.classId,
+      version: 1,
+      state,
+      sources: [
+        {
+          id: crypto.randomUUID(),
+          name: 'Lesson',
+          url: 'https://example.test/lesson',
+          bytes: 0,
+          digest: '',
+        },
+      ],
+      teacherInstructions: '',
+      draft: null,
+      issue: null,
+      leaseUntil: null,
+      preparedAt: null,
+      approvedCourseId: null,
+    };
+    let finishPreparation: (reply: MaterialReply) => void = () => {
+      throw new Error('Preparation has not started');
+    };
+    const pendingPreparation = new Promise<MaterialReply>((resolve) => {
+      finishPreparation = resolve;
+    });
+    const control = vi
+      .fn<NonNullable<DesktopBridge['controlClassMaterials']>>()
+      .mockImplementation((command) => {
+        if (command.kind === 'prepare') {
+          return pendingPreparation;
+        }
+        return Promise.resolve({ kind: 'collection', collection });
+      });
+    window.tro = { ...createDesktopBridge(), controlClassMaterials: control };
+    render(
+      createElement(MantineProvider, {
+        children: createElement(LocaleProvider, {
+          children: createElement(MaterialEditor, {
+            classId: context.meeting.classId,
+            live: false,
+            t: (english) => english,
+            onApproved: () => Promise.resolve(),
+          }),
+        }),
+      }),
+    );
+    if (state === MaterialState.COLLECTING) {
+      const prepare = await screen.findByRole('button', { name: 'Process materials' });
+      await waitFor(() => {
+        expect(prepare.hasAttribute('disabled')).toBe(false);
+      });
+      fireEvent.click(prepare);
+    }
+    const status = await screen.findByRole('status', { name: 'Preparing materials' });
+    expect(within(status).getByText('Preparing your materials…')).toBeTruthy();
+    const review = screen.getByRole('region', { name: 'Review your materials' });
+    expect(review.getAttribute('aria-busy')).toBe('true');
+    expect(status.querySelector('.mantine-Loader-root')).toBeTruthy();
+    expect(screen.queryByText('Your materials, ready to teach with.')).toBeNull();
+    if (state === MaterialState.COLLECTING) {
+      await act(async () => {
+        finishPreparation({
+          kind: 'collection',
+          collection: { ...collection, state: MaterialState.FAILED },
+        });
+        await pendingPreparation;
+      });
+      expect(screen.queryByRole('status')).toBeNull();
+      expect(review.getAttribute('aria-busy')).toBe('false');
+      expect(screen.getByText(/Preparation failed/)).toBeTruthy();
+    }
+  },
+);
+
+function createSavedAccountBridge() {
+  const bridge = createDesktopBridge();
+  const student: AuthUser = { id: 'student-user', name: 'Minh Nguyen', email: 'minh@example.test' };
+  const teacherId = '11111111-1111-4111-8111-111111111111';
+  const studentId = '22222222-2222-4222-8222-222222222222';
+  const readSavedAccounts = vi
+    .fn<NonNullable<DesktopBridge['readSavedAccounts']>>()
+    .mockResolvedValue({
+      kind: 'accounts',
+      activeAccountId: teacherId,
+      accounts: [
+        { id: teacherId, user: testUser, role: AccountRole.TEACHER, requiresSignIn: false },
+        { id: studentId, user: student, role: AccountRole.STUDENT, requiresSignIn: false },
+      ],
+    });
+  const switchAccount = vi
+    .fn<NonNullable<DesktopBridge['switchAccount']>>()
+    .mockResolvedValue({ kind: 'signed-in', user: student });
+  const addGoogleAccount = vi
+    .fn<NonNullable<DesktopBridge['addGoogleAccount']>>()
+    .mockResolvedValue({ kind: 'pending' });
+  const cancelAccountSignIn = vi
+    .fn<NonNullable<DesktopBridge['cancelAccountSignIn']>>()
+    .mockResolvedValue({ kind: 'signed-in', user: testUser });
+  window.tro = {
+    ...bridge,
+    readSavedAccounts,
+    switchAccount,
+    addGoogleAccount,
+    cancelAccountSignIn,
+  };
+  return {
+    bridge,
+    student,
+    studentId,
+    readSavedAccounts,
+    switchAccount,
+    addGoogleAccount,
+    cancelAccountSignIn,
+  };
+}
+
+it('switches from the avatar menu, clears the previous task and draft, and keeps other logins', async () => {
+  const fixture = createSavedAccountBridge();
+  renderDesktop();
+  const input = await screen.findByRole('textbox', { name: 'Your message' });
+  fireEvent.change(input, { target: { value: 'Private teacher task' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send to Tro' }));
+  await screen.findByText('Here is your answer.');
+  fireEvent.change(input, { target: { value: 'Private teacher draft' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Switch account' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Minh Nguyen, Student' }));
+  await screen.findByText(fixture.student.email);
+  expect(screen.getByRole('textbox', { name: 'Your message' })).toHaveProperty('value', '');
+  expect(screen.queryByText('Here is your answer.')).toBeNull();
+  expect(fixture.switchAccount).toHaveBeenCalledExactlyOnceWith(fixture.studentId);
+  expect(fixture.bridge.signOut).not.toHaveBeenCalled();
+  expect(fixture.bridge.controlVoiceInput).toHaveBeenCalledWith({ kind: 'disable' });
+});
+
+it('adds an account through Google and allows cancellation back to the original account', async () => {
+  const fixture = createSavedAccountBridge();
+  renderDesktop();
+  fireEvent.click(await screen.findByRole('button', { name: 'Switch account' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Add account' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Add an account' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Continue with Google' }));
+  await within(dialog).findByText('Finish signing in in your browser.');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel sign-in' }));
+  await waitFor(() => {
+    expect(fixture.cancelAccountSignIn).toHaveBeenCalledOnce();
+  });
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog', { name: 'Add an account' })).toBeNull();
+  });
+  expect(screen.getByText(testUser.email)).toBeTruthy();
+  expect(fixture.addGoogleAccount).toHaveBeenCalledOnce();
+  expect(fixture.bridge.signOut).not.toHaveBeenCalled();
+});
+
+it('keeps the current account on an expired target and translates the error', async () => {
+  const fixture = createSavedAccountBridge();
+  window.localStorage.setItem(localeStorageKey, DesktopLocale.VIETNAMESE);
+  fixture.switchAccount.mockResolvedValue({
+    kind: 'failed',
+    message: 'Sign in to this account again.',
+  });
+  renderDesktop();
+  const accountButton = await screen.findByRole('button', { name: 'Chuyển tài khoản' });
+  await waitFor(() => {
+    expect(accountButton.hasAttribute('disabled')).toBe(false);
+  });
+  fireEvent.click(accountButton);
+  fireEvent.click(await screen.findByRole('button', { name: 'Minh Nguyen, Học sinh' }));
+  await screen.findByText('Phiên đăng nhập đã hết hạn. Thêm lại tài khoản bằng Google.');
+  expect(screen.getByText(testUser.email)).toBeTruthy();
+  expect(screen.queryByText(fixture.student.email)).toBeNull();
+});
+
+it('offers saved accounts after signing out of only the current account', async () => {
+  const fixture = createSavedAccountBridge();
+  renderDesktop();
+  await screen.findByRole('textbox', { name: 'Your message' });
+  fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+  await screen.findByRole('button', { name: 'Continue with Google' });
+  fireEvent.click(screen.getByRole('button', { name: 'Switch account' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Minh Nguyen, Student' }));
+  await screen.findByText(fixture.student.email);
+  expect(fixture.switchAccount).toHaveBeenCalledExactlyOnceWith(fixture.studentId);
+  expect(fixture.bridge.signInWithGoogle).not.toHaveBeenCalled();
 });

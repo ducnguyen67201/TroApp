@@ -156,3 +156,27 @@ it('requires acknowledged requested highlights for a tour, separately from walkt
   );
   expect(lesson.hasReachedGoal(decision)).toBe(true);
 });
+
+it('evicts oversized material exchanges as intact groups', () => {
+  const lesson = new TeachingLessonContext('Help me print');
+  const input = lesson.buildInput('request', null);
+  const exchange: AgentInputItem[] = [
+    {
+      type: 'function_call',
+      name: 'read_class_material_source',
+      callId: 'oversized',
+      arguments: '{}',
+    },
+    {
+      type: 'function_call_result',
+      name: 'read_class_material_source',
+      callId: 'oversized',
+      status: 'completed',
+      output: '漢字 '.repeat(10000),
+    },
+  ];
+  lesson.recordReply([...input, ...exchange], input.length);
+  const retained = JSON.stringify(lesson.buildInput('continue', null));
+  expect(retained).not.toContain('oversized');
+  expect(retained).toContain('Help me print');
+});

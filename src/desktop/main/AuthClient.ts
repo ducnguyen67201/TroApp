@@ -1,3 +1,12 @@
+import { DesktopAuthProtocol } from '../DesktopAuthProtocol.js';
+import {
+  DesktopAuthCallbackError,
+  ensureDesktopAuthCallback,
+} from './accounts/DesktopAuthCallback.js';
+import { AccountSessions } from './accounts/AccountSessions.js';
+import { EncryptedAccountVault } from './accounts/EncryptedAccountVault.js';
+import type { AccountVault } from './accounts/AccountSessions.js';
+import type { AccountReply } from '#contracts/DesktopAccounts.js';
 import {
   TranscriptionCredentialSchema,
   type TranscriptionCredential,
@@ -17,9 +26,10 @@ import {
   type ModelCredential,
 } from '#contracts/AuthSession.js';
 
-const sessionResponseSchema = z.looseObject({
-  user: z.looseObject({ id: z.string().min(1), name: z.string().min(1), email: z.email() }),
-});
+/* SDK 1.7.6 advertises kElectron in types but omits its runtime export. Keep
+   the pinned SDK's state-map key at this adapter boundary and test compatibility. */
+const ElectronPendingSignInKey = Symbol.for('better-auth:electron');
+
 const googleAvailabilitySchema = z.strictObject({ available: z.boolean() });
 
 interface ElectronActions {
@@ -29,7 +39,10 @@ interface ElectronActions {
     scheme: true;
     getWindow: () => BrowserWindow | undefined;
   }): void;
-  requestAuth(options: { provider: 'google' }): Promise<void>;
+  requestAuth(options: {
+    provider: 'google';
+    additionalParams?: { prompt: 'select_account' };
+  }): Promise<void>;
   getCookie(): string;
   signOut(): Promise<unknown>;
 }
@@ -37,16 +50,20 @@ interface ElectronActions {
 /** Better Auth owns the OAuth exchange; main stores only its OS-encrypted session data. */
 export class AuthClient implements AgentChatAuth {
   private readonly client: ElectronActions;
+  private readonly accounts: AccountSessions;
+  private loginGeneration = 0;
 
   constructor(
     private readonly apiBaseUrl: string,
     userDataPath: string,
     private readonly request: typeof fetch = fetch,
+    vault: AccountVault = new EncryptedAccountVault(userDataPath),
+    private readonly prepareCallback: () => Promise<void> = ensureDesktopAuthCallback,
   ) {
     const storageDirectory = join(userDataPath, 'AuthStorage');
     const plugin = electronClient({
       signInURL: `${apiBaseUrl}/sign-in`,
-      protocol: 'app.tro.desktop',
+      protocol: DesktopAuthProtocol.SCHEME,
       userImageProxy: { enabled: false },
       storage: {
         getItem(key) {
@@ -67,10 +84,31 @@ export class AuthClient implements AgentChatAuth {
     if (!isCompatiblePlugin(plugin)) throw new Error('Electron authentication is unavailable.');
     const created: unknown = createAuthClient({
       baseURL: apiBaseUrl,
+      fetchOptions: {
+        customFetchImpl: async (...parameters: Parameters<typeof fetch>): Promise<Response> => {
+          const generation = this.loginGeneration;
+          const response = await request(...parameters);
+          const data = await response.arrayBuffer();
+          if (generation !== this.loginGeneration) {
+            throw new Error('The sign-in attempt ended.');
+          }
+          return new Response(response.status === 204 ? null : data, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+          });
+        },
+      },
       plugins: [plugin],
     });
     if (!hasElectronActions(created)) throw new Error('Electron authentication is unavailable.');
     this.client = created;
+    this.accounts = new AccountSessions(
+      vault,
+      () => this.client.getCookie() || null,
+      request,
+      apiBaseUrl,
+    );
   }
 
   registerDeepLink(getWindow: () => BrowserWindow | undefined): void {
@@ -80,53 +118,121 @@ export class AuthClient implements AgentChatAuth {
   }
 
   async readSession(): Promise<AuthResult> {
-    const cookie = this.readCookie();
-    if (!cookie) return { kind: 'signed-out' };
     try {
-      const response = await this.request(`${this.apiBaseUrl}/api/auth/get-session`, {
-        headers: { cookie },
-      });
-      if (!response.ok) return { kind: 'failed', message: 'Could not check your sign-in.' };
-      const text = await response.text();
-      if (!text) return { kind: 'signed-out' };
-      const body: unknown = JSON.parse(text);
-      if (body === null) return { kind: 'signed-out' };
-      const parsed = sessionResponseSchema.safeParse(body);
-      if (!parsed.success) return { kind: 'failed', message: 'Could not read your sign-in.' };
-      const { id, name, email } = parsed.data.user;
-      return { kind: 'signed-in', user: { id, name, email } };
+      const wasAdding = this.accounts.isAddingAccount();
+      const result = await this.accounts.readSession();
+      if (wasAdding && !this.accounts.isAddingAccount()) {
+        this.invalidateLoginAttempt();
+      }
+      return result;
     } catch {
-      return { kind: 'failed', message: 'Could not reach the sign-in service.' };
+      return { kind: 'failed', message: 'Secure account storage is unavailable.' };
     }
   }
 
-  async signInWithGoogle(): Promise<AuthResult> {
+  listAccounts(): AccountReply {
     try {
-      const response = await this.request(`${this.apiBaseUrl}/api/v1/auth/google`);
+      return this.accounts.listAccounts();
+    } catch {
+      return { kind: 'failed', message: 'Secure account storage is unavailable.' };
+    }
+  }
+
+  isAddingAccount(): boolean {
+    return this.accounts.isAddingAccount();
+  }
+
+  async switchAccount(accountId: string): Promise<AuthResult> {
+    try {
+      this.invalidateLoginAttempt();
+      return await this.accounts.switchAccount(accountId);
+    } catch {
+      return { kind: 'failed', message: 'Secure account storage is unavailable.' };
+    }
+  }
+
+  async cancelAccountSignIn(): Promise<AuthResult> {
+    try {
+      this.invalidateLoginAttempt();
+      this.accounts.cancelSignIn();
+      return await this.readSession();
+    } catch {
+      return { kind: 'failed', message: 'Secure account storage is unavailable.' };
+    }
+  }
+
+  addGoogleAccount(): Promise<AuthResult> {
+    return this.openGoogleSignIn(true);
+  }
+
+  signInWithGoogle(): Promise<AuthResult> {
+    return this.openGoogleSignIn(false);
+  }
+
+  private async openGoogleSignIn(chooseAccount: boolean): Promise<AuthResult> {
+    if (this.accounts.isAddingAccount()) {
+      return { kind: 'failed', message: 'An account change is already in progress.' };
+    }
+    const current = await this.readSession();
+    if (current.kind === 'failed') {
+      return current;
+    }
+    try {
+      const response = await this.request(`${this.apiBaseUrl}/api/v1/auth/google`, {
+        signal: AbortSignal.timeout(10_000),
+      });
       if (!response.ok) return { kind: 'failed', message: 'Could not reach the sign-in service.' };
       const body: unknown = await response.json();
       if (!googleAvailabilitySchema.parse(body).available) {
         return { kind: 'failed', message: 'Google sign-in is not configured on the backend yet.' };
       }
-      await this.client.requestAuth({ provider: 'google' });
+      await this.prepareCallback();
+      this.invalidateLoginAttempt();
+      try {
+        this.accounts.beginSignIn();
+      } catch {
+        return { kind: 'failed', message: 'Secure account storage is unavailable.' };
+      }
+      await this.client.requestAuth({
+        provider: 'google',
+        ...(chooseAccount ? { additionalParams: { prompt: 'select_account' } as const } : {}),
+      });
       return { kind: 'pending' };
-    } catch {
-      return { kind: 'failed', message: 'Could not open Google sign-in.' };
+    } catch (error) {
+      this.invalidateLoginAttempt();
+      this.accounts.cancelSignIn();
+      const callbackMessages: readonly string[] = Object.values(DesktopAuthCallbackError);
+      return {
+        kind: 'failed',
+        message:
+          error instanceof Error && callbackMessages.includes(error.message)
+            ? error.message
+            : 'Could not open Google sign-in.',
+      };
     }
   }
 
   async signOut(): Promise<AuthResult> {
     try {
-      await this.client.signOut();
-      return { kind: 'signed-out' };
+      this.invalidateLoginAttempt();
+      return await this.accounts.signOut();
     } catch {
       return { kind: 'failed', message: 'Could not sign out.' };
     }
   }
 
+  private invalidateLoginAttempt(): void {
+    this.loginGeneration += 1;
+    /* The pinned SDK keeps pending PKCE states in this process-wide map without
+       a cancel action. This client is its sole owner; discard canceled proofs. */
+    const pendingProofs: unknown = Reflect.get(globalThis, ElectronPendingSignInKey);
+    if (pendingProofs instanceof Map) {
+      pendingProofs.clear();
+    }
+  }
+
   readCookie(): string | null {
-    const cookie = this.client.getCookie();
-    return cookie ? cookie : null;
+    return this.accounts.readCookie();
   }
 
   async releaseUnusedTranscription(captureId: string): Promise<void> {

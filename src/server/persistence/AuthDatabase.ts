@@ -1,3 +1,4 @@
+import { AccountRole } from '#contracts/AccountRole.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { betterAuth } from 'better-auth';
 import { electron } from '@better-auth/electron';
@@ -13,6 +14,16 @@ export function createAuthDatabase(environment: ServerEnv) {
   const client = new PrismaClient({ adapter });
   const auth = betterAuth({
     database: prismaAdapter(client, { provider: 'postgresql' }),
+    user: {
+      additionalFields: {
+        role: {
+          type: Object.values(AccountRole),
+          required: true,
+          defaultValue: AccountRole.STUDENT,
+          input: false,
+        },
+      },
+    },
     secret: environment.AUTH_SECRET,
     baseURL: environment.AUTH_BASE_URL,
     /* The desktop's supported sign-in flow uses Google. */

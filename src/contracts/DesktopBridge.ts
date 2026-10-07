@@ -1,4 +1,8 @@
 import type { PetCommand, PetReply, PetSnapshot } from './Pet.js';
+import type { PracticeShortcutEvent } from './PracticeShortcut.js';
+import type { PracticeCommand, PracticeReply } from './PracticeCheck.js';
+import type { AccountReply } from './DesktopAccounts.js';
+import type { MaterialCommand, MaterialReply } from './ClassroomMaterials.js';
 import type {
   MicrophoneTestCommand,
   MicrophoneTestEvent,
@@ -17,6 +21,7 @@ import type {
 } from './DesktopPermissions.js';
 import type { AppUpdateReply, AppUpdateSnapshot } from './AppUpdate.js';
 import type { VoiceoverAck, VoiceoverPlayback, VoiceoverStatus } from './Voiceover.js';
+import type { ClassroomCommand, ClassroomReply } from './Classroom.js';
 
 /** Named capabilities available to React through Electron preload.
  * The agent chooses computer actions inside its worker; React only sends chat
@@ -26,6 +31,10 @@ export interface DesktopBridge {
   readPets?: () => Promise<PetReply>;
   controlPet?: (command: PetCommand) => Promise<PetReply>;
   subscribePet?: (listener: (snapshot: PetSnapshot) => void) => () => void;
+  controlClassMaterials?: (
+    command: Exclude<MaterialCommand, { kind: 'download' }>,
+  ) => Promise<MaterialReply>;
+  downloadClassMaterial?: (classId: string, materialId: string) => Promise<boolean>;
   subscribeVoiceover?: (
     listener: (event: VoiceoverPlayback | VoiceoverStatus) => void,
   ) => () => void;
@@ -33,6 +42,11 @@ export interface DesktopBridge {
   setVoiceoverEnabled?: (enabled: boolean, locale: DesktopLocale) => Promise<void>;
   stopSpeaking?: () => Promise<boolean>;
   cancelGuidance?: () => Promise<void>;
+  readPracticeShortcutAvailable?: () => Promise<boolean>;
+  subscribePracticeShortcut?: (listener: (event: PracticeShortcutEvent) => void) => () => void;
+  controlPractice?: (command: PracticeCommand) => Promise<PracticeReply>;
+  controlClassroom?: (command: ClassroomCommand) => Promise<ClassroomReply>;
+  readPreparedClassroomSubmission?(): Promise<ClassroomReply>;
   updateTeachingLocale?: (sessionId: string, locale: DesktopLocale) => Promise<AgentResult>;
   readAppUpdate(): Promise<AppUpdateSnapshot>;
   checkAppUpdate(): Promise<AppUpdateReply>;
@@ -46,6 +60,10 @@ export interface DesktopBridge {
   appendVoiceAudio(frame: VoiceAudioFrame): Promise<VoiceReply>;
   subscribeVoiceInput(listener: (event: VoiceEvent) => void): () => void;
   subscribeAgentProgress(listener: (event: AgentProgress) => void): () => void;
+  readSavedAccounts?: () => Promise<AccountReply>;
+  addGoogleAccount?: () => Promise<AuthResult>;
+  switchAccount?: (accountId: string) => Promise<AuthResult>;
+  cancelAccountSignIn?: () => Promise<AuthResult>;
   readAuthSession(): Promise<AuthResult>;
   signInWithGoogle(): Promise<AuthResult>;
   signOut(): Promise<AuthResult>;

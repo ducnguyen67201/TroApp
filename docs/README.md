@@ -6,6 +6,7 @@ Start with [Architecture](Architecture.md), [Development](Development.md) and [V
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | Agent execution          | [Computer use](agent/ComputerUseSpec.md), [Task harness](agent/AgentHarnessSpec.md), [Completion](agent/TaskCompletionSpec.md)                                                                                                         | [Prompt research](agent/AgentPromptResearch.md)                                              |
 | Teaching                 | [Companion plan](teaching/TeachingCompanionPlan.md), [Observation design](teaching/TeachingObservationDesign.md), [Input-driven plan](teaching/InputDrivenObservationPlan.md), [Executable contract](teaching/TeachingFlowContract.md) | [HTML demo](teaching/TeachingCompanionDemo.html)                                             |
+| Classroom context        | [Classroom engineering spec](classroom/ClassroomContextEngineeringSpec.md)                                                                                                                                                             | [Implementation and pilot setup](classroom/ClassroomImplementation.md)                       |
 | Cursor companion and HUD | [Setup](companion/CursorCompanion.md), [Engineering](companion/CursorCompanionEngineering.md), [Guidance](companion/CursorCompanionGuidanceSpec.md), [Voice bar](companion/CursorCompanionVoiceBarPlan.md)                             | [Audit](companion/CursorCompanionAudit.md), [Preview](companion/CursorCompanionPreview.html) |
 | Voice and microphones    | [Voice input](VoiceInputSpec.md), [Microphone selection](MicrophoneSelection.md), [Hardware checks](MicrophoneHardwareChecks.md)                                                                                                       | [Desktop UI](DesktopUi.md)                                                                   |
 
@@ -28,3 +29,14 @@ The proposed student pet feature has an
 desktop interactions, collections and prompt-generated appearances. The
 [initial local implementation](companion/StudentPetEngineering.md) provides bundled
 pets; generated pets remain planned and signed platform acceptance is pending.
+
+The [classroom context engineering spec](classroom/ClassroomContextEngineeringSpec.md)
+consolidates the proposed course/class architecture and implementation sequence.
+The [implementation record](classroom/ClassroomImplementation.md) distinguishes
+the initial classroom flow from deferred formats and integrations.
+
+- [Materials preparation](classroom/MaterialPreparationEngineering.md) — uploads, batch extraction, teacher review and approved context.
+- [Compact material context plan](classroom/MaterialContextEngineeringSpec.md) — document briefs, source retrieval, token budgets, compatibility and implementation cleanup.
+- [Compact material context implementation](classroom/MaterialContextImplementation.md) — delivered flow, code ownership, limits, migration and acceptance.
+- [Practice checks and tutoring](classroom/PracticeCheckEngineeringSpec.md) — implemented formative-check pilot, private work snapshots, approved criteria, revisioned hand-ins and targeted teaching; future adapter milestones.
+- [Classroom experience prototype](classroom/ClassroomExperienceDemo.md) — interactive student and teacher HTML mock with sample data.

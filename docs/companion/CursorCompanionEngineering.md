@@ -7,7 +7,7 @@ continuations on the primary macOS display.
 The native V2 implementation follows the reviewed
 [guidance specification](CursorCompanionGuidanceSpec.md). Tro ships the pinned
 Cua source plus `driver-patches/CursorCompanion.patch`; no sibling source or
-Electron presentation window is used. The local build version is `0.30.4-tro.15`.
+Electron presentation window is used. The local build version is `0.30.4-tro.16`.
 
 See [TeachingCompanionPlan](../teaching/TeachingCompanionPlan.md) for the implemented message
 presenter, frozen goal criteria, local student waits and locale changes.

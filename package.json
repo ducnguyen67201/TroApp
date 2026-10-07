@@ -44,7 +44,8 @@
     "test:integration": "tsx scripts/RunIntegration.ts",
     "build:cua": "tsx scripts/BuildCuaCompanion.ts",
     "test:teaching": "tsx scripts/CheckTeachingFlow.ts",
-    "test:teaching:native": "tsx scripts/CheckTeachingFlow.ts --native"
+    "test:teaching:native": "tsx scripts/CheckTeachingFlow.ts --native",
+    "account:role": "tsx src/server/AssignAccountRole.ts"
   },
   "dependencies": {
     "@better-auth/electron": "1.7.6",
@@ -60,9 +61,13 @@
     "better-auth": "^1.7.6",
     "dotenv": "^17.2.3",
     "electron-updater": "6.8.9",
+    "fast-xml-parser": "^5.11.2",
     "fastify": "^5.12.5",
+    "fflate": "^0.8.3",
     "jose": "^6.2.12",
+    "js-tiktoken": "1.0.21",
     "openai": "^7.25.0",
+    "pdfjs-dist": "^6.3.289",
     "pg": "^8.16.3",
     "pino": "^10.3.1",
     "prisma": "7.10.0",

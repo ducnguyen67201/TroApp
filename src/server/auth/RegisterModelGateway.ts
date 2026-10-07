@@ -8,6 +8,7 @@ import { ModelGatewayDiagnosticsSchema } from '#contracts/ModelGatewayError.js';
 import type { ServerEnv } from '../Env.js';
 import type { createAuthDatabase } from '../persistence/AuthDatabase.js';
 import { fetchModelResponse, ModelGatewayRetry } from './FetchModelResponse.js';
+import { createModelInputCounter, type CountModelInput } from './CountModelInput.js';
 import {
   ModelGatewayEvent,
   ModelGatewayFailure,
@@ -49,6 +50,7 @@ export function registerModelGateway(
   readSignedInUserId: ReadSignedInUserId,
   environment: ServerEnv,
   logger: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'> = api.log,
+  countInput: CountModelInput = createModelInputCounter(environment.OPENAI_API_KEY ?? ''),
 ): void {
   const signingKey = createGatewayKey(environment.AUTH_SECRET);
 
@@ -150,6 +152,26 @@ export function registerModelGateway(
       ...parsed.data,
       max_output_tokens: Math.min(parsed.data.max_output_tokens ?? 4096, 4096),
     };
+    try {
+      const inputTokens = await countInput(modelRequest, AbortSignal.timeout(30_000));
+      if (inputTokens + modelRequest.max_output_tokens > environment.MODEL_CONTEXT_TOKENS) {
+        return await rejectRequest(
+          413,
+          ModelGatewayFailure.REQUEST_INVALID,
+          'The assistant context is too large. Start a new request with less material.',
+        );
+      }
+      logger.debug(
+        { ...context, inputTokens, maxOutputTokens: modelRequest.max_output_tokens },
+        'Model input budget checked.',
+      );
+    } catch {
+      return rejectRequest(
+        503,
+        ModelGatewayFailure.REQUEST_INVALID,
+        'The model input budget could not be checked. Try again.',
+      );
+    }
     const requestBody = JSON.stringify(modelRequest);
     const disconnect = new AbortController();
     const timeout = AbortSignal.timeout(120_000);

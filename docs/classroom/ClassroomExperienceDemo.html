@@ -1,0 +1,2360 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tro · Lớp học</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #252d36;
+        --muted: #777b82;
+        --line: #e8e9eb;
+        --paper: #fafaf7;
+        --nav: #242d37;
+        --orange: #ee926c;
+        --violet: #8273bd;
+        --blue: #8ec0ed;
+        --gold: #efcf7c;
+        --green: #8ab7a1;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          ui-sans-serif,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        color: var(--ink);
+        background: #e8e9e5;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+      }
+      button,
+      a,
+      input,
+      textarea,
+      select {
+        -webkit-tap-highlight-color: transparent;
+      }
+      button {
+        cursor: pointer;
+        color: inherit;
+      }
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible,
+      textarea:focus-visible,
+      select:focus-visible,
+      summary:focus-visible {
+        outline: 3px solid #b8a4ee;
+        outline-offset: 4px;
+      }
+      button {
+        border: 0;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: clamp(26px, 2.8vw, 38px);
+        line-height: 1.2;
+        letter-spacing: -1.2px;
+        font-weight: 650;
+      }
+      h2 {
+        font-size: 20px;
+        font-weight: 620;
+        letter-spacing: -0.5px;
+      }
+      h3 {
+        font-size: 16px;
+        font-weight: 620;
+      }
+      svg {
+        display: block;
+      }
+      .icon {
+        width: 20px;
+        height: 20px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.65;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex-shrink: 0;
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 90px minmax(0, 1fr);
+        min-height: 100vh;
+        max-width: 1800px;
+        margin: auto;
+        background: #fff;
+      }
+      .sidebar {
+        background: var(--nav);
+        color: #aab1ba;
+        display: flex;
+        align-items: center;
+        flex-direction: column;
+        padding: 28px 12px 20px;
+        gap: 28px;
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        z-index: 2;
+      }
+      .brand {
+        width: 48px;
+        height: 48px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        background: transparent;
+        border-radius: 15px;
+      }
+      .brand-mark {
+        width: 39px;
+        height: 39px;
+      }
+      .nav-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+        margin-top: 26px;
+      }
+      .nav-button {
+        width: 100%;
+        min-height: 65px;
+        border-radius: 14px;
+        color: inherit;
+        background: transparent;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        font-size: 10px;
+      }
+      .nav-button .icon {
+        width: 22px;
+        height: 22px;
+      }
+      .nav-button.active {
+        color: #ffe0b7;
+        background: #35404b;
+      }
+      .nav-button:hover {
+        background: #35404b;
+        color: #fff;
+      }
+      .sidebar-bottom {
+        margin-top: auto;
+        width: 100%;
+        display: grid;
+        gap: 7px;
+      }
+      .avatar {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        background: #e8d5ad;
+        color: #514230;
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+      .sidebar-profile {
+        margin-top: 15px;
+        padding-top: 18px;
+        border-top: 1px solid #46505a;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 7px;
+        color: #c4cad0;
+        font-size: 10px;
+      }
+      .canvas {
+        min-width: 0;
+        padding: 28px 38px 38px;
+      }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 43px;
+      }
+      .search {
+        position: relative;
+        max-width: 295px;
+        flex: 1;
+      }
+      .search .icon {
+        width: 17px;
+        height: 17px;
+        position: absolute;
+        left: 14px;
+        top: 12px;
+        color: #979aa0;
+      }
+      .search input {
+        width: 100%;
+        height: 42px;
+        border: 1px solid var(--line);
+        padding: 10px 14px 10px 40px;
+        border-radius: 22px;
+        background: #fff;
+        color: var(--ink);
+      }
+      .toolbar-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+      .role-toggle {
+        display: flex;
+        padding: 4px;
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: #f7f7f5;
+      }
+      .role-toggle button {
+        padding: 6px 13px;
+        border-radius: 18px;
+        font-size: 12px;
+        background: transparent;
+        color: var(--muted);
+      }
+      .role-toggle button[aria-pressed='true'] {
+        background: #fff;
+        color: var(--ink);
+        box-shadow: 0 1px 5px #1e253310;
+      }
+      .locale-button {
+        background: transparent;
+        font-size: 12px;
+        padding: 8px;
+      }
+      .demo-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 10px;
+        letter-spacing: 0.7px;
+        text-transform: uppercase;
+        color: #81734f;
+        background: #f6f0de;
+        padding: 5px 9px;
+        border-radius: 7px;
+        white-space: nowrap;
+      }
+      .demo-badge::before {
+        content: '';
+        width: 5px;
+        height: 5px;
+        background: #bd9956;
+        border-radius: 50%;
+      }
+      .page-heading {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 28px;
+      }
+      .eyebrow {
+        color: var(--muted);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1.8px;
+        margin-bottom: 10px;
+      }
+      .subtitle {
+        color: var(--muted);
+        margin-top: 10px;
+        max-width: 580px;
+      }
+      .teacher-note {
+        padding: 10px 13px;
+        background: #f8f5ed;
+        border-radius: 12px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        font-size: 12px;
+      }
+      .teacher-note .avatar {
+        width: 28px;
+        height: 28px;
+        font-size: 10px;
+        background: #e6dfcd;
+      }
+      .teacher-note span {
+        color: var(--muted);
+        display: block;
+        font-size: 10px;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 335px;
+        gap: 30px;
+        align-items: start;
+      }
+      .workspace {
+        min-width: 0;
+      }
+      .tabs {
+        display: flex;
+        align-items: center;
+        gap: 26px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 25px;
+      }
+      .tab {
+        padding: 12px 0;
+        background: transparent;
+        color: var(--muted);
+        font-size: 13px;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tab.active {
+        color: var(--ink);
+        border-color: var(--orange);
+      }
+      .tab .icon {
+        width: 16px;
+        height: 16px;
+      }
+      .count {
+        font-size: 10px;
+        min-width: 18px;
+        padding: 0 5px;
+        border-radius: 5px;
+        background: #f0f0ed;
+      }
+      .section-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+      .section-label h2 {
+        font-size: 18px;
+      }
+      .section-label .muted {
+        font-size: 11px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .lesson-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+      .lesson-card {
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 19px;
+        padding: 18px;
+        text-align: left;
+        position: relative;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        transition:
+          transform 0.18s,
+          border-color 0.18s,
+          box-shadow 0.18s;
+      }
+      .lesson-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 22px #2933420a;
+      }
+      .lesson-card.selected {
+        border-color: #e1ab76;
+        background: #fffaf3;
+        box-shadow: 0 0 0 2px #edcf9e20;
+      }
+      .lesson-card.selected::after {
+        content: '';
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #e3ac73;
+        right: 16px;
+        top: 19px;
+      }
+      .card-state {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 10px;
+        color: #747a80;
+      }
+      .state-dot {
+        height: 5px;
+        width: 5px;
+        border-radius: 50%;
+        background: var(--green);
+      }
+      .state-dot.violet {
+        background: var(--violet);
+      }
+      .state-dot.blue {
+        background: var(--blue);
+      }
+      .card-art {
+        height: 127px;
+        margin: 15px auto 11px;
+        width: 100%;
+        max-width: 150px;
+      }
+      .lesson-card h3 {
+        line-height: 1.3;
+        margin-bottom: 5px;
+        font-size: 15px;
+      }
+      .lesson-card p {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .card-foot {
+        margin-top: auto;
+        padding-top: 19px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 10px;
+        color: #868a90;
+      }
+      .card-foot .icon {
+        width: 13px;
+        height: 13px;
+      }
+      .card-foot .tag {
+        margin-left: auto;
+        background: #f0efea;
+        color: #777369;
+        padding: 3px 7px;
+        border-radius: 5px;
+      }
+      .class-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 17px;
+      }
+      .plain-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 9px 12px;
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 9px;
+        font-size: 12px;
+      }
+      .plain-button:hover {
+        background: #f6f6f3;
+      }
+      .primary-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: var(--ink);
+        color: #fff;
+        padding: 12px 16px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 550;
+      }
+      .primary-button:hover {
+        background: #3d4854;
+      }
+      .primary-button .icon {
+        width: 17px;
+        height: 17px;
+      }
+      .full {
+        width: 100%;
+      }
+      .today {
+        margin-top: 35px;
+      }
+      .activity-list {
+        border-top: 1px solid var(--line);
+      }
+      .activity-row {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 13px;
+        padding: 17px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .step-number {
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        border-radius: 10px;
+        background: #f4f3ef;
+        color: #a2a096;
+        font-size: 12px;
+      }
+      .step-number.done {
+        background: #eaf3ed;
+        color: #63957c;
+      }
+      .step-number.current {
+        background: #fff0d7;
+        color: #ae8542;
+      }
+      .activity-row strong {
+        font-size: 13px;
+        font-weight: 550;
+      }
+      .activity-row p {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .activity-row .status {
+        font-size: 10px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .note-panel {
+        margin-top: 25px;
+        border-radius: 16px;
+        background: #edf3f8;
+        padding: 19px 22px;
+        display: flex;
+        gap: 15px;
+        align-items: flex-start;
+      }
+      .note-panel .icon {
+        width: 24px;
+        height: 24px;
+        color: #6896bf;
+        margin-top: 2px;
+      }
+      .note-panel h3 {
+        font-size: 13px;
+        margin-bottom: 4px;
+      }
+      .note-panel p {
+        color: #6f7f8e;
+        font-size: 12px;
+        max-width: 470px;
+      }
+      .detail {
+        background: var(--paper);
+        border-radius: 23px;
+        padding: 26px;
+        position: sticky;
+        top: 25px;
+        min-width: 0;
+      }
+      .detail-art {
+        height: 160px;
+        width: 100%;
+        margin: 6px 0 17px;
+      }
+      .detail .eyebrow {
+        font-size: 9px;
+        margin-bottom: 7px;
+      }
+      .detail h2 {
+        font-size: 23px;
+        line-height: 1.3;
+      }
+      .detail-desc {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 9px;
+      }
+      .detail-meta {
+        display: flex;
+        gap: 15px;
+        margin-top: 18px;
+        font-size: 11px;
+        color: #777b82;
+      }
+      .detail-meta span {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .detail-meta .icon {
+        width: 14px;
+        height: 14px;
+      }
+      .divider {
+        height: 1px;
+        background: #e6e5df;
+        margin: 22px 0;
+      }
+      .current-activity {
+        border-radius: 12px;
+        background: #f6eedb;
+        padding: 15px;
+        margin: 19px 0 13px;
+      }
+      .current-activity .eyebrow {
+        color: #a1804a;
+        font-size: 9px;
+        margin-bottom: 5px;
+        letter-spacing: 1px;
+      }
+      .current-activity strong {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .current-activity p {
+        color: #8a7a5b;
+        font-size: 11px;
+        margin-top: 5px;
+      }
+      .helper-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        color: #6f6792;
+        background: transparent;
+        width: 100%;
+        font-size: 12px;
+        padding: 11px;
+      }
+      .helper-button:hover {
+        background: #f0ecf7;
+        border-radius: 9px;
+      }
+      .helper-button .icon {
+        width: 15px;
+        height: 15px;
+      }
+      .materials {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .material-row {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        background: transparent;
+        padding: 5px 0;
+        text-align: left;
+        width: 100%;
+      }
+      .file-icon {
+        width: 31px;
+        height: 35px;
+        flex-shrink: 0;
+        background: #ebe6f2;
+        color: #8c79af;
+        border-radius: 7px;
+        display: grid;
+        place-items: center;
+        font-size: 8px;
+        font-weight: 650;
+      }
+      .material-row div:nth-child(2) {
+        min-width: 0;
+        flex: 1;
+      }
+      .material-row strong {
+        font-size: 11px;
+        font-weight: 550;
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .material-row small {
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .material-row .icon {
+        width: 15px;
+        height: 15px;
+        color: #85828a;
+      }
+      .material-row:hover strong {
+        text-decoration: underline;
+      }
+      .submission {
+        background: #fff;
+        padding: 14px;
+        border: 1px solid #eae8e1;
+        border-radius: 12px;
+      }
+      .submission strong {
+        font-size: 12px;
+        font-weight: 550;
+      }
+      .submission p {
+        color: var(--muted);
+        font-size: 11px;
+        margin: 4px 0 11px;
+      }
+      .submission .plain-button {
+        width: 100%;
+      }
+      .saved {
+        font-size: 10px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        color: #789885;
+        margin-top: 10px;
+      }
+      .saved .icon {
+        height: 12px;
+        width: 12px;
+      }
+      .prototype-note {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #93979c;
+        font-size: 10px;
+        margin-top: 28px;
+        gap: 15px;
+      }
+      .text-button {
+        color: #868991;
+        background: transparent;
+        font-size: 11px;
+        padding: 4px 0;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      .empty {
+        padding: 45px 20px;
+        border: 1px dashed var(--line);
+        border-radius: 16px;
+        color: var(--muted);
+        grid-column: 1/-1;
+        text-align: center;
+      }
+      .teacher-tools {
+        display: grid;
+        gap: 9px;
+        margin-top: 20px;
+      }
+      .teacher-section {
+        border: 1px solid #e3e3dd;
+        border-radius: 12px;
+        padding: 13px;
+        margin-bottom: 12px;
+        font-size: 12px;
+      }
+      .teacher-section .muted {
+        font-size: 11px;
+        margin: 4px 0 10px;
+      }
+      .teacher-section .plain-button {
+        width: 100%;
+      }
+      .code {
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        font-size: 19px;
+        letter-spacing: 3px;
+        margin: 8px 0;
+      }
+      .dialog-backdrop {
+        position: fixed;
+        inset: 0;
+        background: #18212b66;
+        backdrop-filter: blur(5px);
+        display: grid;
+        place-items: center;
+        z-index: 8;
+        padding: 22px;
+      }
+      .dialog-backdrop[hidden] {
+        display: none;
+      }
+      .dialog {
+        background: #fff;
+        padding: 28px;
+        border-radius: 23px;
+        width: min(100%, 530px);
+        max-height: 85vh;
+        overflow: auto;
+        box-shadow: 0 25px 80px #121c3040;
+      }
+      .dialog-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 14px;
+      }
+      .dialog-header h2 {
+        font-size: 22px;
+      }
+      .close {
+        background: #f4f4f1;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        display: grid;
+        place-items: center;
+      }
+      .dialog p {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .dialog label {
+        display: block;
+        font-size: 12px;
+        margin: 18px 0 7px;
+      }
+      .dialog input:not([type='file']),
+      .dialog textarea,
+      .dialog select {
+        border: 1px solid #dfe1e5;
+        border-radius: 10px;
+        padding: 11px 12px;
+        width: 100%;
+        color: var(--ink);
+        background: #fff;
+      }
+      .dialog textarea {
+        min-height: 95px;
+        resize: vertical;
+      }
+      .dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 23px;
+      }
+      .dialog-info {
+        background: #f4f0e6;
+        border-radius: 10px;
+        padding: 12px;
+        margin-top: 15px;
+        font-size: 11px;
+        color: #8a7957;
+      }
+      .dropzone {
+        background: #faf9f5;
+        border: 1px dashed #cbc5b7;
+        border-radius: 13px;
+        padding: 26px 15px;
+        text-align: center;
+        margin-top: 18px;
+      }
+      .dropzone .icon {
+        width: 28px;
+        height: 28px;
+        margin: 0 auto 8px;
+      }
+      .dropzone label {
+        margin: 12px auto 0;
+        display: inline-block;
+        cursor: pointer;
+      }
+      .dropzone input {
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        position: absolute;
+      }
+      .source-list {
+        list-style: none;
+        padding: 0;
+        margin: 15px 0;
+      }
+      .source-list li {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        border-bottom: 1px solid var(--line);
+        padding: 9px 0;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+      .source-list button {
+        color: #a07868;
+        background: transparent;
+        font-size: 11px;
+      }
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translate(-50%, 15px);
+        background: #293441;
+        color: #fff;
+        border-radius: 12px;
+        padding: 13px 20px;
+        max-width: calc(100vw - 40px);
+        width: max-content;
+        box-shadow: 0 9px 25px #1b253424;
+        z-index: 10;
+        font-size: 12px;
+        opacity: 0;
+        pointer-events: none;
+        transition:
+          opacity 0.2s,
+          transform 0.2s;
+      }
+      .toast.visible {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+      @media (min-width: 1450px) {
+        .canvas {
+          padding: 35px 55px 45px;
+        }
+        .layout {
+          grid-template-columns: minmax(0, 1fr) 365px;
+          gap: 45px;
+        }
+        .card-art {
+          height: 160px;
+          max-width: 180px;
+        }
+        .detail {
+          padding: 30px;
+        }
+      }
+      @media (max-width: 1120px) {
+        .canvas {
+          padding: 25px;
+        }
+        .layout {
+          grid-template-columns: minmax(0, 1fr) 300px;
+          gap: 22px;
+        }
+        .lesson-grid {
+          gap: 11px;
+        }
+        .lesson-card {
+          padding: 14px;
+        }
+        .card-art {
+          height: 108px;
+        }
+        .teacher-note {
+          display: none;
+        }
+        .detail {
+          padding: 22px;
+        }
+        .toolbar {
+          margin-bottom: 33px;
+        }
+      }
+      @media (max-width: 920px) {
+        .layout {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .detail {
+          position: static;
+          display: grid;
+          grid-template-columns: 240px minmax(0, 1fr);
+          column-gap: 30px;
+        }
+        .detail-art {
+          grid-column: 1;
+        }
+        .detail-heading {
+          grid-column: 1;
+        }
+        .detail-content {
+          grid-column: 2;
+          grid-row: 1/3;
+        }
+        .detail-content .current-activity {
+          margin-top: 0;
+        }
+        .lesson-card {
+          padding: 20px;
+        }
+        .card-art {
+          height: 135px;
+        }
+      }
+      @media (max-width: 660px) {
+        .app {
+          grid-template-columns: 65px minmax(0, 1fr);
+        }
+        .sidebar {
+          padding: 18px 7px;
+          gap: 15px;
+        }
+        .brand {
+          width: 42px;
+        }
+        .nav-list {
+          margin-top: 12px;
+        }
+        .nav-button {
+          min-height: 57px;
+          font-size: 9px;
+        }
+        .nav-button .icon {
+          width: 19px;
+          height: 19px;
+        }
+        .canvas {
+          padding: 18px;
+        }
+        .toolbar {
+          gap: 8px;
+          flex-wrap: wrap;
+          margin-bottom: 27px;
+        }
+        .search {
+          max-width: none;
+          flex-basis: 100%;
+          order: 2;
+        }
+        .toolbar-right {
+          width: 100%;
+          gap: 8px;
+        }
+        .role-toggle {
+          margin-left: auto;
+        }
+        .toolbar-right .avatar {
+          display: none;
+        }
+        .page-heading {
+          margin-bottom: 18px;
+        }
+        h1 {
+          font-size: 29px;
+        }
+        .subtitle {
+          font-size: 12px;
+        }
+        .tabs {
+          gap: 17px;
+        }
+        .tab {
+          font-size: 11px;
+          gap: 5px;
+        }
+        .tab .icon {
+          display: none;
+        }
+        .lesson-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .lesson-card {
+          padding: 15px;
+        }
+        .card-art {
+          height: 100px;
+        }
+        .lesson-card h3 {
+          font-size: 13px;
+        }
+        .card-foot {
+          flex-wrap: wrap;
+        }
+        .card-foot .tag {
+          margin-left: 0;
+        }
+        .detail {
+          display: block;
+        }
+        .detail-art {
+          height: 145px;
+        }
+        .detail-content .current-activity {
+          margin-top: 20px;
+        }
+        .activity-row {
+          grid-template-columns: 29px minmax(0, 1fr);
+          gap: 9px;
+        }
+        .activity-row .status {
+          grid-column: 2;
+        }
+        .prototype-note {
+          align-items: flex-start;
+        }
+        .dialog {
+          padding: 22px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          transition: none !important;
+          animation: none !important;
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg style="position: absolute; width: 0; height: 0; overflow: hidden" aria-hidden="true">
+      <symbol id="i-grid" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+        <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      </symbol>
+      <symbol id="i-class" viewBox="0 0 24 24">
+        <path d="m2 9 10-5 10 5-10 5-10-5Z" />
+        <path d="M6 11v6c4 3 8 3 12 0v-6M22 9v7" />
+      </symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7V5h7l2 3h9v12H3V7Z" /></symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24">
+        <rect x="9" y="3" width="6" height="12" rx="3" />
+        <path d="M5 11a7 7 0 0 0 14 0M12 18v4M9 22h6" />
+      </symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24">
+        <path
+          d="m9 3-.5 3-2.5 1-2.5-1L2 9l2.5 2v3L2 16l1.5 3 3-1 2 1 .5 3h4l.5-3 2-1 3 1 1.5-3-2.5-2v-3L22 9l-1.5-3-3 1-2-1-.5-3H9Z"
+        />
+        <circle cx="12" cy="12" r="3" />
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24">
+        <circle cx="10.5" cy="10.5" r="6.5" />
+        <path d="m16 16 5 5" />
+      </symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 6v6l4 2" />
+      </symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6" /></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24">
+        <path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" />
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" /></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24">
+        <path d="M21 11c0 5-4 8-9 8H8l-5 3 1-6a8 8 0 0 1-1-5c0-5 4-8 9-8s9 3 9 8Z" />
+        <path d="M8 11h.1M12 11h.1M16 11h.1" />
+      </symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24">
+        <path d="M12 17V3m-5 5 5-5 5 5M4 16v5h16v-5" />
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" /></symbol>
+      <symbol id="i-book" viewBox="0 0 24 24">
+        <path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15" />
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></symbol>
+      <symbol id="art-scratch" viewBox="0 0 180 160">
+        <ellipse cx="89" cy="139" rx="68" ry="8" fill="#eddec7" />
+        <rect
+          x="17"
+          y="47"
+          width="105"
+          height="76"
+          rx="7"
+          fill="#faf4e5"
+          stroke="#384653"
+          stroke-width="2"
+        />
+        <path d="M17 64h105" stroke="#384653" stroke-width="2" />
+        <circle cx="26" cy="55" r="2" fill="#d6a368" />
+        <circle cx="34" cy="55" r="2" fill="#d6a368" />
+        <path d="M41 81h57v15H41Z" fill="#95c5ed" />
+        <path d="M47 96h58v15H47Z" fill="#a68acb" />
+        <path d="M50 86h19m-13 17h27" stroke="#fff" stroke-width="2" stroke-linecap="round" />
+        <path
+          d="m124 60 4-22 16 13 15-7 4 22c9 14 9 29 2 40l-19 6-20-10c-7-12-9-29-2-42Z"
+          fill="#edb266"
+          stroke="#384653"
+          stroke-width="2"
+          stroke-linejoin="round"
+        />
+        <path d="m133 48 7 8m14-3 2 8" stroke="#384653" stroke-width="2" />
+        <ellipse cx="143" cy="81" rx="12" ry="10" fill="#fff5de" />
+        <circle cx="135" cy="70" r="3" fill="#384653" />
+        <circle cx="154" cy="70" r="3" fill="#384653" />
+        <path
+          d="m140 78 4 3 4-3m-4 3v6m-10-3-14-2m34 2 15-3"
+          fill="none"
+          stroke="#384653"
+          stroke-width="1.5"
+          stroke-linecap="round"
+        />
+        <path
+          d="m126 105-7 28h16l4-17m16-6 4 24h15"
+          fill="#edb266"
+          stroke="#384653"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M167 99c25-2 15 30 7 15"
+          fill="none"
+          stroke="#384653"
+          stroke-width="5"
+          stroke-linecap="round"
+        />
+        <path
+          d="M167 99c25-2 15 30 7 15"
+          fill="none"
+          stroke="#edb266"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+        <path
+          d="m20 32 4-8m-1 11-8-2m90-6 5-7"
+          stroke="#d1a174"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+      </symbol>
+      <symbol id="art-python" viewBox="0 0 180 160">
+        <ellipse cx="88" cy="139" rx="67" ry="7" fill="#e7e7ee" />
+        <rect
+          x="29"
+          y="54"
+          width="111"
+          height="77"
+          rx="5"
+          fill="#edf3fb"
+          stroke="#384653"
+          stroke-width="2"
+        />
+        <path d="M29 71h111" stroke="#384653" stroke-width="2" />
+        <circle cx="38" cy="62" r="2" fill="#9eabc2" />
+        <path
+          d="m60 90-9 8 9 8m44-16 9 8-9 8m-19-20-7 27"
+          stroke="#8c79bc"
+          stroke-width="3"
+          fill="none"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M138 92V33c0-9-5-13-14-13h-19c-8 0-13 5-13 13v14h33v8H80c-10 0-14 6-14 15v9"
+          fill="#85aed9"
+          stroke="#384653"
+          stroke-width="2"
+          stroke-linejoin="round"
+        />
+        <circle cx="106" cy="31" r="3" fill="#fff" />
+        <path
+          d="M112 67h37v35c0 9-5 14-14 14h-18c-8 0-13-5-13-13v-14h31v-8h-23"
+          fill="#efcf7c"
+          stroke="#384653"
+          stroke-width="2"
+          stroke-linejoin="round"
+        />
+        <circle cx="135" cy="104" r="3" fill="#fff" />
+        <path
+          d="m18 48-6-5m136-18 5-5m7 8 7-1"
+          stroke="#b4a0d0"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+      </symbol>
+      <symbol id="art-design" viewBox="0 0 180 160">
+        <ellipse cx="93" cy="139" rx="65" ry="7" fill="#ede6f0" />
+        <rect
+          x="34"
+          y="43"
+          width="86"
+          height="91"
+          rx="4"
+          fill="#faf6ed"
+          stroke="#384653"
+          stroke-width="2"
+          transform="rotate(-7 77 89)"
+        />
+        <rect
+          x="68"
+          y="49"
+          width="76"
+          height="87"
+          rx="4"
+          fill="#daceec"
+          stroke="#384653"
+          stroke-width="2"
+          transform="rotate(8 106 92)"
+        />
+        <path
+          d="m89 97 10-22 15 7-10 22-10 6-6-13Z"
+          fill="#f0c77b"
+          stroke="#384653"
+          stroke-width="2"
+        />
+        <path d="m98 77 14 6m-22 17 12 4" stroke="#384653" stroke-width="1.5" />
+        <path
+          d="m41 69 17-2m-17 9 22-3m-17 16 13-2m43 36 23 3"
+          stroke="#b59dc8"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+        <path d="M34 124 21 95l10-5 13 29Z" fill="#86b4d1" stroke="#384653" stroke-width="2" />
+        <path d="m24 96 7-3m-1 12 6-3" stroke="#384653" stroke-width="1.5" />
+        <path
+          d="m148 43 4-9m1 14 8-3m-131-7-4-8"
+          stroke="#b59dc8"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+      </symbol>
+      <symbol id="art-library" viewBox="0 0 290 175">
+        <path d="M19 153h252" stroke="#384653" stroke-width="4" stroke-linecap="round" />
+        <path d="m36 97 35-4 5 58-35 2Z" fill="#efc57b" stroke="#384653" stroke-width="2" />
+        <path d="m51 111 3 31m8-36 3 35" stroke="#384653" stroke-width="1.5" />
+        <rect
+          x="78"
+          y="78"
+          width="43"
+          height="73"
+          rx="3"
+          fill="#a28bc8"
+          stroke="#384653"
+          stroke-width="2"
+        />
+        <path
+          d="M88 87h23M90 135h18m-18-34c14-10 26 8 12 12-16 5-8 18 4 15"
+          fill="none"
+          stroke="#f8f2fc"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+        <rect
+          x="127"
+          y="52"
+          width="34"
+          height="100"
+          rx="3"
+          fill="#88b6a0"
+          stroke="#384653"
+          stroke-width="2"
+        />
+        <path
+          d="M135 62h17m-17 80h17m-13-62 9 9-9 9"
+          stroke="#384653"
+          stroke-width="1.7"
+          fill="none"
+        />
+        <path d="m168 48 32-3 8 107-32 1Z" fill="#efac88" stroke="#384653" stroke-width="2" />
+        <path d="m179 62 8 73m8-68 5 66" stroke="#384653" stroke-width="1.5" />
+        <path d="m207 40 26 3-8 108-25-2Z" fill="#a4c5e2" stroke="#384653" stroke-width="2" />
+        <path d="m214 53 8 1m-12 84 8 1" stroke="#384653" stroke-width="1.5" />
+        <path
+          d="M50 69V41m0 16C34 52 30 36 34 25c18 6 21 15 16 32m0-10c13-8 23-21 20-31-17 4-24 16-20 31m0-8c-8-9-11-20-4-29 10 7 12 16 4 29"
+          fill="#9fc1a8"
+          stroke="#384653"
+          stroke-width="1.6"
+          stroke-linejoin="round"
+        />
+        <path d="M32 60h35l-4 28H36Z" fill="#dfa271" stroke="#384653" stroke-width="2" />
+        <path d="m42 67 2 11m13-11-2 11" stroke="#a97350" stroke-width="1.4" />
+        <path d="m242 106 12-8 10 8-2 45h-24Z" fill="#fcf9ef" stroke="#384653" stroke-width="2" />
+        <circle cx="247" cy="120" r="2" fill="#384653" />
+        <circle cx="256" cy="120" r="2" fill="#384653" />
+        <path
+          d="m249 130 4 3 5-3m-14-40 2-10m-8 8-7-3"
+          fill="none"
+          stroke="#384653"
+          stroke-width="1.5"
+          stroke-linecap="round"
+        />
+      </symbol>
+    </svg>
+    <div class="app">
+      <aside class="sidebar" aria-label="Điều hướng chính" id="sidebar">
+        <button class="brand" data-action="home" aria-label="Tro">
+          <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
+            <path
+              d="M12 19c0-8 5-12 12-12s12 4 12 12v12c0 7-5 11-12 11S12 38 12 31Z"
+              fill="#fff2df"
+            />
+            <circle cx="19" cy="20" r="2.5" fill="#28313a" />
+            <circle cx="29" cy="20" r="2.5" fill="#28313a" />
+            <path
+              d="M19 28c3 4 7 4 10 0M8 29l-4 4m36-4 4 4"
+              fill="none"
+              stroke="#e69875"
+              stroke-width="3"
+              stroke-linecap="round"
+            />
+            <path d="M24 6V3m-3 1h6" stroke="#fff2df" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <nav class="nav-list">
+          <button class="nav-button" data-action="workspace">
+            <svg class="icon"><use href="#i-grid" /></svg
+            ><span data-i18n="workspace">Không gian</span>
+          </button>
+          <button class="nav-button active" aria-current="page" data-action="home">
+            <svg class="icon"><use href="#i-class" /></svg
+            ><span data-i18n="classroom">Lớp học</span>
+          </button>
+          <button class="nav-button" data-action="files">
+            <svg class="icon"><use href="#i-folder" /></svg><span data-i18n="files">Tài liệu</span>
+          </button>
+        </nav>
+        <div class="sidebar-bottom">
+          <button class="nav-button" data-action="microphone">
+            <svg class="icon"><use href="#i-mic" /></svg><span data-i18n="microphone">Micrô</span>
+          </button>
+          <button class="nav-button" data-action="settings">
+            <svg class="icon"><use href="#i-settings" /></svg
+            ><span data-i18n="settings">Cài đặt</span>
+          </button>
+          <div class="sidebar-profile">
+            <div class="avatar" id="profile-avatar">AN</div>
+            <span id="profile-role">Học sinh</span>
+          </div>
+        </div>
+      </aside>
+      <main class="canvas">
+        <div class="toolbar">
+          <div class="search">
+            <svg class="icon" aria-hidden="true"><use href="#i-search" /></svg
+            ><input
+              id="search"
+              type="search"
+              aria-label="Tìm lớp học"
+              placeholder="Tìm lớp học, chủ đề…"
+            />
+          </div>
+          <div class="toolbar-right">
+            <span class="demo-badge" data-i18n="prototype">Bản mẫu</span>
+            <div class="role-toggle" aria-label="Xem bản mẫu theo vai trò">
+              <button
+                id="student-role"
+                aria-pressed="true"
+                data-action="student"
+                data-i18n="student"
+              >
+                Học sinh</button
+              ><button
+                id="teacher-role"
+                aria-pressed="false"
+                data-action="teacher"
+                data-i18n="teacher"
+              >
+                Giáo viên
+              </button>
+            </div>
+            <button
+              class="locale-button"
+              id="locale"
+              data-action="locale"
+              aria-label="Switch to English"
+            >
+              EN
+            </button>
+            <div class="avatar" aria-hidden="true" id="header-avatar">AN</div>
+          </div>
+        </div>
+        <header class="page-heading">
+          <div>
+            <p class="eyebrow" id="greeting">Rất vui được gặp lại bạn, An</p>
+            <h1 id="page-title">Một chút tò mò.<br />Một điều mới hôm nay.</h1>
+            <p class="subtitle" id="page-subtitle">
+              Vào lớp của bạn, tiếp tục khám phá. Tro ở đây khi bạn cần một gợi ý.
+            </p>
+          </div>
+          <div class="teacher-note">
+            <div class="avatar">LC</div>
+            <div id="teacher-message">Cô Linh đang hướng dẫn<span>Scratch · Buổi 3</span></div>
+          </div>
+        </header>
+        <div class="layout">
+          <section class="workspace" aria-label="Lớp học của bạn" id="workspace">
+            <div class="tabs" role="tablist" aria-label="Danh sách lớp học">
+              <button class="tab active" role="tab" aria-selected="true" data-tab="classes">
+                <svg class="icon"><use href="#i-class" /></svg
+                ><span data-i18n="myClasses">Lớp của bạn</span><span class="count">3</span></button
+              ><button class="tab" role="tab" aria-selected="false" data-tab="tasks">
+                <svg class="icon"><use href="#i-book" /></svg
+                ><span data-i18n="activities">Hoạt động</span></button
+              ><button class="tab" role="tab" aria-selected="false" data-tab="materials">
+                <svg class="icon"><use href="#i-folder" /></svg
+                ><span data-i18n="files">Tài liệu</span>
+              </button>
+            </div>
+            <div id="main-content" role="tabpanel"></div>
+            <footer class="prototype-note">
+              <span data-i18n="demoNote"
+                >Dữ liệu minh hoạ · Thao tác chỉ diễn ra trong bản mẫu này.</span
+              ><button class="text-button" data-action="reset" data-i18n="reset">
+                Đặt lại bản mẫu
+              </button>
+            </footer>
+          </section>
+          <aside class="detail" id="detail" aria-label="Chi tiết lớp học"></aside>
+        </div>
+      </main>
+    </div>
+    <div class="dialog-backdrop" id="dialog-backdrop" hidden>
+      <section
+        class="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dialog-title"
+        id="dialog"
+      ></section>
+    </div>
+    <div class="toast" role="status" aria-live="polite" id="toast"></div>
+    <script>
+      const words = {
+        workspace: ['Không gian', 'Workspace'],
+        classroom: ['Lớp học', 'Classroom'],
+        files: ['Tài liệu', 'Materials'],
+        microphone: ['Micrô', 'Microphone'],
+        settings: ['Cài đặt', 'Settings'],
+        prototype: ['Bản mẫu', 'Prototype'],
+        student: ['Học sinh', 'Student'],
+        teacher: ['Giáo viên', 'Teacher'],
+        myClasses: ['Lớp của bạn', 'Your classes'],
+        activities: ['Hoạt động', 'Activities'],
+        reset: ['Đặt lại bản mẫu', 'Reset demo'],
+        demoNote: [
+          'Dữ liệu minh hoạ · Thao tác chỉ diễn ra trong bản mẫu này.',
+          'Sample data · All actions stay in this prototype.',
+        ],
+        search: ['Tìm lớp học, chủ đề…', 'Find a class or topic…'],
+        selectLesson: ['Chọn một lớp học', 'Pick a class'],
+        threeClasses: ['3 lớp của bạn', '3 classes for you'],
+        session: ['Buổi', 'Session'],
+        live: ['Đang học', 'In class now'],
+        upcoming: ['Sắp bắt đầu', 'Coming up'],
+        selfPaced: ['Tự khám phá', 'Explore at your pace'],
+        minutes: ['phút', 'min'],
+        practice: ['Thực hành', 'Practice'],
+        project: ['Dự án', 'Project'],
+        liveSection: ['Đang làm cùng cả lớp', 'Working with your class'],
+        returnTask: ['Trở lại bài đang làm', 'Back to my activity'],
+        askTro: ['Nhờ Tro gợi ý', 'Ask Tro for a hint'],
+        download: ['Tải tài liệu mẫu', 'Download sample notes'],
+        materialTitle: ['Tài liệu cho buổi này', 'For this session'],
+        originals: ['Tệp mẫu trong bản xem thử', 'Sample files in this prototype'],
+        submission: ['Sẵn sàng chia sẻ chưa?', 'Ready to share your work?'],
+        submissionText: [
+          'Gửi đường dẫn dự án để cô Linh xem bài của bạn.',
+          'Share your project link so Ms Linh can see your work.',
+        ],
+        submit: ['Nộp bài của bạn', 'Submit your work'],
+        submitted: ['Đã nộp trong bản mẫu', 'Submitted in this demo'],
+        saved: ['Bài đang làm được giữ trong bản mẫu', 'Your working link is kept in this demo'],
+        today: ['Lộ trình buổi học', 'Today’s little adventure'],
+        teacherLeads: ['Theo hướng dẫn của cô Linh', 'Follow Ms Linh’s lead'],
+        completed: ['Đã thử', 'Tried it'],
+        current: ['Đang làm', 'Working on it'],
+        next: ['Tiếp theo', 'Up next'],
+        encouragement: ['Không cần biết hết mọi thứ.', 'You don’t have to know everything.'],
+        encouragementText: [
+          'Thử một chút, hỏi một câu. Nếu bạn lạc giữa các tab, Tro giúp bạn quay lại bài đang làm.',
+          'Try something. Ask a question. Lost between tabs? Tro can help you find your activity again.',
+        ],
+        joinClass: ['Tham gia bằng mã lớp', 'Join with a class code'],
+        teacherClasses: ['Lớp bạn đang dạy', 'Classes you teach'],
+        addClass: ['Tạo lớp mới', 'Create a class'],
+        prepare: ['Chuẩn bị tài liệu', 'Prepare materials'],
+        students: ['học sinh', 'students'],
+        reviewed: ['Đã duyệt tài liệu', 'Materials reviewed'],
+        draft: ['Chưa chuẩn bị', 'Not prepared yet'],
+        teacherStart: ['Bắt đầu buổi học', 'Start session'],
+        teacherLive: ['Buổi học đang diễn ra', 'Session is live'],
+        invite: ['Mời học sinh', 'Invite students'],
+        codeLabel: ['Mã lớp mẫu', 'Sample class code'],
+        copy: ['Sao chép mã', 'Copy code'],
+        copyDone: [
+          'Mã lớp đã sao chép. Đây là mã minh hoạ.',
+          'Class code copied. This is a sample code.',
+        ],
+        close: ['Đóng', 'Close'],
+        cancel: ['Để sau', 'Not now'],
+        confirm: ['Xác nhận nộp trong bản mẫu', 'Confirm demo submission'],
+        submitTitle: ['Chia sẻ điều bạn đã làm', 'Share what you made'],
+        submitInfo: [
+          'Xem lại đường dẫn, rồi xác nhận. Bản mẫu này không gửi bài cho giáo viên thật.',
+          'Check your link, then confirm. This prototype does not send work to a real teacher.',
+        ],
+        projectLink: ['Đường dẫn dự án Scratch', 'Scratch project link'],
+        optionalNote: [
+          'Bạn muốn nhắn gì với cô? Không bắt buộc.',
+          'A note for your teacher? Optional.',
+        ],
+        notePlaceholder: ['Con đã thử thay đổi số bước…', 'I tried changing the number of steps…'],
+        invalidLink: [
+          'Nhập đường dẫn dạng https://scratch.mit.edu/projects/123456/',
+          'Enter a link like https://scratch.mit.edu/projects/123456/',
+        ],
+        submitDone: [
+          'Đã lưu bài nộp minh hoạ. Không gửi tới máy chủ.',
+          'Demo submission saved. Nothing was sent to a server.',
+        ],
+        mockOpen: [
+          'Bản mẫu: bài đang làm đã được tìm thấy. Trong Tro, nút này sẽ đưa bạn về đúng cửa sổ.',
+          'Demo: your activity was found. In Tro, this would return you to the right window.',
+        ],
+        hintTitle: ['Một gợi ý nhỏ, từ Tro', 'A little hint from Tro'],
+        hintQuestion: ['Bạn đang vướng ở đâu?', 'Where are you stuck?'],
+        hintPlaceholder: [
+          'Bấm cờ xanh nhưng mèo không chạy…',
+          'The green flag doesn’t make my cat move…',
+        ],
+        hintResponse: [
+          'Thử nhìn đầu chuỗi khối của bạn: có khối vàng “khi bấm cờ xanh” chưa? Gắn nó ở trên khối “di chuyển 10 bước”, rồi bấm cờ xanh trên sân khấu.',
+          'Check the top of your block stack: is there a yellow “when green flag clicked” block? Attach it above “move 10 steps”, then click the stage’s green flag.',
+        ],
+        showHint: ['Xem gợi ý mẫu', 'See a sample hint'],
+        hintDisclosure: [
+          'Đây là câu trả lời minh hoạ, không phải một lượt gọi AI hoặc quan sát màn hình.',
+          'This is a sample reply, not an AI call or screen observation.',
+        ],
+        joinTitle: ['Bạn có mã từ giáo viên?', 'Got a code from your teacher?'],
+        joinInfo: [
+          'Nhập mã lớp để xem cách tham gia. Mã minh hoạ: TRO-314.',
+          'Enter a class code to preview joining. Sample code: TRO-314.',
+        ],
+        codeInput: ['Mã lớp', 'Class code'],
+        join: ['Tham gia bản mẫu', 'Join demo'],
+        joinDone: [
+          'Bạn đã ở trong lớp Scratch minh hoạ này.',
+          'You’re already in this sample Scratch class.',
+        ],
+        invalidCode: ['Thử mã mẫu TRO-314.', 'Try the sample code TRO-314.'],
+        noResults: [
+          'Chưa có lớp phù hợp. Thử tìm “Scratch” hoặc “Python”.',
+          'No matching classes. Try “Scratch” or “Python”.',
+        ],
+        materialDemo: [
+          'Bản tải xuống là ghi chú văn bản mẫu, không phải tài liệu lớp thật.',
+          'The download is sample text notes, not a real class file.',
+        ],
+        teacherGreeting: ['Chào cô Linh,', 'Hello, Ms Linh.'],
+        teacherTitle: [
+          'Mang tài liệu của bạn.<br>Dạy theo cách của bạn.',
+          'Bring your materials.<br>Teach your way.',
+        ],
+        teacherSubtitle: [
+          'Tài liệu, lớp học và buổi học — mọi thứ ở cùng một nơi.',
+          'Materials, classes and sessions — all in one place.',
+        ],
+        studentGreeting: ['Rất vui được gặp lại bạn, An', 'Good to see you again, An'],
+        studentTitle: [
+          'Một chút tò mò.<br>Một điều mới hôm nay.',
+          'A little curiosity.<br>Something new today.',
+        ],
+        studentSubtitle: [
+          'Vào lớp của bạn, tiếp tục khám phá. Tro ở đây khi bạn cần một gợi ý.',
+          'Step into your class and keep exploring. Tro is here when you need a hint.',
+        ],
+        teacherLabel: ['Cô Linh đang hướng dẫn', 'Ms Linh is teaching'],
+        prepareTitle: ['Chỉ cần mang tài liệu bạn đang dạy', 'Bring what you already teach'],
+        prepareInfo: [
+          'Thêm tài liệu, kiểm tra ghi chú và các phần học, rồi duyệt. Không cần điền một giáo án mới.',
+          'Add materials, review notes and sections, then approve. No lesson builder to fill out.',
+        ],
+        drop: ['Thả tài liệu vào đây', 'Drop your materials here'],
+        chooseFiles: ['Chọn tệp', 'Choose files'],
+        formats: [
+          'PDF, slide, Python hoặc dự án Scratch',
+          'PDFs, slides, Python or Scratch projects',
+        ],
+        intent: ['Tro nên biết thêm điều gì?', 'Anything Tro should know?'],
+        intentDefault: [
+          'Học sinh mới học Scratch. Hôm nay để mèo di chuyển và nói một câu.',
+          'Students are new to Scratch. Today, make the cat move and say something.',
+        ],
+        reviewSample: ['Xem bản chuẩn bị mẫu', 'Preview prepared notes'],
+        reviewTitle: ['Kiểm tra tài liệu cho buổi học', 'Review your session materials'],
+        reviewInfo: [
+          'Đây là nội dung mẫu để thử giao diện. Tệp bạn chọn chỉ được liệt kê, không đọc hoặc tải lên.',
+          'These are sample notes for trying the interface. Selected files are only listed, not read or uploaded.',
+        ],
+        summary: ['Tóm tắt', 'Summary'],
+        sampleSummary: [
+          'Mở dự án khởi đầu. Gắn khối sự kiện cờ xanh, thêm di chuyển và lời nói, chạy thử rồi thay đổi một chi tiết.',
+          'Open the starter project. Add the green-flag event, movement and speech, test the stack and change one detail.',
+        ],
+        sectionNotes: ['Các phần học · có thể sửa', 'Lesson sections · editable'],
+        sampleSections: [
+          '1. Mở dự án và tìm sân khấu\n2. Khi bấm cờ xanh → di chuyển → nói\n3. Chạy thử và thay đổi số bước\n4. Chia sẻ đường dẫn dự án',
+          '1. Open the project and find the stage\n2. Green flag → move → say\n3. Test it and change the step count\n4. Share the project link',
+        ],
+        approve: ['Duyệt tài liệu mẫu', 'Approve sample materials'],
+        approvedToast: [
+          'Tài liệu mẫu đã được duyệt cho lớp này.',
+          'Sample materials approved for this class.',
+        ],
+        remove: ['Bỏ tệp', 'Remove file'],
+        startTitle: ['Bắt đầu với phần nào?', 'Where would you like to start?'],
+        startInfo: [
+          'Chọn phần hiện tại để học sinh có cùng ngữ cảnh. Giáo viên vẫn dẫn dắt buổi học.',
+          'Choose the current section so students share the same context. You still lead the lesson.',
+        ],
+        currentSection: ['Phần học hiện tại', 'Current section'],
+        startConfirm: ['Bắt đầu buổi học mẫu', 'Start demo session'],
+        started: [
+          'Buổi học mẫu đã bắt đầu. Chuyển sang Học sinh để xem.',
+          'Demo session started. Switch to Student to preview it.',
+        ],
+        classTitle: ['Tạo một lớp cho bài học của bạn', 'Create a class for your teaching'],
+        className: ['Tên lớp', 'Class name'],
+        create: ['Tạo lớp mẫu', 'Create sample class'],
+        created: ['Lớp mẫu đã được tạo.', 'Sample class created.'],
+        micTitle: ['Micrô của bạn', 'Your microphone'],
+        micInfo: [
+          'Bản mẫu không thu âm. Trong Tro, thiết bị được chọn ở đây sẽ dùng cho hướng dẫn bằng giọng nói.',
+          'This prototype does not record audio. In Tro, this choice controls your voice input device.',
+        ],
+        device: ['Thiết bị đầu vào', 'Input device'],
+        deviceDefault: ['Tự động · Theo cài đặt máy tính', 'Automatic · Follow computer settings'],
+        micBuiltIn: ['Micrô tích hợp', 'Built-in microphone'],
+        save: ['Lưu trong bản mẫu', 'Save in demo'],
+        micSaved: [
+          'Lựa chọn micrô mẫu đã được lưu. Không thu âm.',
+          'Demo microphone choice saved. No audio was recorded.',
+        ],
+        settingsInfo: [
+          'Chọn ngôn ngữ cho giao diện và gợi ý. Bản mẫu giữ thay đổi trong bộ nhớ của trang.',
+          'Choose a language for the interface and hints. This prototype keeps changes in page memory.',
+        ],
+        language: ['Ngôn ngữ', 'Language'],
+        resetDone: [
+          'Bản mẫu đã trở về dữ liệu ban đầu.',
+          'Demo reset to its original sample data.',
+        ],
+        workingLinks: ['Bài của bạn', 'Your work'],
+        workingDesc: [
+          'Bạn có thể quay lại dự án đang làm, không phải tìm lại giữa nhiều tab.',
+          'Return to your working project without hunting through your tabs.',
+        ],
+        edit: ['Sửa nội dung', 'Edit notes'],
+        inviteInfo: [
+          'Chia sẻ mã để học sinh xem cách vào lớp. Mã này chỉ dùng trong bản mẫu.',
+          'Share the code to preview joining a class. This code works only in the demo.',
+        ],
+        available: ['Có thể tự khám phá lúc rảnh', 'Available to explore in your own time'],
+        awaits: [
+          'Buổi học sẽ bắt đầu khi giáo viên sẵn sàng.',
+          'The session starts when your teacher is ready.',
+        ],
+        explore: ['Xem hoạt động mẫu', 'Preview activity'],
+        draftHint: [
+          'Thêm tài liệu và kiểm tra trước khi bắt đầu.',
+          'Add and review materials before you begin.',
+        ],
+        errorName: ['Nhập tên lớp trước khi tạo.', 'Enter a class name first.'],
+        futureHint: [
+          'Bạn có thể xem tài liệu trước buổi học.',
+          'You can explore the materials before class.',
+        ],
+      };
+      let locale = 'vi',
+        role = 'student',
+        selected = 'scratch',
+        activeTab = 'classes',
+        search = '';
+      let submitted = false,
+        teacherLive = true,
+        prepared = { scratch: true, python: false, design: true },
+        extraClasses = [];
+      let sourceNames = ['Mèo di chuyển · Slides.pdf', 'Mèo khởi đầu.sb3'],
+        activeSections = {},
+        reviewEdits = {},
+        microphone = 'auto',
+        toastTimeout,
+        lastFocus;
+      const lessons = [
+        {
+          id: 'scratch',
+          title: ['Scratch: mèo biết kể chuyện', 'Scratch: a cat with a story'],
+          desc: [
+            'Cho nhân vật chuyển động và cất lời.',
+            'Give your character movement and a voice.',
+          ],
+          session: 3,
+          duration: 45,
+          art: 'scratch',
+          tag: 'Scratch',
+          state: 'live',
+          detail: [
+            'Từ những khối nhỏ, tạo nên một câu chuyện của riêng bạn.',
+            'Build your own little story, one block at a time.',
+          ],
+          activity: ['Di chuyển, rồi nói', 'Move, then speak'],
+          activityDesc: [
+            'Gắn khối sự kiện, di chuyển và lời nói thành một chuỗi.',
+            'Connect an event, movement and speech into one stack.',
+          ],
+          sources: ['Mèo di chuyển · Ghi chú', 'Mèo khởi đầu · Ghi chú'],
+          count: 12,
+        },
+        {
+          id: 'python',
+          title: ['Python: xin chào, thế giới!', 'Python: hello, world!'],
+          desc: ['Viết những dòng lệnh đầu tiên.', 'Write your very first lines of code.'],
+          session: 1,
+          duration: 40,
+          art: 'python',
+          tag: 'Python',
+          state: 'upcoming',
+          detail: [
+            'Một chương trình nhỏ có thể bắt đầu bằng một lời chào.',
+            'A small program can start with a simple hello.',
+          ],
+          activity: ['Một lời chào của bạn', 'Your own greeting'],
+          activityDesc: [
+            'Mở tệp khởi đầu và thử lệnh print().',
+            'Open the starter file and try print().',
+          ],
+          sources: ['Lời chào · Ghi chú', 'hello.py · Ghi chú'],
+          count: 10,
+        },
+        {
+          id: 'design',
+          title: ['Thiết kế: ý tưởng trên giấy', 'Design: ideas on paper'],
+          desc: ['Một tấm thiệp, theo cách của bạn.', 'A little card, made your way.'],
+          session: 2,
+          duration: 30,
+          art: 'design',
+          tag: 'Creative',
+          state: 'selfPaced',
+          detail: [
+            'Kết hợp màu sắc, hình dạng và một ý tưởng rất riêng.',
+            'Mix colors, shapes and an idea that is yours alone.',
+          ],
+          activity: ['Phác thảo tấm thiệp', 'Sketch a little card'],
+          activityDesc: [
+            'Chọn ba màu và phác thảo lời nhắn của bạn.',
+            'Pick three colors and sketch your message.',
+          ],
+          sources: ['Màu sắc & hình dạng · Ghi chú'],
+          count: 8,
+        },
+      ];
+      const icon = (name) => `<svg class="icon" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+      const art = (name, className) =>
+        `<svg class="${className}" aria-hidden="true"><use href="#art-${name}"/></svg>`;
+      const text = (key) => words[key]?.[locale === 'vi' ? 0 : 1] ?? key;
+      const local = (value) => value[locale === 'vi' ? 0 : 1];
+      const escapeHtml = (value) =>
+        String(value).replace(
+          /[&<>"']/g,
+          (character) =>
+            ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character],
+        );
+      const getLesson = () => ({
+        ...([...lessons, ...extraClasses].find((lesson) => lesson.id === selected) ?? lessons[0]),
+        ...activeSections[selected],
+      });
+      function render() {
+        document.documentElement.lang = locale;
+        document.title = `Tro · ${text('classroom')}`;
+        document.querySelectorAll('[data-i18n]').forEach((element) => {
+          element.textContent = text(element.dataset.i18n);
+        });
+        document.getElementById('search').placeholder = text('search');
+        document.getElementById('search').setAttribute('aria-label', text('search'));
+        document.getElementById('sidebar').setAttribute('aria-label', text('classroom'));
+        document.getElementById('workspace').setAttribute('aria-label', text('myClasses'));
+        document
+          .querySelector('.role-toggle')
+          .setAttribute(
+            'aria-label',
+            locale === 'vi' ? 'Xem bản mẫu theo vai trò' : 'Preview a role',
+          );
+        document
+          .querySelector('.tabs')
+          .setAttribute('aria-label', locale === 'vi' ? 'Danh sách lớp học' : 'Classroom views');
+        document
+          .getElementById('detail')
+          .setAttribute('aria-label', locale === 'vi' ? 'Chi tiết lớp học' : 'Class details');
+        document.getElementById('locale').textContent = locale === 'vi' ? 'EN' : 'VI';
+        document
+          .getElementById('locale')
+          .setAttribute(
+            'aria-label',
+            locale === 'vi' ? 'Switch to English' : 'Chuyển sang tiếng Việt',
+          );
+        document.getElementById('profile-avatar').textContent = role === 'student' ? 'AN' : 'LC';
+        document.getElementById('header-avatar').textContent = role === 'student' ? 'AN' : 'LC';
+        document.getElementById('profile-role').textContent = text(role);
+        document
+          .getElementById('student-role')
+          .setAttribute('aria-pressed', String(role === 'student'));
+        document
+          .getElementById('teacher-role')
+          .setAttribute('aria-pressed', String(role === 'teacher'));
+        document.getElementById('greeting').textContent = text(
+          role === 'student' ? 'studentGreeting' : 'teacherGreeting',
+        );
+        document.getElementById('page-title').innerHTML = text(
+          role === 'student' ? 'studentTitle' : 'teacherTitle',
+        );
+        document.getElementById('page-subtitle').textContent = text(
+          role === 'student' ? 'studentSubtitle' : 'teacherSubtitle',
+        );
+        document.getElementById('teacher-message').innerHTML =
+          `${text('teacherLabel')}<span>Scratch · ${text('session')} 3</span>`;
+        document.querySelector('.teacher-note').style.visibility =
+          role === 'student' ? 'visible' : 'hidden';
+        document.querySelectorAll('[data-tab]').forEach((button) => {
+          const isActive = button.dataset.tab === activeTab;
+          button.classList.toggle('active', isActive);
+          button.setAttribute('aria-selected', String(isActive));
+        });
+        document.querySelector('.count').textContent = String(lessons.length + extraClasses.length);
+        renderMain();
+        renderDetail();
+      }
+      function renderMain() {
+        const target = document.getElementById('main-content');
+        const allLessons = [...lessons, ...extraClasses];
+        const matching = allLessons.filter((lesson) =>
+          (local(lesson.title) + ' ' + lesson.tag)
+            .toLocaleLowerCase()
+            .includes(search.toLocaleLowerCase()),
+        );
+        const lesson = getLesson();
+        if (activeTab === 'materials') {
+          target.innerHTML = `<div class="section-label"><h2>${text('materialTitle')}</h2><span class="muted">${escapeHtml(local(lesson.title))}</span></div><div class="note-panel">${icon('folder')}<div><h3>${text('originals')}</h3><p>${text('materialDemo')}</p></div></div><div class="materials">${lesson.sources.map((name, index) => materialRow(lesson, name, index)).join('')}</div>${role === 'teacher' ? `<div class="class-actions"><button class="primary-button" data-action="prepare">${icon('plus')}${text('prepare')}</button></div>` : ''}`;
+          return;
+        }
+        if (activeTab === 'tasks') {
+          target.innerHTML = `<div class="section-label"><h2>${text('workingLinks')}</h2></div><p class="muted">${text('workingDesc')}</p><div class="activity-list" style="margin-top:20px">${allLessons.map((item) => `<div class="activity-row"><span class="step-number">${icon('book')}</span><div><strong>${escapeHtml(local(item.title))}</strong><p>${escapeHtml(local(item.activity))}</p></div><button class="plain-button" data-select="${item.id}">${text('explore')}${icon('arrow')}</button></div>`).join('')}</div>${renderToday(lesson)}`;
+          return;
+        }
+        target.innerHTML = `<div class="section-label"><h2>${text(role === 'teacher' ? 'teacherClasses' : 'selectLesson')}</h2><span class="muted">${allLessons.length} ${locale === 'vi' ? 'lớp' : 'classes'}</span></div><div class="lesson-grid">${matching.length ? matching.map((item) => `<button class="lesson-card ${item.id === selected ? 'selected' : ''}" aria-pressed="${item.id === selected}" data-select="${item.id}"><span class="card-state"><span class="state-dot ${item.state === 'upcoming' ? 'violet' : item.state === 'selfPaced' ? 'blue' : ''}"></span>${text(item.id === 'scratch' && !teacherLive ? 'upcoming' : item.state)}</span>${art(item.art, 'card-art')}<h3>${escapeHtml(local(item.title))}</h3><p>${escapeHtml(local(item.desc))}</p><span class="card-foot">${icon('clock')}${item.duration} ${text('minutes')}<span class="tag">${item.tag}</span></span></button>`).join('') : `<p class="empty">${text('noResults')}</p>`}</div><div class="class-actions"><button class="plain-button" data-action="${role === 'teacher' ? 'createClass' : 'join'}">${icon('plus')}${text(role === 'teacher' ? 'addClass' : 'joinClass')}</button></div>${renderToday(lesson)}<div class="note-panel">${icon(role === 'teacher' ? 'book' : 'chat')}<div><h3>${text(role === 'teacher' ? 'prepareTitle' : 'encouragement')}</h3><p>${text(role === 'teacher' ? 'prepareInfo' : 'encouragementText')}</p></div></div>`;
+      }
+      function renderToday(lesson) {
+        const isScratch = lesson.id === 'scratch';
+        const steps = isScratch
+          ? [
+              {
+                name: ['Mở dự án khởi đầu', 'Open the project'],
+                desc: [
+                  'Tìm khối lệnh, sân khấu và nhân vật.',
+                  'Find the blocks, stage and sprite.',
+                ],
+                status: 'completed',
+              },
+              { name: lesson.activity, desc: lesson.activityDesc, status: 'current' },
+              {
+                name: ['Thử một thay đổi nhỏ', 'Try a small change'],
+                desc: [
+                  'Đổi số bước hoặc lời chào, rồi chạy lại.',
+                  'Change the steps or greeting, then run it again.',
+                ],
+                status: 'next',
+              },
+            ]
+          : [
+              { name: lesson.activity, desc: lesson.activityDesc, status: 'current' },
+              {
+                name: ['Chia sẻ điều bạn vừa làm', 'Share what you made'],
+                desc: ['Giải thích một điều bạn đã thử.', 'Tell us one thing you tried.'],
+                status: 'next',
+              },
+            ];
+        return `<section class="today"><div class="section-label"><h2>${text('today')}</h2><span class="muted">${isScratch ? text('teacherLeads') : text('selfPaced')}</span></div><div class="activity-list">${steps.map((step, index) => `<div class="activity-row"><span class="step-number ${step.status === 'completed' ? 'done' : step.status === 'current' ? 'current' : ''}">${step.status === 'completed' ? icon('check') : index + 1}</span><div><strong>${escapeHtml(local(step.name))}</strong><p>${escapeHtml(local(step.desc))}</p></div><span class="status">${text(step.status)}</span></div>`).join('')}</div></section>`;
+      }
+      function materialRow(lesson, name, index) {
+        return `<button class="material-row" data-download="${index}"><span class="file-icon">TXT</span><div><strong>${escapeHtml(name)}</strong><small>${text('originals')}</small></div>${icon('download')}</button>`;
+      }
+      function renderDetail() {
+        const lesson = getLesson();
+        const studentContent = `<div class="current-activity"><p class="eyebrow">${text(lesson.state === 'live' && teacherLive ? 'liveSection' : lesson.state === 'upcoming' ? 'upcoming' : 'selfPaced')}</p><strong>${escapeHtml(local(lesson.activity))}</strong><p>${escapeHtml(local(lesson.activityDesc))}</p></div><button class="primary-button full" data-action="back">${text(lesson.state === 'upcoming' ? 'explore' : 'returnTask')}${icon('arrow')}</button><button class="helper-button" data-action="help">${icon('chat')}${text('askTro')}</button><div class="divider"></div><h3 style="font-size:12px">${text('materialTitle')}</h3><div class="materials">${lesson.sources.map((name, index) => materialRow(lesson, name, index)).join('')}</div><div class="divider"></div><div class="submission"><strong>${text(submitted && lesson.id === 'scratch' ? 'submitted' : 'submission')}</strong><p>${text('submissionText')}</p><button class="plain-button" data-action="submit" ${lesson.id !== 'scratch' ? 'disabled' : ''}>${icon(submitted ? 'check' : 'upload')}${text(submitted ? 'submitted' : 'submit')}</button></div><div class="saved">${icon('check')}${text('saved')}</div>`;
+        const teacherContent = `<div class="teacher-tools"><div class="teacher-section"><strong>${text(prepared[lesson.id] ? 'reviewed' : 'draft')}</strong><p class="muted">${text(prepared[lesson.id] ? 'prepareInfo' : 'draftHint')}</p><button class="plain-button" data-action="prepare">${icon('folder')}${text(prepared[lesson.id] ? 'edit' : 'prepare')}</button></div><div class="teacher-section"><strong>${text('invite')}</strong><p class="muted">${lesson.count} ${text('students')} · ${text('codeLabel')}</p><p class="code">TRO-314</p><button class="plain-button" data-action="invite">${icon('plus')}${text('invite')}</button></div><button class="primary-button full" data-action="start" ${!prepared[lesson.id] ? 'disabled' : ''}>${text(lesson.id === 'scratch' && teacherLive ? 'teacherLive' : 'teacherStart')}${icon('arrow')}</button>${lesson.id === 'scratch' && teacherLive ? `<button class="helper-button" data-action="section">${text('currentSection')}: ${escapeHtml(local(lesson.activity))}</button>` : ''}</div>`;
+        document.getElementById('detail').innerHTML =
+          `${art('library', 'detail-art')}<div class="detail-heading"><p class="eyebrow">${lesson.tag} · ${text('session')} ${lesson.session}</p><h2>${escapeHtml(local(lesson.title))}</h2><p class="detail-desc">${escapeHtml(local(lesson.detail))}</p><div class="detail-meta"><span>${icon('clock')}${lesson.duration} ${text('minutes')}</span><span>${icon('class')}${role === 'teacher' ? `${lesson.count} ${text('students')}` : locale === 'vi' ? 'Cô Linh' : 'Ms Linh'}</span></div></div><div class="detail-content">${role === 'student' ? studentContent : teacherContent}</div>`;
+      }
+      function notify(message) {
+        clearTimeout(toastTimeout);
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.classList.add('visible');
+        toastTimeout = setTimeout(() => toast.classList.remove('visible'), 5500);
+      }
+      function openDialog(title, body) {
+        lastFocus = document.activeElement;
+        const dialog = document.getElementById('dialog');
+        dialog.innerHTML = `<div class="dialog-header"><h2 id="dialog-title">${title}</h2><button class="close" data-action="close" aria-label="${text('close')}">${icon('close')}</button></div>${body}`;
+        document.getElementById('dialog-backdrop').hidden = false;
+        const focusTarget = dialog.querySelector('input:not([type="file"]),textarea,select,button');
+        focusTarget?.focus();
+      }
+      function closeDialog() {
+        document.getElementById('dialog-backdrop').hidden = true;
+        lastFocus?.focus();
+      }
+      function actionButton(action, key, primary = true) {
+        return `<button class="${primary ? 'primary-button' : 'plain-button'}" data-action="${action}">${text(key)}</button>`;
+      }
+      function openPrepare() {
+        openDialog(
+          text('prepareTitle'),
+          `<p>${text('prepareInfo')}</p><div class="dropzone" id="dropzone">${icon('upload')}<strong>${text('drop')}</strong><p>${text('formats')}</p><label class="plain-button" tabindex="0" for="local-files">${text('chooseFiles')}</label><input id="local-files" type="file" multiple accept=".pdf,.pptx,.sb3,.py,.txt,.md" aria-label="${text('chooseFiles')}" /></div><ul class="source-list" id="source-list"></ul><label for="intent">${text('intent')}</label><textarea id="intent">${text('intentDefault')}</textarea><div class="dialog-info">${text('reviewInfo')}</div><div class="dialog-actions">${actionButton('review', 'reviewSample')}</div>`,
+        );
+        renderSources();
+      }
+      function renderSources() {
+        document.getElementById('source-list').innerHTML = sourceNames
+          .map(
+            (name, index) =>
+              `<li><span>${escapeHtml(name)}</span><button data-remove-source="${index}" aria-label="${text('remove')}: ${escapeHtml(name)}">${text('remove')}</button></li>`,
+          )
+          .join('');
+      }
+      function downloadSample(index) {
+        const lesson = getLesson();
+        const name = lesson.sources[index] ?? lesson.sources[0];
+        const content = `Tro — ${text('originals')}\n${local(lesson.title)}\n\n${local(lesson.activity)}\n${local(lesson.activityDesc)}\n\n${text('materialDemo')}\n`;
+        const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Tro-${lesson.id}-SampleNotes.txt`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        notify(text('materialDemo'));
+      }
+      function runAction(action) {
+        if (action === 'close') {
+          closeDialog();
+          return;
+        }
+        if (action === 'student' || action === 'teacher') {
+          role = action;
+          render();
+          return;
+        }
+        if (action === 'locale') {
+          locale = locale === 'vi' ? 'en' : 'vi';
+          closeDialog();
+          render();
+          return;
+        }
+        if (action === 'home') {
+          activeTab = 'classes';
+          search = '';
+          document.getElementById('search').value = '';
+          render();
+          return;
+        }
+        if (action === 'files') {
+          activeTab = 'materials';
+          render();
+          return;
+        }
+        if (action === 'workspace' || action === 'back') {
+          notify(text('mockOpen'));
+          return;
+        }
+        if (action === 'reset') {
+          submitted = false;
+          teacherLive = true;
+          selected = 'scratch';
+          role = 'student';
+          activeTab = 'classes';
+          search = '';
+          extraClasses = [];
+          prepared = { scratch: true, python: false, design: true };
+          sourceNames = ['Mèo di chuyển · Slides.pdf', 'Mèo khởi đầu.sb3'];
+          reviewEdits = {};
+          activeSections = {};
+          microphone = 'auto';
+          document.getElementById('search').value = '';
+          render();
+          notify(text('resetDone'));
+          return;
+        }
+        if (action === 'submit') {
+          openDialog(
+            text('submitTitle'),
+            `<p>${text('submitInfo')}</p><label for="project-link">${text('projectLink')}</label><input type="url" id="project-link" value="https://scratch.mit.edu/projects/123456789/" /><label for="student-note">${text('optionalNote')}</label><textarea id="student-note" placeholder="${text('notePlaceholder')}"></textarea><div class="dialog-info">${text('demoNote')}</div><p id="dialog-error" role="alert" style="color:#b16a4d;margin-top:10px"></p><div class="dialog-actions">${actionButton('close', 'cancel', false)}${actionButton('confirmSubmit', 'confirm')}</div>`,
+          );
+          return;
+        }
+        if (action === 'confirmSubmit') {
+          const value = document.getElementById('project-link').value.trim();
+          if (!/^https:\/\/scratch\.mit\.edu\/projects\/\d+\/?$/.test(value)) {
+            document.getElementById('dialog-error').textContent = text('invalidLink');
+            return;
+          }
+          submitted = true;
+          closeDialog();
+          render();
+          notify(text('submitDone'));
+          return;
+        }
+        if (action === 'help') {
+          openDialog(
+            text('hintTitle'),
+            `<p>${text('hintDisclosure')}</p><label for="question">${text('hintQuestion')}</label><textarea id="question" placeholder="${text('hintPlaceholder')}"></textarea><div id="hint-reply" role="status"></div><div class="dialog-actions">${actionButton('showHint', 'showHint')}</div>`,
+          );
+          return;
+        }
+        if (action === 'showHint') {
+          document.getElementById('hint-reply').innerHTML =
+            `<div class="dialog-info">${getLesson().id === 'scratch' ? text('hintResponse') : escapeHtml(local(getLesson().activityDesc))}</div>`;
+          return;
+        }
+        if (action === 'join') {
+          openDialog(
+            text('joinTitle'),
+            `<p>${text('joinInfo')}</p><label for="join-code">${text('codeInput')}</label><input id="join-code" placeholder="TRO-314" /><p id="dialog-error" role="alert" style="color:#b16a4d;margin-top:10px"></p><div class="dialog-actions">${actionButton('confirmJoin', 'join')}</div>`,
+          );
+          return;
+        }
+        if (action === 'confirmJoin') {
+          if (document.getElementById('join-code').value.trim().toUpperCase() !== 'TRO-314') {
+            document.getElementById('dialog-error').textContent = text('invalidCode');
+            return;
+          }
+          selected = 'scratch';
+          activeTab = 'classes';
+          closeDialog();
+          render();
+          notify(text('joinDone'));
+          return;
+        }
+        if (action === 'prepare') {
+          openPrepare();
+          return;
+        }
+        if (action === 'review') {
+          openDialog(
+            text('reviewTitle'),
+            `<p>${text('reviewInfo')}</p><label for="review-summary">${text('summary')}</label><textarea id="review-summary">${escapeHtml(reviewEdits[selected]?.summary || (selected === 'scratch' ? text('sampleSummary') : `${local(getLesson().detail)} ${local(getLesson().activityDesc)}`))}</textarea><label for="review-sections">${text('sectionNotes')}</label><textarea id="review-sections" style="min-height:140px">${escapeHtml(reviewEdits[selected]?.sections || (selected === 'scratch' ? text('sampleSections') : `1. ${local(getLesson().activity)}\n2. ${local(getLesson().activityDesc)}\n3. ${locale === 'vi' ? 'Thử một thay đổi nhỏ' : 'Try a small change'}`))}</textarea><div class="dialog-actions">${actionButton('approve', 'approve')}</div>`,
+          );
+          return;
+        }
+        if (action === 'approve') {
+          reviewEdits[selected] = {
+            summary: document.getElementById('review-summary').value,
+            sections: document.getElementById('review-sections').value,
+          };
+          prepared[selected] = true;
+          closeDialog();
+          render();
+          notify(text('approvedToast'));
+          return;
+        }
+        if (action === 'invite') {
+          openDialog(
+            text('invite'),
+            `<p>${text('inviteInfo')}</p><div class="dialog-info"><p class="code" style="text-align:center">TRO-314</p></div><div class="dialog-actions">${actionButton('copy', 'copy')}</div>`,
+          );
+          return;
+        }
+        if (action === 'copy') {
+          if (navigator.clipboard) {
+            navigator.clipboard
+              .writeText('TRO-314')
+              .then(() => notify(text('copyDone')))
+              .catch(() => notify(`${text('codeLabel')}: TRO-314`));
+          } else {
+            notify(`${text('codeLabel')}: TRO-314`);
+          }
+          return;
+        }
+        if (action === 'start' || action === 'section') {
+          const lesson = getLesson();
+          openDialog(
+            text('startTitle'),
+            `<p>${text('startInfo')}</p><label for="section-choice">${text('currentSection')}</label><select id="section-choice"><option>${escapeHtml(local(lesson.activity))}</option><option>${locale === 'vi' ? 'Chạy thử và thay đổi' : 'Test it and change something'}</option><option>${locale === 'vi' ? 'Chia sẻ dự án' : 'Share the project'}</option></select><div class="dialog-info">${text('demoNote')}</div><div class="dialog-actions">${actionButton('confirmStart', 'startConfirm')}</div>`,
+          );
+          return;
+        }
+        if (action === 'confirmStart') {
+          const sectionIndex = document.getElementById('section-choice').selectedIndex;
+          if (sectionIndex === 1) {
+            activeSections[selected] = {
+              activity: ['Chạy thử và thay đổi', 'Test it and change something'],
+              activityDesc: [
+                'Chạy bài của bạn, rồi thay đổi một chi tiết và thử lại.',
+                'Run your work, change one detail and try again.',
+              ],
+            };
+          }
+          if (sectionIndex === 2) {
+            activeSections[selected] = {
+              activity: ['Chia sẻ dự án', 'Share the project'],
+              activityDesc: [
+                'Kiểm tra bài của bạn và chia sẻ với giáo viên.',
+                'Check your work and share it with your teacher.',
+              ],
+            };
+          }
+          teacherLive = true;
+          closeDialog();
+          render();
+          notify(text('started'));
+          return;
+        }
+        if (action === 'createClass') {
+          openDialog(
+            text('classTitle'),
+            `<label for="class-name">${text('className')}</label><input id="class-name" placeholder="${locale === 'vi' ? 'Ví dụ: Python sáng thứ Bảy' : 'For example: Saturday Python'}" maxlength="60" /><p id="dialog-error" role="alert" style="color:#b16a4d;margin-top:10px"></p><div class="dialog-actions">${actionButton('confirmCreate', 'create')}</div>`,
+          );
+          return;
+        }
+        if (action === 'confirmCreate') {
+          const name = document.getElementById('class-name').value.trim();
+          if (!name) {
+            document.getElementById('dialog-error').textContent = text('errorName');
+            return;
+          }
+          const id = `class-${extraClasses.length + 1}`;
+          extraClasses.push({ ...lessons[1], id, title: [name, name], count: 0 });
+          prepared[id] = false;
+          selected = id;
+          closeDialog();
+          render();
+          notify(text('created'));
+          return;
+        }
+        if (action === 'microphone') {
+          openDialog(
+            text('micTitle'),
+            `<p>${text('micInfo')}</p><label for="device">${text('device')}</label><select id="device"><option value="auto" ${microphone === 'auto' ? 'selected' : ''}>${text('deviceDefault')}</option><option value="builtin" ${microphone === 'builtin' ? 'selected' : ''}>${text('micBuiltIn')}</option></select><div class="dialog-actions">${actionButton('saveMicrophone', 'save')}</div>`,
+          );
+          return;
+        }
+        if (action === 'saveMicrophone') {
+          microphone = document.getElementById('device').value;
+          closeDialog();
+          notify(text('micSaved'));
+          return;
+        }
+        if (action === 'settings') {
+          openDialog(
+            text('settings'),
+            `<p>${text('settingsInfo')}</p><label for="language-choice">${text('language')}</label><select id="language-choice"><option value="vi" ${locale === 'vi' ? 'selected' : ''}>Tiếng Việt</option><option value="en" ${locale === 'en' ? 'selected' : ''}>English</option></select><div class="dialog-actions">${actionButton('saveSettings', 'save')}</div>`,
+          );
+          return;
+        }
+        if (action === 'saveSettings') {
+          locale = document.getElementById('language-choice').value;
+          closeDialog();
+          render();
+        }
+      }
+      document.addEventListener('click', (event) => {
+        const button = event.target.closest('button');
+        if (!button || button.disabled) {
+          return;
+        }
+        if (button.dataset.action) {
+          runAction(button.dataset.action);
+        } else if (button.dataset.select) {
+          selected = button.dataset.select;
+          render();
+        } else if (button.dataset.tab) {
+          activeTab = button.dataset.tab;
+          render();
+        } else if (button.dataset.download) {
+          downloadSample(Number(button.dataset.download));
+        } else if (button.dataset.removeSource) {
+          sourceNames.splice(Number(button.dataset.removeSource), 1);
+          renderSources();
+        }
+      });
+      document.getElementById('search').addEventListener('input', (event) => {
+        search = event.target.value;
+        renderMain();
+      });
+      document.addEventListener('change', (event) => {
+        if (event.target.id === 'local-files') {
+          sourceNames.push(
+            ...Array.from(event.target.files)
+              .slice(0, 12)
+              .map((file) => file.name),
+          );
+          renderSources();
+        }
+      });
+      document.addEventListener('dragover', (event) => {
+        if (event.target.closest('#dropzone')) {
+          event.preventDefault();
+        }
+      });
+      document.addEventListener('drop', (event) => {
+        if (event.target.closest('#dropzone')) {
+          event.preventDefault();
+          sourceNames.push(
+            ...Array.from(event.dataTransfer.files)
+              .slice(0, 12)
+              .map((file) => file.name),
+          );
+          renderSources();
+        }
+      });
+      document.addEventListener('keydown', (event) => {
+        const backdrop = document.getElementById('dialog-backdrop');
+        if (event.key === 'Escape' && !backdrop.hidden) {
+          closeDialog();
+        }
+        if (
+          (event.key === 'Enter' || event.key === ' ') &&
+          event.target.matches('label[for="local-files"]')
+        ) {
+          event.preventDefault();
+          document.getElementById('local-files').click();
+        }
+        if (event.key === 'Tab' && !backdrop.hidden) {
+          const items = Array.from(
+            document
+              .getElementById('dialog')
+              .querySelectorAll('button,input:not([type="file"]),textarea,select,[tabindex="0"]'),
+          ).filter((item) => !item.disabled);
+          const first = items[0],
+            last = items[items.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last?.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first?.focus();
+          }
+        }
+      });
+      document.getElementById('dialog-backdrop').addEventListener('click', (event) => {
+        if (event.target.id === 'dialog-backdrop') {
+          closeDialog();
+        }
+      });
+      render();
+    </script>
+  </body>
+</html>

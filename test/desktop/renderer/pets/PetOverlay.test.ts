@@ -34,6 +34,47 @@ it('renders a localized pet and sends a bounded slap command without workspace c
   render(createElement(PetOverlay));
   const pet = await screen.findByRole('button', { name: 'Pet Mochi' });
   expect(screen.getByRole('status').textContent).toBe('One small step at a time.');
+  bridge.interactWithPet.mockClear();
+  fireEvent.mouseMove(window);
+  expect(bridge.interactWithPet).toHaveBeenLastCalledWith({ kind: PetOverlayAction.HOVER });
+  fireEvent.mouseLeave(window);
+  expect(bridge.interactWithPet).toHaveBeenCalledTimes(2);
+
+  Object.defineProperties(pet, {
+    setPointerCapture: { value: vi.fn<(pointerId: number) => void>() },
+    hasPointerCapture: { value: () => false },
+  });
+  bridge.interactWithPet.mockClear();
+  fireEvent(
+    pet,
+    new MouseEvent('pointerdown', { bubbles: true, button: 0, screenX: 72, screenY: 100 }),
+  );
+  expect(bridge.interactWithPet).not.toHaveBeenCalled();
+  fireEvent(
+    pet,
+    new MouseEvent('pointerup', { bubbles: true, button: 0, screenX: 72, screenY: 100 }),
+  );
+  expect(bridge.interactWithPet.mock.calls).toEqual([
+    [{ kind: PetOverlayAction.END_DRAG }],
+    [{ kind: PetOverlayAction.PET }],
+  ]);
+
+  bridge.interactWithPet.mockClear();
+  fireEvent(
+    pet,
+    new MouseEvent('pointerdown', { bubbles: true, button: 0, screenX: 72, screenY: 100 }),
+  );
+  fireEvent(pet, new MouseEvent('pointermove', { bubbles: true, screenX: 80, screenY: 100 }));
+  fireEvent(pet, new MouseEvent('pointermove', { bubbles: true, screenX: 90, screenY: 100 }));
+  fireEvent(
+    pet,
+    new MouseEvent('pointerup', { bubbles: true, button: 0, screenX: 90, screenY: 100 }),
+  );
+  expect(bridge.interactWithPet.mock.calls).toEqual([
+    [{ kind: PetOverlayAction.START_DRAG }],
+    [{ kind: PetOverlayAction.END_DRAG }],
+  ]);
+
   fireEvent.contextMenu(pet);
   expect(bridge.interactWithPet).toHaveBeenCalledWith({ kind: PetOverlayAction.SLAP });
   cleanup();

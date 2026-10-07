@@ -14,7 +14,9 @@ The workspace and overlay use one self-contained preload bundle to avoid shared 
 
 ## Behavior and lifecycle
 
-Petting produces an 800 ms bounce; right-click produces an 800 ms squash. Rapid reactions replace the previous timer. Settings includes keyboard-accessible Pet and Playful slap actions. No health/punishment mechanic exists. Quiet mode disables encouragement. Otherwise one curated localized message appears after ten visible idle minutes for five seconds. Hide, suppression and sign-out cancel timers. Reduced motion disables animation; system reduced-motion preferences are honored by CSS.
+Petting produces an 800 ms bounce; right-click produces an 800 ms squash. Rapid desktop reactions replace the previous timer. Settings previews are buttons: click or use Enter/Space to pet a preview, and right-click for a playful slap, including while the desktop pet is hidden. Preview reactions stay local and do not adopt, show or save a pet. Settings also includes keyboard-accessible Pet and Playful slap actions for the visible desktop pet, mirrored in its selected preview. No health/punishment mechanic exists. Quiet mode disables encouragement. Otherwise one curated localized message appears after ten visible idle minutes for five seconds. Hide, suppression and sign-out cancel timers. Reduced motion disables animation; system reduced-motion preferences are honored by CSS.
+
+The overlay listens for forwarded `mousemove` and `mouseleave` events to switch click-through behavior. Pointer events own deliberate clicks and captured drags. Dragging starts only after movement exceeds four screen pixels; a stationary click does not start a placement save.
 
 Main hides the pet while the chat controller is busy or voice capture is preparing, recording or finalizing. Teaching and voice HUD ownership/evidence remain unchanged. The pet consumes no screen images and makes no model requests. Sign-out and workspace closure invalidate pending reads/saves and destroy the overlay. An overlay load/crash failure is reported and stays hidden until an explicit preference/adoption action retries it.
 
@@ -23,6 +25,8 @@ The pet's encouragement language is saved with the adoption/preferences command 
 ## Diagnostics
 
 `pet.preferences.failed` reports `stage: read`, `save` or `placement`, without identifiers, paths, names or raw data. A missing preference file defaults silently; corrupt/unreadable files default with a warning and remain intact until a later explicit save. `pet.presentation.failed` reports `stage: overlay`. The gallery displays a save or presentation failure and allows retry. No prompt, image, screen capture, credential or raw configuration enters these events.
+
+`pet.interaction.rejected` reports a rejected drag start with `reason: outside-hit-region`, pointer offsets relative to the overlay and the circular hit radius. This event occurs only on a drag attempt, never on hover polls. Compare the offsets against `PetGeometry` to diagnose a geometry mismatch; no screen content or account information is logged.
 
 ## Verification and remaining acceptance
 

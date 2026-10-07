@@ -20,10 +20,16 @@ model OutfitDraft {
   @@index([ownerId, createdAt])
 }
 
+enum AccountRole {
+  student
+  teacher
+}
+
 model User {
   id            String    @id
   name          String
   email         String    @unique
+  role          AccountRole @default(student)
   emailVerified Boolean   @default(false)
   image         String?
   createdAt     DateTime  @default(now())
@@ -35,8 +41,129 @@ model User {
   transcriptionCaptures TranscriptionCapture[]
   voiceoverUsage VoiceoverUsage[]
   voiceoverUtterances VoiceoverUtterance[]
+  classroomCourses ClassroomCourseRevision[]
+  teachingClasses ClassroomGroup[]
+  classEnrollments ClassroomEnrollment[]
+  classParticipations ClassroomParticipation[]
+  workSnapshots ClassroomWorkSnapshot[]
+  practiceChecks ClassroomPracticeCheck[]
+  workSubmissions ClassroomWorkSubmission[]
 
   @@map("user")
+}
+
+model ClassroomCourseRevision {
+  id String @id @db.Uuid
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  title String
+  content Json
+  createdAt DateTime @default(now())
+  classes ClassroomGroup[]
+  materialPublication ClassroomMaterialPublication?
+  workSnapshots ClassroomWorkSnapshot[]
+  @@index([ownerId, createdAt])
+}
+
+model ClassroomGroup {
+  materialDerivations ClassroomMaterialDerivation[]
+  id String @id @db.Uuid
+  teacherId String
+  teacher User @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  name String
+  courseRevisionId String @db.Uuid
+  courseRevision ClassroomCourseRevision @relation(fields: [courseRevisionId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+  enrollments ClassroomEnrollment[]
+  meetings ClassroomMeeting[]
+  invitations ClassroomInvitation[]
+  @@index([teacherId])
+  materialCollection ClassroomMaterialCollection?
+  materialFiles ClassroomMaterialFile[]
+}
+
+model ClassroomEnrollment {
+  classId String @db.Uuid
+  studentId String
+  schoolClass ClassroomGroup @relation(fields: [classId], references: [id], onDelete: Restrict)
+  student User @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  active Boolean @default(true)
+  @@id([classId, studentId])
+  @@index([studentId, active])
+}
+
+model ClassroomMeeting {
+  id String @id @db.Uuid
+  classId String @db.Uuid
+  schoolClass ClassroomGroup @relation(fields: [classId], references: [id], onDelete: Restrict)
+  status String
+  phase String
+  pacing String
+  currentActivityId String @db.Uuid
+  contextVersion Int @default(1)
+  createdAt DateTime @default(now())
+  participations ClassroomParticipation[]
+  @@index([classId, createdAt])
+}
+
+model ClassroomParticipation {
+  id String @id @db.Uuid
+  classSessionId String @db.Uuid
+  meeting ClassroomMeeting @relation(fields: [classSessionId], references: [id], onDelete: Restrict)
+  studentId String
+  student User @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  deviceId String @db.Uuid
+  leaseUntil DateTime
+  left Boolean @default(false)
+  attempts ClassroomAttempt[]
+  @@unique([classSessionId, studentId])
+}
+
+model ClassroomAttempt {
+  id String @id @db.Uuid
+  participationId String @db.Uuid
+  participation ClassroomParticipation @relation(fields: [participationId], references: [id], onDelete: Restrict)
+  activityId String @db.Uuid
+  progressVersion Int @default(0)
+  workspaceUrl String?
+  evidence Json
+  declaredComplete Boolean @default(false)
+  helpSummary String @default("")
+  events ClassroomProgressEvent[]
+  preparations ClassroomSubmissionPreparation[]
+  submissions ClassroomSubmission[]
+  workSnapshots ClassroomWorkSnapshot[]
+  practiceChecks ClassroomPracticeCheck[]
+  workSubmissions ClassroomWorkSubmission[]
+  @@unique([participationId, activityId])
+}
+
+model ClassroomProgressEvent {
+  attemptId String @db.Uuid
+  eventId String @db.Uuid
+  attempt ClassroomAttempt @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+  @@id([attemptId, eventId])
+}
+
+model ClassroomSubmissionPreparation {
+  id String @id @db.Uuid
+  attemptId String @db.Uuid
+  attempt ClassroomAttempt @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+  url String
+  progressVersion Int
+  contextVersion Int
+  expiresAt DateTime
+}
+
+model ClassroomSubmission {
+  id String @id @db.Uuid
+  attemptId String @db.Uuid
+  attempt ClassroomAttempt @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+  idempotencyKey String @db.Uuid
+  url String
+  submittedAt DateTime
+  @@unique([attemptId, idempotencyKey])
 }
 
 model Session {
@@ -139,4 +266,138 @@ model VoiceoverUtterance {
   expiresAt DateTime
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([expiresAt])
+}
+
+model ClassroomInvitation {
+  id String @id @db.Uuid
+  classId String @db.Uuid
+  schoolClass ClassroomGroup @relation(fields: [classId], references: [id], onDelete: Restrict)
+  codeDigest String @unique
+  email String?
+  expiresAt DateTime
+  revoked Boolean @default(false)
+  @@index([classId, revoked])
+}
+
+model ClassroomMaterialCollection {
+  classId String @id @db.Uuid
+  schoolClass ClassroomGroup @relation(fields: [classId], references: [id], onDelete: Restrict)
+  version Int
+  state String
+  leaseUntil DateTime?
+  document Json
+}
+
+model ClassroomMaterialFile {
+  id String @id @db.Uuid
+  classId String @db.Uuid
+  schoolClass ClassroomGroup @relation(fields: [classId], references: [id], onDelete: Restrict)
+  name String
+  bytes Bytes
+  size Int
+  @@index([classId])
+}
+
+model ClassroomMaterialPublication {
+  courseId String @id @db.Uuid
+  course ClassroomCourseRevision @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  document Json
+}
+
+model ClassroomMaterialBudget {
+ id String @id
+ requests Int
+}
+
+model ClassroomMaterialDerivation {
+  classId String @db.Uuid
+  key String
+  schoolClass ClassroomGroup @relation(fields: [classId], references: [id], onDelete: Restrict)
+  jobId String @db.Uuid
+  claimId String @db.Uuid
+  document Json
+  @@id([classId, key])
+  @@index([jobId])
+}
+
+model ClassroomWorkSnapshot {
+ id String @id @db.Uuid
+ studentId String
+ student User @relation(fields:[studentId],references:[id],onDelete:Restrict)
+ attemptId String @db.Uuid
+ attempt ClassroomAttempt @relation(fields:[attemptId],references:[id],onDelete:Restrict)
+ courseRevisionId String @db.Uuid
+ courseRevision ClassroomCourseRevision @relation(fields:[courseRevisionId],references:[id],onDelete:Restrict)
+ checkpointId String @db.Uuid
+ rubricRevisionId String @db.Uuid
+ manifestDigest String @db.VarChar(64)
+ createdAt DateTime
+ evidence ClassroomPracticeEvidence[]
+ checks ClassroomPracticeCheck[]
+ submissions ClassroomWorkSubmission[]
+ @@index([studentId,createdAt])
+ @@index([attemptId,checkpointId,createdAt])
+}
+model ClassroomPracticeEvidence {
+ id String @id @db.Uuid
+ snapshotId String @db.Uuid
+ snapshot ClassroomWorkSnapshot @relation(fields:[snapshotId],references:[id],onDelete:Restrict)
+ kind String
+ name String
+ mediaType String
+ byteCount Int
+ digest String @db.VarChar(64)
+ content Bytes
+ @@index([snapshotId])
+}
+model ClassroomPracticeCheck {
+ id String @id @db.Uuid
+ studentId String
+ student User @relation(fields:[studentId],references:[id],onDelete:Restrict)
+ attemptId String @db.Uuid
+ attempt ClassroomAttempt @relation(fields:[attemptId],references:[id],onDelete:Restrict)
+ checkpointId String @db.Uuid
+ snapshotId String @db.Uuid
+ snapshot ClassroomWorkSnapshot @relation(fields:[snapshotId],references:[id],onDelete:Restrict)
+ requestId String @db.Uuid
+ payloadDigest String @db.VarChar(64)
+ rubric Json
+ status String
+ finding String?
+ evaluator String
+ createdAt DateTime
+ completedAt DateTime?
+ results ClassroomPracticeResult[]
+ submissions ClassroomWorkSubmission[]
+ @@unique([studentId,requestId])
+ @@index([studentId,createdAt])
+ @@index([attemptId,createdAt])
+}
+model ClassroomPracticeResult {
+ checkId String @db.Uuid
+ check ClassroomPracticeCheck @relation(fields:[checkId],references:[id],onDelete:Restrict)
+ criterionId String @db.Uuid
+ finding String
+ feedback String
+ evidenceIds Json
+ @@id([checkId,criterionId])
+}
+model ClassroomWorkSubmission {
+ id String @id @db.Uuid
+ studentId String
+ student User @relation(fields:[studentId],references:[id],onDelete:Restrict)
+ attemptId String @db.Uuid
+ attempt ClassroomAttempt @relation(fields:[attemptId],references:[id],onDelete:Restrict)
+ checkpointId String @db.Uuid
+ snapshotId String @db.Uuid
+ snapshot ClassroomWorkSnapshot @relation(fields:[snapshotId],references:[id],onDelete:Restrict)
+ checkId String @db.Uuid
+ check ClassroomPracticeCheck @relation(fields:[checkId],references:[id],onDelete:Restrict)
+ sequence Int
+ requestId String @db.Uuid
+ payloadDigest String @db.VarChar(64)
+ submittedAt DateTime
+ @@unique([studentId,requestId])
+ @@unique([attemptId,checkpointId,sequence])
+ @@index([attemptId,submittedAt])
 }

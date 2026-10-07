@@ -9,6 +9,25 @@ import {
   PetReaction,
   type PetReply,
 } from '#contracts/Pet.js';
+import { randomUUID } from 'node:crypto';
+import { GlobalPracticeShortcut } from './GlobalPracticeShortcut.js';
+import { PracticeShortcutEventSchema } from '#contracts/PracticeShortcut.js';
+import {
+  PracticeCommandSchema,
+  PracticeFailure,
+  type PracticeReply,
+} from '#contracts/PracticeCheck.js';
+import { PracticeCheckApiClient } from './classroom/PracticeCheckApiClient.js';
+import {
+  AccountCommandKind,
+  AccountCommandSchema,
+  type AccountReply,
+} from '#contracts/DesktopAccounts.js';
+import { AccountTransitionGate } from './accounts/AccountTransitionGate.js';
+import { MaterialCommandSchema } from '#contracts/ClassroomMaterials.js';
+import { MaterialApiClient } from './classroom/MaterialApiClient.js';
+import { writeFile } from 'node:fs/promises';
+import { dialog } from 'electron';
 import { VoiceoverController } from './voiceover/VoiceoverController.js';
 import {
   VoiceoverAckSchema,
@@ -18,6 +37,13 @@ import {
   type VoiceoverPlayback,
 } from '#contracts/Voiceover.js';
 import { GlobalStudentInput } from './input/GlobalStudentInput.js';
+import {
+  ClassroomCommandSchema,
+  ClassroomFailure,
+  type ClassroomReply,
+} from '#contracts/Classroom.js';
+import { ClassroomApiClient } from './classroom/ClassroomApiClient.js';
+import { ClassroomSessionController } from './classroom/ClassroomSessionController.js';
 import {
   MicrophoneTestCommandSchema,
   type MicrophoneTestReply,
@@ -80,6 +106,7 @@ let mainWindow: BrowserWindow | undefined;
 let pets: PetController | undefined;
 let petWindow: PetWindow | undefined;
 let chat: AgentChatController | undefined;
+let classroom: ClassroomSessionController | undefined;
 let voice: VoiceInputController | undefined;
 let microphoneTests: MicrophoneTestLease | undefined;
 let desktopCompanion: DesktopCompanion | undefined;
@@ -383,6 +410,9 @@ async function startDesktop(): Promise<void> {
     reportFailure: (stage) => {
       console.warn('voiceover.failed', { stage });
     },
+    reportEvent: (event) => {
+      console.debug(`voiceover.${event.kind}`, event);
+    },
   });
   ipcMain.handle('tro:voiceover-ack', (event, raw: unknown) => {
     const parsed = VoiceoverAckSchema.safeParse(raw);
@@ -430,6 +460,185 @@ async function startDesktop(): Promise<void> {
     }
   }
 
+  const accountGate = new AccountTransitionGate(
+    () => auth.isAddingAccount(),
+    () =>
+      Boolean(
+        chat?.isBusy() ||
+        isStartingMicrophone ||
+        microphoneTests?.isActive() ||
+        (voice &&
+          voice.readStatus().state !== VoiceState.IDLE &&
+          voice.readStatus().state !== VoiceState.DISABLED),
+      ),
+  );
+
+  const practiceShortcut = new GlobalPracticeShortcut(globalShortcut);
+  const classroomController: ClassroomSessionController = new ClassroomSessionController(
+    new ClassroomApiClient(environment.API_BASE_URL, () => auth.readCookie()),
+    () => {
+      chat?.cancelClassroomTask();
+      desktopCompanion?.reset();
+    },
+    (context) => {
+      if (!context) {
+        practiceShortcut.disable();
+        return;
+      }
+      if (practiceShortcut.isAvailable()) {
+        return;
+      }
+      practiceShortcut.enable(() => {
+        const current = classroomController.readPracticeContext();
+        const window = mainWindow;
+        if (
+          !current ||
+          accountGate.isChanging() ||
+          auth.isAddingAccount() ||
+          !window ||
+          window.isDestroyed() ||
+          window.webContents.isDestroyed() ||
+          !isTrustedFrameUrl(window.webContents.getURL(), documentUrl)
+        ) {
+          return;
+        }
+        const intent = PracticeShortcutEventSchema.parse({
+          requestId: randomUUID(),
+          classId: current.meeting.classId,
+          participationId: current.participation.id,
+          activityId: current.activity.id,
+          attemptId: current.attempt.id,
+          contextVersion: current.meeting.contextVersion,
+        });
+        if (window.isMinimized()) {
+          window.restore();
+        }
+        window.show();
+        window.focus();
+        window.webContents.send('tro:practice-shortcut', intent);
+      });
+    },
+  );
+  ipcMain.handle(
+    'tro:practice-shortcut-available',
+    (event) => isTrustedSender(event) && practiceShortcut.isAvailable(),
+  );
+  classroom = classroomController;
+  agentWorker.setClassroomToolHandler((command, context) =>
+    classroomController.executeTool(command, context),
+  );
+  const materialApi = new MaterialApiClient(
+    environment.API_BASE_URL,
+    () => auth.readCookie(),
+    fetch,
+    (event) => {
+      console.warn('classroom.materials.request.failed', event);
+    },
+  );
+  ipcMain.handle('tro:class-materials', async (event, raw: unknown) => {
+    if (!isTrustedSender(event)) {
+      return { kind: 'failed', code: 'forbidden' };
+    }
+    const command = MaterialCommandSchema.safeParse(raw);
+    if (!command.success || command.data.kind === 'download') {
+      return { kind: 'failed', code: 'invalid' };
+    }
+    return accountGate.runRequest(() => materialApi.execute(command.data), {
+      kind: 'failed',
+      code: 'unavailable',
+    });
+  });
+  ipcMain.handle('tro:class-material-download', async (event, raw: unknown) => {
+    if (!isTrustedSender(event)) {
+      return false;
+    }
+    const command = MaterialCommandSchema.safeParse(raw);
+    if (!command.success || command.data.kind !== 'download') {
+      return false;
+    }
+    return accountGate.runRequest(async () => {
+      const downloadCookie = auth.readCookie();
+      const result = await materialApi.execute(command.data);
+      if (result.kind !== 'download') {
+        return false;
+      }
+      const destination = await dialog.showSaveDialog({
+        defaultPath: result.name,
+      });
+      if (
+        destination.canceled ||
+        !destination.filePath ||
+        !isTrustedSender(event) ||
+        auth.readCookie() !== downloadCookie
+      ) {
+        return false;
+      }
+      try {
+        await writeFile(destination.filePath, Buffer.from(result.data, 'base64'));
+        return true;
+      } catch {
+        return false;
+      }
+    }, false);
+  });
+  const practiceApi = new PracticeCheckApiClient(environment.API_BASE_URL, () => auth.readCookie());
+  ipcMain.handle('tro:practice-check', async (event, raw: unknown): Promise<PracticeReply> => {
+    if (!isTrustedSender(event)) {
+      return { kind: 'failed', code: PracticeFailure.FORBIDDEN };
+    }
+    const parsed = PracticeCommandSchema.safeParse(raw);
+    if (!parsed.success) {
+      return { kind: 'failed', code: PracticeFailure.INVALID };
+    }
+    return accountGate.runRequest(
+      async () => {
+        const command = parsed.data;
+        const operation = command.kind === 'check' || command.kind === 'submit-snapshot';
+        if (
+          operation &&
+          desktopCompanion?.hud.startPractice(command.requestId, command.kind, command.locale)
+        ) {
+          void desktopCompanion.startPresentation();
+        }
+        try {
+          const reply = await classroomController.executePractice(command, (request) =>
+            practiceApi.execute(request),
+          );
+          if (operation) {
+            desktopCompanion?.hud.receivePracticeReply(command.requestId, reply);
+          } else if (command.kind === 'history' && reply.kind === 'history') {
+            desktopCompanion?.hud.receivePracticeHistory(reply);
+          }
+          return reply;
+        } catch {
+          const reply: PracticeReply = { kind: 'failed', code: PracticeFailure.UNAVAILABLE };
+          if (operation) {
+            desktopCompanion?.hud.receivePracticeReply(command.requestId, reply);
+          }
+          return reply;
+        }
+      },
+      { kind: 'failed', code: PracticeFailure.UNAVAILABLE },
+    );
+  });
+  ipcMain.handle('tro:classroom-command', async (event, raw: unknown): Promise<ClassroomReply> => {
+    if (!isTrustedSender(event)) {
+      return { kind: 'failed', code: ClassroomFailure.FORBIDDEN };
+    }
+    const parsed = ClassroomCommandSchema.safeParse(raw);
+    if (!parsed.success) {
+      return { kind: 'failed', code: ClassroomFailure.INVALID };
+    }
+    return accountGate.runRequest(() => classroomController.execute(parsed.data), {
+      kind: 'failed',
+      code: ClassroomFailure.UNAVAILABLE,
+    });
+  });
+  ipcMain.handle('tro:classroom-preparation', (event): ClassroomReply => {
+    return isTrustedSender(event)
+      ? (classroomController.readPreparedSubmission() ?? { kind: 'ok' })
+      : { kind: 'failed', code: ClassroomFailure.FORBIDDEN };
+  });
   chat = new AgentChatController(
     auth,
     agentWorker,
@@ -437,6 +646,7 @@ async function startDesktop(): Promise<void> {
     permissions,
     cancelShortcut,
     narration,
+    classroomController,
   );
 
   const companionChat = chat;
@@ -526,7 +736,7 @@ async function startDesktop(): Promise<void> {
       if (parsed.data.kind === 'stop') {
         return microphoneTests.stopTest(parsed.data.testId);
       }
-      if (isStartingMicrophone) {
+      if (isStartingMicrophone || accountGate.isChanging() || auth.isAddingAccount()) {
         return { kind: 'failed' };
       }
       isStartingMicrophone = true;
@@ -576,6 +786,14 @@ async function startDesktop(): Promise<void> {
     }
     const parsed = VoiceCommandSchema.safeParse(rawCommand);
     if (!parsed.success) {
+      return { kind: 'failed' };
+    }
+    if (
+      (accountGate.isChanging() || auth.isAddingAccount()) &&
+      parsed.data.kind !== 'disable' &&
+      parsed.data.kind !== 'cancel' &&
+      parsed.data.kind !== 'status'
+    ) {
       return { kind: 'failed' };
     }
     const controller = voice;
@@ -677,6 +895,45 @@ async function startDesktop(): Promise<void> {
     return parsed.success ? voice.appendVoiceAudio(parsed.data) : { kind: 'failed' };
   });
 
+  async function changeActiveAccount(
+    action: () => Promise<AuthResult>,
+    canCancelSignIn = false,
+  ): Promise<AuthResult> {
+    return accountGate.changeAccount(async () => {
+      petAccessGeneration += 1;
+      petController.dispose();
+      overlay.closePet();
+      await classroomController.leave();
+      disableVoice();
+      if (!chat) {
+        return { kind: 'failed', message: 'The sign-in request is invalid.' };
+      }
+      return chat.changeAccount(action);
+    }, canCancelSignIn);
+  }
+
+  ipcMain.handle('tro:account-command', async (event, raw: unknown): Promise<AccountReply> => {
+    if (!isTrustedSender(event)) {
+      return { kind: 'failed', message: 'This window cannot access sign-in.' };
+    }
+    const parsed = AccountCommandSchema.safeParse(raw);
+    if (!parsed.success) {
+      return { kind: 'failed', message: 'The sign-in request is invalid.' };
+    }
+    switch (parsed.data.kind) {
+      case AccountCommandKind.LIST:
+        return auth.listAccounts();
+      case AccountCommandKind.ADD_GOOGLE:
+        return changeActiveAccount(() => auth.addGoogleAccount());
+      case AccountCommandKind.SWITCH: {
+        const accountId = parsed.data.accountId;
+        return changeActiveAccount(() => auth.switchAccount(accountId));
+      }
+      case AccountCommandKind.CANCEL_ADD:
+        return changeActiveAccount(() => auth.cancelAccountSignIn(), true);
+    }
+  });
+
   ipcMain.handle('tro:auth-command', async (event, rawCommand: unknown): Promise<AuthResult> => {
     if (!isTrustedSender(event)) {
       return { kind: 'failed', message: 'This window cannot access sign-in.' };
@@ -687,6 +944,9 @@ async function startDesktop(): Promise<void> {
     }
     switch (parsed.data.kind) {
       case 'status': {
+        if (accountGate.isChanging()) {
+          return { kind: 'pending' };
+        }
         const generation = petAccessGeneration;
         const result = await chat.readAuthSession();
         if (isTrustedSender(event) && generation === petAccessGeneration) {
@@ -697,17 +957,9 @@ async function startDesktop(): Promise<void> {
         return result;
       }
       case 'sign-in-google':
-        petAccessGeneration += 1;
-        petController.dispose();
-        overlay.closePet();
-        disableVoice();
-        return chat.signInWithGoogle();
+        return changeActiveAccount(() => auth.signInWithGoogle());
       case 'sign-out':
-        petAccessGeneration += 1;
-        petController.dispose();
-        overlay.closePet();
-        disableVoice();
-        return chat.signOut();
+        return changeActiveAccount(() => auth.signOut());
     }
   });
 
@@ -753,6 +1005,9 @@ async function startDesktop(): Promise<void> {
       return { kind: 'failed', message: 'This window cannot control an agent session.' };
     }
 
+    if (accountGate.isChanging() || auth.isAddingAccount()) {
+      return { kind: 'failed', message: 'An account change is already in progress.' };
+    }
     petController.setSuspended(true);
     try {
       return await executeAgentCommand(rawCommand, {
@@ -862,6 +1117,8 @@ async function startDesktop(): Promise<void> {
       petAccessGeneration += 1;
       petController.dispose();
       overlay.closePet();
+      practiceShortcut.disable();
+      classroom?.dispose();
       mainWindow = undefined;
       disableVoice();
       chat?.dispose();
@@ -913,6 +1170,7 @@ app.on('before-quit', (event) => {
   desktopCompanion?.dispose();
   pets?.dispose();
   petWindow?.dispose();
+  classroom?.dispose();
   chat?.dispose();
   void desktopDriver
     .stop()

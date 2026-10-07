@@ -25,11 +25,14 @@ export function PetOverlay(): ReactElement | null {
     const hover = (): void => {
       window.troPet.interactWithPet({ kind: PetOverlayAction.HOVER });
     };
-    window.addEventListener('pointermove', hover);
+    /* Electron forwards mouse movement while the transparent window ignores clicks. */
+    window.addEventListener('mousemove', hover);
+    window.addEventListener('mouseleave', hover);
     return () => {
       active = false;
       unsubscribe();
-      window.removeEventListener('pointermove', hover);
+      window.removeEventListener('mousemove', hover);
+      window.removeEventListener('mouseleave', hover);
       window.troPet.interactWithPet({ kind: PetOverlayAction.END_DRAG });
     };
   }, []);
@@ -68,7 +71,6 @@ export function PetOverlay(): ReactElement | null {
           event.preventDefault();
           drag.current = { x: event.screenX, y: event.screenY, moved: false };
           event.currentTarget.setPointerCapture(event.pointerId);
-          window.troPet.interactWithPet({ kind: PetOverlayAction.START_DRAG });
         }}
         onPointerMove={(event) => {
           const previous = drag.current;
@@ -78,6 +80,7 @@ export function PetOverlay(): ReactElement | null {
             Math.hypot(event.screenX - previous.x, event.screenY - previous.y) > 4
           ) {
             drag.current = { ...previous, moved: true };
+            window.troPet.interactWithPet({ kind: PetOverlayAction.START_DRAG });
           }
         }}
         onPointerUp={finishDrag}

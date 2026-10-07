@@ -1,8 +1,15 @@
 import { Agent, tool } from '@openai/agents';
+import {
+  createClassroomTeachingTools,
+  type ClassroomTeachingSession,
+} from '../teaching/ClassroomTeachingTools.js';
 import { z } from 'zod';
 import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import type { DesktopLocale } from '#contracts/DesktopLocale.js';
-import { createComputerUseInstructions } from './ComputerUseInstructions.js';
+import {
+  createComputerUseInstructions,
+  ClassroomMaterialInstructions,
+} from './ComputerUseInstructions.js';
 import { LoggedCuaServer } from '../cua/LoggedCuaServer.js';
 import type { TaskContext } from '../execution/TaskContext.js';
 import { DefineTaskGoalSchema } from '../execution/TaskGoal.js';
@@ -69,6 +76,7 @@ export function createTeachingAgent(
   desktopServer: LoggedCuaServer,
   locale: DesktopLocale,
   controls: TeachingAgentControls,
+  classroom?: ClassroomTeachingSession,
 ): Agent<unknown, typeof TeachingReplySchema> {
   const recovery = new TeachingProposalRecovery((rejection) =>
     controls.reportInvalidProposal?.(rejection),
@@ -76,12 +84,13 @@ export function createTeachingAgent(
   return new Agent({
     name: 'Tro teaching assistant',
     model: 'gpt-5.4',
-    instructions: createComputerUseInstructions(locale, AgentTaskMode.TEACH),
+    instructions: `${createComputerUseInstructions(locale, AgentTaskMode.TEACH)}\n${classroom ? ClassroomMaterialInstructions : ''}`,
     mcpServers: [desktopServer],
     mcpConfig: { convertSchemasToStrict: false },
     modelSettings: { parallelToolCalls: false },
     outputType: TeachingReplySchema,
     tools: [
+      ...(classroom ? createClassroomTeachingTools(classroom) : []),
       tool({
         name: 'define_teaching_goal',
         description:

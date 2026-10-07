@@ -60,12 +60,21 @@ notification subscription; it carries no screenshots or observer logs.
 Voiceover requires a matching candidate and installed message. Task scope, lesson,
 step, sequence, text and locale checks reject stale/conflicting messages and avoid
 replay on renewals/reconnects. Native final receipts still govern teaching admission;
-voiceover is never completion evidence. The native dependency is `0.30.4-tro.15`.
+voiceover is never completion evidence. The native dependency is `0.30.4-tro.16`.
 
 Snapshot messages also receive installation tracking for questions/completion.
 A nullable `speakingSequence` keeps a matching completion bubble visible while
 speech is pending/playing, with a native 60-second maximum and host deadlines.
 A valid final utterance may finish after task settlement; new work/teardown stops it.
+Once a completion message has been verified as visible and narration starts, a
+missing native frame or an older message poll cannot cancel that utterance. Main
+retains its completion bubble until the renderer acknowledges that the final
+queued audio sample has played. Explicit stop, new messages, microphone capture,
+revocation, mute and teardown still interrupt immediately; deadlines remain bounded.
+Diagnostics `voiceover.completion_retained`, `voiceover.playback_finished` and
+`voiceover.stopped` include the utterance ID, message kind/sequence and stop reason,
+without message text or audio. A normal finish logs `playback_finished` before
+`stopped` with reason `completed`; a cutoff logs its interruption or failure instead.
 
 ## Provider and backend configuration
 

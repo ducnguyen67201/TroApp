@@ -109,6 +109,22 @@ it('does not expose a previous account after a pending read completes', async ()
   });
 });
 
+it('lets hidden pet previews react locally without adopting or showing them', async () => {
+  const bridge = createBridge();
+  Object.defineProperty(window, 'tro', { configurable: true, value: bridge });
+  renderGallery();
+  const fox = await screen.findByRole('region', { name: 'Fox' });
+  const preview = within(fox).getByRole('button', { name: 'Pet Maple' });
+  fireEvent.click(preview);
+  expect(preview.querySelector('img')?.dataset.reaction).toBe(PetReaction.HAPPY);
+  fireEvent.contextMenu(preview);
+  expect(preview.querySelector('img')?.dataset.reaction).toBe(PetReaction.STARTLED);
+  expect(bridge.controlPet).not.toHaveBeenCalled();
+  await waitFor(() => {
+    expect(preview.querySelector('img')?.dataset.reaction).toBe(PetReaction.IDLE);
+  });
+});
+
 it('keeps a failed adoption visible and retryable instead of pretending it was saved', async () => {
   const bridge = createBridge();
   bridge.controlPet.mockResolvedValueOnce({ kind: 'failed', reason: 'save' });
