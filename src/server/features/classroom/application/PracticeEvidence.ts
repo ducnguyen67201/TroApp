@@ -1,4 +1,3 @@
-import { getEncoding } from 'js-tiktoken';
 import { createHash } from 'node:crypto';
 import {
   PracticeFailure,
@@ -7,17 +6,18 @@ import {
   type PracticeRecord,
 } from '#contracts/PracticeCheck.js';
 import { PracticeError } from '../domain/PracticeFindings.js';
-const encoding = getEncoding('o200k_base');
+import { countTextTokens } from '../../../application/TextTokenCounter.js';
+
 export function countPracticeInput(rubric: unknown, evidence: PracticeEvidence[]): number {
   return (
-    encoding.encode(
+    countTextTokens(
       JSON.stringify({
         rubric,
         evidence: evidence.map((item) =>
           item.kind === 'text' ? item : { id: item.id, kind: item.kind, name: item.name },
         ),
       }),
-    ).length + 1000
+    ) + 1000
   );
 }
 

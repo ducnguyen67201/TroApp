@@ -85,8 +85,8 @@ notes, invalid source references, invalid draft, or changed source extraction.
 HTTP failures retain the provider request ID and status; incomplete output retains
 its status and stop reason. Validation logs contain issue counts, never source
 values, raw provider error bodies or model output. Unknown exceptions remain
-explicitly unknown. These diagnostics do not change the teacher-facing failure
-message or automatically retry a paid call.
+explicitly unknown. Diagnostics themselves do not schedule provider calls. The bounded citation repair
+described below applies only after a completed composition fails reference validation.
 
 ## Approval and student context
 
@@ -166,3 +166,166 @@ files even when new uploads invalidate the collection review. A failed new batch
 does not erase that earlier processing status; the batch failure appears in the
 review panel. Processing status does not imply teacher approval. Links always show
 **Reference only**, with an explicit notice that their contents are not read.
+
+## Preparation request diagnostics
+
+The API emits `classroom.materials.provider.request` at the start and completion or
+failure of each SDK call. `operation` distinguishes `count_input` from `generate`;
+`generationStage` distinguishes a document `brief` from the final `composition`.
+Use `jobId`, `classId`, `collectionVersion` and `stageKey` to follow a preparation,
+and `localRequestId` to pair the two events for an individual call. Existing
+`classroom.materials.stage.completed` events include those job/stage bindings and
+`cacheHit`; a cache hit makes no provider request. The final
+`classroom.materials.preparation.failed` warning also includes the job/version
+and translated provider diagnostics.
+
+Success records include counted or used input tokens, generated output tokens
+when available, and a safe provider request ID for generation. Incomplete responses
+also retain `usedInputTokens`, `usedOutputTokens`, `reasoningTokens` and request ID
+when supplied, so output exhaustion can be measured without saving partial text. Request metadata
+includes model, timeout, retry setting, output limit for generation, original file
+byte count and passage/summary/document/source-unit counts. `durationMs` measures
+that SDK operation, not the entire job. A completed provider event means the
+adapter returned validated output; the later stage-completed event additionally
+means citation checks and cache persistence succeeded.
+
+Failure records retain the existing `reason`, plus `providerErrorKind`
+(`connection`, `timeout`, `abort`, `http`, `validation`, `json`, `preparation` or
+`unknown`). Known transport codes such as `ECONNRESET`, `ENOTFOUND` and
+`UND_ERR_HEADERS_TIMEOUT` are extracted from at most four nested causes.
+Unknown codes are omitted. HTTP status and safe request IDs are included when
+available. `signalAborted` and bounded `abortKind` (`timeout`, `abort`, `other`)
+distinguish the job's deadline signal from a provider timeout. The final warning's
+`providerDurationMs` is the operation duration; its `durationMs` remains the job
+elapsed time. Missing HTTP status/request ID alone does not establish a particular
+network failure; use the error category and cause code as evidence.
+
+For example, filter the API terminal output for
+`classroom.materials.provider.request`, then find the `state: failed` event. A
+`generationStage: composition`, `operation: generate`, `providerErrorKind: connection`,
+`networkCauseCode: ECONNRESET` record identifies a connection reset during final
+lesson generation. A `providerErrorKind: abort`, `signalAborted: true`,
+`abortKind: timeout` record instead indicates the supplied deadline signal expired.
+A started event without a terminal event can indicate a still-pending operation or
+process termination; it is not proof of provider failure.
+
+If the provider logs `state: completed` followed by
+`classroom.materials.preparation.failed` with `invalid_source_references`, generation
+finished but Tro rejected the draft's source bindings. Increasing time/output
+limits does not resolve this rejection. The warning now includes a plain-language
+`failureSummary`, the `generationStage`/`stageKey` for a fresh stage, and at most ten
+`referenceIssues`. Each issue has an exact structural `path`, `expectedKind`,
+`allowedReferenceCount`, and one of:
+
+- `wrong_reference_kind`: an ID belongs to the other known namespace; `actualKind`
+  identifies it. Section bindings and exercise criteria require page IDs; setup
+  notes and document briefs require passage IDs retained in that stage's input.
+- `reference_not_in_allowed_set`: the ID was not supplied as an allowed reference
+  for that field. This alone does not prove that it was hallucinated rather than
+  copied from stale material or the wrong namespace.
+- `missing_required_reference`: source-backed content omitted the required
+  citation. Uncited inferred suggestions remain allowed where they were before.
+
+For example, `composition.sections[0].sourcePageIds[0]`, `expectedKind: page`,
+`actualKind: passage` identifies the first section's page binding as a passage-ID
+mix-up. `failureSummary` explains that requirement in a sentence. `sourceId` is
+included only for a valid UUID; generated prose, section titles and filenames are
+excluded. `referenceIssueCount` counts all rejected bindings,
+`referenceIssuesTruncated` flags the ten-example cap, and `allowedPageCount` /
+`allowedPassageCount` show the available reference-set sizes. Brief failures also
+include `materialId` when rejected inside their generation stage.
+
+The October 7 18:55 attempt in the supplied log reused four document briefs,
+counted 8,780 composition input tokens, and completed generation in 43,791 ms with
+5,273 output tokens against a 60,000-token limit. It then failed source-reference
+validation. That older log did not retain the exact offending field or ID, so the
+new diagnostic cannot reconstruct it retrospectively. A future explicit retry
+will identify the binding if the same rejection recurs. Those diagnostics initially preserved the existing explicit-retry behavior. The
+composition-only citation repair below is a subsequent change; the older log still
+cannot establish the exact rejected citation.
+
+These are bounded backend operational records, not content traces: source text,
+file names, URLs, PDF/base64 bytes, teacher requests, outputs, credentials, headers,
+raw error messages/stacks and arbitrary cause fields are never emitted by these
+new events. Diagnostic events themselves do not change job behavior. Stage-specific output budgets and composition request timeouts are documented in
+[compact material context implementation](MaterialContextImplementation.md). SDK retries remain disabled. Failed requests
+are not automatically replayed, and adding logs does not retry an existing job.
+Tests exercise the real SDK with mocked fetch responses; no live model calls are
+needed to verify these diagnostics. Start events and successful terminal events
+use info level; failures use warn level. Restart the API if it is not already using
+Node's development watch mode before a future user-triggered preparation.
+
+## Constrained citations and one repair attempt
+
+Final composition receives `sourceMap`, an authoritative mapping of every passage
+retained by the current document briefs to its original page and material. Normal
+composition still sends compact briefs and page metadata, without all original
+passage text. Brief generator version/cache keys stay unchanged; the added composition
+input invalidates only the composition cache.
+
+`MaterialCompositionFormat.ts` builds a source-specific wire schema. Section bindings
+and exercise criteria can select only supplied page IDs; setup notes can select only
+mapped passage IDs. Source-backed setup/criteria require nonempty citations. Inferred
+suggestions may remain uncited. With no retained passages, setup can contain only
+uncited suggestions; with no pages, composition stops before a provider request.
+Shared enum definitions prevent repeating the ID lists across fields. UUID lists are
+split into chunks of at most 250 entries, keeping a maximum-sized 120-page/600-passage
+collection inside the documented enum limits. See [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
+for supported references/unions and total/per-enum limits. Token counting and generation
+use identical instructions, wire schema and reference input.
+
+The SDK parses the completed response with the canonical structural contract, then
+`MaterialReferenceValidation.ts` checks the permitted IDs independently. This keeps
+wrong-kind, unknown and missing references diagnosable even if a provider violates
+the constrained wire schema. A structurally valid, completed composition with invalid
+references is recorded as `rejected`, with actual usage and `result: null`; invalid
+output is not admitted to the completed cache. A transient `MaterialCitationRejection`
+carries the rejected draft to the repair builder, never to ordinary logs.
+
+`MaterialCitationRepair.ts` includes the rejected draft, the total issue count, at
+most ten exact field diagnostics, the same allowed source map, and at most eight
+original passages (up to 64,000 source-text characters), prioritizing implicated
+sources. Model instructions allow changes to citation arrays only. Backend comparison
+rejects changes to summary, questions, section wording/order, setup origins and every
+exercise requirement. All references are validated again, including fields beyond
+the ten-example diagnostic cap. Tro never guesses an ID replacement or removes a
+source requirement to make validation pass.
+
+The repair runs as a separate durable stage key/claim in the same class/job/version.
+It uses the same call/input/output admission and abort signal/deadline. Both generation
+attempts reserve their full configured output allowance and retain their actual usage;
+repair is skipped when the remaining budget, lease or deadline disallows it. It is
+scheduled only after persisting the confirmed rejection. There is exactly one repair
+attempt; a failed repair ends the job. Document brief failures, unfinished responses,
+schema/JSON errors, unknown transport outcomes and provider timeouts do not start this
+repair path. SDK network retries remain zero. Process termination still leaves a
+pending/uncertain stage requiring an explicit teacher retry, never an automatic replay.
+An explicit retry starts a new job and reuses completed document briefs.
+
+The existing PostgreSQL JSON documents store the additive `rejected` derivation state
+and optional preparation phase; no Prisma model/migration or data reset is needed.
+Existing documents without a phase remain readable. Deploy the updated backend and
+desktop together; older processes do not understand the new rejected state. Legacy
+material clients continue to receive the old failure category and omit progress.
+
+Teacher progress reports Preparing, Checking source references, Correcting source
+references and Ready for review. The optional `preparationProgress.phase` crosses the
+validated API/main/preload boundary. Checking can be too brief to appear in a two-second
+poll; correction remains visible while the repair request is pending. Persistent
+citation rejection has a specific localized explanation and the existing explicit
+Process materials again button. Original files, teacher corrections, the previous
+review and approved student content are preserved on failure. Approval is still a
+separate teacher action.
+
+Provider events include `citationRepair`; `classroom.materials.stage.rejected`
+warnings include `rejected`,
+bounded `referenceIssues`/`referenceIssueCount`, usage and normal job/stage correlation.
+A rejected original composition followed by a completed repair explains recovery;
+a final `citationRepair: true` preparation failure explains exhausted repair. Source
+text, rejected drafts and repair evidence never enter ordinary logs.
+
+These checks establish citation membership and preserve lesson content during repair.
+They do not establish that a claim is supported by its cited passage or eliminate
+hallucinations. Semantic evidence verification remains separate future work. Tests use
+mocked provider responses and disposable PostgreSQL; live model quality and signed
+Electron visual acceptance require a teacher-triggered preparation.

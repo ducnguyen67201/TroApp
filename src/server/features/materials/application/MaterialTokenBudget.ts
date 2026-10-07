@@ -1,4 +1,3 @@
-import { getEncoding } from 'js-tiktoken';
 import {
   MaterialContextLimits,
   MaterialContextStatus,
@@ -6,16 +5,16 @@ import {
   type MaterialContextSelection,
   type MaterialSourcePassage,
 } from '#contracts/MaterialContext.js';
+import { countTextTokens } from '../../../application/TextTokenCounter.js';
 
 export interface MaterialTokenCounter {
   countText(text: string): number;
 }
-let encoding: ReturnType<typeof getEncoding> | null = null;
+
 /** Local text estimate using bundled o200k ranks. Visual/protocol overhead is counted separately. */
 export const materialTokenCounter: MaterialTokenCounter = {
   countText(text) {
-    encoding ??= getEncoding('o200k_base');
-    return encoding.encode(text, [], []).length;
+    return countTextTokens(text, { allowSpecialTokenText: true });
   },
 };
 

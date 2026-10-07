@@ -15,6 +15,7 @@ import {
   MaterialIssue,
   MaterialLimits,
   MaterialState,
+  MaterialPreparationPhase,
   type MaterialCommand,
   type MaterialReply,
   type StoredMaterialCollection,
@@ -31,6 +32,7 @@ import {
   MaterialPreparationError,
   MaterialPreparationReason,
   type MaterialPreparationDiagnostic,
+  describeMaterialPreparationFailure,
 } from './MaterialPreparationError.js';
 import { ZodError } from 'zod';
 
@@ -44,11 +46,14 @@ export class MaterialService {
     private readonly reportFailure: (
       event: MaterialPreparationDiagnostic & {
         classId: string;
+        jobId: string | null;
+        collectionVersion: number;
         stage: string;
         errorType: string;
         durationMs: number;
         sourceCount: number;
         pageCount: number;
+        failureSummary: string;
       },
     ) => void = () => {},
   ) {}
@@ -179,7 +184,11 @@ export class MaterialService {
           leaseUntil: null,
           resolvedQuestions: false,
           jobId: randomUUID(),
-          preparationProgress: { completed: 0, total: collection.sources.length + 1 },
+          preparationProgress: {
+            completed: 0,
+            total: collection.sources.length + 1,
+            phase: MaterialPreparationPhase.PREPARING,
+          },
         };
       } else if (command.kind === 'save-review') {
         if (
@@ -457,10 +466,19 @@ export class MaterialService {
         throw new MaterialPreparationError({ reason: MaterialPreparationReason.SOURCE_CHANGED });
       }
       stage = 'save_review';
-      await this.store.runAtomically((store) =>
-        store.saveMaterialCollection(
+      await this.store.runAtomically(async (store) => {
+        const current = await store.readMaterialCollection(claimed.classId);
+        if (
+          !current ||
+          current.jobId !== claimed.jobId ||
+          current.version !== claimed.version ||
+          current.state !== MaterialState.PREPARING
+        ) {
+          return;
+        }
+        await store.saveMaterialCollection(
           {
-            ...claimed,
+            ...current,
             version: claimed.version + 1,
             state: MaterialState.REVIEW,
             revisionRequest: null,
@@ -469,6 +487,7 @@ export class MaterialService {
             preparationProgress: {
               completed: claimed.sources.length + 1,
               total: claimed.sources.length + 1,
+              phase: MaterialPreparationPhase.READY,
             },
             draft: {
               ...draft,
@@ -499,11 +518,22 @@ export class MaterialService {
             },
           },
           claimed.version,
-        ),
-      );
+        );
+      });
     } catch (error: unknown) {
+      const diagnostic: MaterialPreparationDiagnostic =
+        error instanceof MaterialPreparationError
+          ? error.diagnostic
+          : error instanceof ZodError
+            ? {
+                reason: MaterialPreparationReason.INVALID_DRAFT,
+                validationIssueCount: error.issues.length,
+              }
+            : { reason: MaterialPreparationReason.UNKNOWN };
       this.reportFailure({
         classId: claimed.classId,
+        jobId: claimed.jobId,
+        collectionVersion: claimed.version,
         stage,
         errorType:
           error instanceof MaterialPreparationError
@@ -514,27 +544,36 @@ export class MaterialService {
         durationMs: this.now().getTime() - startedAt,
         sourceCount: claimed.sources.length,
         pageCount: claimed.extractedPages.length,
-        ...(error instanceof MaterialPreparationError
-          ? error.diagnostic
-          : error instanceof ZodError
-            ? {
-                reason: MaterialPreparationReason.INVALID_DRAFT,
-                validationIssueCount: error.issues.length,
-              }
-            : { reason: MaterialPreparationReason.UNKNOWN }),
+        ...diagnostic,
+        failureSummary: describeMaterialPreparationFailure(diagnostic),
       });
-      await this.store.runAtomically((store) =>
-        store.saveMaterialCollection(
+      await this.store.runAtomically(async (store) => {
+        const current = await store.readMaterialCollection(claimed.classId);
+        if (
+          !current ||
+          current.jobId !== claimed.jobId ||
+          current.version !== claimed.version ||
+          current.state !== MaterialState.PREPARING
+        ) {
+          return;
+        }
+        await store.saveMaterialCollection(
           {
-            ...claimed,
+            ...current,
             version: claimed.version + 1,
             state: MaterialState.FAILED,
-            issue: MaterialIssue.PREPARATION_FAILED,
+            issue:
+              diagnostic.reason === MaterialPreparationReason.INVALID_SOURCE_REFERENCES ||
+              diagnostic.reason === MaterialPreparationReason.CITATION_REPAIR_CHANGED_CONTENT
+                ? MaterialIssue.CITATION_VALIDATION_FAILED
+                : diagnostic.reason === MaterialPreparationReason.GENERATION_LIMIT
+                  ? MaterialIssue.GENERATION_LIMIT
+                  : MaterialIssue.PREPARATION_FAILED,
             leaseUntil: null,
           },
           claimed.version,
-        ),
-      );
+        );
+      });
     }
     return true;
   }

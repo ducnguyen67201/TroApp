@@ -137,6 +137,7 @@ export const MaterialDerivationState = {
   PREPARING: 'preparing',
   COMPLETED: 'completed',
   UNCERTAIN: 'uncertain',
+  REJECTED: 'rejected',
 } as const;
 
 export const MaterialDerivationSchema = z.strictObject({

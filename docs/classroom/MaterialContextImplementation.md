@@ -86,15 +86,48 @@ the cache is not a historical billing ledger. Existing daily preparation limits 
 
 Defaults, validated in backend `Env.ts`:
 
-| Setting                        | Default                          |
-| ------------------------------ | -------------------------------- |
-| `MATERIAL_JOB_CALLS`           | 24                               |
-| `MATERIAL_JOB_INPUT_TOKENS`    | 150,000                          |
-| `MATERIAL_JOB_OUTPUT_TOKENS`   | 48,000                           |
-| `MATERIAL_STAGE_INPUT_TOKENS`  | 64,000                           |
-| `MATERIAL_STAGE_OUTPUT_TOKENS` | 2,000                            |
-| `MATERIAL_JOB_DEADLINE_MS`     | 540,000                          |
-| `MODEL_CONTEXT_TOKENS`         | 100,000 including output reserve |
+| Setting                              | Default                             |
+| ------------------------------------ | ----------------------------------- |
+| `MATERIAL_JOB_CALLS`                 | 24                                  |
+| `MATERIAL_JOB_INPUT_TOKENS`          | 150,000                             |
+| `MATERIAL_JOB_OUTPUT_TOKENS`         | 160,000                             |
+| `MATERIAL_STAGE_INPUT_TOKENS`        | 100,000                             |
+| `MATERIAL_STAGE_OUTPUT_TOKENS`       | 2,000 per document brief            |
+| `MATERIAL_COMPOSITION_OUTPUT_TOKENS` | 60,000 (configurable 2,000–100,000) |
+| `MATERIAL_COMPOSITION_TIMEOUT_MS`    | 240,000 (90,000–540,000)            |
+| `MATERIAL_JOB_DEADLINE_MS`           | 540,000                             |
+| `MODEL_CONTEXT_TOKENS`               | 100,000 including output reserve    |
+
+The output limit includes both visible structured output and model reasoning. Final
+composition has more headroom than document briefs because it combines teaching
+sections, citations, setup and practice criteria. The same stage-specific limit is
+used in provider requests, job reservations and the derivation cache key. Raising
+only the composition limit reuses unchanged document briefs; the composition is
+regenerated. Budget changes alone do not add automatic retry; completed composition
+citation failures now permit the one bounded repair described in
+[material preparation engineering](MaterialPreparationEngineering.md#constrained-citations-and-one-repair-attempt). Incomplete responses retain safe input,
+output and reasoning token usage and provider request ID when supplied.
+
+A deployment can set `MATERIAL_COMPOSITION_OUTPUT_TOKENS=100000` for unusually detailed
+lessons. It should also allocate `MATERIAL_JOB_OUTPUT_TOKENS` for all brief calls plus
+composition (the default 160,000 covers 23 × 2,000 plus 100,000). The total job budget
+continues to apply even when an individual stage limit is higher. Existing environment
+overrides take precedence over the new defaults; no Doppler secrets are changed.
+Composition generation now has a four-minute request timeout, configured through
+`MATERIAL_COMPOSITION_TIMEOUT_MS`. Token counting and document generation keep the
+90-second timeout. The nine-minute overall job deadline remains the outer bound;
+a later composition can have less time remaining. Requests remain non-streaming,
+and automatic retries remain disabled. Output allowances are ceilings, not a
+requested response length; compact overview and document prompts remain unchanged.
+
+GPT-5.4 supports up to 128,000 output tokens, so the configurable 100,000 ceiling is
+within the [provider's documented model limit](https://developers.openai.com/api/docs/models/gpt-5.4).
+Input allowance means material the model can read, not the length of the lesson it
+should write. Increasing these token allowances does not remove upload/extraction
+limits: 12 sources, 120 pages/chunks and 200,000 extracted characters per batch.
+Larger courses still need multiple batches; automatic PDF page partitioning and
+unlimited course synthesis remain deferred. Student context stays bounded at 8,000
+text tokens with source retrieval, independent of the preparation output budget.
 
 Limits are enforced incrementally. A later stage may exceed a job allowance after
 earlier briefs succeeded; those completed briefs remain cached for review/retry.

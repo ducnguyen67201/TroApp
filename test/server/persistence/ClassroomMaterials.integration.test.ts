@@ -329,3 +329,95 @@ it('persists compact stages with claim fencing and reuses briefs across preparat
     await freshStore.close();
   }
 });
+
+it('persists a rejected composition and a separately fenced citation repair without caching invalid output', async () => {
+  const teacher = randomUUID();
+  await client.user.create({
+    data: {
+      id: teacher,
+      name: 'Teacher',
+      email: `${teacher}@example.test`,
+      emailVerified: true,
+      role: AccountRole.TEACHER,
+    },
+  });
+  await new ClassroomService(database.store).execute(teacher, {
+    kind: 'create-class',
+    name: 'Citation repair',
+  });
+  const schoolClass = (await database.store.listClasses(teacher))[0];
+  if (!schoolClass) {
+    throw new Error('Missing class.');
+  }
+  const generation = createMaterialGeneration();
+  const original = generation.generate.getMockImplementation();
+  if (!original) {
+    throw new Error('Missing generator.');
+  }
+  generation.generate.mockImplementation(async (input, signal, context) => {
+    const generated = await original(input, signal, context);
+    if (
+      input.kind === 'composition' &&
+      !input.citationRepair &&
+      generated.output.kind === 'composition'
+    ) {
+      generated.output.composition.sections.forEach((section) => {
+        section.sourcePageIds = [randomUUID()];
+      });
+    }
+    return generated;
+  });
+  const service = new MaterialService(
+    database.store,
+    new MaterialExtractorWorker(),
+    new PrepareMaterialCollection(database.store, generation),
+  );
+  const collection = readCompactCollection(
+    await service.execute(teacher, {
+      kind: 'upload',
+      classId: schoolClass.id,
+      version: 0,
+      materialSchemaVersion: 2,
+      name: 'Lesson.py',
+      data: Buffer.from('print("Hello")').toString('base64'),
+    }),
+  );
+  await service.execute(teacher, {
+    kind: 'prepare',
+    classId: schoolClass.id,
+    version: collection.version,
+    materialSchemaVersion: 2,
+    locale: 'en',
+    teacherInstructions: 'Teach printing.',
+  });
+  await service.prepareNextCollection();
+  expect(generation.generate).toHaveBeenCalledTimes(3);
+  const fresh = createPrismaClassroomStore(environment.DATABASE_URL);
+  try {
+    const stored = await fresh.store.readMaterialCollection(schoolClass.id);
+    if (!stored?.jobId) {
+      throw new Error('Missing job.');
+    }
+    expect(stored.state).toBe('review');
+    expect(stored.preparationProgress?.phase).toBe('ready');
+    const stages = await fresh.store.listMaterialDerivations(stored.jobId);
+    expect(stages).toHaveLength(3);
+    expect(stages.filter((stage) => stage.state === 'rejected')).toHaveLength(1);
+    expect(stages.find((stage) => stage.state === 'rejected')).toMatchObject({
+      result: null,
+      reservedOutput: 60000,
+      usedInput: 100,
+      usedOutput: 50,
+    });
+    const repaired = stages.find((stage) => stage.result?.kind === 'composition');
+    if (!repaired) {
+      throw new Error('Missing repair.');
+    }
+    expect(repaired.state).toBe('completed');
+    await expect(fresh.store.saveMaterialDerivation(repaired, randomUUID())).rejects.toMatchObject({
+      code: 'stale',
+    });
+  } finally {
+    await fresh.close();
+  }
+});

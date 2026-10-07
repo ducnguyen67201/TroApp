@@ -1,3 +1,4 @@
+import { defaultMaterialGenerationPolicy } from '../../../../src/server/features/materials/application/MaterialGeneration.js';
 import type { MaterialCollection, MaterialReply } from '#contracts/ClassroomMaterials.js';
 import { MaterialEvidenceOrigin } from '#contracts/MaterialContext.js';
 import { ClassroomService } from '../../../../src/server/features/classroom/application/ClassroomService.js';
@@ -5,6 +6,7 @@ import { MaterialService } from '../../../../src/server/features/materials/appli
 import { PrepareMaterialCollection } from '../../../../src/server/features/materials/application/PrepareMaterialCollection.js';
 import type {
   MaterialGeneration,
+  MaterialGenerationPolicy,
   MaterialStageInput,
 } from '../../../../src/server/features/materials/application/MaterialGeneration.js';
 import { ExtractMaterial } from '../../../../src/server/features/materials/infrastructure/ExtractMaterial.js';
@@ -73,7 +75,10 @@ export function createMaterialGeneration() {
   return { available: true, version: 'test-v2', generate, countInput } satisfies MaterialGeneration;
 }
 
-export async function createCompactFixture(texts = ['print("Hello")', 'setup_editor = "IDLE"']) {
+export async function createCompactFixture(
+  texts = ['print("Hello")', 'setup_editor = "IDLE"'],
+  policy: MaterialGenerationPolicy = defaultMaterialGenerationPolicy,
+) {
   const store = new MemoryClassroomStore();
   const classroom = new ClassroomService(store);
   await classroom.execute('teacher', { kind: 'create-class', name: 'Python' });
@@ -82,8 +87,17 @@ export async function createCompactFixture(texts = ['print("Hello")', 'setup_edi
     throw new Error('Missing class.');
   }
   const generation = createMaterialGeneration();
-  const prepare = new PrepareMaterialCollection(store, generation);
-  const service = new MaterialService(store, new ExtractMaterial(), prepare);
+  const reportStage =
+    vi.fn<NonNullable<ConstructorParameters<typeof PrepareMaterialCollection>[3]>>();
+  const prepare = new PrepareMaterialCollection(store, generation, policy, reportStage);
+  const reportFailure = vi.fn<NonNullable<ConstructorParameters<typeof MaterialService>[4]>>();
+  const service = new MaterialService(
+    store,
+    new ExtractMaterial(),
+    prepare,
+    () => new Date(),
+    reportFailure,
+  );
   let version = 0;
   for (const [index, text] of texts.entries()) {
     const collection = readCompactCollection(
@@ -124,7 +138,18 @@ export async function createCompactFixture(texts = ['print("Hello")', 'setup_edi
         materialSchemaVersion: 2,
       }),
     );
-  return { store, classroom, generation, prepare, service, classId: schoolClass.id, queue, read };
+  return {
+    store,
+    classroom,
+    generation,
+    prepare,
+    service,
+    reportFailure,
+    classId: schoolClass.id,
+    reportStage,
+    queue,
+    read,
+  };
 }
 
 export function readStageInputs(

@@ -440,6 +440,8 @@ it('reports safe provider diagnostics while retaining the original and extracted
     }),
   );
   expect(typeof fixture.reportFailure.mock.calls[0]?.[0].durationMs).toBe('number');
+  expect(typeof fixture.reportFailure.mock.calls[0]?.[0].jobId).toBe('string');
+  expect(typeof fixture.reportFailure.mock.calls[0]?.[0].collectionVersion).toBe('number');
   const source = fixture.uploaded.sources[0];
   if (!source) {
     throw new Error('Missing source.');

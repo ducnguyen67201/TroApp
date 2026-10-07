@@ -5,6 +5,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   MaterialState,
+  MaterialIssue,
+  MaterialPreparationPhase,
   type MaterialCollection,
   type MaterialReply,
 } from '#contracts/ClassroomMaterials.js';
@@ -324,4 +326,49 @@ it('exposes batch processing before the file list and preserves the preparation 
     });
   });
   expect(screen.getByRole('button', { name: 'Processing…' })).toHaveProperty('disabled', true);
+});
+
+it.each([
+  [MaterialPreparationPhase.CHECKING_REFERENCES, 'Checking source references…'],
+  [MaterialPreparationPhase.CORRECTING_REFERENCES, 'Correcting source references…'],
+])(
+  'shows preparation reference status while keeping the existing review (%s)',
+  async (phase, label) => {
+    const control = vi.fn<NonNullable<DesktopBridge['controlClassMaterials']>>().mockResolvedValue({
+      kind: 'collection',
+      collection: {
+        ...existing,
+        state: MaterialState.PREPARING,
+        preparationProgress: { completed: 1, total: 2, phase },
+      },
+    });
+    renderEditor(control);
+    await screen.findByText('Previously reviewed lesson.', { selector: 'p' });
+    expect(screen.getByText((text) => text.includes(label))).toBeTruthy();
+    expect(
+      screen.getByRole('region', { name: 'Review your materials' }).getAttribute('aria-busy'),
+    ).toBe('true');
+    expect(screen.queryByRole('button', { name: 'Use reviewed materials' })).toBeNull();
+  },
+);
+
+it('explains a failed citation repair and exposes an explicit retry with the previous review intact', async () => {
+  const control = vi.fn<NonNullable<DesktopBridge['controlClassMaterials']>>().mockResolvedValue({
+    kind: 'collection',
+    collection: {
+      ...existing,
+      state: MaterialState.FAILED,
+      issue: MaterialIssue.CITATION_VALIDATION_FAILED,
+    },
+  });
+  renderEditor(control);
+  await screen.findByText(
+    'AI source references could not be verified. Your files and previous review are saved. Process materials again to retry.',
+  );
+  expect(screen.getByText('Previously reviewed lesson.', { selector: 'p' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Process materials again' })).toHaveProperty(
+    'disabled',
+    false,
+  );
+  expect(control).toHaveBeenCalledTimes(1);
 });

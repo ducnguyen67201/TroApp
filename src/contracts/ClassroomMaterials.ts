@@ -40,6 +40,8 @@ export const MaterialIssue = {
   TOO_LARGE: 'too_large',
   PROVIDER_UNAVAILABLE: 'provider_unavailable',
   PREPARATION_FAILED: 'preparation_failed',
+  CITATION_VALIDATION_FAILED: 'citation_validation_failed',
+  GENERATION_LIMIT: 'generation_limit',
   REVIEW_REQUIRED: 'review_required',
 } as const;
 const title = z.string().trim().min(1).max(200);
@@ -159,6 +161,19 @@ export const MaterialDraftSchema = z.union([MaterialDraftV2Schema, LegacyMateria
 
 export type MaterialDraftV2 = z.infer<typeof MaterialDraftV2Schema>;
 
+export const MaterialPreparationPhase = {
+  PREPARING: 'preparing',
+  CHECKING_REFERENCES: 'checking_references',
+  CORRECTING_REFERENCES: 'correcting_references',
+  READY: 'ready',
+} as const;
+
+export const MaterialPreparationProgressSchema = z.strictObject({
+  completed: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  phase: z.enum(MaterialPreparationPhase).optional(),
+});
+
 export const MaterialCollectionSchema = z.strictObject({
   classId: z.uuid(),
   version: z.number().int().nonnegative(),
@@ -170,13 +185,7 @@ export const MaterialCollectionSchema = z.strictObject({
   leaseUntil: z.iso.datetime().nullable(),
   preparedAt: z.iso.datetime().nullable(),
   approvedCourseId: z.uuid().nullable(),
-  preparationProgress: z
-    .strictObject({
-      completed: z.number().int().nonnegative(),
-      total: z.number().int().nonnegative(),
-    })
-    .nullable()
-    .optional(),
+  preparationProgress: MaterialPreparationProgressSchema.nullable().optional(),
 });
 
 export const MaterialCommandSchema = z.discriminatedUnion('kind', [
@@ -316,13 +325,7 @@ export const StoredMaterialCollectionSchema = MaterialCollectionSchema.extend({
   revisionRequest: z.string().trim().min(1).max(4000).nullable().optional(),
   extractionVersion: z.string().max(100).nullable().optional(),
   jobId: z.uuid().nullable().optional(),
-  preparationProgress: z
-    .strictObject({
-      completed: z.number().int().nonnegative(),
-      total: z.number().int().nonnegative(),
-    })
-    .nullable()
-    .default(null),
+  preparationProgress: MaterialPreparationProgressSchema.nullable().default(null),
   locale: z.enum(['en', 'vi']),
   resolvedQuestions: z.boolean(),
   extractedPages: z.array(MaterialPageSchema).max(MaterialLimits.PAGE_COUNT).default([]),

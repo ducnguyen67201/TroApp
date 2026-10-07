@@ -1,3 +1,4 @@
+import { MaterialProviderRequestState } from './features/materials/application/MaterialGeneration.js';
 import { PracticeCheckService } from './features/classroom/application/PracticeCheckService.js';
 import { OpenAiPracticeCheckEvaluator } from './features/classroom/infrastructure/OpenAiPracticeCheckEvaluator.js';
 import { registerPracticeCheckRoutes } from './features/classroom/infrastructure/RegisterPracticeCheckRoutes.js';
@@ -83,7 +84,18 @@ async function startApi(): Promise<void> {
       classroom.store,
       new OpenAiMaterialPreparation(
         environment.OPENAI_API_KEY,
-        environment.MATERIAL_STAGE_OUTPUT_TOKENS,
+        {
+          stageOutputTokens: environment.MATERIAL_STAGE_OUTPUT_TOKENS,
+          compositionOutputTokens: environment.MATERIAL_COMPOSITION_OUTPUT_TOKENS,
+          compositionTimeoutMs: environment.MATERIAL_COMPOSITION_TIMEOUT_MS,
+        },
+        (event) => {
+          if (event.state === MaterialProviderRequestState.FAILED) {
+            logger.warn(event, 'classroom.materials.provider.request');
+          } else {
+            logger.info(event, 'classroom.materials.provider.request');
+          }
+        },
       ),
       {
         calls: environment.MATERIAL_JOB_CALLS,
@@ -91,10 +103,16 @@ async function startApi(): Promise<void> {
         outputTokens: environment.MATERIAL_JOB_OUTPUT_TOKENS,
         stageInputTokens: environment.MATERIAL_STAGE_INPUT_TOKENS,
         stageOutputTokens: environment.MATERIAL_STAGE_OUTPUT_TOKENS,
+        compositionOutputTokens: environment.MATERIAL_COMPOSITION_OUTPUT_TOKENS,
+        compositionTimeoutMs: environment.MATERIAL_COMPOSITION_TIMEOUT_MS,
         deadlineMs: environment.MATERIAL_JOB_DEADLINE_MS,
       },
       (event) => {
-        logger.info(event, 'classroom.materials.stage.completed');
+        if (event.rejected) {
+          logger.warn(event, 'classroom.materials.stage.rejected');
+        } else {
+          logger.info(event, 'classroom.materials.stage.completed');
+        }
       },
     ),
     () => new Date(),

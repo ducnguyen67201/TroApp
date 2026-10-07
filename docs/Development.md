@@ -29,6 +29,9 @@ processes.
 
 The API binds to `127.0.0.1:3000` locally. PostgreSQL binds to `127.0.0.1:54329`. The desktop main process calls the API; the React renderer has no generic network or database bridge. Development reload is handled by electron-vite and Node's watch mode with tsx.
 
+For startup memory/process measurements, package-size findings and how to compare
+development with a built desktop, see [Startup performance](StartupPerformance.md).
+
 The selected `tro-api` config needs `DATABASE_URL` and a unique `AUTH_SECRET` (`openssl rand -base64 32`). Chat also needs a backend-only `OPENAI_API_KEY`. Google sign-in needs `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` on the API only. Create a Google OAuth **Web application** client with authorized redirect URI `http://127.0.0.1:3000/api/auth/callback/google` (match `AUTH_BASE_URL` exactly). Save the generated secret in Doppler before running. Optional `APP_ENV=dev|stage|prod` selects the backend application mode; it defaults to `dev`.
 
 Pino emits debug records only in `dev`, while operational info and errors remain available in all modes. The API defaults to the local host and port, and the desktop defaults to the local API. `ELECTRON_RENDERER_URL` is supplied by electron-vite during development; you do not set it yourself.

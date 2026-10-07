@@ -2,11 +2,11 @@ import { createHash, randomUUID } from 'node:crypto';
 import {
   MaterialDraftV2Schema,
   MaterialState,
+  MaterialPreparationPhase,
   type MaterialDraftV2,
 } from '#contracts/ClassroomMaterials.js';
 import {
   MaterialDerivationState,
-  MaterialEvidenceOrigin,
   MaterialGenerationOutputSchema,
   type DocumentBrief,
   type DocumentBriefContent,
@@ -20,10 +20,31 @@ import {
   type MaterialStageInput,
   type MaterialGenerationPolicy,
   defaultMaterialGenerationPolicy,
+  readMaterialStageOutputTokens,
 } from './MaterialGeneration.js';
-import { MaterialPreparationError, MaterialPreparationReason } from './MaterialPreparationError.js';
+import {
+  MaterialPreparationError,
+  MaterialPreparationReason,
+  type MaterialReferenceIssue,
+} from './MaterialPreparationError.js';
 import { buildMaterialPassages } from './MaterialSourceSelection.js';
 import { materialTokenCounter } from './MaterialTokenBudget.js';
+import {
+  validateBriefReferences,
+  validateCompositionReferences,
+} from './MaterialReferenceValidation.js';
+import {
+  MaterialCitationRejection,
+  buildMaterialCitationRepair,
+  validateMaterialCitationRepair,
+} from './MaterialCitationRepair.js';
+
+interface MaterialJobBinding {
+  classId: string;
+  jobId: string;
+  collectionVersion: number;
+  extractionVersion: string | null;
+}
 
 /** One teacher job, bounded durable stages. Existing publications never depend on this mutable cache. */
 export class PrepareMaterialCollection implements MaterialPreparation {
@@ -34,10 +55,17 @@ export class PrepareMaterialCollection implements MaterialPreparation {
     private readonly policy: MaterialGenerationPolicy = defaultMaterialGenerationPolicy,
     private readonly report: (event: {
       jobId: string;
+      classId: string;
+      stageKey: string;
+      collectionVersion: number;
       kind: string;
       cacheHit: boolean;
       inputTokens: number;
       outputTokens: number | null;
+      citationRepair?: boolean;
+      rejected?: boolean;
+      referenceIssueCount?: number;
+      referenceIssues?: MaterialReferenceIssue[];
     }) => void = () => {},
   ) {
     this.available = generation.available;
@@ -97,6 +125,7 @@ export class PrepareMaterialCollection implements MaterialPreparation {
         validateBriefReferences(
           result.brief,
           part.map((passage) => passage.id),
+          part.map((passage) => passage.sourceUnitId),
         );
         summaries.push(result.brief);
       }
@@ -120,6 +149,7 @@ export class PrepareMaterialCollection implements MaterialPreparation {
         validateBriefReferences(
           result.brief,
           documentPassages.map((passage) => passage.id),
+          documentPassages.map((passage) => passage.sourceUnitId),
         );
         brief = result.brief;
       }
@@ -142,14 +172,25 @@ export class PrepareMaterialCollection implements MaterialPreparation {
         await store.saveMaterialCollection(
           {
             ...current,
-            preparationProgress: { completed: documents.length, total: input.sources.length + 1 },
+            preparationProgress: {
+              completed: documents.length,
+              total: input.sources.length + 1,
+              phase: MaterialPreparationPhase.PREPARING,
+            },
           },
           current.version,
         );
       });
     }
     const revision = buildMaterialRevision(input);
-    const result = await this.runStage(
+    const citedPassageIds = new Set(
+      documents.flatMap((document) =>
+        [document.purpose, ...document.setup, ...document.practice, ...document.examples].flatMap(
+          (note) => note.sourceIds,
+        ),
+      ),
+    );
+    const result = await this.composeWithCitationRepair(
       binding,
       {
         kind: 'composition',
@@ -174,7 +215,15 @@ export class PrepareMaterialCollection implements MaterialPreparation {
           materialId,
           location,
         })),
+        sourceMap: passages
+          .filter((passage) => citedPassageIds.has(passage.id))
+          .map((passage) => ({
+            passageId: passage.id,
+            pageId: passage.sourceUnitId,
+            materialId: passage.materialId,
+          })),
       },
+      passages,
       signal,
     );
     if (result.kind !== 'composition') {
@@ -207,17 +256,52 @@ export class PrepareMaterialCollection implements MaterialPreparation {
     });
   }
 
+  private async composeWithCitationRepair(
+    binding: MaterialJobBinding,
+    input: Extract<MaterialStageInput, { kind: 'composition' }>,
+    passages: MaterialSourcePassage[],
+    signal: AbortSignal,
+  ): Promise<MaterialGenerationOutput> {
+    try {
+      return await this.runStage(binding, input, signal);
+    } catch (error: unknown) {
+      if (!(error instanceof MaterialCitationRejection)) {
+        throw error;
+      }
+      signal.throwIfAborted();
+      await this.savePreparationPhase(binding, MaterialPreparationPhase.CORRECTING_REFERENCES);
+      // Separate stage key/claim and normal budget admission; there is no recursive repair loop.
+      return this.runStage(binding, buildMaterialCitationRepair(input, error, passages), signal);
+    }
+  }
+
+  private async savePreparationPhase(
+    binding: MaterialJobBinding,
+    phase: (typeof MaterialPreparationPhase)[keyof typeof MaterialPreparationPhase],
+  ): Promise<void> {
+    await this.store.runAtomically(async (store) => {
+      const current = await this.requireCurrentJob(store, binding);
+      await store.saveMaterialCollection(
+        {
+          ...current,
+          preparationProgress: {
+            completed: current.sources.length,
+            total: current.sources.length + 1,
+            phase,
+          },
+        },
+        current.version,
+      );
+    });
+  }
+
   private async runStage(
-    binding: {
-      classId: string;
-      jobId: string;
-      collectionVersion: number;
-      extractionVersion: string | null;
-    },
+    binding: MaterialJobBinding,
     input: MaterialStageInput,
     signal: AbortSignal,
   ): Promise<MaterialGenerationOutput> {
     signal.throwIfAborted();
+    const outputTokens = readMaterialStageOutputTokens(this.policy, input.kind);
     const reference =
       input.kind === 'brief'
         ? {
@@ -235,7 +319,7 @@ export class PrepareMaterialCollection implements MaterialPreparation {
         JSON.stringify({
           version: this.generation.version,
           extractionVersion: binding.extractionVersion,
-          outputTokens: this.policy.stageOutputTokens,
+          outputTokens,
           input: reference,
         }),
       )
@@ -244,7 +328,8 @@ export class PrepareMaterialCollection implements MaterialPreparation {
     if (cached?.state === MaterialDerivationState.COMPLETED && cached.result) {
       await this.requireCurrentJob(this.store, binding);
       this.report({
-        jobId: binding.jobId,
+        ...binding,
+        stageKey: key,
         kind: input.kind,
         cacheHit: true,
         inputTokens: 0,
@@ -252,7 +337,13 @@ export class PrepareMaterialCollection implements MaterialPreparation {
       });
       return cached.result;
     }
-    const inputTokens = await this.generation.countInput(input, signal);
+    const context = {
+      classId: binding.classId,
+      jobId: binding.jobId,
+      collectionVersion: binding.collectionVersion,
+      stageKey: key,
+    };
+    const inputTokens = await this.generation.countInput(input, signal, context);
     if (inputTokens > this.policy.stageInputTokens) {
       throw new MaterialPreparationError({ reason: MaterialPreparationReason.GENERATION_LIMIT });
     }
@@ -267,8 +358,7 @@ export class PrepareMaterialCollection implements MaterialPreparation {
         stages.length >= this.policy.calls ||
         stages.reduce((sum, stage) => sum + stage.reservedInput, 0) + inputTokens >
           this.policy.inputTokens ||
-        stages.reduce((sum, stage) => sum + stage.reservedOutput, 0) +
-          this.policy.stageOutputTokens >
+        stages.reduce((sum, stage) => sum + stage.reservedOutput, 0) + outputTokens >
           this.policy.outputTokens
       ) {
         throw new MaterialPreparationError({ reason: MaterialPreparationReason.GENERATION_LIMIT });
@@ -281,7 +371,7 @@ export class PrepareMaterialCollection implements MaterialPreparation {
         claimId: randomUUID(),
         state: MaterialDerivationState.PREPARING,
         reservedInput: inputTokens,
-        reservedOutput: this.policy.stageOutputTokens,
+        reservedOutput: outputTokens,
         usedInput: null,
         usedOutput: null,
         result: null,
@@ -289,55 +379,40 @@ export class PrepareMaterialCollection implements MaterialPreparation {
       await store.saveMaterialDerivation(record, current?.claimId ?? null);
       return record;
     });
+    let generatedOutput: MaterialGenerationOutput | undefined;
+    let usedInput: number | null = null;
+    let usedOutput: number | null = null;
     try {
-      const generated = await this.generation.generate(input, signal);
+      const generated = await this.generation.generate(input, signal, context);
+      usedInput = generated.usedInput;
+      usedOutput = generated.usedOutput;
       const output = MaterialGenerationOutputSchema.parse(generated.output);
+      generatedOutput = output;
       if (output.kind !== input.kind) {
         throw new MaterialPreparationError({ reason: MaterialPreparationReason.INVALID_DRAFT });
       }
       if (output.kind === 'brief' && input.kind === 'brief') {
-        validateBriefReferences(output.brief, [
-          ...input.passages.map((passage) => passage.id),
-          ...input.summaries.flatMap((summary) =>
-            [summary.purpose, ...summary.setup, ...summary.practice, ...summary.examples].flatMap(
-              (note) => note.sourceIds,
+        validateBriefReferences(
+          output.brief,
+          [
+            ...input.passages.map((passage) => passage.id),
+            ...input.summaries.flatMap((summary) =>
+              [summary.purpose, ...summary.setup, ...summary.practice, ...summary.examples].flatMap(
+                (note) => note.sourceIds,
+              ),
             ),
-          ),
-        ]);
+          ],
+          input.passages.map((passage) => passage.sourceUnitId),
+        );
       }
       if (output.kind === 'composition' && input.kind === 'composition') {
-        const pageIds = new Set(input.sourceUnits.map((unit) => unit.id));
-        const passageIds = new Set(
-          input.documents.flatMap((document) =>
-            [
-              document.brief.purpose,
-              ...document.brief.setup,
-              ...document.brief.practice,
-              ...document.brief.examples,
-            ].flatMap((note) => note.sourceIds),
-          ),
-        );
-        if (
-          output.composition.sections.some(
-            (section) =>
-              section.sourcePageIds.some((id) => !pageIds.has(id)) ||
-              (section.practiceSuggestions ?? []).some((checkpoint) =>
-                checkpoint.criteria.some(
-                  (criterion) =>
-                    criterion.sourceIds.some((id) => !pageIds.has(id)) ||
-                    (checkpoint.origin === 'source' && criterion.sourceIds.length === 0),
-                ),
-              ) ||
-              section.setup.some(
-                (note) =>
-                  (note.origin === MaterialEvidenceOrigin.SOURCE && note.sourceIds.length === 0) ||
-                  note.sourceIds.some((id) => !passageIds.has(id)),
-              ),
-          )
-        ) {
-          throw new MaterialPreparationError({
-            reason: MaterialPreparationReason.INVALID_SOURCE_REFERENCES,
-          });
+        await this.savePreparationPhase(binding, MaterialPreparationPhase.CHECKING_REFERENCES);
+        validateCompositionReferences(output.composition, input);
+        if (input.citationRepair) {
+          validateMaterialCitationRepair(
+            input.citationRepair.previousComposition,
+            output.composition,
+          );
         }
       }
       await this.store.runAtomically(async (store) => {
@@ -354,24 +429,80 @@ export class PrepareMaterialCollection implements MaterialPreparation {
         );
       });
       this.report({
-        jobId: binding.jobId,
+        ...binding,
+        stageKey: key,
         kind: input.kind,
         cacheHit: false,
         inputTokens: generated.usedInput ?? inputTokens,
         outputTokens: generated.usedOutput,
+        ...(input.kind === 'composition' ? { citationRepair: Boolean(input.citationRepair) } : {}),
       });
       return output;
     } catch (error: unknown) {
+      const rejected =
+        generatedOutput !== undefined &&
+        error instanceof MaterialPreparationError &&
+        (error.diagnostic.reason === MaterialPreparationReason.INVALID_SOURCE_REFERENCES ||
+          error.diagnostic.reason === MaterialPreparationReason.CITATION_REPAIR_CHANGED_CONTENT);
+      let savedRejection = false;
       try {
         await this.store.runAtomically(async (store) => {
           await this.requireCurrentJob(store, binding);
           await store.saveMaterialDerivation(
-            { ...claim, state: MaterialDerivationState.UNCERTAIN },
+            {
+              ...claim,
+              state: rejected
+                ? MaterialDerivationState.REJECTED
+                : MaterialDerivationState.UNCERTAIN,
+              usedInput,
+              usedOutput,
+            },
             claim.claimId,
           );
         });
+        savedRejection = rejected;
       } catch {
         /* Preserve the original diagnostic; a superseded worker cannot alter a newer claim. */
+      }
+      if (error instanceof MaterialPreparationError) {
+        const diagnostic = {
+          ...error.diagnostic,
+          stageKey: key,
+          generationStage: input.kind,
+          ...(input.kind === 'brief' ? { materialId: input.materialId } : {}),
+          ...(input.kind === 'composition'
+            ? { citationRepair: Boolean(input.citationRepair) }
+            : {}),
+          ...(usedInput !== null ? { usedInputTokens: usedInput } : {}),
+          ...(usedOutput !== null ? { usedOutputTokens: usedOutput } : {}),
+        };
+        if (rejected) {
+          this.report({
+            ...context,
+            kind: input.kind,
+            cacheHit: false,
+            inputTokens: usedInput ?? inputTokens,
+            outputTokens: usedOutput,
+            rejected: true,
+            ...(diagnostic.referenceIssueCount !== undefined
+              ? { referenceIssueCount: diagnostic.referenceIssueCount }
+              : {}),
+            ...(diagnostic.referenceIssues ? { referenceIssues: diagnostic.referenceIssues } : {}),
+            ...(input.kind === 'composition'
+              ? { citationRepair: Boolean(input.citationRepair) }
+              : {}),
+          });
+        }
+        if (
+          savedRejection &&
+          error.diagnostic.reason === MaterialPreparationReason.INVALID_SOURCE_REFERENCES &&
+          input.kind === 'composition' &&
+          generatedOutput?.kind === 'composition' &&
+          !input.citationRepair
+        ) {
+          throw new MaterialCitationRejection(diagnostic, generatedOutput.composition);
+        }
+        throw new MaterialPreparationError(diagnostic);
       }
       throw error;
     }
@@ -394,21 +525,6 @@ export class PrepareMaterialCollection implements MaterialPreparation {
       throw new MaterialPreparationError({ reason: MaterialPreparationReason.STALE_STAGE });
     }
     return collection;
-  }
-}
-
-function validateBriefReferences(brief: DocumentBriefContent, sourceIds: readonly string[]): void {
-  const ids = new Set(sourceIds);
-  if (
-    [brief.purpose, ...brief.setup, ...brief.practice, ...brief.examples].some(
-      (note) =>
-        (note.origin === MaterialEvidenceOrigin.SOURCE && !note.sourceIds.length) ||
-        note.sourceIds.some((id) => !ids.has(id)),
-    )
-  ) {
-    throw new MaterialPreparationError({
-      reason: MaterialPreparationReason.INVALID_SOURCE_REFERENCES,
-    });
   }
 }
 

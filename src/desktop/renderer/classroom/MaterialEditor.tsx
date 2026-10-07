@@ -18,6 +18,7 @@ import {
   MaterialLimits,
   MaterialState,
   MaterialIssue,
+  MaterialPreparationPhase,
   type MaterialCollection,
   type MaterialCommand,
   type MaterialReply,
@@ -268,6 +269,7 @@ export function MaterialEditor({
   }
 
   const showPreparationLoading = isRequestingPreparation || isPreparing;
+  const preparationLabel = readPreparationLabel(collection?.preparationProgress?.phase, t);
   const editable = !busy && !isPreparing && !isLoading;
   const draft = collection?.draft;
   const canReview = Boolean(
@@ -531,10 +533,20 @@ export function MaterialEditor({
             </Group>
             {collection?.state === MaterialState.FAILED && !showPreparationLoading && (
               <Alert>
-                {t(
-                  'Preparation failed. Try again or use a smaller collection. Your original files are saved.',
-                  'Chuẩn bị thất bại. Thử lại hoặc dùng ít tài liệu hơn. Tệp gốc vẫn được giữ.',
-                )}
+                {collection.issue === MaterialIssue.CITATION_VALIDATION_FAILED
+                  ? t(
+                      'AI source references could not be verified. Your files and previous review are saved. Process materials again to retry.',
+                      'Chưa xác minh được nguồn trích dẫn của AI. Tệp và bản trước vẫn được giữ. Xử lý lại tài liệu để thử lại.',
+                    )
+                  : collection.issue === MaterialIssue.GENERATION_LIMIT
+                    ? t(
+                        'Preparation reached its processing budget. Your files and previous review are saved. Try a smaller collection or ask to increase the budget.',
+                        'Chuẩn bị đã đạt giới hạn xử lý. Tệp và bản trước vẫn được giữ. Thử với ít tài liệu hơn hoặc yêu cầu tăng giới hạn.',
+                      )
+                    : t(
+                        'Preparation failed. Try again or use a smaller collection. Your original files are saved.',
+                        'Chuẩn bị thất bại. Thử lại hoặc dùng ít tài liệu hơn. Tệp gốc vẫn được giữ.',
+                      )}
               </Alert>
             )}
             {collection?.state === MaterialState.COLLECTING && draft && (
@@ -560,6 +572,7 @@ export function MaterialEditor({
                   {collection.preparationProgress
                     ? ` (${String(collection.preparationProgress.completed)}/${String(collection.preparationProgress.total)})`
                     : ''}
+                  {preparationLabel ? ` ${preparationLabel}` : ''}
                 </Text>
               </Group>
             )}
@@ -709,7 +722,8 @@ export function MaterialEditor({
                   )}
                   <Text fw={600}>
                     {showPreparationLoading
-                      ? t('Preparing your materials…', 'Đang chuẩn bị tài liệu…')
+                      ? (preparationLabel ??
+                        t('Preparing your materials…', 'Đang chuẩn bị tài liệu…'))
                       : error && !collection
                         ? t('Load your materials to continue.', 'Tải tài liệu để tiếp tục.')
                         : t(
@@ -736,6 +750,24 @@ export function MaterialEditor({
       </div>
     </div>
   );
+}
+
+function readPreparationLabel(
+  phase: (typeof MaterialPreparationPhase)[keyof typeof MaterialPreparationPhase] | undefined,
+  t: ClassroomTranslate,
+): string | null {
+  switch (phase) {
+    case MaterialPreparationPhase.PREPARING:
+      return t('Preparing materials…', 'Đang chuẩn bị tài liệu…');
+    case MaterialPreparationPhase.CHECKING_REFERENCES:
+      return t('Checking source references…', 'Đang kiểm tra nguồn trích dẫn…');
+    case MaterialPreparationPhase.CORRECTING_REFERENCES:
+      return t('Correcting source references…', 'Đang sửa nguồn trích dẫn…');
+    case MaterialPreparationPhase.READY:
+      return t('Ready for review', 'Sẵn sàng để duyệt');
+    default:
+      return null;
+  }
 }
 
 function encodeFile(file: File): Promise<string> {

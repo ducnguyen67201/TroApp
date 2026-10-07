@@ -3,6 +3,7 @@ import type {
   MaterialDraft,
   MaterialCollection,
 } from '#contracts/ClassroomMaterials.js';
+import { MaterialIssue } from '#contracts/ClassroomMaterials.js';
 
 /** Legacy projection is read-only: a V1 client cannot save and discard V2 fields. */
 export function projectLegacyMaterialDraft(draft: MaterialDraft): MaterialDraft {
@@ -40,6 +41,11 @@ export function projectMaterialReply(
   delete fields.preparationProgress;
   const collection: MaterialCollection = {
     ...fields,
+    issue:
+      fields.issue === MaterialIssue.CITATION_VALIDATION_FAILED ||
+      fields.issue === MaterialIssue.GENERATION_LIMIT
+        ? MaterialIssue.PREPARATION_FAILED
+        : fields.issue,
     draft: fields.draft ? projectLegacyMaterialDraft(fields.draft) : null,
   };
   return { kind: 'collection', collection };
