@@ -1,5 +1,6 @@
 import { MaterialFailure } from '#contracts/ClassroomMaterials.js';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Alert,
   Badge,
@@ -33,12 +34,14 @@ export function MaterialEditor({
   t,
   onApproved,
   sessionControls,
+  preparationSidebar,
 }: {
   classId: string;
   live: boolean;
   t: ClassroomTranslate;
   onApproved: () => Promise<void>;
   sessionControls?: ReactElement;
+  preparationSidebar?: HTMLElement | null;
 }): ReactElement {
   const { locale } = useLocale();
   const [collection, setCollection] = useState<MaterialCollection | null>(null);
@@ -273,8 +276,8 @@ export function MaterialEditor({
   );
   const approved = collection?.state === MaterialState.APPROVED && !dirty;
   const currentStep = approved ? 3 : canReview ? 2 : 1;
-  return (
-    <div className="material-workspace">
+  const preparationGuide = (
+    <section aria-label={t('Prepare your materials', 'Chuẩn bị tài liệu')}>
       <header className="material-heading">
         <Title order={2}>{t('Prepare your materials', 'Chuẩn bị tài liệu')}</Title>
         <Text c="dimmed" size="sm">
@@ -296,6 +299,11 @@ export function MaterialEditor({
           </li>
         ))}
       </ol>
+    </section>
+  );
+  return (
+    <div className="material-workspace">
+      {preparationSidebar ? createPortal(preparationGuide, preparationSidebar) : preparationGuide}
       {error && (
         <Alert role="alert" mb="md">
           {error}
@@ -355,7 +363,7 @@ export function MaterialEditor({
           component="section"
           aria-label={t('Class materials', 'Tài liệu lớp học')}
         >
-          <Stack gap="md">
+          <Stack gap="sm">
             <Group justify="space-between">
               <Text fw={600} size="lg">
                 {t('Class materials', 'Tài liệu lớp học')}
@@ -506,7 +514,7 @@ export function MaterialEditor({
           aria-label={t('Review your materials', 'Kiểm tra tài liệu của bạn')}
           aria-busy={showPreparationLoading}
         >
-          <Stack gap="md">
+          <Stack gap="sm">
             <Group justify="space-between">
               <Text fw={600} size="lg">
                 {t('Review your materials', 'Kiểm tra tài liệu của bạn')}

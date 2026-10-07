@@ -29,8 +29,8 @@ export function MaterialReview({
           <Tabs.Tab value="sections">{t('Sections', 'Các phần học')}</Tabs.Tab>
           <Tabs.Tab value="notes">{t('Material notes', 'Ghi chú tài liệu')}</Tabs.Tab>
         </Tabs.List>
-        <Tabs.Panel value="summary" pt="md">
-          <Text className="material-prose">{draft.summary}</Text>
+        <Tabs.Panel value="summary" pt="sm">
+          <Text className="material-prose material-summary">{draft.summary}</Text>
           <details className="material-edit">
             <summary>{t('Edit summary', 'Sửa tóm tắt')}</summary>
             <Textarea
@@ -48,7 +48,7 @@ export function MaterialReview({
               }}
             />
           </details>
-          <Text fw={600} mt="lg">
+          <Text fw={600} mt="md">
             {t('Sections for today', 'Các phần học hôm nay')}
           </Text>
           {draft.sections.map((section, index) => (
@@ -56,7 +56,7 @@ export function MaterialReview({
               {index + 1}. {section.title}
             </Text>
           ))}
-          <Text size="xs" c="dimmed" mt="lg">
+          <Text size="xs" c="dimmed" mt="md">
             {'schemaVersion' in draft ? draft.documents.length : draft.pages.length}{' '}
             {'schemaVersion' in draft
               ? t(
@@ -69,7 +69,7 @@ export function MaterialReview({
                 )}
           </Text>
         </Tabs.Panel>
-        <Tabs.Panel value="sections" pt="md">
+        <Tabs.Panel value="sections" pt="sm">
           <Text size="xs" c="dimmed" mb="md">
             {t(
               'A suggested order based on your materials. Edit it to fit how you teach.',
@@ -167,7 +167,7 @@ export function MaterialReview({
             ))}
           </Stack>
         </Tabs.Panel>
-        <Tabs.Panel value="notes" pt="md">
+        <Tabs.Panel value="notes" pt="sm">
           <Stack>
             {'schemaVersion' in draft ? (
               <DocumentBriefReview

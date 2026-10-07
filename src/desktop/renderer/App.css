@@ -756,6 +756,17 @@ textarea:focus-visible {
   container-type: inline-size;
 }
 
+.material-preparation-sidebar:not([hidden]) {
+  margin-bottom: 18px;
+}
+
+.material-preparation-sidebar .material-steps {
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 0;
+  padding-bottom: 16px;
+}
+
 .material-heading {
   margin-bottom: 16px;
 }
@@ -808,13 +819,13 @@ textarea:focus-visible {
 .material-grid {
   display: grid;
   grid-template-columns: minmax(260px, 0.9fr) minmax(340px, 1.25fr);
-  gap: 22px;
+  gap: 16px;
   align-items: start;
 }
 
 .material-grid > section {
   min-width: 0;
-  padding: 22px;
+  padding: 18px;
 }
 
 .material-drop {
@@ -822,7 +833,7 @@ textarea:focus-visible {
   border-radius: 10px;
   background: var(--tro-sidebar);
   text-align: center;
-  padding: 26px 18px;
+  padding: 20px 16px;
 }
 
 .material-drop[data-dragging='true'] {
@@ -837,8 +848,8 @@ textarea:focus-visible {
 .material-file {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 13px 0;
+  gap: 10px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--tro-border);
 }
 
@@ -849,8 +860,8 @@ textarea:focus-visible {
 .material-file-icon {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 38px;
+  width: 32px;
+  height: 36px;
   background: var(--tro-sidebar);
   border: 1px solid var(--tro-border);
   border-radius: 6px;
@@ -868,13 +879,20 @@ textarea:focus-visible {
 
 .material-prepare-actions {
   border-bottom: 1px solid var(--tro-border);
-  padding-bottom: 16px;
+  padding-bottom: 12px;
+}
+
+.material-file-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 4px;
 }
 
 .material-processing-tag {
   display: flex;
   width: fit-content;
-  margin-top: 5px;
   max-width: 100%;
 }
 
@@ -911,7 +929,7 @@ textarea:focus-visible {
 }
 
 .material-review-empty {
-  min-height: 380px;
+  min-height: 300px;
   display: grid;
   place-items: center;
   text-align: center;
@@ -943,7 +961,7 @@ textarea:focus-visible {
 }
 
 .material-section {
-  padding: 13px 0;
+  padding: 10px 0;
   border-bottom: 1px solid var(--tro-border);
 }
 
@@ -954,13 +972,17 @@ textarea:focus-visible {
 .material-prose {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  line-height: 1.6;
-  margin: 7px 0;
+  line-height: 1.55;
+  margin: 5px 0;
+}
+
+.material-summary {
+  font-size: 15px;
 }
 
 .material-review-tabs .mantine-Tabs-tab {
   padding-inline: 0;
-  margin-right: 18px;
+  margin-right: 14px;
   font-size: 14px;
 }
 

@@ -61,36 +61,38 @@ export function MaterialFiles({
                       ? t('Reference link', 'Đường dẫn tham khảo')
                       : `${String(Math.max(1, Math.round(source.bytes / 1000)))} KB`}
                   </Text>
-                  <Badge
-                    size="sm"
-                    variant="light"
-                    color={status.color}
-                    className="material-processing-tag"
-                    leftSection={
-                      !source.url &&
-                      (collection.state === MaterialState.QUEUED ||
-                        collection.state === MaterialState.PREPARING) ? (
-                        <Loader size={10} />
-                      ) : undefined
-                    }
-                  >
-                    {status.label}
-                  </Badge>
+                  <div className="material-file-actions">
+                    <Badge
+                      size="sm"
+                      variant="light"
+                      color={status.color}
+                      className="material-processing-tag"
+                      leftSection={
+                        !source.url &&
+                        (collection.state === MaterialState.QUEUED ||
+                          collection.state === MaterialState.PREPARING) ? (
+                          <Loader size={10} />
+                        ) : undefined
+                      }
+                    >
+                      {status.label}
+                    </Badge>
+                    {!source.url && (
+                      <Button
+                        size="compact-xs"
+                        variant="subtle"
+                        onClick={() => {
+                          onDownload(source.id);
+                        }}
+                      >
+                        {t('Download', 'Tải xuống')}
+                      </Button>
+                    )}
+                  </div>
                   {source.url && (
                     <Text size="xs" c="dimmed">
                       {t('Link contents are not read.', 'Chưa đọc nội dung đường dẫn.')}
                     </Text>
-                  )}
-                  {!source.url && (
-                    <Button
-                      size="compact-xs"
-                      variant="subtle"
-                      onClick={() => {
-                        onDownload(source.id);
-                      }}
-                    >
-                      {t('Download', 'Tải xuống')}
-                    </Button>
                   )}
                 </div>
                 <Button

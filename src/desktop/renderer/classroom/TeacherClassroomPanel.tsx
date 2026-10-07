@@ -50,6 +50,7 @@ export function TeacherClassroomPanel({
   search = '',
   error = null,
 }: TeacherClassroomProps): ReactElement {
+  const [preparationSidebar, setPreparationSidebar] = useState<HTMLDivElement | null>(null);
   const [className, setClassName] = useState('');
   const [createOpened, setCreateOpened] = useState(false);
   const classId =
@@ -451,6 +452,7 @@ export function TeacherClassroomPanel({
                   live={Boolean(liveMeeting)}
                   t={t}
                   onApproved={refresh}
+                  preparationSidebar={preparationSidebar}
                   sessionControls={
                     <Stack gap="sm" className="material-session-controls">
                       <Text fw={600}>
@@ -536,6 +538,11 @@ export function TeacherClassroomPanel({
         </div>
         {showsLiveLesson ? null : selectedClass ? (
           <aside className="classroom-detail" aria-label={t('Class details', 'Chi tiết lớp')}>
+            <div
+              ref={setPreparationSidebar}
+              className="material-preparation-sidebar"
+              hidden={tab !== ClassView.MATERIALS}
+            />
             <div className="classroom-detail-status">
               <ClassSessionBadge live={Boolean(liveMeeting)} t={t} />
             </div>
