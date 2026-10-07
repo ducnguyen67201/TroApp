@@ -92,8 +92,18 @@ export class PetWindow implements PetPresentation {
       if (!this.dragTimer) {
         this.window.setIgnoreMouseEvents(!inside, { forward: true });
       }
-    } else if (command.kind === PetOverlayAction.START_DRAG && inside) {
-      this.startDrag(pointer, bounds);
+    } else if (command.kind === PetOverlayAction.START_DRAG) {
+      if (inside) {
+        this.startDrag(pointer, bounds);
+      } else {
+        console.warn('pet.interaction.rejected', {
+          stage: 'start-drag',
+          reason: 'outside-hit-region',
+          offsetX: pointer.x - bounds.x,
+          offsetY: pointer.y - bounds.y,
+          hitRadius: PetGeometry.HIT_RADIUS,
+        });
+      }
     }
   }
 

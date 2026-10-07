@@ -38,6 +38,7 @@ export function describeDebugExchange(value: unknown): DebugValue {
       }
       const redacted = current
         .replace(/data:[^\s"']+;base64,[A-Za-z0-9+/=]+/g, '[image omitted]')
+        .replace(/https:\/\/scratch\.mit\.edu\/projects\/[^\s"'<>]+/gi, '[project link omitted]')
         .replace(/\bBearer\s+\S+/gi, 'Bearer [redacted]')
         .replace(/\bsk-[A-Za-z0-9_-]+/g, '[redacted]')
         .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[redacted]')
@@ -62,6 +63,17 @@ export function describeDebugExchange(value: unknown): DebugValue {
     if (typeof current === 'object') {
       const entries = Object.entries(current);
       if (
+        (entries.some(([key]) => key === 'participation') &&
+          entries.some(([key]) => key === 'meeting')) ||
+        entries.some(
+          ([key, item]) =>
+            key === 'kind' &&
+            (item === 'material-note' || item === 'material-source' || item === 'material-search'),
+        )
+      ) {
+        return '[classroom context omitted]';
+      }
+      if (
         entries.some(
           ([key, item]) => key === 'type' && typeof item === 'string' && /image|audio/.test(item),
         )
@@ -71,7 +83,7 @@ export function describeDebugExchange(value: unknown): DebugValue {
       const result: { [key: string]: DebugValue } = {};
       for (const [key, item] of entries.slice(0, 40)) {
         const isPrivate =
-          /token|secret|password|authorization|cookie|headers|api.?key|image|audio|base64|encrypted|session|endpoint|gateway.?url/i.test(
+          /token|secret|password|authorization|cookie|headers|api.?key|image|audio|base64|encrypted|session|endpoint|gateway.?url|classroom|workspace.?url|material.?context|extracted.?text|prepared.?note|teacher.?note|teacher.?instructions|^url$/i.test(
             key,
           );
         result[key] = isPrivate ? '[omitted]' : visit(item, depth + 1);

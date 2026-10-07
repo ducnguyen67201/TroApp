@@ -1,4 +1,5 @@
 import type { StudentActivity } from '#contracts/StudentActivity.js';
+import type { ClassroomTeachingSession } from '../teaching/ClassroomTeachingTools.js';
 import { logAgentExchange } from './AgentExchangeLog.js';
 import { CompanionHudTool, type AgentProgressPhase } from '#contracts/CompanionHud.js';
 import type { Logger } from 'pino';
@@ -96,6 +97,7 @@ export class ComputerUseTaskRunner {
     mode: AgentTaskMode = AgentTaskMode.EXECUTE,
     receiveProgress?: (phase: AgentProgressPhase) => void,
     receiveTeachingStep?: ReceiveTeachingStep,
+    classroom?: ClassroomTeachingSession,
   ): Promise<AgentResult> {
     if (this.active) {
       throw new Error('Wait for the current task to finish.');
@@ -144,7 +146,13 @@ export class ComputerUseTaskRunner {
         this.log,
         this.runAgent,
       );
-      const result = await this.teachingRunner.run(message, locale, signal, receiveTeachingStep);
+      const result = await this.teachingRunner.run(
+        message,
+        locale,
+        signal,
+        receiveTeachingStep,
+        classroom,
+      );
       this.log.debug(
         {
           mode,

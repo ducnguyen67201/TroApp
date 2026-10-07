@@ -7,6 +7,28 @@ import {
   logAgentExchange,
 } from '../../../../src/desktop/worker/agent/AgentExchangeLog.js';
 
+it('omits classroom context and working project links from development exchanges', () => {
+  const result = describeDebugExchange({
+    classroom: { materials: ['private lesson'] },
+    text: 'Resume https://scratch.mit.edu/projects/123/',
+    output: {
+      participation: { studentId: 'private-student' },
+      meeting: { id: 'private-meeting' },
+      activity: { instructions: 'private instructions' },
+    },
+    arguments: JSON.stringify({ url: 'https://scratch.mit.edu/projects/123/' }),
+  });
+  const serialized = JSON.stringify(result);
+  for (const value of [
+    'private lesson',
+    'private-student',
+    'private instructions',
+    'scratch.mit.edu',
+  ]) {
+    expect(serialized).not.toContain(value);
+  }
+});
+
 it('shows readable requests, parsed tool arguments and native refusals without media or credentials', () => {
   const result = describeDebugExchange({
     input: 'Làm sao mở YouTube?',
@@ -70,4 +92,37 @@ it('emits paired input/output/error only with development debug enabled', () => 
   expect(chunks.join('')).toContain('invalid_request');
   expect(chunks.join('')).toContain('"input":');
   expect(chunks.join('')).toContain('"output":');
+});
+
+it('omits retained classroom source notes from development exchanges', () => {
+  expect(
+    JSON.stringify(
+      describeDebugExchange({
+        kind: 'material-note',
+        page: { extractedText: 'private class source' },
+      }),
+    ),
+  ).not.toContain('private class source');
+  expect(
+    JSON.stringify(
+      describeDebugExchange({
+        extractedText: 'private extraction',
+        preparedNote: 'private generated note',
+        teacherNote: 'private correction',
+      }),
+    ),
+  ).not.toContain('private');
+});
+
+it('omits retrieved classroom passages and search excerpts from development content traces', () => {
+  for (const kind of ['material-source', 'material-search']) {
+    const described = describeDebugExchange({
+      kind,
+      result: {
+        evidence: [{ text: 'private classroom passage' }],
+        matches: [{ excerpt: 'private classroom excerpt' }],
+      },
+    });
+    expect(described).toBe('[classroom context omitted]');
+  }
 });

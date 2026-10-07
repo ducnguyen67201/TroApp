@@ -15,8 +15,16 @@
   display: grid;
   place-items: center;
   height: 116px;
+  width: 100%;
+  padding: 0;
+  border: 0;
   background: #faf7f2;
   border-radius: 12px;
+  cursor: pointer;
+}
+.pet-card-preview:focus-visible {
+  outline: 2px solid var(--mantine-color-text);
+  outline-offset: 3px;
 }
 .pet-sprite {
   image-rendering: pixelated;

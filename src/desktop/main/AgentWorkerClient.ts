@@ -1,4 +1,12 @@
 import type { StudentInputPort } from './input/GlobalStudentInput.js';
+import {
+  ClassroomToolRequestSchema,
+  ClassroomToolResponseSchema,
+  ClassroomFailure,
+  type TeachingContext,
+  type ClassroomToolCommand,
+  type ClassroomReply,
+} from '#contracts/Classroom.js';
 import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { randomUUID } from 'node:crypto';
 import { utilityProcess, type UtilityProcess } from 'electron';
@@ -30,6 +38,16 @@ export class AgentWorkerClient implements AgentChatWorker {
     this.dispose();
   };
   private readonly pending = new Map<string, PendingRequest>();
+  private classroomTool:
+    ((command: ClassroomToolCommand, context: TeachingContext) => Promise<ClassroomReply>) | null =
+    null;
+  private classroomContext: TeachingContext | null = null;
+
+  setClassroomToolHandler(
+    handler: (command: ClassroomToolCommand, context: TeachingContext) => Promise<ClassroomReply>,
+  ): void {
+    this.classroomTool = handler;
+  }
 
   constructor(
     private readonly workerEntryPath: string,
@@ -102,6 +120,37 @@ export class AgentWorkerClient implements AgentChatWorker {
       if (this.worker !== child) {
         return;
       }
+      const classroomRequest = ClassroomToolRequestSchema.safeParse(message);
+      if (classroomRequest.success) {
+        const input = classroomRequest.data;
+        const context = this.classroomContext;
+        const handler = this.classroomTool;
+        const response =
+          context &&
+          context.participation.id === input.participationId &&
+          this.pending.has(input.taskRequestId) &&
+          handler
+            ? handler(input.command, context)
+            : Promise.resolve<ClassroomReply>({ kind: 'failed', code: ClassroomFailure.FORBIDDEN });
+        void response
+          .catch((): ClassroomReply => ({ kind: 'failed', code: ClassroomFailure.UNAVAILABLE }))
+          .then((reply) => {
+            if (this.worker === child && this.pending.has(input.taskRequestId)) {
+              try {
+                child.postMessage(
+                  ClassroomToolResponseSchema.parse({
+                    kind: 'classroom-tool-result',
+                    requestId: input.requestId,
+                    reply,
+                  }),
+                );
+              } catch {
+                this.dispose();
+              }
+            }
+          });
+        return;
+      }
       const progress = AgentProgressSchema.safeParse(message);
       if (progress.success) {
         if (this.pending.has(progress.data.requestId)) {
@@ -155,8 +204,17 @@ export class AgentWorkerClient implements AgentChatWorker {
     message: string,
     locale: DesktopLocale,
     mode: AgentTaskMode = AgentTaskMode.EXECUTE,
+    classroomContext?: TeachingContext,
   ): Promise<AgentResult> {
-    return this.send({ kind: 'turn', sessionId, message, locale, mode });
+    this.classroomContext = classroomContext ?? null;
+    return this.send({
+      kind: 'turn',
+      sessionId,
+      message,
+      locale,
+      mode,
+      ...(classroomContext ? { classroomContext } : {}),
+    });
   }
 
   answerLesson(
@@ -197,6 +255,7 @@ export class AgentWorkerClient implements AgentChatWorker {
   }
 
   dispose(): void {
+    this.classroomContext = null;
     this.studentInput?.stop();
     this.generation += 1;
     this.failPending('The agent session ended.');

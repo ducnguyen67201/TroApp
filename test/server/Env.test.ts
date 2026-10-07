@@ -74,3 +74,34 @@ it('validates backend speech configuration without requiring it for ordinary sta
     }).ELEVENLABS_MODEL_ID,
   ).toBe('eleven_flash_v2_5');
 });
+
+it('uses separate brief and composition budgets and allows configured larger compositions', () => {
+  const base = { DATABASE_URL: databaseUrl, AUTH_SECRET: authSecret };
+  const environment = readServerEnv(base);
+  expect(environment.MATERIAL_STAGE_OUTPUT_TOKENS).toBe(2000);
+  expect(environment.MATERIAL_COMPOSITION_OUTPUT_TOKENS).toBe(60000);
+  expect(environment.MATERIAL_STAGE_INPUT_TOKENS).toBe(100000);
+  expect(environment.MATERIAL_JOB_OUTPUT_TOKENS).toBe(160000);
+  expect(environment.MATERIAL_COMPOSITION_TIMEOUT_MS).toBe(240000);
+  const configured = readServerEnv({
+    ...base,
+    MATERIAL_COMPOSITION_OUTPUT_TOKENS: '100000',
+    MATERIAL_JOB_OUTPUT_TOKENS: '160000',
+  });
+  expect(configured.MATERIAL_COMPOSITION_OUTPUT_TOKENS).toBe(100000);
+  expect(configured.MATERIAL_JOB_OUTPUT_TOKENS).toBe(160000);
+  expect(() => readServerEnv({ ...base, MATERIAL_COMPOSITION_OUTPUT_TOKENS: '100001' })).toThrow(
+    'Backend configuration is invalid.',
+  );
+});
+
+it('validates configurable composition timeouts independently of the overall job deadline', () => {
+  const base = { DATABASE_URL: databaseUrl, AUTH_SECRET: authSecret };
+  expect(
+    readServerEnv({ ...base, MATERIAL_COMPOSITION_TIMEOUT_MS: '300000' })
+      .MATERIAL_COMPOSITION_TIMEOUT_MS,
+  ).toBe(300000);
+  expect(() => readServerEnv({ ...base, MATERIAL_COMPOSITION_TIMEOUT_MS: '540001' })).toThrow(
+    'Backend configuration is invalid.',
+  );
+});

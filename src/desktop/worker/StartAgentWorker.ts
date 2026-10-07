@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { ClassroomToolResponseSchema } from '#contracts/Classroom.js';
+import { ClassroomToolClient } from './teaching/ClassroomToolClient.js';
 import { AgentProgressPhase, AgentProgressSchema } from '#contracts/CompanionHud.js';
 import { TeachingLessonPhase } from '#contracts/DesktopObservation.js';
 import { AgentFailureCode } from '#contracts/AgentSession.js';
@@ -21,6 +23,7 @@ let hasModelCredential = false;
 let activeRun: ReturnType<ComputerUseTaskRunner['runTask']> | null = null;
 let activeRequestId: string | null = null;
 let dailyLimitReached = false;
+let classroomTools: ClassroomToolClient | null = null;
 
 function hasReachedDailyLimit(): boolean {
   return dailyLimitReached;
@@ -151,6 +154,18 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
       activeRequestId = requestId;
       dailyLimitReached = false;
       activeAbort = new AbortController();
+      const context = command.classroomContext;
+      const toolClient = context
+        ? new ClassroomToolClient(
+            (message) => {
+              parentPort.postMessage(message);
+            },
+            requestId,
+            context.participation.id,
+            activeAbort.signal,
+          )
+        : null;
+      classroomTools = toolClient;
       const run = runner.runTask(
         command.message,
         command.locale,
@@ -199,6 +214,9 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
             }),
           );
         },
+        context && toolClient
+          ? { context, callTool: (command) => toolClient.request(command) }
+          : undefined,
       );
       activeRun = run;
       try {
@@ -216,6 +234,8 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
           message: 'Could not complete the task. Check the connection and desktop access.',
         };
       } finally {
+        toolClient?.dispose();
+        classroomTools = null;
         activeRequestId = null;
         activeRun = null;
         activeAbort = null;
@@ -242,6 +262,11 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
 }
 
 parentPort.on('message', (event) => {
+  const classroomResponse = ClassroomToolResponseSchema.safeParse(event.data);
+  if (classroomResponse.success) {
+    classroomTools?.receive(classroomResponse.data);
+    return;
+  }
   const parsed = AgentWorkerRequestSchema.safeParse(event.data);
   if (!parsed.success) {
     return;

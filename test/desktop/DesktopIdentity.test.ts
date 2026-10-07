@@ -1,5 +1,9 @@
 import { expect, it } from 'vitest';
-import { DesktopBundleId, selectDesktopHostBundleId } from '../../src/desktop/DesktopIdentity.js';
+import {
+  createDevelopmentBundleId,
+  DesktopBundleId,
+  selectDesktopHostBundleId,
+} from '../../src/desktop/DesktopIdentity.js';
 
 it('attributes permissions to the installed, branded development, or direct Electron host', () => {
   expect(selectDesktopHostBundleId(true, '/Applications/Tro.app/Contents/MacOS/Tro')).toBe(
@@ -7,7 +11,7 @@ it('attributes permissions to the installed, branded development, or direct Elec
   );
   expect(
     selectDesktopHostBundleId(false, '/repo/.tro-development/Tro.app/Contents/MacOS/Electron'),
-  ).toBe(DesktopBundleId.DEVELOPMENT);
+  ).toBe(createDevelopmentBundleId('/repo'));
   expect(
     selectDesktopHostBundleId(
       false,
@@ -17,4 +21,14 @@ it('attributes permissions to the installed, branded development, or direct Elec
   expect(selectDesktopHostBundleId(false, '/unrelated/Tro.app/Contents/MacOS/Electron')).toBe(
     DesktopBundleId.ELECTRON,
   );
+});
+
+it('keeps each checkout identity stable and separates it from other Tro checkouts', () => {
+  const first = createDevelopmentBundleId('/repo');
+  expect(first).toMatch(/^app\.tro\.desktop\.development\.[a-f0-9]{12}$/);
+  expect(createDevelopmentBundleId('/repo')).toBe(first);
+  expect(createDevelopmentBundleId('/other/repo')).not.toBe(first);
+  expect(
+    selectDesktopHostBundleId(true, '/repo/.tro-development/Tro.app/Contents/MacOS/Electron'),
+  ).toBe(first);
 });

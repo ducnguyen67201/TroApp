@@ -1,4 +1,5 @@
 import { StudentInteractionTracker } from '../observation/StudentInteractionTracker.js';
+import type { ClassroomTeachingSession } from './ClassroomTeachingTools.js';
 import type { StudentActivity } from '#contracts/StudentActivity.js';
 import { logAgentExchange } from '../agent/AgentExchangeLog.js';
 import type { Logger } from 'pino';
@@ -79,6 +80,7 @@ export class TeachingTaskRunner {
   private requestedLocale: DesktopLocale = DesktopLocale.ENGLISH;
   private localeAbort = new AbortController();
   private receiveStep: ReceiveTeachingStep | undefined;
+  private classroom: ClassroomTeachingSession | undefined;
 
   updateLocale(locale: DesktopLocale): boolean {
     if (!this.lesson) {
@@ -112,8 +114,10 @@ export class TeachingTaskRunner {
     locale: DesktopLocale,
     signal: AbortSignal,
     receiveStep?: ReceiveTeachingStep,
+    classroom?: ClassroomTeachingSession,
   ): Promise<TeachingResult> {
-    const lesson = new TeachingLessonContext(message);
+    this.classroom = classroom;
+    const lesson = new TeachingLessonContext(message, classroom?.context);
     const policy = new TeachingObservationPolicy();
     const budget = new TeachingPresentationBudget();
     this.lesson = lesson;
@@ -422,36 +426,42 @@ export class TeachingTaskRunner {
         output: null,
       });
       const reply = await this.runAgent(
-        createTeachingAgent(this.server, locale, {
-          defineGoal: (definition) => lesson.defineGoal(definition),
-          reviseGoal: (revision) => lesson.reviseGoal(revision),
-          reportInvalidProposal: (rejection) => {
-            lesson.recordOperation({
-              operation: 'invalid_proposal',
-              issues: rejection.issues,
-              ...budget.reject('invalid_tool_input'),
-            });
-          },
-          presentStep: async (proposal) => {
-            const baseline = this.observation.readBaseline();
-            const current = await this.observation.read();
-            if (
-              baseline &&
-              (baseline.input_revision !== current.input_revision || current.buttons_down)
-            ) {
+        createTeachingAgent(
+          this.server,
+          locale,
+          {
+            defineGoal: (definition) => lesson.defineGoal(definition),
+            reviseGoal: (revision) => lesson.reviseGoal(revision),
+            reportInvalidProposal: (rejection) => {
               lesson.recordOperation({
-                operation: 'presentation_superseded_by_input',
-                captureId: proposal.captureId,
+                operation: 'invalid_proposal',
+                issues: rejection.issues,
+                ...budget.reject('invalid_tool_input'),
               });
-              return {
-                admitted: false,
-                reason: 'student_input_superseded',
-                repair: 'Yield; the host will provide a fresh screen after physical input settles.',
-              };
-            }
-            return presenter.presentStep(proposal, locale);
+            },
+            presentStep: async (proposal) => {
+              const baseline = this.observation.readBaseline();
+              const current = await this.observation.read();
+              if (
+                baseline &&
+                (baseline.input_revision !== current.input_revision || current.buttons_down)
+              ) {
+                lesson.recordOperation({
+                  operation: 'presentation_superseded_by_input',
+                  captureId: proposal.captureId,
+                });
+                return {
+                  admitted: false,
+                  reason: 'student_input_superseded',
+                  repair:
+                    'Yield; the host will provide a fresh screen after physical input settles.',
+                };
+              }
+              return presenter.presentStep(proposal, locale);
+            },
           },
-        }),
+          this.classroom,
+        ),
         input,
         AbortSignal.any([
           signal,

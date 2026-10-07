@@ -1,8 +1,9 @@
 import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
-import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { prepareCuaSdk } from './PrepareCuaSdk.js';
+import { prepareDesktopRuntime } from './PrepareDesktopRuntime.js';
 import { loadDesktopReleaseEnv } from './Env.js';
 
 const { updateFeedUrl } = loadDesktopReleaseEnv();
@@ -19,20 +20,15 @@ const packageMetadata = z
 
 await cp('scripts/DesktopEntitlements.plist', 'out/DesktopEntitlements.plist');
 await cp('src/desktop/assets', 'out/branding', { recursive: true });
-await mkdir('out/node_modules', { recursive: true });
-await cp('node_modules/uiohook-napi', 'out/node_modules/uiohook-napi', {
-  recursive: true,
-  dereference: true,
-});
 const require = createRequire(import.meta.url);
 const nativeLoaderDirectory = dirname(
   require.resolve('node-gyp-build/package.json', {
     paths: [dirname(require.resolve('uiohook-napi/package.json'))],
   }),
 );
-await cp(nativeLoaderDirectory, 'out/node_modules/node-gyp-build', {
-  recursive: true,
-  dereference: true,
+await prepareDesktopRuntime('out/node_modules', {
+  shortcuts: 'node_modules/uiohook-napi',
+  nativeLoader: nativeLoaderDirectory,
 });
 await prepareCuaSdk('out/cua-sdk');
 

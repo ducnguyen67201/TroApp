@@ -1,3 +1,8 @@
+import {
+  PracticeCheckStatus,
+  PracticeFailure,
+  type PracticeReply,
+} from '#contracts/PracticeCheck.js';
 import { AgentProgressPhase } from '#contracts/CompanionHud.js';
 import { CompletionMode, TaskOutcomeStatus } from '#contracts/TaskOutcome.js';
 import { TeachingOutcome } from '#contracts/CursorCompanion.js';
@@ -29,6 +34,8 @@ export interface CompanionHudClock {
 /** Reduces existing lifecycle events into an optional native presentation.
  * It cannot capture audio or submit a task. Capture/task identities fence late events. */
 export class CompanionHudController {
+  private practiceRequestId: string | null = null;
+  private practiceCheckId: string | null = null;
   private captureId: string | null = null;
   private sessionId: string | null = null;
   private sequence = -1;
@@ -45,6 +52,64 @@ export class CompanionHudController {
     private readonly port: CompanionHudPort,
     private readonly clock: CompanionHudClock,
   ) {}
+
+  /** Practice owns the HUD only while voice/teaching is idle. No evidence enters presentation. */
+  startPractice(
+    requestId: string,
+    kind: 'check' | 'submit-snapshot',
+    locale: Locale = this.snapshot.locale,
+  ): boolean {
+    if (
+      this.captureId ||
+      this.sessionId ||
+      this.snapshot.speakingSequence != null ||
+      (this.practiceRequestId && this.practiceRequestId !== requestId)
+    ) {
+      return false;
+    }
+    this.reset();
+    this.practiceRequestId = requestId;
+    this.setLocale(locale);
+    this.showPhase(kind === 'check' ? CompanionHudPhase.CHECKING : CompanionHudPhase.SUBMITTING);
+    this.cancelHide = this.clock.schedule(() => {
+      this.receivePracticeReply(requestId, { kind: 'failed', code: PracticeFailure.UNAVAILABLE });
+    }, 100_000);
+    return true;
+  }
+
+  receivePracticeReply(requestId: string, reply: PracticeReply): void {
+    if (requestId !== this.practiceRequestId) {
+      return;
+    }
+    if (reply.kind === 'check' && reply.check.status === PracticeCheckStatus.RUNNING) {
+      this.practiceCheckId = reply.check.id;
+      return;
+    }
+    if (reply.kind === 'history') {
+      const check = reply.checks.find((item) => item.id === this.practiceCheckId);
+      if (!check || check.status === PracticeCheckStatus.RUNNING) {
+        return;
+      }
+      this.receivePracticeReply(requestId, { kind: 'check', check });
+      return;
+    }
+    this.practiceRequestId = null;
+    this.practiceCheckId = null;
+    this.finishPresentation(
+      reply.kind === 'submitted'
+        ? CompanionHudPhase.SUBMITTED
+        : reply.kind === 'check' && reply.check.status === PracticeCheckStatus.COMPLETED
+          ? CompanionHudPhase.CHECKED
+          : CompanionHudPhase.ERROR,
+      2200,
+    );
+  }
+
+  receivePracticeHistory(reply: PracticeReply): void {
+    if (this.practiceRequestId && this.practiceCheckId) {
+      this.receivePracticeReply(this.practiceRequestId, reply);
+    }
+  }
 
   setSpeakingMessage(message: TeachingMessage | null): void {
     this.snapshot = {
@@ -282,6 +347,8 @@ export class CompanionHudController {
   }
 
   reset(): void {
+    this.practiceRequestId = null;
+    this.practiceCheckId = null;
     this.cancelHide?.();
     this.cancelHide = null;
     this.captureId = null;

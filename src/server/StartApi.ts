@@ -1,3 +1,14 @@
+import { MaterialProviderRequestState } from './features/materials/application/MaterialGeneration.js';
+import { PracticeCheckService } from './features/classroom/application/PracticeCheckService.js';
+import { OpenAiPracticeCheckEvaluator } from './features/classroom/infrastructure/OpenAiPracticeCheckEvaluator.js';
+import { registerPracticeCheckRoutes } from './features/classroom/infrastructure/RegisterPracticeCheckRoutes.js';
+import { createPrismaPracticeCheckStore } from './persistence/PrismaPracticeCheckStore.js';
+import { PrepareMaterialCollection } from './features/materials/application/PrepareMaterialCollection.js';
+import { MaterialService } from './features/materials/application/MaterialService.js';
+import { MaterialPreparationRunner } from './features/materials/application/MaterialPreparationRunner.js';
+import { MaterialExtractorWorker } from './features/materials/infrastructure/MaterialExtractorWorker.js';
+import { OpenAiMaterialPreparation } from './features/materials/infrastructure/OpenAiMaterialPreparation.js';
+import { registerMaterialRoutes } from './features/materials/infrastructure/RegisterMaterialRoutes.js';
 import { ElevenLabsSpeechProvider } from './features/voiceover/ElevenLabsSpeechProvider.js';
 import { VoiceoverConfig } from './features/voiceover/VoiceoverConfig.js';
 import { registerVoiceoverRoutes } from './features/voiceover/RegisterVoiceoverRoutes.js';
@@ -13,6 +24,9 @@ import { registerModelGateway } from './auth/RegisterModelGateway.js';
 import { readServerEnv } from './Env.js';
 import { createServerLogger } from './Logger.js';
 import { createPrismaDatabaseStatus } from './persistence/PrismaDatabaseStatus.js';
+import { createPrismaClassroomStore } from './persistence/PrismaClassroomStore.js';
+import { ClassroomService } from './features/classroom/application/ClassroomService.js';
+import { registerClassroomRoutes } from './features/classroom/infrastructure/RegisterClassroomRoutes.js';
 
 async function startApi(): Promise<void> {
   const environment = readServerEnv(process.env);
@@ -35,6 +49,82 @@ async function startApi(): Promise<void> {
       voiceIds: VoiceoverConfig.VOICE_IDS,
     }),
   );
+  const classroom = createPrismaClassroomStore(environment.DATABASE_URL);
+  registerClassroomRoutes(
+    api,
+    authentication.readSignedInUserId,
+    new ClassroomService(classroom.store),
+    logger,
+  );
+  const practice = createPrismaPracticeCheckStore(environment.DATABASE_URL);
+  registerPracticeCheckRoutes(
+    api,
+    authentication.readSignedInUserId,
+    new PracticeCheckService(
+      practice.store,
+      new OpenAiPracticeCheckEvaluator(
+        environment.OPENAI_API_KEY,
+        environment.PRACTICE_CHECK_MODEL ?? 'gpt-5.4',
+      ),
+      {
+        dailyChecks: environment.PRACTICE_CHECK_DAILY_LIMIT ?? 30,
+        minuteChecks: environment.PRACTICE_CHECK_MINUTE_LIMIT ?? 5,
+      },
+      () => new Date(),
+      (event) => {
+        logger.info(event, 'classroom.practice.lifecycle');
+      },
+    ),
+    logger,
+  );
+  const materials = new MaterialService(
+    classroom.store,
+    new MaterialExtractorWorker(),
+    new PrepareMaterialCollection(
+      classroom.store,
+      new OpenAiMaterialPreparation(
+        environment.OPENAI_API_KEY,
+        {
+          stageOutputTokens: environment.MATERIAL_STAGE_OUTPUT_TOKENS,
+          compositionOutputTokens: environment.MATERIAL_COMPOSITION_OUTPUT_TOKENS,
+          compositionTimeoutMs: environment.MATERIAL_COMPOSITION_TIMEOUT_MS,
+        },
+        (event) => {
+          if (event.state === MaterialProviderRequestState.FAILED) {
+            logger.warn(event, 'classroom.materials.provider.request');
+          } else {
+            logger.info(event, 'classroom.materials.provider.request');
+          }
+        },
+      ),
+      {
+        calls: environment.MATERIAL_JOB_CALLS,
+        inputTokens: environment.MATERIAL_JOB_INPUT_TOKENS,
+        outputTokens: environment.MATERIAL_JOB_OUTPUT_TOKENS,
+        stageInputTokens: environment.MATERIAL_STAGE_INPUT_TOKENS,
+        stageOutputTokens: environment.MATERIAL_STAGE_OUTPUT_TOKENS,
+        compositionOutputTokens: environment.MATERIAL_COMPOSITION_OUTPUT_TOKENS,
+        compositionTimeoutMs: environment.MATERIAL_COMPOSITION_TIMEOUT_MS,
+        deadlineMs: environment.MATERIAL_JOB_DEADLINE_MS,
+      },
+      (event) => {
+        if (event.rejected) {
+          logger.warn(event, 'classroom.materials.stage.rejected');
+        } else {
+          logger.info(event, 'classroom.materials.stage.completed');
+        }
+      },
+    ),
+    () => new Date(),
+    (event) => {
+      logger.warn(event, 'classroom.materials.preparation.failed');
+    },
+  );
+  registerMaterialRoutes(api, authentication.readSignedInUserId, materials, logger);
+  const materialRunner = new MaterialPreparationRunner(materials, () => {
+    logger.warn({ event: 'material.runner.failed' }, 'Material preparation runner failed.');
+  });
+  materialRunner.start();
   const transcriptionAllowance = createPrismaTranscriptionAllowance(environment.DATABASE_URL);
   await registerTranscriptionRoutes(
     api,
@@ -59,10 +149,13 @@ async function startApi(): Promise<void> {
   registerModelGateway(api, authentication.readSignedInUserId, environment, logger);
 
   api.addHook('onClose', async () => {
+    await materialRunner.close();
     await database.close();
     await authentication.close();
     await transcriptionAllowance.close();
     await voiceoverAllowance.close();
+    await classroom.close();
+    await practice.close();
   });
 
   try {

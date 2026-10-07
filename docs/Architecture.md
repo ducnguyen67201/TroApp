@@ -59,13 +59,30 @@ The desktop explicitly enables Better Auth's protocol registration with `scheme:
 
 After sign-in on macOS, Electron main reads Tro's Accessibility and Screen Recording grants using the native Cua SDK without starting a driver or requesting access. React shows permission onboarding while either grant is missing or unverifiable. The user requests access with a button; the native call runs inside main so macOS identifies the host app. Main opens a fixed System Settings destination. On return to Tro, a read-only recheck enters the workspace once both grants are verified. Main checks again before issuing a task session and before fetching a model gateway credential. After verification, main directly spawns a private embedded Cua daemon under Tro and passes its MCP endpoint to the agent worker. It never launches a separate CuaDriver app. The standard development launcher uses a separate Tro development identity; signed packaged builds use `app.tro.desktop`. See [PermissionsOnboarding.md](PermissionsOnboarding.md).
 
-On macOS, validate browser-to-app return in a packaged app with its protocol registered in `Info.plist`. Plain command-line Electron development is not sufficient for OS deep-link registration. Keep the same app instance open throughout sign-in because the SDK holds the pending proof-key verifier in memory. See [Electron's deep-link guidance](https://www.electronjs.org/docs/latest/tutorial/launch-app-from-url-in-another-app). Full Google login and packaged OS dispatch still require an interactive smoke test.
+On macOS, both the packaged app and the branded development host declare the protocol in `Info.plist`. Each development checkout has its own stable bundle identity and a bootstrap that loads its main module when macOS launches it without a project argument. Before browser sign-in, main registers the current handler and verifies that the OS resolves it to the running bundle. Plain unbranded command-line Electron lacks this host setup. Keep the same app instance open throughout sign-in because the SDK holds the pending proof-key verifier in memory. See [Electron's deep-link guidance](https://www.electronjs.org/docs/latest/tutorial/launch-app-from-url-in-another-app). Full Google login and packaged OS dispatch still require an interactive smoke test.
 
 For operational status, `CreateApi.ts` still routes `/health/ready` to `ReadServiceStatus.ts`. That service depends on a `DatabaseStatus` port, not Prisma or Fastify. `PrismaDatabaseStatus.ts` checks a mapped model and reports availability without exposing database diagnostics.
 
 A future `createTryOnJob` follows the same path: validated contract → authorized route → application service → Prisma repository/provider port. Ownership checks belong on the backend even when the desktop already validated input.
 
 ## Code organization
+
+### Classroom context
+
+The [classroom context engineering spec](classroom/ClassroomContextEngineeringSpec.md)
+describes teacher-prepared activities and material roles, class enrollment and explicit
+session participation, per-student working resources, durable progress and submission
+receipts. Backend features own authorization and persistence; desktop main binds a
+student's session and supplies validated context to the existing teaching worker.
+Teacher-controlled explanation/practice phases preserve classroom teaching, while
+individual assistance retains paired instruction/drawing presentation. This is a
+target architecture. The initial implementation uses individual accounts and
+Scratch-link hand-ins. Account roles are stored in Prisma and granted by a backend
+operator by verified email; classroom invitation codes authorize enrollment only.
+The sidebar shows the account role and opens a role-specific Classroom page; see [ClassroomImplementation.md](classroom/ClassroomImplementation.md)
+for delivered behavior, setup and limits.
+
+### Existing ownership boundaries
 
 Keep a single pnpm root and one backend modular monolith. `src/contracts` has real desktop and API consumers; it does not need a published workspace package yet. Put new business features under `src/server/features/<feature>`, with domain, application, and infrastructure files as needed. Avoid empty layers for trivial functions.
 
@@ -89,7 +106,7 @@ The first implemented agent feature is a general computer-use text chat, specifi
 
 The worker owns the loop and tool execution. Model requests normally still go over the network. Screenshots or tool outputs sent to the model leave the machine; local orchestration is not an offline or all-local privacy guarantee.
 
-Tro now signs users in with Google through backend Better Auth/Prisma. Better Auth's Electron client stores the Tro cookie with OS `safeStorage` when available, and main obtains a 15-minute model-only token from the backend. The local worker uses that token to call Tro's Responses gateway; the product OpenAI key and Google client secret remain on the backend. The gateway restricts the model and output tokens; it has no model request count cap and no longer writes per-account request counters. The companion keeps the macOS worker connected while the signed-in window is open; other platforms start on demand and stop after 15 idle minutes. Each message starts a fresh SDK run with no `Session` or previous message history. React displays messages in memory until the window closes; screenshots and tool outputs are not persisted. See [ComputerUseSpec.md](agent/ComputerUseSpec.md) for limits and release work.
+Tro now signs users in with Google through backend Better Auth/Prisma. Better Auth's Electron client stores the Tro cookie with OS `safeStorage` when available, and main obtains a 15-minute model-only token from the backend. The local worker uses that token to call Tro's Responses gateway; the product OpenAI key and Google client secret remain on the backend. The gateway restricts the model and output tokens; it has no model request count cap and no longer writes per-account request counters. The companion keeps the macOS worker connected while the signed-in window is open; other platforms start on demand and stop after 15 idle minutes. Each message starts a fresh SDK run with no `Session` or previous message history. Joined classroom tasks also load their authorized activity and durable progress through the classroom service. React displays messages in memory until the window closes; screenshots and tool outputs are not persisted. See [ComputerUseSpec.md](agent/ComputerUseSpec.md) for limits and release work.
 
 The selected product direction remains a local worker. Desktop control needs Windows/macOS validation and permissions; a separate process alone does not make arbitrary model-generated GUI actions harmless.
 
@@ -211,3 +228,19 @@ Validated local preferences are scoped by account. The pet hides during agent wo
 and voice capture, and uses no model requests or screen observation. See
 [StudentPetEngineering](companion/StudentPetEngineering.md) for ownership, behavior
 and pending signed macOS/Windows acceptance. Generated pets remain planned.
+
+## Materials preparation
+
+Teacher uploads, batch preparation, editable notes, private original downloads and approved
+section context are implemented in `src/server/features/materials` with canonical contracts,
+application ports and worker/provider adapters. See [MaterialPreparationEngineering](classroom/MaterialPreparationEngineering.md)
+for the storage limits, durable jobs, source retention and live-session approval fence.
+
+Compact material preparation uses backend generation/counting ports, durable class-scoped
+derivations and immutable approved sources. The student agent receives a bounded packet
+and authorized source tools; the existing paired instruction/drawing presenter remains
+the only teaching presentation path. See [MaterialContextImplementation](classroom/MaterialContextImplementation.md).
+
+### Practice checks and work snapshots
+
+Classroom practice checking has a separate evaluator and persistence port. Checkpoint schemas in `src/contracts/PracticeCheck.ts` are optional additions to course/material contracts; existing progress and Scratch-link submission contracts remain intact. Teacher review enables criteria before publication. `PracticeCheckService` admits one bounded inference per request, snapshots evidence, validates all findings and fences late results against classroom versions. `PrismaPracticeCheckStore` owns serializable reservations, private bounded binary evidence and append-only submission receipts. The structured Responses adapter is read-only and cannot execute work or modify rubrics. Desktop main attaches authentication/device bindings; the renderer explicitly previews, checks, requests a hint and confirms hand-in. See [the engineering spec](classroom/PracticeCheckEngineeringSpec.md) for current limits and deferred capture/storage/review adapters.

@@ -1,3 +1,4 @@
+import { DesktopAccountLimits, type SavedAccounts } from '#contracts/DesktopAccounts.js';
 import { AgentProgressPhase } from '#contracts/CompanionHud.js';
 import { VoiceState, type VoiceEvent } from '#contracts/VoiceInput.js';
 import { useEffect, useRef, useState } from 'react';
@@ -23,6 +24,12 @@ export interface ComputerUseController {
   isLoading: boolean;
   isSigning: boolean;
   isSigningOut: boolean;
+  isSwitchingAccount: boolean;
+  savedAccounts: SavedAccounts | null;
+  refreshAccounts: () => Promise<void>;
+  switchAccount: (accountId: string) => Promise<void>;
+  addGoogleAccount: () => Promise<void>;
+  cancelAccountSignIn: () => Promise<void>;
   isSending: boolean;
   isResetting: boolean;
   taskMode: AgentTaskMode;
@@ -38,6 +45,7 @@ export interface ComputerUseController {
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   startNewTask: () => Promise<void>;
+  preparePracticeHelp?: (instruction: string) => Promise<boolean>;
   sendMessage: (instruction?: string) => Promise<void>;
   receiveVoiceEvent: (event: VoiceEvent) => void;
 }
@@ -54,6 +62,10 @@ export function useComputerUse(): ComputerUseController {
   const [isLoading, setIsLoading] = useState(true);
   const [isSigning, setIsSigning] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);
+  const [savedAccounts, setSavedAccounts] = useState<SavedAccounts | null>(null);
+  const accountOperation = useRef(false);
+  const accountGeneration = useRef(0);
   const [taskMode, setTaskMode] = useState<AgentTaskMode>(AgentTaskMode.TEACH);
   const [messageInput, setMessageInput] = useState('');
   const [answerLessonId, setAnswerLessonId] = useState<string | null>(null);
@@ -119,6 +131,7 @@ export function useComputerUse(): ComputerUseController {
       } finally {
         if (effectState.active) {
           setIsLoading(false);
+          void refreshAccounts();
         }
       }
     })();
@@ -134,19 +147,41 @@ export function useComputerUse(): ComputerUseController {
     /* Google returns through the existing system-browser deep link. Poll the
        narrow session bridge with one read at a time and a two-minute deadline. */
     let active = true;
-    const deadline = Date.now() + 120_000;
+    const deadline = Date.now() + DesktopAccountLimits.SIGN_IN_TIMEOUT_MS;
+    const generation = accountGeneration.current;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     async function checkSignIn(): Promise<void> {
       try {
         const result = await window.tro.readAuthSession();
-        if (!active) {
+        if (!active || generation !== accountGeneration.current) {
           return;
         }
         if (result.kind === 'signed-in') {
           setUser(result.user);
           setIsSigning(false);
           setMessage(null);
+          void refreshAccounts();
+          return;
+        }
+        if (result.kind === 'failed') {
+          const error = resolveBridgeError(result.message, 'errorOpenGoogle');
+          if (
+            error === 'errorAccountStorage' ||
+            error === 'errorAccountExpired' ||
+            error === 'errorAccountLimit' ||
+            error === 'errorSignInTimeout'
+          ) {
+            await cancelAccountSignIn();
+            if (generation + 1 === accountGeneration.current) {
+              setMessage(error);
+            }
+            return;
+          }
+        }
+        if (result.kind === 'signed-out') {
+          setIsSigning(false);
+          setMessage('errorOpenGoogle');
           return;
         }
       } catch {
@@ -156,8 +191,10 @@ export function useComputerUse(): ComputerUseController {
         return;
       }
       if (Date.now() >= deadline) {
-        setIsSigning(false);
-        setMessage('errorSignInTimeout');
+        await cancelAccountSignIn();
+        if (generation + 1 === accountGeneration.current) {
+          setMessage('errorSignInTimeout');
+        }
         return;
       }
       timer = setTimeout(() => void checkSignIn(), 1000);
@@ -170,17 +207,73 @@ export function useComputerUse(): ComputerUseController {
     };
   }, [isSigning]);
 
-  async function signInWithGoogle(): Promise<void> {
-    if (isLoading || isSigning || isSigningOut) {
+  function clearAccountTask(): void {
+    taskGeneration.current += 1;
+    currentSessionId.current = null;
+    voiceCaptureId.current = null;
+    setMessages([]);
+    setMessageInput('');
+    setTeachingStep(null);
+    setTeachingPhase(null);
+    setAnswerLessonId(null);
+    setIsVoiceLessonActive(false);
+    setIsVoiceBusy(false);
+    setMessage(null);
+  }
+
+  async function refreshAccounts(): Promise<void> {
+    if (!window.tro.readSavedAccounts) {
       return;
     }
-    setIsSigning(true);
-    setMessage(null);
+    const generation = accountGeneration.current;
     try {
-      const result = await window.tro.signInWithGoogle();
+      const result = await window.tro.readSavedAccounts();
+      if (generation !== accountGeneration.current) {
+        return;
+      }
+      if (result.kind === 'accounts') {
+        setSavedAccounts(result);
+      } else if (result.kind === 'failed') {
+        setMessage(resolveBridgeError(result.message, 'errorSavedAccounts'));
+      }
+    } catch {
+      if (generation === accountGeneration.current) {
+        setMessage('errorSavedAccounts');
+      }
+    }
+  }
+
+  function canChangeAccount(): boolean {
+    return (
+      !accountOperation.current &&
+      !isLoading &&
+      !isSigning &&
+      !isSigningOut &&
+      !isSwitchingAccount &&
+      !isSending &&
+      !isVoiceBusy &&
+      !isVoiceLessonActive &&
+      !isResetting
+    );
+  }
+
+  async function openGoogleAccount(addAccount: boolean): Promise<void> {
+    if (!canChangeAccount()) {
+      return;
+    }
+    accountOperation.current = true;
+    accountGeneration.current += 1;
+    clearAccountTask();
+    setIsSigning(true);
+    try {
+      const result =
+        addAccount && window.tro.addGoogleAccount
+          ? await window.tro.addGoogleAccount()
+          : await window.tro.signInWithGoogle();
       if (result.kind === 'signed-in') {
         setUser(result.user);
         setIsSigning(false);
+        await refreshAccounts();
       } else if (result.kind !== 'pending') {
         setMessage(
           result.kind === 'failed'
@@ -192,11 +285,89 @@ export function useComputerUse(): ComputerUseController {
     } catch {
       setMessage('errorOpenGoogle');
       setIsSigning(false);
+    } finally {
+      accountOperation.current = false;
+    }
+  }
+
+  function signInWithGoogle(): Promise<void> {
+    return openGoogleAccount(false);
+  }
+
+  function addGoogleAccount(): Promise<void> {
+    return openGoogleAccount(true);
+  }
+
+  async function cancelAccountSignIn(): Promise<void> {
+    if (accountOperation.current) {
+      return;
+    }
+    if (!window.tro.cancelAccountSignIn) {
+      accountGeneration.current += 1;
+      setIsSigning(false);
+      return;
+    }
+    accountOperation.current = true;
+    accountGeneration.current += 1;
+    setIsSwitchingAccount(true);
+    try {
+      const result = await window.tro.cancelAccountSignIn();
+      setIsSigning(false);
+      if (result.kind === 'signed-in') {
+        setUser(result.user);
+      } else if (result.kind === 'signed-out') {
+        setUser(null);
+      } else if (result.kind === 'failed') {
+        setMessage(resolveBridgeError(result.message, 'errorSwitchAccount'));
+      }
+      await refreshAccounts();
+    } catch {
+      setIsSigning(false);
+      setMessage('errorSwitchAccount');
+    } finally {
+      accountOperation.current = false;
+      setIsSwitchingAccount(false);
+    }
+  }
+
+  async function switchAccount(accountId: string): Promise<void> {
+    if (!canChangeAccount() || !window.tro.switchAccount) {
+      return;
+    }
+    accountOperation.current = true;
+    accountGeneration.current += 1;
+    clearAccountTask();
+    setIsSwitchingAccount(true);
+    try {
+      const result = await window.tro.switchAccount(accountId);
+      if (result.kind === 'signed-in') {
+        setUser(result.user);
+      } else {
+        setMessage(
+          result.kind === 'failed'
+            ? resolveBridgeError(result.message, 'errorSwitchAccount')
+            : 'errorSwitchAccount',
+        );
+      }
+      await refreshAccounts();
+    } catch {
+      setMessage('errorSwitchAccount');
+    } finally {
+      accountOperation.current = false;
+      setIsSwitchingAccount(false);
     }
   }
 
   async function startNewTask(): Promise<void> {
-    if (isSending || isVoiceBusy || isVoiceLessonActive || isSigningOut || isResetting) {
+    if (
+      isSending ||
+      isVoiceBusy ||
+      isVoiceLessonActive ||
+      isSigning ||
+      isSwitchingAccount ||
+      isSigningOut ||
+      isResetting
+    ) {
       return;
     }
     setIsResetting(true);
@@ -217,12 +388,34 @@ export function useComputerUse(): ComputerUseController {
       currentSessionId.current = null;
       setMessages([]);
       setMessageInput('');
+      setAnswerLessonId(null);
       setMessage(null);
     } catch {
       setMessage('errorClearTask');
     } finally {
       setIsResetting(false);
     }
+  }
+
+  async function preparePracticeHelp(instruction: string): Promise<boolean> {
+    if (
+      isSending ||
+      isVoiceBusy ||
+      isVoiceLessonActive ||
+      isSigning ||
+      isSwitchingAccount ||
+      isSigningOut ||
+      isResetting
+    ) {
+      return false;
+    }
+    await startNewTask();
+    if (currentSessionId.current !== null) {
+      return false;
+    }
+    setTaskMode(AgentTaskMode.TEACH);
+    setMessageInput(instruction);
+    return true;
   }
 
   async function sendMessage(instruction: string = messageInput): Promise<void> {
@@ -234,7 +427,9 @@ export function useComputerUse(): ComputerUseController {
       instruction.trim() &&
       !isVoiceBusy &&
       !isResetting &&
-      !isSigningOut
+      !isSigningOut &&
+      !isSigning &&
+      !isSwitchingAccount
     ) {
       const submittedAnswer = instruction.trim();
       let result: Awaited<ReturnType<typeof window.tro.answerTeachingLesson>>;
@@ -267,6 +462,8 @@ export function useComputerUse(): ComputerUseController {
       isVoiceBusy ||
       isVoiceLessonActive ||
       isSigningOut ||
+      isSigning ||
+      isSwitchingAccount ||
       isResetting ||
       !instruction.trim()
     ) {
@@ -387,18 +584,18 @@ export function useComputerUse(): ComputerUseController {
   }, [isSending, isVoiceBusy, isVoiceLessonActive, taskMode, stopTask]);
 
   async function signOut(): Promise<void> {
-    if (isSending || isVoiceBusy || isVoiceLessonActive || isSigningOut || isResetting) {
+    if (!canChangeAccount()) {
       return;
     }
+    accountOperation.current = true;
+    accountGeneration.current += 1;
     setIsSigningOut(true);
     try {
       const result = await window.tro.signOut();
       if (result.kind === 'signed-out') {
         setUser(null);
-        currentSessionId.current = null;
-        setMessages([]);
-        setMessageInput('');
-        setMessage(null);
+        clearAccountTask();
+        await refreshAccounts();
       } else {
         setMessage(
           result.kind === 'failed'
@@ -409,11 +606,15 @@ export function useComputerUse(): ComputerUseController {
     } catch {
       setMessage('errorSignOut');
     } finally {
+      accountOperation.current = false;
       setIsSigningOut(false);
     }
   }
 
   function receiveVoiceEvent(event: VoiceEvent): void {
+    if (isSigning || isSwitchingAccount || isSigningOut) {
+      return;
+    }
     if (
       event.kind === 'result' &&
       event.result.kind === 'accepted' &&
@@ -482,6 +683,12 @@ export function useComputerUse(): ComputerUseController {
     isLoading,
     isSigning,
     isSigningOut,
+    isSwitchingAccount,
+    savedAccounts,
+    refreshAccounts,
+    switchAccount,
+    addGoogleAccount,
+    cancelAccountSignIn,
     isSending: isSending || isVoiceBusy || isVoiceLessonActive,
     isResetting,
     taskMode,
@@ -497,6 +704,7 @@ export function useComputerUse(): ComputerUseController {
     signInWithGoogle,
     signOut,
     startNewTask,
+    preparePracticeHelp,
     sendMessage,
     receiveVoiceEvent,
   };

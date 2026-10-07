@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { DesktopLocale } from '#contracts/DesktopLocale.js';
 import type { AgentProgress } from '#contracts/CompanionHud.js';
-import type { TeachingMessage } from '#contracts/TeachingStep.js';
+import { TeachingMessageKind, type TeachingMessage } from '#contracts/TeachingStep.js';
 import {
   VoiceoverLimits,
   VoiceoverState,
@@ -10,6 +10,36 @@ import {
   type VoiceoverStatus,
 } from '#contracts/Voiceover.js';
 
+const VoiceoverStopReason = {
+  INTERRUPTED: 'interrupted',
+  MESSAGE_REPLACED: 'message_replaced',
+  MESSAGE_HIDDEN: 'message_hidden',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+} as const;
+
+type VoiceoverStopReason = (typeof VoiceoverStopReason)[keyof typeof VoiceoverStopReason];
+
+const VoiceoverEventKind = {
+  COMPLETION_RETAINED: 'completion_retained',
+  PLAYBACK_FINISHED: 'playback_finished',
+  STOPPED: 'stopped',
+} as const;
+
+export interface VoiceoverEvent {
+  kind: (typeof VoiceoverEventKind)[keyof typeof VoiceoverEventKind];
+  utteranceId: string;
+  messageKind: TeachingMessage['kind'];
+  messageSequence: number;
+  reason?: VoiceoverStopReason;
+}
+
+interface ActiveUtterance {
+  id: string;
+  abort: AbortController;
+  message: TeachingMessage;
+}
+
 export interface VoiceoverDependencies {
   canSpeak(): boolean;
   fetchSpeech(request: VoiceoverRequest, signal: AbortSignal): Promise<ReadableStream<Uint8Array>>;
@@ -17,6 +47,7 @@ export interface VoiceoverDependencies {
   showStatus(status: VoiceoverStatus): void;
   holdMessage(message: TeachingMessage | null): void;
   reportFailure(stage: string): void;
+  reportEvent?(event: VoiceoverEvent): void;
 }
 
 /** Reads only the current accepted and natively visible message, once per sequence. */
@@ -25,7 +56,7 @@ export class VoiceoverController {
   private candidate: AgentProgress | null = null;
   private visible: TeachingMessage | null = null;
   private lastIdentity: string | null = null;
-  private active: { id: string; abort: AbortController } | null = null;
+  private active: ActiveUtterance | null = null;
   private stopping: Promise<boolean> = Promise.resolve(true);
   private enabled = true;
   private locale: DesktopLocale | null = null;
@@ -86,11 +117,34 @@ export class VoiceoverController {
   }
 
   receiveVisibleMessage(message: TeachingMessage | null): void {
+    const active = this.active;
+    /* A completion was already verified as visible before speech started.
+       Native frame polling can briefly return null during repaint or fade;
+       audio drain, rather than that visibility loss, releases its final hold. */
+    if (!message && active?.message.kind === TeachingMessageKind.COMPLETION) {
+      if (this.visible) {
+        this.dependencies.holdMessage(active.message);
+        this.reportEvent(VoiceoverEventKind.COMPLETION_RETAINED, active);
+      }
+      this.visible = null;
+      return;
+    }
+    if (
+      message &&
+      active?.message.kind === TeachingMessageKind.COMPLETION &&
+      message.lessonId === active.message.lessonId &&
+      message.sequence < active.message.sequence
+    ) {
+      return;
+    }
+    const currentMessage = active?.message ?? this.visible;
     if (
       !message ||
-      (this.visible && this.readIdentity(this.visible) !== this.readIdentity(message))
+      (currentMessage && this.readIdentity(currentMessage) !== this.readIdentity(message))
     ) {
-      void this.stopSpeaking();
+      void this.stopSpeaking(
+        message ? VoiceoverStopReason.MESSAGE_REPLACED : VoiceoverStopReason.MESSAGE_HIDDEN,
+      );
     }
     this.visible = message;
     this.trySpeak();
@@ -121,9 +175,12 @@ export class VoiceoverController {
     void this.stopSpeaking();
   }
 
-  stopSpeaking(): Promise<boolean> {
+  stopSpeaking(reason: VoiceoverStopReason = VoiceoverStopReason.INTERRUPTED): Promise<boolean> {
     const active = this.active;
     this.active = null;
+    if (active) {
+      this.reportEvent(VoiceoverEventKind.STOPPED, active, reason);
+    }
     active?.abort.abort();
     this.dependencies.holdMessage(null);
     this.dependencies.showStatus({ state: VoiceoverState.IDLE });
@@ -151,6 +208,20 @@ export class VoiceoverController {
     return `${message.lessonId}:${String(message.sequence)}:${message.stepId}`;
   }
 
+  private reportEvent(
+    kind: VoiceoverEvent['kind'],
+    active: ActiveUtterance,
+    reason?: VoiceoverStopReason,
+  ): void {
+    this.dependencies.reportEvent?.({
+      kind,
+      utteranceId: active.id,
+      messageKind: active.message.kind,
+      messageSequence: active.message.sequence,
+      ...(reason ? { reason } : {}),
+    });
+  }
+
   private trySpeak(): void {
     const progress = this.candidate;
     const message = progress?.teachingMessage;
@@ -172,7 +243,7 @@ export class VoiceoverController {
     if (!this.dependencies.canSpeak()) {
       return;
     }
-    const active = { id: randomUUID(), abort: new AbortController() };
+    const active = { id: randomUUID(), abort: new AbortController(), message };
     const stopping = this.stopSpeaking();
     this.active = active;
     this.dependencies.holdMessage(message);
@@ -202,7 +273,7 @@ export class VoiceoverController {
 
   private async readMessageAloud(
     request: VoiceoverRequest,
-    active: { id: string; abort: AbortController },
+    active: ActiveUtterance,
     stopping: Promise<boolean>,
   ): Promise<void> {
     const startup = setTimeout(() => {
@@ -299,11 +370,12 @@ export class VoiceoverController {
         throw new Error('Playback did not finish.');
       }
       if (this.active === active) {
-        await this.stopSpeaking();
+        this.reportEvent(VoiceoverEventKind.PLAYBACK_FINISHED, active);
+        await this.stopSpeaking(VoiceoverStopReason.COMPLETED);
       }
     } catch {
       if (this.active === active) {
-        await this.stopSpeaking();
+        await this.stopSpeaking(VoiceoverStopReason.FAILED);
         this.dependencies.reportFailure('playback');
         if (!this.hasActiveUtterance()) {
           this.dependencies.showStatus({ state: VoiceoverState.UNAVAILABLE });

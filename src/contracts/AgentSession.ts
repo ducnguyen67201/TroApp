@@ -1,4 +1,5 @@
 import { StudentActivitySchema } from './StudentActivity.js';
+import { TeachingContextSchema } from './Classroom.js';
 import { z } from 'zod';
 import { DesktopLocaleSchema } from './DesktopLocale.js';
 import { AgentTaskMode, AgentTaskModeSchema, TeachingResultSchema } from './CursorCompanion.js';
@@ -69,6 +70,7 @@ export const AgentWorkerCommandSchema = z.discriminatedUnion('kind', [
     message: z.string().min(1),
     locale: DesktopLocaleSchema,
     mode: AgentTaskModeSchema.default(AgentTaskMode.EXECUTE),
+    classroomContext: TeachingContextSchema.optional(),
   }),
   z.strictObject({
     kind: z.literal('answer'),

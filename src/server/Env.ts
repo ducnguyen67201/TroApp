@@ -1,3 +1,4 @@
+import { defaultMaterialGenerationPolicy } from './features/materials/application/MaterialGeneration.js';
 import { createEnv } from '@t3-oss/env-core';
 import { z } from 'zod';
 import { AppEnvironment, AppEnvironmentSchema } from '#contracts/AppEnvironment.js';
@@ -12,6 +13,18 @@ export interface ServerEnv {
   GOOGLE_CLIENT_ID?: string | undefined;
   GOOGLE_CLIENT_SECRET?: string | undefined;
   OPENAI_API_KEY?: string | undefined;
+  PRACTICE_CHECK_MODEL?: string;
+  PRACTICE_CHECK_DAILY_LIMIT?: number;
+  PRACTICE_CHECK_MINUTE_LIMIT?: number;
+  MATERIAL_JOB_CALLS: number;
+  MODEL_CONTEXT_TOKENS: number;
+  MATERIAL_JOB_INPUT_TOKENS: number;
+  MATERIAL_JOB_OUTPUT_TOKENS: number;
+  MATERIAL_STAGE_INPUT_TOKENS: number;
+  MATERIAL_STAGE_OUTPUT_TOKENS: number;
+  MATERIAL_COMPOSITION_OUTPUT_TOKENS: number;
+  MATERIAL_COMPOSITION_TIMEOUT_MS: number;
+  MATERIAL_JOB_DEADLINE_MS: number;
   ELEVENLABS_API_KEY?: string | undefined;
   ELEVENLABS_MODEL_ID: string;
   VOICEOVER_DAILY_CHARACTERS: number;
@@ -32,6 +45,43 @@ export function readServerEnv(environment: NodeJS.ProcessEnv): ServerEnv {
       GOOGLE_CLIENT_ID: z.string().min(1).optional(),
       GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
       OPENAI_API_KEY: z.string().min(20).optional(),
+      PRACTICE_CHECK_MODEL: z.string().min(1).max(100).default('gpt-5.4'),
+      PRACTICE_CHECK_DAILY_LIMIT: z.coerce.number().int().min(1).max(100).default(30),
+      PRACTICE_CHECK_MINUTE_LIMIT: z.coerce.number().int().min(1).max(10).default(5),
+      MATERIAL_JOB_CALLS: z.coerce.number().int().min(1).max(100).default(24),
+      MODEL_CONTEXT_TOKENS: z.coerce.number().int().min(8192).max(1000000).default(100000),
+      MATERIAL_JOB_INPUT_TOKENS: z.coerce.number().int().positive().max(1000000).default(150000),
+      MATERIAL_JOB_OUTPUT_TOKENS: z.coerce
+        .number()
+        .int()
+        .positive()
+        .max(200000)
+        .default(defaultMaterialGenerationPolicy.outputTokens),
+      MATERIAL_STAGE_INPUT_TOKENS: z.coerce
+        .number()
+        .int()
+        .positive()
+        .max(100000)
+        .default(defaultMaterialGenerationPolicy.stageInputTokens),
+      MATERIAL_STAGE_OUTPUT_TOKENS: z.coerce
+        .number()
+        .int()
+        .min(1000)
+        .max(8000)
+        .default(defaultMaterialGenerationPolicy.stageOutputTokens),
+      MATERIAL_COMPOSITION_OUTPUT_TOKENS: z.coerce
+        .number()
+        .int()
+        .min(2000)
+        .max(100000)
+        .default(defaultMaterialGenerationPolicy.compositionOutputTokens),
+      MATERIAL_COMPOSITION_TIMEOUT_MS: z.coerce
+        .number()
+        .int()
+        .min(90000)
+        .max(540000)
+        .default(defaultMaterialGenerationPolicy.compositionTimeoutMs),
+      MATERIAL_JOB_DEADLINE_MS: z.coerce.number().int().positive().max(540000).default(540000),
       ELEVENLABS_API_KEY: z.string().min(1).optional(),
       ELEVENLABS_MODEL_ID: z.enum(['eleven_flash_v2_5', 'eleven_v3']).default('eleven_flash_v2_5'),
       VOICEOVER_DAILY_CHARACTERS: z.coerce.number().int().positive().max(1000000).default(30000),

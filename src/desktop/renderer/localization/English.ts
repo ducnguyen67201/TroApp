@@ -1,5 +1,38 @@
+import { DesktopLocale } from '#contracts/DesktopLocale.js';
+import { readClassroomMessages } from '../../localization/ClassroomMessages.js';
+
 /** Canonical desktop copy. Other catalogs must implement every key and parameter. */
 export const english = {
+  ...readClassroomMessages(DesktopLocale.ENGLISH),
+  switchAccount: 'Switch account',
+  savedAccounts: 'Accounts on this device',
+  currentAccount: 'Current',
+  addAccount: 'Add account',
+  signOutCurrentAccount: 'Sign out of this account',
+  accountTeacher: 'Teacher',
+  accountStudent: 'Student',
+  accountRoleUnknown: 'Account',
+  accountExpired: 'Sign in again',
+  accountSignInHeading: 'Add an account',
+  accountSignInDescription:
+    'Sign in with another Google account. Your current account stays signed in on this device.',
+  accountContinueGoogle: 'Continue with Google',
+  accountWaitingGoogle: 'Finish signing in in your browser.',
+  accountCancelSignIn: 'Cancel sign-in',
+  accountCancel: 'Cancel',
+  accountCloseMenu: 'Close account menu',
+  accountSwitching: 'Switching account…',
+  accountChoose: 'Choose a saved account',
+  accountStorageHint: 'Saved sessions stay encrypted on this device.',
+  errorSavedAccounts: 'Could not load saved accounts. Try again.',
+  errorSwitchAccount: 'Could not switch accounts. Try again.',
+  errorAccountExpired: 'This session expired. Add the account again with Google.',
+  errorAccountStorage:
+    'Secure account storage is unavailable. Check access to your system keychain and restart Tro.',
+  errorAccountLimit:
+    'You can save up to 10 accounts. Sign out of an account before adding another.',
+  errorAccountBusy:
+    'Finish the current task, upload, or microphone test before switching accounts.',
   voiceover: 'Read guidance aloud',
   voiceoverDescription: 'Read HUD guidance in your selected language using cloud speech.',
   voiceoverUnavailable: 'Speech is unavailable. Visual guidance will continue.',
@@ -95,7 +128,6 @@ export const english = {
   ownWorkspace: 'Your own little workspace',
   signInInvitation: 'Sign in to make it yours.',
   signIn: 'Sign in',
-  yourDesktop: 'YOUR DESKTOP',
   attention: 'Something needs attention',
   settingsGeneral: 'General',
   settingsNavigation: 'Settings categories',
@@ -147,6 +179,8 @@ export const english = {
     'Tro may view your screen and use your mouse or keyboard. Screen observations sent to OpenAI leave your computer. Each message is a fresh task; this display clears when you close the app.',
   errorCheckSignIn: 'Could not check sign-in. Please try signing in again.',
   errorSignInTimeout: 'Google sign-in did not finish. Please try again.',
+  errorSignInCallback:
+    'Tro could not receive the sign-in callback. Close other Tro apps and restart this desktop launcher, then try again.',
   errorOpenGoogle: 'Could not open Google sign-in.',
   errorClearTask: 'Could not clear the task. Please try again.',
   errorStartTask: 'Could not start a task. Please try again.',

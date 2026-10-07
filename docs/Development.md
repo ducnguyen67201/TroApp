@@ -29,6 +29,9 @@ processes.
 
 The API binds to `127.0.0.1:3000` locally. PostgreSQL binds to `127.0.0.1:54329`. The desktop main process calls the API; the React renderer has no generic network or database bridge. Development reload is handled by electron-vite and Node's watch mode with tsx.
 
+For startup memory/process measurements, package-size findings and how to compare
+development with a built desktop, see [Startup performance](StartupPerformance.md).
+
 The selected `tro-api` config needs `DATABASE_URL` and a unique `AUTH_SECRET` (`openssl rand -base64 32`). Chat also needs a backend-only `OPENAI_API_KEY`. Google sign-in needs `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` on the API only. Create a Google OAuth **Web application** client with authorized redirect URI `http://127.0.0.1:3000/api/auth/callback/google` (match `AUTH_BASE_URL` exactly). Save the generated secret in Doppler before running. Optional `APP_ENV=dev|stage|prod` selects the backend application mode; it defaults to `dev`.
 
 Pino emits debug records only in `dev`, while operational info and errors remain available in all modes. The API defaults to the local host and port, and the desktop defaults to the local API. `ELECTRON_RENDERER_URL` is supplied by electron-vite during development; you do not set it yourself.
@@ -118,6 +121,15 @@ Screen bytes and capture IDs stay out of logs. Native guidance reasons such as
 `target_invalidated`, `invalid_request` and `render_timeout` appear as recognized
 `reasonCode` values in `cua.response`.
 
+## Classroom pilot
+
+The initial classroom flow uses the existing individual Google accounts and Scratch
+project-link hand-ins. Accounts default to Student. A backend operator grants Teacher
+once by verified email: `doppler run -- pnpm account:role teacher@example.com teacher`.
+Use `student` to revoke teacher access. No teacher-ID environment list is used. Apply the reviewed classroom migration through normal startup. See
+[ClassroomImplementation.md](classroom/ClassroomImplementation.md) for the teacher
+and student walkthrough, update handling and deferred file/CMS integrations.
+
 ## Doppler configuration
 
 The Featherlane AI Doppler workplace has two Tro projects: `tro-local` and `tro-api`. `tro-local` owns public Electron settings; `tro-api` owns backend and Prisma settings. Each project has `dev`, `stg`, and `prd` root configs.
@@ -185,9 +197,31 @@ The main build leaves `ws`'s optional `bufferutil` and `utf-8-validate` requires
 
 ## Desktop packaging
 
-On macOS, `pnpm dev:desktop` and `pnpm start:desktop` launch a checkout-owned `.tro-development/Tro.app` with Tro's icon and display name. `scripts/PrepareDesktopDevelopmentHost.ts` copies the pinned Electron runtime, applies the committed icon and microphone purpose, and signs only that local copy ad hoc. The dependency in `node_modules` remains intact. The host is reused until its Electron version, artwork or purpose changes; quit Tro before rebuilding it. `pnpm exec tsx scripts/StartDesktop.ts --prepare-only` prepares the host without launching the app or requesting permissions.
+On macOS, `pnpm dev:desktop` and `pnpm start:desktop` launch a checkout-owned `.tro-development/Tro.app` with Tro's icon and display name. `scripts/PrepareDesktopDevelopmentHost.ts` copies the pinned Electron runtime, applies the committed icon and microphone purpose, and signs only that local copy ad hoc. The dependency in `node_modules` remains intact. The host is reused until its Electron version, artwork, purpose, checkout location or bootstrap changes. The launcher refuses to replace a running host; quit Tro before rebuilding it. `pnpm exec tsx scripts/StartDesktop.ts --prepare-only` prepares the host without launching the app or requesting permissions.
 
-The development bundle ID is `app.tro.desktop.development`; installed Tro remains `app.tro.desktop`. macOS grants are separate, and the first branded development launch needs its own grants. Direct `electron-vite` launches still use Electron's identity. No existing Settings entries or grants are removed. The native host receives the matching identity so permission checks remain tied to the actual app. The packaged ICNS supplies the icon in Finder and macOS permission dialogs; runtime Dock changes alone do not change the OS permission identity.
+Each checkout has a stable development bundle ID, `app.tro.desktop.development.<checkout-hash>`; installed Tro remains `app.tro.desktop`. The hash derives from the resolved checkout path so older worktrees cannot be mistaken for the current development app. macOS grants are separate, and the first branded development launch needs its own grants. Direct `electron-vite` launches still use Electron's identity. No existing Settings entries or grants are removed. The native host receives the matching identity so permission checks remain tied to the actual app. The packaged ICNS supplies the icon in Finder and macOS permission dialogs; runtime Dock changes alone do not change the OS permission identity.
+
+The development bundle declares the `app.tro.desktop` URL scheme in `Info.plist`.
+The launcher registers this bundle with LaunchServices before starting electron-vite.
+`Resources/app/StartDevelopmentHost.js` also points macOS launches without a project
+argument to that checkout's `out/main/Main.js`; otherwise Electron displays its
+welcome screen. This bootstrap retains the `tro` user-data directory, preserving
+saved accounts and device settings. It buffers early URL events until the main
+module installs the Better Auth handler; it never logs callback URLs or tokens.
+The generated host configuration contains only the checkout path and public app name.
+
+Before opening Google, main reasserts the protocol handler and checks that macOS
+resolves it to the running bundle. If another Tro app owns it, sign-in stops with a
+translated restart message. Keep the same app instance open throughout OAuth: the
+pending proof-key verifier lives in its memory. A new instance cannot recover an
+in-flight login from a previous process.
+
+For a development callback smoke test, close old Tro/Electron welcome windows,
+stop and restart `pnpm dev:desktop`, then sign in again. Google should return to the
+same Tro window. Adding a second Google account should use that same window too.
+Repeat after running from another checkout to check handler ownership. First use
+of the new checkout identity may require fresh macOS desktop/microphone grants;
+existing grants are preserved. Test packaged macOS and Windows dispatch separately.
 
 Set `MAIN_VITE_API_BASE_URL` to the public HTTPS backend URL before building, then run `pnpm package:desktop` on the target operating system. This is the only desktop API URL setting; Vite embeds it in the build, so changing it requires a new build. The desktop defaults to `dev` during development and `prod` when packaged; set public `MAIN_VITE_APP_ENV=stage` for a staging build. This command does not publish artifacts. Windows and macOS signing, macOS notarization, installer smoke tests, and updater configuration remain release work. Desktop builds contain public settings, never database credentials or shared provider keys.
 
@@ -219,3 +253,9 @@ Move the pointer without clicking: this must not advance the lesson. Press Esc w
 while waiting: no later cue or instruction may appear. An unchanged screen remains in local waiting without another model request;
 there is no sixty-second lesson timeout. This live check uses
 model requests and is separate from synthetic unit/integration validation.
+
+### Practice-check pilot
+
+Apply the additive classroom practice migration with `pnpm db:deploy` before restarting the API. The evaluator uses backend `OPENAI_API_KEY`; without it, check requests return unavailable while existing classes remain usable. Optional validated settings are `PRACTICE_CHECK_MODEL` (default `gpt-5.4`), `PRACTICE_CHECK_DAILY_LIMIT` (30, max 100) and `PRACTICE_CHECK_MINUTE_LIMIT` (5, max 10). A teacher must enable a checkpoint and publish materials, then enter Practice before students can check or hand in. Students can paste work/code and preview bounded image/text evidence; they explicitly send it to the checker. No code is executed. Evidence and hand-ins are private database snapshots in this pilot. Teacher status exposes findings and saved evidence; targeted help prefills Show me and requires the student to send the request. See [the engineering spec](classroom/PracticeCheckEngineeringSpec.md) for one-machine testing steps and storage limits.
+
+Student practice shortcut: **Cmd/Ctrl + Shift + Enter** opens a review for the current joined Practice activity. Add text/code or an image/file, review it, then choose Check my work. The HUD shows Checking work / Feedback ready and Submitting / Hand-in saved. Final hand-in requires confirmation. The shortcut does not capture an open app. If another app reserves the global chord, use it while Tro is focused or click Review work. Rebuild the updated native HUD with `pnpm build:cua`.

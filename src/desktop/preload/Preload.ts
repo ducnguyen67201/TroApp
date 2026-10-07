@@ -1,5 +1,19 @@
 import { petOverlayBridge } from './PetPreload.js';
 import { PetCommandSchema, PetReplySchema, PetSnapshotSchema, PetFailure } from '#contracts/Pet.js';
+import { PracticeShortcutEventSchema } from '#contracts/PracticeShortcut.js';
+import {
+  PracticeCommandSchema,
+  PracticeReplySchema,
+  PracticeFailure,
+} from '#contracts/PracticeCheck.js';
+import {
+  AccountCommandKind,
+  AccountCommandSchema,
+  AccountReplySchema,
+  type AccountCommand,
+  type AccountReply,
+} from '#contracts/DesktopAccounts.js';
+import { MaterialCommandSchema, MaterialReplySchema } from '#contracts/ClassroomMaterials.js';
 import {
   VoiceoverPlaybackSchema,
   VoiceoverStatusSchema,
@@ -11,6 +25,11 @@ import {
   MicrophoneTestEventSchema,
   MicrophoneTestReplySchema,
 } from '#contracts/MicrophoneTest.js';
+import {
+  ClassroomCommandSchema,
+  ClassroomReplySchema,
+  ClassroomFailure,
+} from '#contracts/Classroom.js';
 import { AgentProgressSchema, VoiceMeterSchema, type VoiceMeter } from '#contracts/CompanionHud.js';
 import {
   VoiceCommandSchema,
@@ -82,6 +101,22 @@ const bridge: DesktopBridge = {
       ipcRenderer.removeListener('tro:pet-snapshot', receive);
     };
   },
+  async controlClassMaterials(command) {
+    try {
+      return MaterialReplySchema.parse(
+        await ipcRenderer.invoke('tro:class-materials', MaterialCommandSchema.parse(command)),
+      );
+    } catch {
+      return { kind: 'failed', code: 'unavailable' };
+    }
+  },
+  async downloadClassMaterial(classId, materialId) {
+    const result: unknown = await ipcRenderer.invoke(
+      'tro:class-material-download',
+      MaterialCommandSchema.parse({ kind: 'download', classId, materialId }),
+    );
+    return result === true;
+  },
   subscribeVoiceover(listener) {
     const receive = (_event: Electron.IpcRendererEvent, raw: unknown): void => {
       const status = VoiceoverStatusSchema.safeParse(raw);
@@ -114,6 +149,47 @@ const bridge: DesktopBridge = {
   },
   async cancelGuidance() {
     await ipcRenderer.invoke('tro:cancel-guidance');
+  },
+  async readPracticeShortcutAvailable() {
+    const available: unknown = await ipcRenderer.invoke('tro:practice-shortcut-available');
+    return available === true;
+  },
+  subscribePracticeShortcut(listener) {
+    const receive = (_event: Electron.IpcRendererEvent, raw: unknown): void => {
+      const event = PracticeShortcutEventSchema.safeParse(raw);
+      if (event.success) {
+        listener(event.data);
+      }
+    };
+    ipcRenderer.on('tro:practice-shortcut', receive);
+    return () => {
+      ipcRenderer.removeListener('tro:practice-shortcut', receive);
+    };
+  },
+  async controlPractice(command) {
+    try {
+      return PracticeReplySchema.parse(
+        await ipcRenderer.invoke('tro:practice-check', PracticeCommandSchema.parse(command)),
+      );
+    } catch {
+      return { kind: 'failed', code: PracticeFailure.UNAVAILABLE };
+    }
+  },
+  async controlClassroom(command) {
+    try {
+      return ClassroomReplySchema.parse(
+        await ipcRenderer.invoke('tro:classroom-command', ClassroomCommandSchema.parse(command)),
+      );
+    } catch {
+      return { kind: 'failed', code: ClassroomFailure.UNAVAILABLE };
+    }
+  },
+  async readPreparedClassroomSubmission() {
+    try {
+      return ClassroomReplySchema.parse(await ipcRenderer.invoke('tro:classroom-preparation'));
+    } catch {
+      return { kind: 'failed', code: ClassroomFailure.UNAVAILABLE };
+    }
   },
   subscribeAgentProgress(listener) {
     const receive = (_event: Electron.IpcRendererEvent, raw: unknown): void => {
@@ -205,6 +281,10 @@ const bridge: DesktopBridge = {
       ipcRenderer.removeListener('tro:voice-event', receiveEvent);
     };
   },
+  readSavedAccounts: () => requestAccountCommand({ kind: AccountCommandKind.LIST }),
+  addGoogleAccount: () => requestAccountAuth({ kind: AccountCommandKind.ADD_GOOGLE }),
+  switchAccount: (accountId) => requestAccountAuth({ kind: AccountCommandKind.SWITCH, accountId }),
+  cancelAccountSignIn: () => requestAccountAuth({ kind: AccountCommandKind.CANCEL_ADD }),
   async readAuthSession(): Promise<AuthResult> {
     try {
       return AuthResultSchema.parse(
@@ -322,6 +402,23 @@ const bridge: DesktopBridge = {
     }
   },
 };
+
+async function requestAccountCommand(command: AccountCommand): Promise<AccountReply> {
+  try {
+    return AccountReplySchema.parse(
+      await ipcRenderer.invoke('tro:account-command', AccountCommandSchema.parse(command)),
+    );
+  } catch {
+    return { kind: 'failed', message: 'Could not update saved accounts.' };
+  }
+}
+
+async function requestAccountAuth(command: AccountCommand): Promise<AuthResult> {
+  const result = await requestAccountCommand(command);
+  return result.kind === 'accounts'
+    ? { kind: 'failed', message: 'Could not update saved accounts.' }
+    : result;
+}
 
 async function requestAppUpdate(
   kind: (typeof AppUpdateCommand)[keyof typeof AppUpdateCommand],

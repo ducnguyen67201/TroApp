@@ -1,9 +1,11 @@
+import { readClassroomMessages } from '../localization/ClassroomMessages.js';
 import type { VoiceoverController } from './voiceover/VoiceoverController.js';
 import type { TeachingMessage } from '#contracts/TeachingStep.js';
 import { AgentTaskMode, GuidanceReason, TeachingOutcome } from '#contracts/CursorCompanion.js';
 import { AgentProgressPhase, type AgentProgress } from '#contracts/CompanionHud.js';
 import { randomUUID } from 'node:crypto';
 import type { AgentResult } from '#contracts/AgentSession.js';
+import type { ClassroomTaskContext } from './classroom/ClassroomSessionController.js';
 import type { DesktopLocale } from '#contracts/DesktopLocale.js';
 import type { AuthResult } from '#contracts/AuthSession.js';
 import { DesktopPermissionState } from '#contracts/DesktopPermissions.js';
@@ -126,6 +128,7 @@ export class AgentChatController {
   private companionRequested = false;
   private authChangeInProgress = false;
   private companionStartup: Promise<AgentResult> | null = null;
+  private classroomTask = false;
 
   constructor(
     private readonly auth: AgentChatAuth,
@@ -134,7 +137,14 @@ export class AgentChatController {
     private readonly permissions: AgentChatPermissions,
     private readonly cancelShortcut?: AgentCancelShortcut,
     private readonly voiceover?: VoiceoverController,
+    private readonly classroom?: ClassroomTaskContext,
   ) {}
+
+  cancelClassroomTask(): void {
+    if (this.classroomTask && this.pendingSessionId) {
+      void this.stopSession(this.pendingSessionId).catch(() => {});
+    }
+  }
 
   isBusy(): boolean {
     return this.turnInProgress && this.waitingLessonId === null;
@@ -144,27 +154,23 @@ export class AgentChatController {
     return this.auth.readSession();
   }
 
-  async signInWithGoogle(): Promise<AuthResult> {
-    this.voiceover?.clearTask();
-    this.authChangeInProgress = true;
-    this.companionRequested = false;
-    this.taskGeneration += 1;
-    try {
-      await this.stopWorker();
-      return await this.auth.signInWithGoogle();
-    } finally {
-      this.authChangeInProgress = false;
-    }
+  signInWithGoogle(): Promise<AuthResult> {
+    return this.changeAccount(() => this.auth.signInWithGoogle());
   }
 
-  async signOut(): Promise<AuthResult> {
+  signOut(): Promise<AuthResult> {
+    return this.changeAccount(() => this.auth.signOut());
+  }
+
+  /** Tear down credentials and task presentation before changing the active identity. */
+  async changeAccount(action: () => Promise<AuthResult>): Promise<AuthResult> {
     this.voiceover?.clearTask();
     this.authChangeInProgress = true;
     this.companionRequested = false;
     this.taskGeneration += 1;
     try {
       await this.stopWorker();
-      return await this.auth.signOut();
+      return await action();
     } finally {
       this.authChangeInProgress = false;
     }
@@ -262,6 +268,18 @@ export class AgentChatController {
       }
       if (accessFailure) return accessFailure;
 
+      const classroomContext = await this.classroom?.readTeachingContext(message);
+      this.classroomTask = Boolean(classroomContext);
+      if (classroomContext && mode !== AgentTaskMode.TEACH) {
+        return {
+          kind: 'failed',
+          message: readClassroomMessages(locale).errorClassroomTeachMode,
+        };
+      }
+      if (generation !== this.taskGeneration) {
+        return readInterruptedResult();
+      }
+
       if (
         this.activeSessionId !== sessionId ||
         !this.worker.isRunning() ||
@@ -287,7 +305,16 @@ export class AgentChatController {
       if (mode === AgentTaskMode.TEACH) {
         this.startCredentialRenewal();
       }
-      const result = await this.worker.sendMessage(sessionId, message, locale, mode);
+      const result = classroomContext
+        ? await this.worker.sendMessage(sessionId, message, locale, mode, classroomContext)
+        : await this.worker.sendMessage(sessionId, message, locale, mode);
+      if (classroomContext && !this.classroom?.isContextCurrent(classroomContext)) {
+        this.voiceover?.clearTask();
+        return {
+          kind: 'failed',
+          message: readClassroomMessages(locale).errorClassroomContextChanged,
+        };
+      }
       if (
         result.kind === 'failed' ||
         result.kind === 'stopped' ||
@@ -306,6 +333,7 @@ export class AgentChatController {
       }
       return { kind: 'failed', message: 'Could not complete this task. Try again.' };
     } finally {
+      this.classroomTask = false;
       if (this.credentialTimer) {
         clearInterval(this.credentialTimer);
         this.credentialTimer = null;

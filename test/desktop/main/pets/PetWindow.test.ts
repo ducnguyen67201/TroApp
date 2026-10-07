@@ -199,4 +199,23 @@ describe('pet desktop adapter', () => {
     expect(doubles.destroyed).toBe(true);
     window.dispose();
   });
+
+  it('records geometry for a rejected drag without starting a drag timer', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const window = createWindow();
+    window.showPet(snapshot);
+    await Promise.resolve();
+    doubles.pointer = { x: doubles.bounds.x, y: doubles.bounds.y };
+    window.receiveInteraction({ kind: PetOverlayAction.START_DRAG });
+    expect(warning).toHaveBeenCalledWith('pet.interaction.rejected', {
+      stage: 'start-drag',
+      reason: 'outside-hit-region',
+      offsetX: 0,
+      offsetY: 0,
+      hitRadius: 48,
+    });
+    expect(vi.getTimerCount()).toBe(0);
+    window.dispose();
+    warning.mockRestore();
+  });
 });

@@ -1,10 +1,10 @@
 # Desktop UI
 
-Tro uses Mantine in Electron's React renderer. The sidebar opens Workspace and a compact Settings dialog. The sidebar shows the current Google account and sign-out control. The existing preload bridge remains the only route to authentication and agent tasks.
+Tro uses Mantine in Electron's React renderer. The sidebar opens Workspace, Classroom and a compact Settings dialog. Signed-in users open the microphone picker from the sidebar above Settings. The sidebar shows the current Google account and sign-out control. The existing preload bridge remains the only route to authentication and agent tasks.
 
 The desktop opens at 1360 × 860 logical pixels, close to a 16:10 ratio. These defaults live in `src/desktop/main/Main.ts`. The window remains freely resizable down to 680 × 520.
 
-The 52-pixel top bar shares the sidebar's warm background, with no separate gray title strip or centered window title. Electron keeps native window controls: inset traffic lights on macOS and a matching controls overlay on Windows/Linux. The empty top bar is draggable; the workspace and dialogs remain outside that region. `src/desktop/DesktopAppearance.ts` shares the native background color and bar height with the renderer so controls and content stay aligned.
+The 52-pixel top bar shares the sidebar background, with no separate gray title strip or centered window title. Electron keeps native window controls: inset traffic lights on macOS and a matching controls overlay on Windows/Linux. The empty top bar is draggable; the workspace and dialogs remain outside that region. `src/desktop/DesktopAppearance.ts` shares the native background color and bar height with the renderer so controls and content stay aligned.
 
 ## Styling in one place
 
@@ -62,3 +62,72 @@ The packages are already included in `package.json`: `@mantine/core`, matching `
 Renderer tests use a typed fake preload bridge and require no Google account, model calls, or database. They cover the sidebar account, dialog and tab navigation preserving the mounted workspace and conversation/draft/task state, nested microphone dismissal and current selection summaries, successful sign-out clearing local state, disabled sign-out during a task, authentication failures, default/saved locales, switching without clearing content, inaccessible storage, and localized errors. Follow the repository's final validation commands after completing edits.
 
 References: [Mantine with Vite](https://mantine.dev/guides/vite/), [Mantine theme](https://mantine.dev/theming/theme-object/), [AppShell](https://mantine.dev/core/app-shell/).
+
+## Content space
+
+The main panel begins directly with page content. It has no separate page-name or
+“Your desktop” header strip; the active sidebar item identifies the current page.
+Microphone selection is a sidebar action using the same dialog stack and focus
+return behavior as the former header button. The native draggable title bar and
+window controls remain in their existing position.
+
+## Classroom experience
+
+The signed-in sidebar is a compact 96px charcoal rail with labeled actions, an
+account avatar and the actual Teacher/Student role. Microphone, Settings, updates
+and sign-out keep their existing controllers. Signed-out screens retain the wider
+sidebar. Classroom uses a white canvas with pastel details and original decorative
+inline artwork from the approved
+[prototype](classroom/ClassroomExperienceDemo.html).
+
+Class cards select local details; selecting a student card does not join a session.
+The student explicitly joins using the existing command. Sections, original
+materials, project links and submission confirmation use the existing data and
+bridges. The teacher view puts owned classes and sections beside session controls,
+with a Create class button beside the class-list tabs, a class-name dialog, expandable invite
+forms and the existing full-width materials editor.
+Class cards now open a dedicated `#/classroom/<classId>` page inside Tro. Overview,
+Materials and Settings share the right-hand illustration. Back to All classes and
+browser Back/Forward use renderer hash navigation, compatible with Electron's
+installed file entry point. Routes select only classes present in the authorized
+home snapshot; a deleted or inaccessible class returns to the class list.
+Settings contains direct enrollment by an existing verified account's email,
+optional shared invitation codes and class deletion. Adding by email uses the
+existing backend enrollment command; it neither sends an email nor joins a session.
+The class page puts the Back control, class name and Refresh on one row, with
+24 px top padding and tighter tabs. Create class remains on the class list.
+The class-list title, search and refresh share a compact toolbar. Materials use a
+short preparation heading rather than repeating the page introduction, keeping
+upload and review panels visible higher on the screen. Narrow windows wrap the
+toolbar controls without squeezing their labels. Material preparation shows a
+spinner and a live status in the review panel from the Prepare click through queued
+and running work; success or failure replaces that loading state.
+There is no demo role switch, sample class, fabricated duration or completion score
+in the production interface. Class search is local to already-authorized data.
+
+`classroom/ClassArtwork.tsx` owns decorative SVG art; `StudentClassroomPanel.tsx`
+owns student browsing, `StudentMaterials.tsx` presents authorized downloads, and
+`StudentActivityPanel.tsx` retains project/progress/submission actions.
+`TeacherClassroomPanel.tsx` retains teacher commands. `ClassroomPage.tsx` keeps
+its existing command dispatcher and polling. Theme tokens and responsive CSS
+control the design. No backend contracts, persistence or authorization changed
+for this visual update.
+
+Teacher session controls separate the current section, student pacing and session stages.
+Each stage has a short explanation and the saved stage is marked as current. Selecting
+a different section or pacing shows a pending-change hint: the existing stage buttons
+apply those selections. Ending a session sits in a separate footer. This presentation
+uses the existing start/update/end commands and preserves their session versions.
+
+`desktop/localization/ClassroomMessages.ts` owns classroom task failure copy shared by
+Electron main and the renderer catalogs. Main selects the task locale without React
+hooks; the bridge error map retains the message key so visible errors also follow
+later UI language changes.
+
+## Account menu
+
+The signed-in sidebar avatar opens `accounts/AccountMenu.tsx`: saved identities,
+Google account addition and current-account sign-out. `UseComputerUse.ts` owns
+the selected renderer identity and clears local task state during transitions.
+Cookies stay in main and encrypted device storage; see
+[account switching](classroom/AccountSwitching.md) for lifecycle and verification.

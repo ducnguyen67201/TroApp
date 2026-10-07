@@ -26,6 +26,7 @@ function createHarness() {
     holdMessage: vi.fn<VoiceoverDependencies['holdMessage']>(),
     showStatus: vi.fn<VoiceoverDependencies['showStatus']>(),
     reportFailure: vi.fn<VoiceoverDependencies['reportFailure']>(),
+    reportEvent: vi.fn<NonNullable<VoiceoverDependencies['reportEvent']>>(),
   } satisfies VoiceoverDependencies;
   const progress = {
     kind: 'progress',
@@ -48,6 +49,122 @@ function createHarness() {
 }
 
 describe('HUD narration', () => {
+  it('retains completion narration through missing and older native frames until audio drains', async () => {
+    const { controller, dependencies, progress } = createHarness();
+    let finishAudio: ((accepted: boolean) => void) | undefined;
+    dependencies.sendPlayback.mockImplementation((command) =>
+      command.kind === 'end'
+        ? new Promise((resolve) => {
+            finishAudio = resolve;
+          })
+        : Promise.resolve(true),
+    );
+    const completion = {
+      ...progress,
+      teachingMessage: {
+        ...progress.teachingMessage,
+        sequence: 2,
+        kind: TeachingMessageKind.COMPLETION,
+        text: 'Xong rồi. Bạn có thể bắt đầu đặt câu hỏi.',
+      },
+    };
+    controller.receiveProgress(completion);
+    controller.receiveVisibleMessage(completion.teachingMessage);
+    try {
+      await vi.waitFor(() => {
+        expect(finishAudio).toBeTypeOf('function');
+      });
+      controller.receiveVisibleMessage(null);
+      controller.receiveVisibleMessage(null);
+      controller.receiveVisibleMessage(progress.teachingMessage);
+      expect(dependencies.fetchSpeech.mock.calls[0]?.[1].aborted).toBe(false);
+      expect(
+        dependencies.sendPlayback.mock.calls.some(([command]) => command.kind === 'stop'),
+      ).toBe(false);
+      expect(dependencies.holdMessage).toHaveBeenLastCalledWith(completion.teachingMessage);
+      expect(dependencies.reportEvent).toHaveBeenCalledOnce();
+      expect(dependencies.reportEvent).toHaveBeenLastCalledWith(
+        expect.objectContaining({ kind: 'completion_retained', messageSequence: 2 }),
+      );
+
+      finishAudio?.(true);
+      await vi.waitFor(() => {
+        expect(dependencies.reportEvent).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: 'playback_finished' }),
+        );
+        expect(dependencies.holdMessage).toHaveBeenLastCalledWith(null);
+      });
+      expect(dependencies.reportEvent).toHaveBeenLastCalledWith(
+        expect.objectContaining({ kind: 'stopped', reason: 'completed' }),
+      );
+      controller.receiveVisibleMessage(completion.teachingMessage);
+      expect(dependencies.fetchSpeech).toHaveBeenCalledOnce();
+    } finally {
+      controller.clearTask();
+    }
+  });
+
+  it.each(['stop', 'new task', 'new message'] as const)(
+    'still interrupts a retained completion for %s',
+    async (interruption) => {
+      const { controller, dependencies, progress } = createHarness();
+      dependencies.sendPlayback.mockImplementation((command) =>
+        command.kind === 'end' ? new Promise(() => {}) : Promise.resolve(true),
+      );
+      const completion = {
+        ...progress,
+        teachingMessage: { ...progress.teachingMessage, kind: TeachingMessageKind.COMPLETION },
+      };
+      controller.receiveProgress(completion);
+      controller.receiveVisibleMessage(completion.teachingMessage);
+      try {
+        await vi.waitFor(() => {
+          expect(dependencies.sendPlayback).toHaveBeenCalledWith(
+            expect.objectContaining({ kind: 'end' }),
+          );
+        });
+        controller.receiveVisibleMessage(null);
+        if (interruption === 'stop') {
+          await controller.stopSpeaking();
+        } else if (interruption === 'new task') {
+          controller.startTask(randomUUID());
+        } else {
+          controller.receiveVisibleMessage({ ...completion.teachingMessage, sequence: 2 });
+        }
+        expect(dependencies.fetchSpeech.mock.calls[0]?.[1].aborted).toBe(true);
+        expect(dependencies.sendPlayback).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: 'stop' }),
+        );
+        expect(dependencies.holdMessage).toHaveBeenLastCalledWith(null);
+      } finally {
+        controller.clearTask();
+      }
+    },
+  );
+
+  it('still cancels instruction narration when its native message disappears', async () => {
+    const { controller, dependencies, progress } = createHarness();
+    dependencies.sendPlayback.mockImplementation((command) =>
+      command.kind === 'end' ? new Promise(() => {}) : Promise.resolve(true),
+    );
+    controller.receiveProgress(progress);
+    controller.receiveVisibleMessage(progress.teachingMessage);
+    try {
+      await vi.waitFor(() => {
+        expect(dependencies.sendPlayback).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: 'end' }),
+        );
+      });
+      controller.receiveVisibleMessage(null);
+      expect(dependencies.fetchSpeech.mock.calls[0]?.[1].aborted).toBe(true);
+      expect(dependencies.reportEvent).toHaveBeenLastCalledWith(
+        expect.objectContaining({ kind: 'stopped', reason: 'message_hidden' }),
+      );
+    } finally {
+      controller.clearTask();
+    }
+  });
+
   it('waits for the matching visible message, preserves split PCM samples and reads duplicates once', async () => {
     const { controller, dependencies, progress } = createHarness();
     controller.receiveProgress(progress);

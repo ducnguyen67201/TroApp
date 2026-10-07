@@ -32,13 +32,15 @@ See [Development](docs/Development.md) for setup and database commands.
 
 Google sign-in needs backend-only `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` plus the redirect URI in [Development](docs/Development.md). Give the backend a unique `AUTH_SECRET`; development startup applies the authentication migration automatically. Chat also needs a backend-only `OPENAI_API_KEY`; the API can start without it.
 
-The desktop build includes a pinned Cua Driver release. The development launcher downloads and verifies that release once before starting Electron. On macOS, Tro checks Screen Recording and Accessibility after Google sign-in and guides you to enable Tro in System Settings before showing chat. Tro requests these permissions in its own main process and starts a private embedded Cua daemon only after both grants are verified. The standard macOS development launcher and installed builds display Tro; their permission grants remain separate. With the macOS companion installed, Tro starts a local pointer-following worker after permission setup without model credentials or requests. It stays connected while the signed-in window is open. Without the companion, Tro starts the worker on the first task and keeps it warm for 15 minutes after a completed task. Each message has fresh agent context; only the current app window displays its messages, and they disappear when it closes. Model calls and screenshots sent to OpenAI require network access and may incur charges. See [ComputerUseSpec.md](docs/agent/ComputerUseSpec.md) for details and validation limits.
+Click the sidebar avatar to add or switch saved Google accounts on this device. Each account keeps its own encrypted session; switching clears local task state while retaining other logins and the teacher's live class. See [account switching](docs/classroom/AccountSwitching.md) for engineering and a one-machine test flow.
+
+The desktop build includes a pinned Cua Driver release. The development launcher downloads and verifies that release once before starting Electron. On macOS, Tro checks Screen Recording and Accessibility after Google sign-in and guides you to enable Tro in System Settings before showing chat. Tro requests these permissions in its own main process and starts a private embedded Cua daemon only after both grants are verified. The standard macOS development launcher and installed builds display Tro; their permission grants remain separate. With the macOS companion installed, Tro starts a local pointer-following worker after permission setup without model credentials or requests. It stays connected while the signed-in window is open. Without the companion, Tro starts the worker on the first task and keeps it warm for 15 minutes after a completed task. Each message starts a fresh agent run; joined classroom tasks also receive their current authorized activity and saved progress. Only the current app window displays its messages, and they disappear when it closes. Model calls and screenshots sent to OpenAI require network access and may incur charges. See [ComputerUseSpec.md](docs/agent/ComputerUseSpec.md) for details and validation limits.
 
 A per-task harness gates desktop completion: task replies distinguish succeeded, partial, blocked and unverified results after the main agent explicitly requests a read-only verification agent. Current evidence from both agents is retained only in task memory. See [ComputerUseSpec.md](docs/agent/ComputerUseSpec.md) and [TaskCompletionSpec.md](docs/agent/TaskCompletionSpec.md) for details and validation limits.
 
 Voice input starts automatically after signing in: hold Command + Control on Mac or Control + Left Alt on Windows, speak, and release to send the final transcript to the agent. It uses GPT Live Transcribe through the authenticated backend and follows the existing English/Vietnamese language choice. The companion HUD shows voice capture and task progress; the workspace has no separate voice panel. If the global shortcut is unavailable, use typed messages until OS access is restored and you sign in again. Development startup applies the transcription migration automatically; hosted releases use the normal reviewed migration workflow. Backend defaults allow one capture at a time and 3,600 audio seconds per account per UTC day. See [VoiceInputSpec.md](docs/VoiceInputSpec.md) for implementation and live/packaged verification limits.
 
-Choose an input from **Microphone** in the app header or Settings. Auto-detect follows your computer settings; a specific choice is saved locally. Tro suggests recognized wired or built-in inputs using device-name hints, with explanations for wireless/virtual inputs. Use **Edit ranking** to save your preferred order, or **Compare microphones** to run a six-second local quiet/speech test for each input. Tests show levels, clipping and startup time without uploading or saving audio. Ranking never changes the selected route. Missing explicit choices never silently switch to another microphone. See [MicrophoneSelection.md](docs/MicrophoneSelection.md) for engineering details and hardware checks.
+Choose an input from **Microphone** in the sidebar or Settings. Auto-detect follows your computer settings; a specific choice is saved locally. Tro suggests recognized wired or built-in inputs using device-name hints, with explanations for wireless/virtual inputs. Use **Edit ranking** to save your preferred order, or **Compare microphones** to run a six-second local quiet/speech test for each input. Tests show levels, clipping and startup time without uploading or saving audio. Ranking never changes the selected route. Missing explicit choices never silently switch to another microphone. See [MicrophoneSelection.md](docs/MicrophoneSelection.md) for engineering details and hardware checks.
 
 HUD teaching bubbles can be read aloud through ElevenLabs in the selected English
 or Vietnamese language. **Read guidance aloud** and **Stop speaking** are in Settings.
@@ -46,7 +48,7 @@ Speech stops before microphone capture and leaves visual guidance usable if it
 fails. Set backend-only `ELEVENLABS_API_KEY` in Doppler. The locale-to-voice map lives
 in `src/server/features/voiceover/VoiceoverConfig.ts`; voiceover is unavailable
 without the key. Rebuild
-with `pnpm build:cua` for the `0.30.4-tro.15` native message reader. No live provider
+with `pnpm build:cua` for the `0.30.4-tro.16` native message reader. No live provider
 or signed playback acceptance has been completed. See the
 [voiceover engineering record](docs/companion/HudVoiceoverEngineering.md).
 
@@ -101,3 +103,31 @@ Tro's embedded driver endpoint, while the HUD transport survives task handoffs.
 See [CursorCompanionVoiceBarPlan.md](docs/companion/CursorCompanionVoiceBarPlan.md).
 
 Teaching orchestration checks: `pnpm test:teaching` (local scripted flow) and `pnpm test:teaching:native` (also verifies the real macOS capture boundary). See [TeachingFlowContract](docs/teaching/TeachingFlowContract.md) for coverage and manual acceptance.
+
+## Classroom pilot
+
+Teachers can delete an inactive class from its detail panel after confirmation.
+Student work and history are retained. Materials have a labeled Delete control;
+unused originals are removed, while approved lesson sources remain available to
+their existing revisions. See the classroom implementation notes for migration
+and retention behavior.
+
+Teachers can upload PDF/slides/Scratch/Python/text materials, prepare and edit their
+summary, sections and detailed notes, then approve them for student assistance. Originals
+remain available for authorized download. See [materials preparation](docs/classroom/MaterialPreparationEngineering.md)
+for supported formats and limits. Teachers enroll signed-in students and run teacher-paced or
+self-paced sessions. Students explicitly join, ask Tro for help with the current
+activity, save a working project link and confirm a Scratch-link submission.
+Stored account roles control teacher permissions. A backend operator can grant a
+teacher by verified email using `doppler run -- pnpm account:role teacher@example.com teacher`.
+Classroom appears in the sidebar with a Teacher/Student badge; teachers prepare
+lessons and issue invitation codes, while students enroll by code and join live sessions.
+See [classroom setup and implementation](docs/classroom/ClassroomImplementation.md)
+for the migration, walkthrough and current limits.
+
+Materials now prepare a compact brief per document and a class overview, retaining
+original sources for authorized retrieval. Student context uses token limits and
+question-based source selection. See [compact material context implementation](docs/classroom/MaterialContextImplementation.md)
+for the additive migration, backend budget settings, compatibility and manual checks.
+
+In a joined student Practice activity, **Cmd/Ctrl + Shift + Enter** opens the current work review. Check selected evidence there; hand-in requires separate confirmation. The native HUD shows checking and submission progress. A Review work button and an in-app shortcut fallback remain available.

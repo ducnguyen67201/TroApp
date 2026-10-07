@@ -3,7 +3,7 @@ import { petMessages } from './pets/PetMessages.js';
 import { Badge, Button, Modal, NativeSelect, Switch, Tabs, Text, Title } from '@mantine/core';
 import type { VoiceoverView } from './voiceover/UseVoiceover.js';
 import { VoiceoverState } from '#contracts/Voiceover.js';
-import { IconSettings, IconUser } from '@tabler/icons-react';
+import { IconPaw, IconSettings, IconUser } from '@tabler/icons-react';
 import { useId, type ReactElement, type ReactNode } from 'react';
 import { VoiceShortcut, type VoiceStatus } from '#contracts/VoiceInput.js';
 import type { AuthUser } from '#contracts/AuthSession.js';
@@ -109,6 +109,7 @@ export function SettingsDialog({
           root: 'settings-layout',
           list: 'settings-navigation',
           tab: 'settings-tab',
+          tabLabel: 'settings-tab-label',
           panel: 'settings-panel',
         }}
       >
@@ -119,7 +120,9 @@ export function SettingsDialog({
           >
             {messages.settingsGeneral}
           </Tabs.Tab>
-          <Tabs.Tab value={SettingsSection.PETS}>{petMessages[locale].pets}</Tabs.Tab>
+          <Tabs.Tab value={SettingsSection.PETS} leftSection={<IconPaw size={18} stroke={1.6} />}>
+            {petMessages[locale].pets}
+          </Tabs.Tab>
           <Tabs.Tab
             value={SettingsSection.ACCOUNT}
             leftSection={<IconUser size={18} stroke={1.6} />}
@@ -206,7 +209,7 @@ export function SettingsDialog({
                   }}
                 />
                 <Button
-                  variant="subtle"
+                  variant="default"
                   onClick={() => {
                     voiceover.stopSpeaking();
                   }}
