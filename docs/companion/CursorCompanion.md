@@ -31,6 +31,8 @@ The native implementation extends pinned Cua 0.30.4 in
 `driver-patches/CursorCompanion.patch`. Tro imports no sibling source and draws
 no desktop overlay. `CuaCompanionClient` owns transport lifecycle and renews
 Cua's lease; all pointer sampling, geometry, animation and rendering run natively.
+Host debug logs retain mode transitions, failed renewals and invalid acknowledgements;
+unchanged successful following renewals stay quiet.
 
 ## Using the local implementation
 
