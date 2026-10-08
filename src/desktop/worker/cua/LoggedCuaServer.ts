@@ -502,13 +502,18 @@ export class LoggedCuaServer extends MCPServerStdio {
   }
 
   private nextHostCall = 0;
+  private isCompanionFollowing = false;
 
   /** Trusted worker lifecycle operations; never advertised to the model. */
   async callHostTool(toolName: string, args: Record<string, unknown>): Promise<CallToolResult> {
     const hostCallId = 'host-' + String(++this.nextHostCall);
     const startedAt = performance.now();
     const isMetadataPoll = toolName === DesktopObservationTool.READ;
-    if (!isMetadataPoll) {
+    const isFollowingRenewal =
+      toolName === CursorCompanionTool.SET_MODE &&
+      args['mode'] === 'follow' &&
+      this.isCompanionFollowing;
+    if (!isMetadataPoll && !isFollowingRenewal) {
       this.log.debug(
         {
           toolName,
@@ -524,7 +529,21 @@ export class LoggedCuaServer extends MCPServerStdio {
     }
     try {
       const result = await super.callToolResult(toolName, args);
-      if (!isMetadataPoll || result.isError) {
+      const companionState =
+        toolName === CursorCompanionTool.SET_MODE
+          ? CursorCompanionStateSchema.safeParse(result.structuredContent)
+          : null;
+      if (companionState) {
+        this.isCompanionFollowing =
+          !result.isError && companionState.success && companionState.data.following;
+      }
+      /* Lease renewals carry no new state. Keep invalid acknowledgements and
+         native failures visible even when routine successful calls are quiet. */
+      const shouldLogResult =
+        (!isMetadataPoll && !isFollowingRenewal) ||
+        result.isError ||
+        (isFollowingRenewal && !this.isCompanionFollowing);
+      if (shouldLogResult) {
         const level = result.isError ? 'error' : 'debug';
         this.log[level](
           {
@@ -536,7 +555,7 @@ export class LoggedCuaServer extends MCPServerStdio {
           'cua.host.response',
         );
       }
-      if (!isMetadataPoll || result.isError) {
+      if (shouldLogResult) {
         logAgentExchange(this.log, {
           operation: 'native.host',
           context: { toolName, hostCallId },
@@ -547,6 +566,9 @@ export class LoggedCuaServer extends MCPServerStdio {
       }
       return result;
     } catch (error) {
+      if (toolName === CursorCompanionTool.SET_MODE) {
+        this.isCompanionFollowing = false;
+      }
       logAgentExchange(this.log, {
         operation: 'native.host',
         context: { toolName, hostCallId },

@@ -665,3 +665,62 @@ it('refuses an unobserved capture instead of bypassing the local target check', 
     native.mockRestore();
   }
 });
+
+it('keeps successful following renewals quiet while retaining transitions and failures', async () => {
+  const logs: string[] = [];
+  const following: CallToolResult = {
+    content: [{ type: 'text', text: 'following' }],
+    structuredContent: { status: 'following', following: true, active: false },
+  };
+  const native = vi.spyOn(MCPServerStdio.prototype, 'callToolResult').mockResolvedValue(following);
+  const server = new LoggedCuaServer(
+    { name: 'Following diagnostics', command: 'unused' },
+    pino({ level: 'debug' }, { write: (line: string) => logs.push(line) }),
+  );
+  const follow = { mode: 'follow', label: 'Tro' };
+  try {
+    await server.callHostTool(CursorCompanionTool.SET_MODE, follow);
+    expect(logs.join('')).toContain('cua.host.request');
+    expect(logs.join('')).toContain('cua.host.response');
+    logs.length = 0;
+    await server.callHostTool(CursorCompanionTool.SET_MODE, follow);
+    expect(logs).toEqual([]);
+
+    native.mockResolvedValue({ isError: true, content: [] });
+    await server.callHostTool(CursorCompanionTool.SET_MODE, follow);
+    expect(logs.join('')).toContain('"level":50');
+    expect(logs.join('')).toContain('cua.host.response');
+    logs.length = 0;
+    native.mockResolvedValue(following);
+    await server.callHostTool(CursorCompanionTool.SET_MODE, follow);
+    expect(logs.join('')).toContain('cua.host.request');
+
+    logs.length = 0;
+    native.mockResolvedValue({ content: [], structuredContent: { following: true } });
+    await server.callHostTool(CursorCompanionTool.SET_MODE, follow);
+    expect(logs.join('')).toContain('cua.host.response');
+
+    native.mockResolvedValue(following);
+    await server.callHostTool(CursorCompanionTool.SET_MODE, follow);
+    logs.length = 0;
+    native.mockRejectedValue(new Error('Disconnected'));
+    await expect(server.callHostTool(CursorCompanionTool.SET_MODE, follow)).rejects.toThrow(
+      'Disconnected',
+    );
+    expect(logs.join('')).toContain('cua.host.failed');
+
+    native.mockResolvedValue({
+      content: [],
+      structuredContent: { status: 'hidden', following: false, active: false },
+    });
+    logs.length = 0;
+    await server.callHostTool(CursorCompanionTool.SET_MODE, { mode: 'hidden' });
+    expect(logs.join('')).toContain('cua.host.request');
+    native.mockResolvedValue(following);
+    logs.length = 0;
+    await server.callHostTool(CursorCompanionTool.SET_MODE, follow);
+    expect(logs.join('')).toContain('cua.host.request');
+  } finally {
+    native.mockRestore();
+  }
+});
