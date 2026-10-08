@@ -20,6 +20,7 @@ import {
   SubmissionPreparationSchema,
   SubmissionReceiptSchema,
   ClassroomFailure,
+  ClassroomStatus,
   type CourseContent,
   type ClassMeeting,
   type Participation,
@@ -393,6 +394,17 @@ class PrismaClassroomStore implements ClassroomStore {
       leaseUntil: row.leaseUntil.toISOString(),
       left: row.left,
     });
+  }
+
+  async listJoinedParticipations(studentId: string) {
+    const rows = await this.client.classroomParticipation.findMany({
+      where: { studentId, left: false, meeting: { status: ClassroomStatus.LIVE } },
+      orderBy: { leaseUntil: 'desc' },
+      take: 100,
+    });
+    return rows.map((row) =>
+      ParticipationSchema.parse({ ...row, leaseUntil: row.leaseUntil.toISOString() }),
+    );
   }
 
   async readParticipation(id: string) {

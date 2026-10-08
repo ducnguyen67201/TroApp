@@ -138,36 +138,38 @@ export function ClassroomPage({
     setError(null);
     accept(reply);
     const current = contextRef.current;
-    if (current) {
-      const updated = await bridge({
-        kind: 'context',
-        participationId: current.participation.id,
-        deviceId: current.participation.deviceId,
-        activityId: current.activity.id,
-      });
-      if (currentGeneration !== generation.current) {
-        return;
+    const updated = await bridge(
+      current
+        ? {
+            kind: 'context',
+            participationId: current.participation.id,
+            deviceId: current.participation.deviceId,
+            activityId: current.activity.id,
+          }
+        : { kind: 'resume', deviceId: crypto.randomUUID() },
+    );
+    if (currentGeneration !== generation.current) {
+      return;
+    }
+    if (updated.kind === 'context') {
+      accept(updated);
+    } else if (updated.kind !== 'ok') {
+      if (
+        updated.kind === 'failed' &&
+        (updated.code === ClassroomFailure.FORBIDDEN ||
+          updated.code === ClassroomFailure.STALE ||
+          updated.code === ClassroomFailure.NOT_FOUND)
+      ) {
+        contextRef.current = null;
+        setContext(null);
+        setPreparation(null);
       }
-      if (updated.kind === 'context') {
-        accept(updated);
-      } else {
-        if (
-          updated.kind === 'failed' &&
-          (updated.code === ClassroomFailure.FORBIDDEN ||
-            updated.code === ClassroomFailure.STALE ||
-            updated.code === ClassroomFailure.NOT_FOUND)
-        ) {
-          contextRef.current = null;
-          setContext(null);
-          setPreparation(null);
-        }
-        setError(
-          t(
-            'Class connection needs attention. Rejoin to continue.',
-            'Kết nối lớp học cần kiểm tra. Hãy vào lại để tiếp tục.',
-          ),
-        );
-      }
+      setError(
+        t(
+          'Class connection needs attention. Rejoin to continue.',
+          'Kết nối lớp học cần kiểm tra. Hãy vào lại để tiếp tục.',
+        ),
+      );
     }
     const prepared = await window.tro.readPreparedClassroomSubmission?.();
     if (currentGeneration === generation.current) {

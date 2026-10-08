@@ -1824,3 +1824,48 @@ it('offers saved accounts after signing out of only the current account', async 
   expect(fixture.switchAccount).toHaveBeenCalledExactlyOnceWith(fixture.studentId);
   expect(fixture.bridge.signInWithGoogle).not.toHaveBeenCalled();
 });
+
+it('restores an existing classroom participation when the desktop opens', async () => {
+  const bridge = createDesktopBridge();
+  const context = createTeachingContext();
+  bridge.controlClassroom.mockImplementation((command) => {
+    if (command.kind === 'home') {
+      return Promise.resolve({
+        kind: 'home',
+        home: {
+          role: AccountRole.STUDENT,
+          courses: [],
+          classes: [
+            {
+              schoolClass: {
+                id: context.meeting.classId,
+                name: context.className,
+                teacherId: 'teacher',
+                courseRevisionId: context.courseRevisionId,
+              },
+              meetings: [context.meeting],
+            },
+          ],
+        },
+      });
+    }
+    if (command.kind === 'resume' || command.kind === 'context') {
+      return Promise.resolve({ kind: 'context', context });
+    }
+    return Promise.resolve({ kind: 'ok' });
+  });
+  window.tro = bridge;
+  renderDesktop();
+  await waitFor(() => {
+    expect(bridge.controlClassroom).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'resume' }),
+    );
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Classroom' }));
+  fireEvent.click(await screen.findByRole('button', { name: new RegExp(context.className) }));
+  expect(await screen.findByRole('button', { name: 'Leave session' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Join session' })).toBeNull();
+  expect(bridge.controlClassroom.mock.calls.some(([command]) => command.kind === 'join')).toBe(
+    false,
+  );
+});

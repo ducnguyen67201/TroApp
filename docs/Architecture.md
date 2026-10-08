@@ -87,7 +87,7 @@ preload. Adding or switching an account does not change backend roles.
 
 `AccountTransitionGate` excludes account changes from active task, voice,
 microphone-test and classroom/material operations. A switch verifies the target
-session before selection, releases old desktop participation and clears task,
+session before selection, detaches the old local classroom binding and clears task,
 capture and presentation state. The old account stays signed in and its teacher
 session remains stored. Sign-out revokes the selected account's session and removes
 its vault entry; other saved accounts remain. Late replies cannot restore an old
@@ -300,7 +300,12 @@ working resource and durable student progress. Joined classroom Do it for me
 requests are refused. Rejoining restores participation and work; device leases
 prevent another device from writing with old authority. Context/version checks
 fence late commands. Esc cancels guidance without leaving the class. Switching
-accounts leaves desktop participation without ending a teacher's live session.
+accounts or quitting disposes local task authority without leaving the classroom.
+The desktop restores the signed-in student's existing live participation from the
+backend, renewing its device lease. An explicit Leave ends participation; a teacher
+ending the session or revoking enrollment prevents restoration. Device takeover
+still fences the previous device, which does not automatically reclaim authority
+until its next account lifetime.
 
 Teachers upload originals, prepare suggestions, edit review and explicitly approve.
 `MaterialService` owns collection versions and approval; `MaterialPreparationRunner`

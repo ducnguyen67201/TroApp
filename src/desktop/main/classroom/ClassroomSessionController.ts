@@ -32,6 +32,8 @@ export class ClassroomSessionController implements ClassroomTaskContext {
   private context: TeachingContext | null = null;
   private binding: { participationId: string; activityId: string } | null = null;
   private generation = 0;
+  private restorationAttempted = false;
+  private restoring: Promise<ClassroomReply> | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private refreshing: Promise<ClassroomReply> | null = null;
   private preparation: Extract<ClassroomReply, { kind: 'prepared' }> | null = null;
@@ -44,6 +46,39 @@ export class ClassroomSessionController implements ClassroomTaskContext {
   ) {}
 
   async execute(command: ClassroomCommand): Promise<ClassroomReply> {
+    if (command.kind === 'resume') {
+      if (this.binding) {
+        return this.refresh();
+      }
+      if (this.restoring) {
+        return this.restoring;
+      }
+      if (this.restorationAttempted) {
+        return { kind: 'ok' };
+      }
+      const generation = this.generation;
+      const pending = this.api
+        .execute({ ...command, deviceId: this.deviceId, materialSchemaVersion: 2 })
+        .then((reply): ClassroomReply => {
+          if (generation !== this.generation) {
+            return { kind: 'failed', code: ClassroomFailure.STALE };
+          }
+          if (reply.kind === 'context' || reply.kind === 'ok') {
+            this.restorationAttempted = true;
+          }
+          if (reply.kind === 'context') {
+            this.startParticipation(reply.context);
+          }
+          return reply;
+        })
+        .finally(() => {
+          if (this.restoring === pending) {
+            this.restoring = null;
+          }
+        });
+      this.restoring = pending;
+      return pending;
+    }
     if (command.kind === 'join') {
       const generation = this.generation + 1;
       await this.leave();
@@ -59,16 +94,7 @@ export class ClassroomSessionController implements ClassroomTaskContext {
         return { kind: 'failed', code: ClassroomFailure.STALE };
       }
       if (reply.kind === 'context') {
-        this.binding = {
-          participationId: reply.context.participation.id,
-          activityId: reply.context.activity.id,
-        };
-        this.acceptContext(reply.context);
-        this.timer = setInterval(() => {
-          void this.refresh();
-        }, 20_000);
-        this.timer.unref();
-        this.startUpdates();
+        this.startParticipation(reply.context);
       }
       return reply;
     }
@@ -260,6 +286,7 @@ export class ClassroomSessionController implements ClassroomTaskContext {
   async leave(): Promise<void> {
     const binding = this.binding;
     this.dispose();
+    this.restorationAttempted = true;
     if (binding) {
       await this.api.execute({
         kind: 'leave',
@@ -269,7 +296,11 @@ export class ClassroomSessionController implements ClassroomTaskContext {
     }
   }
 
-  dispose(): void {
+  dispose(resetRestoration = true): void {
+    if (resetRestoration) {
+      this.restorationAttempted = false;
+    }
+    this.restoring = null;
     this.generation += 1;
     if (this.timer) {
       clearInterval(this.timer);
@@ -283,6 +314,16 @@ export class ClassroomSessionController implements ClassroomTaskContext {
     this.preparation = null;
     this.refreshing = null;
     this.invalidateTask();
+  }
+
+  private startParticipation(context: TeachingContext): void {
+    this.restorationAttempted = true;
+    this.acceptContext(context);
+    this.timer = setInterval(() => {
+      void this.refresh();
+    }, 20_000);
+    this.timer.unref();
+    this.startUpdates();
   }
 
   private refresh(): Promise<ClassroomReply> {
@@ -319,7 +360,7 @@ export class ClassroomSessionController implements ClassroomTaskContext {
               reply.code === ClassroomFailure.STALE ||
               reply.code === ClassroomFailure.NOT_FOUND)
           ) {
-            this.dispose();
+            this.dispose(false);
           }
         }
         return reply;

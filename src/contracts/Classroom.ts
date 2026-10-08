@@ -313,6 +313,11 @@ export const ClassroomCommandSchema = z.discriminatedUnion('kind', [
     deviceId: z.uuid(),
   }),
   z.strictObject({
+    kind: z.literal('resume'),
+    deviceId: z.uuid(),
+    materialSchemaVersion: z.literal(2).optional(),
+  }),
+  z.strictObject({
     kind: z.literal('context'),
     ...binding,
     materialSchemaVersion: z.literal(2).optional(),

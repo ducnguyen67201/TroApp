@@ -256,6 +256,18 @@ export class MemoryClassroomStore implements ClassroomStore {
     this.participations.set(participation.id, participation);
     return Promise.resolve(participation);
   }
+  listJoinedParticipations(studentId: string) {
+    return Promise.resolve(
+      [...this.participations.values()]
+        .filter(
+          (participation) =>
+            participation.studentId === studentId &&
+            !participation.left &&
+            this.meetings.get(participation.classSessionId)?.status === ClassroomStatus.LIVE,
+        )
+        .sort((first, second) => second.leaseUntil.localeCompare(first.leaseUntil)),
+    );
+  }
   readParticipation(id: string) {
     return Promise.resolve(this.participations.get(id) ?? null);
   }

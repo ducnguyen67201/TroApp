@@ -184,3 +184,60 @@ it('enables review only for live approved practice and clears it on context loss
     controller.dispose();
   }
 });
+
+it('detaches locally on account changes and restores without sending Leave', async () => {
+  const context = createTeachingContext();
+  const execute = vi.fn<ClassroomApi['execute']>().mockResolvedValue({ kind: 'context', context });
+  const controller = new ClassroomSessionController({ execute }, () => {});
+  const resume = { kind: 'resume', deviceId: randomUUID() } as const;
+  try {
+    await controller.execute(resume);
+    expect(controller.isContextCurrent(context)).toBe(true);
+    controller.dispose();
+    expect(controller.isContextCurrent(context)).toBe(false);
+    await controller.execute(resume);
+    expect(controller.isContextCurrent(context)).toBe(true);
+    expect(execute.mock.calls.map(([command]) => command.kind)).toEqual(['resume', 'resume']);
+    await controller.execute({
+      kind: 'leave',
+      participationId: context.participation.id,
+      deviceId: context.participation.deviceId,
+    });
+    expect(await controller.execute(resume)).toEqual({ kind: 'ok' });
+    expect(execute.mock.calls.at(-1)?.[0].kind).toBe('leave');
+  } finally {
+    controller.dispose();
+  }
+});
+
+it('fences delayed restoration after account cleanup and avoids reclaiming a replaced device lease', async () => {
+  const context = createTeachingContext();
+  const execute = vi.fn<ClassroomApi['execute']>();
+  let finish: (reply: ClassroomReply) => void = () => {};
+  execute.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const controller = new ClassroomSessionController({ execute }, () => {});
+  const resume = { kind: 'resume', deviceId: randomUUID() } as const;
+  try {
+    const first = controller.execute(resume);
+    const duplicate = controller.execute(resume);
+    expect(execute).toHaveBeenCalledTimes(1);
+    controller.dispose();
+    finish({ kind: 'context', context });
+    expect(await first).toEqual({ kind: 'failed', code: ClassroomFailure.STALE });
+    expect(await duplicate).toEqual({ kind: 'failed', code: ClassroomFailure.STALE });
+    execute.mockResolvedValue({ kind: 'context', context });
+    await controller.execute(resume);
+    execute.mockResolvedValue({ kind: 'failed', code: ClassroomFailure.FORBIDDEN });
+    await controller.execute(resume);
+    execute.mockClear();
+    expect(await controller.execute(resume)).toEqual({ kind: 'ok' });
+    expect(execute).not.toHaveBeenCalled();
+  } finally {
+    controller.dispose();
+  }
+});

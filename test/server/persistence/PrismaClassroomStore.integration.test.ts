@@ -426,3 +426,51 @@ it('persists invitation enrollment and rejects a revoked code', async () => {
     }),
   ).rejects.toMatchObject({ code: 'forbidden' });
 });
+
+it('restores persisted participation through authenticated HTTP after desktop restart', async () => {
+  const fixture = await createFixture();
+  const joined = await fixture.join(fixture.first);
+  await client.classroomParticipation.update({
+    where: { id: joined.participation.id },
+    data: { leaseUntil: new Date(0) },
+  });
+  const api = createApi({ isDatabaseReady: () => Promise.resolve(true) });
+  registerClassroomRoutes(
+    api,
+    (headers) =>
+      Promise.resolve(typeof headers['x-test-user'] === 'string' ? headers['x-test-user'] : null),
+    new ClassroomService(database.store),
+    createServerLogger(environment.APP_ENV),
+  );
+  const deviceId = randomUUID();
+  const resume = (userId: string) =>
+    api.inject({
+      method: 'POST',
+      url: '/api/v1/classroom/command',
+      headers: { 'x-test-user': userId },
+      payload: { kind: 'resume', deviceId },
+    });
+  try {
+    const response = await resume(fixture.first);
+    expect(response.statusCode).toBe(200);
+    const body: unknown = JSON.parse(response.body);
+    const reply = ClassroomReplySchema.parse(body);
+    if (reply.kind !== 'context') {
+      throw new Error('Missing restored participation.');
+    }
+    expect(reply.context.participation.id).toBe(joined.participation.id);
+    expect(reply.context.participation.deviceId).toBe(deviceId);
+    expect(reply.context.attempt.id).toBe(joined.attempt.id);
+    const otherBody: unknown = JSON.parse((await resume(fixture.second)).body);
+    expect(ClassroomReplySchema.parse(otherBody)).toEqual({ kind: 'ok' });
+    await fixture.service.execute(fixture.first, {
+      kind: 'leave',
+      participationId: joined.participation.id,
+      deviceId,
+    });
+    const leftBody: unknown = JSON.parse((await resume(fixture.first)).body);
+    expect(ClassroomReplySchema.parse(leftBody)).toEqual({ kind: 'ok' });
+  } finally {
+    await api.close();
+  }
+});

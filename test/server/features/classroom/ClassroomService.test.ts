@@ -401,3 +401,65 @@ it('enforces invitation email, verification, expiry and teacher revocation', asy
     code: ClassroomFailure.FORBIDDEN,
   });
 });
+
+describe('durable classroom participation', () => {
+  it('restores expired participation and saved work on a new device while fencing the old device', async () => {
+    let now = new Date();
+    const { store, service, join } = await createClassroom(() => now);
+    const context = await join('student');
+    const saved = contextOf(
+      await service.execute('student', {
+        kind: 'save-workspace',
+        ...mutation(context),
+        url: 'https://scratch.mit.edu/projects/123/',
+      }),
+    );
+    now = new Date(now.getTime() + 120_000);
+    const restarted = new ClassroomService(store, () => now);
+    const resumed = contextOf(
+      await restarted.execute('student', {
+        kind: 'resume',
+        deviceId: randomUUID(),
+      }),
+    );
+    expect(resumed.participation.id).toBe(context.participation.id);
+    expect(resumed.attempt).toEqual(saved.attempt);
+    expect(Date.parse(resumed.participation.leaseUntil)).toBeGreaterThan(now.getTime());
+    await expect(
+      service.execute('student', { kind: 'context', ...binding(context) }),
+    ).rejects.toMatchObject({ code: ClassroomFailure.FORBIDDEN });
+    expect(
+      await restarted.execute('another-student', { kind: 'resume', deviceId: randomUUID() }),
+    ).toEqual({ kind: 'ok' });
+  });
+
+  it.each(['leave', 'end-session', 'revoke'] as const)(
+    'does not restore after %s',
+    async (action) => {
+      const { service, join, meeting, schoolClass } = await createClassroom();
+      const context = await join('student');
+      if (action === 'leave') {
+        await service.execute('student', {
+          kind: 'leave',
+          participationId: context.participation.id,
+          deviceId: context.participation.deviceId,
+        });
+      } else if (action === 'end-session') {
+        await service.execute('teacher', {
+          kind: 'end-session',
+          classSessionId: meeting.id,
+          contextVersion: meeting.contextVersion,
+        });
+      } else {
+        await service.execute('teacher', {
+          kind: 'revoke',
+          classId: schoolClass.id,
+          studentId: 'student',
+        });
+      }
+      expect(await service.execute('student', { kind: 'resume', deviceId: randomUUID() })).toEqual({
+        kind: 'ok',
+      });
+    },
+  );
+});

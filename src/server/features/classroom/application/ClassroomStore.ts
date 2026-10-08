@@ -73,6 +73,7 @@ export interface ClassroomStore {
     deviceId: string,
     leaseUntil: Date,
   ): Promise<Participation>;
+  listJoinedParticipations(studentId: string): Promise<Participation[]>;
   readParticipation(id: string): Promise<Participation | null>;
   saveParticipation(participation: Participation): Promise<void>;
   readOrCreateAttempt(participationId: string, activityId: string): Promise<StudentAttempt>;
