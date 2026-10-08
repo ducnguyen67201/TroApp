@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ModelTransportSnapshotSchema } from './ModelTransportDiagnostics.js';
 
 /** Allowlisted diagnostics only. Raw provider messages, bodies and credentials never cross here. */
 export const ProviderErrorCodeSchema = z.enum([
@@ -57,6 +58,7 @@ export const ModelGatewayDiagnosticsSchema = z.object({
   attemptNumber: z.number().int().min(0).max(2),
   durationMs: z.number().nonnegative(),
   timedOut: z.boolean().optional(),
+  transport: ModelTransportSnapshotSchema.optional(),
   errorType: z
     .enum(['AbortError', 'TimeoutError', 'TypeError', 'AggregateError', 'unknown'])
     .optional(),

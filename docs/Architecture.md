@@ -1,246 +1,432 @@
 # Tro architecture
 
-Updated September 30, 2026. Current direction: Electron + React on Windows/macOS, TypeScript throughout, Prisma + PostgreSQL on the backend, Railway first, AWS later.
+This is the single maintained description of Tro's implemented system. Updated
+October 8, 2026. Change this document when ownership, component communication or
+an architectural invariant changes. Contracts and configuration in the linked code
+own exact wire shapes and policy values. Setup and validation commands live in the
+[root README](../README.md). Research and UI prototypes are reference material,
+not requirements or evidence that a capability exists.
 
-## What runs where
+- [System and process boundaries](#system-and-process-boundaries)
+- [Authentication and account lifetime](#authentication-and-account-lifetime)
+- [Agent requests and model gateway](#agent-requests-and-model-gateway)
+- [Teaching](#teaching)
+- [Native companion and HUD](#native-companion-and-hud)
+- [Voice input and narration](#voice-input-and-narration)
+- [Classroom and materials](#classroom-and-materials)
+- [Local presentation and app updates](#local-presentation-and-app-updates)
+- [Code ownership](#code-ownership)
+- [Verification and current limits](#verification-and-current-limits)
 
-| Component                       | Location                          | Responsibility                                        |
-| ------------------------------- | --------------------------------- | ----------------------------------------------------- |
-| React interface                 | User's machine, Electron renderer | Screens, input, progress, approval controls           |
-| Electron main and preload       | User's machine                    | Narrow OS/IPC bridge and backend access               |
-| Agents SDK worker, implemented  | User's machine                    | General computer-use loop and Cua MCP client          |
-| Cua Driver MCP process          | User's machine, bundled with Tro  | Publishes desktop tools and executes local actions    |
-| Model                           | Remote provider by default        | Inference; a local SDK does not make the model local  |
-| TypeScript API                  | Railway initially                 | Accounts, authorization, model gateway, billing, jobs |
-| Prisma                          | Backend process only              | Typed persistence adapter and migrations              |
-| PostgreSQL                      | Managed backend database          | Product records, job state, entitlements              |
-| Images, planned                 | Private object storage            | Photos, garments, generated previews                  |
-| Try-on worker/provider, planned | Backend/provider                  | Durable generation and retries                        |
+## System and process boundaries
 
-The starter implements a renderer → preload → main bridge and a backend HTTP API with application services and Prisma adapters. Operational readiness remains an API endpoint, with no desktop check panel. It also implements a separate local computer-use worker that connects to Cua Driver through MCP. Google sign-in through the system browser and a scoped backend model gateway are implemented. Task messages are displayed only in the current React window; no conversation history is persisted. Try-on job execution and image storage remain future work.
+Tro is one pnpm root and a modular monolith. Application code is strict TypeScript.
+The desktop uses Electron and React; the API uses Fastify and Prisma/PostgreSQL.
+The bundled Cua dependency uses native Rust and platform adapters. It owns screen
+capture, desktop tools, input observation and the macOS compositor. Its native
+presentation fence cannot be replaced by asynchronous TypeScript messages.
 
-The desktop and API share the `dev | stage | prod` application environment vocabulary. The backend uses Pino for structured logs: database-readiness failures log an error category at debug level only in `dev`, without exposing Prisma messages through logs or HTTP responses.
+```mermaid
+flowchart TB
+  subgraph Device[Student or teacher computer]
+    UI[Sandboxed React renderer]
+    Bridge[Validated preload methods]
+    Main[Electron main]
+    Task[Agent utility worker]
+    HUD[HUD utility worker]
+    Native[Main-owned native Cua daemon]
+    OS[Desktop, screen capture and native overlay]
+    UI <-->|Named calls and events| Bridge
+    Bridge <-->|IPC with sender checks| Main
+    Main <-->|Typed worker messages| Task
+    Main <-->|Typed HUD snapshots and events| HUD
+    Main -->|Start, permissions and shutdown| Native
+    Task <-->|Private MCP connection| Native
+    HUD <-->|Private MCP connection| Native
+    Native <--> OS
+  end
+  subgraph Backend[Tro API]
+    Routes[Authenticated HTTP and WebSocket routes]
+    Services[Application services and explicit ports]
+    Adapters[Persistence and provider adapters]
+    DB[(PostgreSQL)]
+    Routes --> Services --> Adapters --> DB
+  end
+  Main <-->|Authenticated HTTP and audio streams| Routes
+  Task <-->|Scoped Responses HTTP stream| Routes
+  Adapters <-->|Backend-only credentials| Providers[OpenAI and ElevenLabs]
+```
 
-## The full system
+| Boundary                  | Contract and responsibility                                                                                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Renderer ↔ preload ↔ main | Narrow named methods and validated events. Main checks the sender, frame and document. No generic IPC, shell, filesystem or database capability crosses preload. |
+| Main ↔ workers            | Validated task, progress, HUD and shutdown messages. Orchestration runs outside the renderer and main UI event loop.                                             |
+| Workers ↔ Cua             | MCP tools over a private connection supplied by main. Host lifecycle, HUD and teaching admission tools are hidden from the model.                                |
+| Desktop ↔ API             | Versioned HTTP contracts, authenticated sessions and scoped credentials. Desktop sends no database or shared provider key.                                       |
+| API ↔ database/providers  | Services depend on application ports; adapters own Prisma, I/O and provider clients. Domain code imports no frameworks or I/O.                                   |
 
-Desktop updates run in Electron main through `electron-updater`, using a build-configured public HTTPS feed. Validated state crosses preload to a full-width sidebar action above Settings. Checks run only in configured installed macOS/Windows builds; downloads and restart require clicks. Main blocks restart during active work and cleans up local workers and the embedded driver before installation. The backend does not serve updates. See [AppUpdates.md](AppUpdates.md) for release setup and installed-app verification limits.
+`EmbeddedDesktopDriver` owns one private native daemon shared by task and HUD
+connections. A worker closing its connection must not stop that shared host. Main
+stops the host when the application quits. Sign-out, account transitions and window
+closure dispose the associated tasks and presentation resources. The renderer
+stores task messages in memory; general conversation history is not persisted.
+
+## Authentication and account lifetime
+
+`AuthClient` opens Google sign-in in the system browser through Better Auth.
+Google returns to the backend callback; the backend sends a short-lived code through
+`app.tro.desktop://auth/callback#token=…`. Electron main exchanges and verifies it.
+The same running instance retains the pending proof-key verifier. Before sign-in,
+main registers the protocol and verifies that the OS handler points to that app.
+
+Saved accounts use independent backend sessions. `AccountSessions` owns selection
+and generation guards; `EncryptedAccountVault` stores cookies using Electron
+`safeStorage` with atomic replacement. It fails closed when native encryption is
+unavailable. Cookies remain in main; only validated profile metadata crosses
+preload. Adding or switching an account does not change backend roles.
+
+`AccountTransitionGate` excludes account changes from active task, voice,
+microphone-test and classroom/material operations. A switch verifies the target
+session before selection, releases old desktop participation and clears task,
+capture and presentation state. The old account stays signed in and its teacher
+session remains stored. Sign-out revokes the selected account's session and removes
+its vault entry; other saved accounts remain. Late replies cannot restore an old
+identity.
+
+On macOS, main checks Screen Recording and Accessibility before admitting computer
+use. The branded development host and installed Tro have different bundle
+identities and permission grants. `DesktopPermissions` requests access in main so
+the OS attributes it to Tro. Missing grants lead to onboarding; no driver task or
+model credential is issued before admission.
+
+## Agent requests and model gateway
+
+Typed instructions and completed voice transcripts enter `AgentChatController`.
+Main checks account, permissions and exclusivity, obtains a scoped model credential,
+and sends one task to the utility worker. With the macOS companion, the local
+following worker stays connected while the signed-in window is open. The fallback
+worker starts on demand and retains a bounded warm lifetime after a task. Every
+settled follow-up starts a fresh task; an active teaching lesson retains its own goal.
+
+```mermaid
+sequenceDiagram
+  participant UI as Renderer
+  participant Main as Electron main
+  participant Worker as Agent worker
+  participant API as Tro API
+  participant Model as OpenAI
+  participant Cua as Native Cua
+  UI->>Main: Submit validated instruction
+  Main->>API: Request scoped model credential
+  API-->>Main: Short-lived credential
+  Main->>Worker: Start task with private Cua connection
+  Worker->>API: Responses request with scoped credential
+  API->>Model: Validated request with backend key
+  Model-->>API: Responses stream
+  API-->>Worker: Forward stream with cancellation/backpressure
+  Worker->>Cua: Admitted tools
+  Cua-->>Worker: Validated observations or receipts
+  Worker-->>Main: Typed progress and final outcome
+  Main-->>UI: Validated event
+```
+
+The gateway is split by responsibility: `RegisterModelGateway` owns routes,
+`ModelCredentials` scoped authentication, `ModelRequest` admission,
+`FetchModelResponse` bounded fetch recovery, and `ForwardModelResponse` streaming.
+`ModelGatewayConfig` owns the model, output ceiling, body limit, credential lifetime,
+timeout and retry policy; backend `Env.ts` owns validated secrets.
+
+Assistant requests have no input-token counting preflight and no daily model request
+cap. A rejected fetch before headers may retry once, only for the configured socket
+codes, under the same cancellation/deadline. HTTP errors, other network errors and
+post-header failures are not retried. SDK automatic retries are disabled. Desktop
+tools are never replayed by transport recovery. A pre-header retry can still incur
+another inference charge because provider execution may be uncertain.
+
+Execution tasks use `TaskHarness`, `MainAgentRunner`, `TaskVerifier` and
+`CompletionGate`. The harness owns immutable request/goal state, budgets and final
+settlement. The actor explicitly requests a separate read-only verifier. Both agents'
+actual observations are retained in bounded task memory. The gate checks criterion
+coverage, provenance, age and supersession before accepting the stored verdict.
+A bounded continuation can retain the original task history. Desktop tool use
+cannot bypass verification through a prose-only response. Public outcomes distinguish
+succeeded, partial, blocked and unverified; these checks validate evidence wiring,
+not the correctness of every model judgment.
+
+## Teaching
+
+Show me keeps the student's original goal and lets the student control the real
+pointer. `TeachingTaskRunner` owns SDK segments, questions, local waiting and
+cancellation. `TeachingLessonContext` owns the current goal, checkpoints, proposal,
+assessment and localized instruction. `TeachingPresenter` is the only paired
+instruction/drawing presentation path.
 
 ```mermaid
 flowchart LR
-  subgraph User[User's Windows or Mac]
-    UI[React interface] --> PRELOAD[Narrow preload bridge]
-    PRELOAD --> MAIN[Electron main]
-    MAIN --> AGENT[Local Agents SDK worker]
-    AGENT --> MCP[Cua Driver MCP process]
-    MCP --> DESKTOP[Visible desktop]
-  end
-  subgraph Backend[Railway first; AWS later]
-    API[TypeScript API] --> SERVICE[Application services]
-    SERVICE --> DB[Prisma adapter] --> PG[(PostgreSQL)]
-    API --> GATEWAY[Authenticated model gateway]
-    SERVICE --> JOBS[Future try-on worker]
-    SERVICE --> STORAGE[Future private image storage]
-  end
-  MAIN -->|HTTPS| API
-  AGENT -->|Short-lived token| GATEWAY
-  GATEWAY --> MODEL[OpenAI model API]
-  JOBS --> TRYON[Try-on provider]
+  Request[Original request and authorized classroom context] --> Observe[Capture fresh desktop]
+  Observe --> Model[SDK segment: assess goal and propose one action]
+  Model --> Admit[Validate goal, evidence and action]
+  Admit --> Present[Publish one message and its derived cue]
+  Present --> Receipt[Require native presentation receipt]
+  Receipt --> Wait[Wait locally for relevant input or bounded loading]
+  Wait --> Observe
+  Model --> Question[Ask student while retaining lesson]
+  Question --> Observe
+  Model --> Finish[Validate current goal evidence and settle]
 ```
 
-## Following one request
+The model defines or explicitly revises a typed teaching goal, then proposes one
+reachable action through `present_teaching_step`. Message, cue geometry and expected
+input targets derive from that same action. The final decision references the
+presentation rather than introducing another unacknowledged instruction. Spatial
+actions require a current message and drawing receipt. Keyboard, focused typing and
+loading actions require an explicit text-only receipt.
 
-1. `App.tsx` owns the shared `UseComputerUse.ts` controller, which calls the named `window.tro.signInWithGoogle()` bridge for the sidebar and workspace. Mantine styling is centralized in `Theme.ts`; see [DesktopUi.md](DesktopUi.md).
-2. `Preload.ts` validates the IPC response; `Main.ts` verifies the sending frame.
-3. Electron main asks Better Auth to open Google sign-in in the system browser.
-4. Google returns to the backend OAuth callback. Better Auth creates a short-lived authorization code and the browser hands it to the registered `app.tro.desktop` protocol.
-5. Electron main exchanges that code for its encrypted local session cookie. Later chat requests use that session to obtain a scoped model token.
+`LoggedCuaServer` restricts model tools, binds the lesson, pins V2, checks capture
+freshness and validates native replies. Host-generated epochs and presentation IDs
+cannot be overridden by the model. Native `refresh_cursor_guidance_capture` compares
+cue regions, rather than requiring a still whole desktop; it returns bounded
+measurements without an image. Changed targets/input/geometry refuse playback.
+Unknown transport results may mean an operation executed and are not replayed.
 
-The desktop explicitly enables Better Auth's protocol registration with `scheme: true`, while leaving the SDK's CSP and IPC bridges disabled in favour of Tro's boundaries. The browser callback uses `app.tro.desktop://auth/callback#token=…`: the installed SDK matches the hostname plus path. Changing this to the single-slash form prevents the callback from matching. Regression tests cover registration and execute the return-page script with a synthetic code; they do not complete a real Google login.
+`DesktopObservationClient` and `TeachingObservationPolicy` read the session-owned
+native watch and structured input history. Settled clicks, keys and scrolling can
+resume the same lesson; passive pointer movement and unrelated animation do not
+schedule inference. Loading and target appearance use bounded observation. Failed
+comparisons are feedback in the same SDK history within a shared repair budget.
+Fresh capture references are required for current goal criteria.
 
-After sign-in on macOS, Electron main reads Tro's Accessibility and Screen Recording grants using the native Cua SDK without starting a driver or requesting access. React shows permission onboarding while either grant is missing or unverifiable. The user requests access with a button; the native call runs inside main so macOS identifies the host app. Main opens a fixed System Settings destination. On return to Tro, a read-only recheck enters the workspace once both grants are verified. Main checks again before issuing a task session and before fetching a model gateway credential. After verification, main directly spawns a private embedded Cua daemon under Tro and passes its MCP endpoint to the agent worker. It never launches a separate CuaDriver app. The standard development launcher uses a separate Tro development identity; signed packaged builds use `app.tro.desktop`. See [PermissionsOnboarding.md](PermissionsOnboarding.md).
+Click/key/scroll during a drawing interrupts that preview and returns to observation.
+Esc cancels the entire lesson, releases its watch/epoch and prevents later input from
+resuming it. Native presentation or transport failures end the task with a typed
+reason. Demonstrated teaching is separate from independently verified desktop
+execution and from classroom assessment.
 
-On macOS, both the packaged app and the branded development host declare the protocol in `Info.plist`. Each development checkout has its own stable bundle identity and a bootstrap that loads its main module when macOS launches it without a project argument. Before browser sign-in, main registers the current handler and verifies that the OS resolves it to the running bundle. Plain unbranded command-line Electron lacks this host setup. Keep the same app instance open throughout sign-in because the SDK holds the pending proof-key verifier in memory. See [Electron's deep-link guidance](https://www.electronjs.org/docs/latest/tutorial/launch-app-from-url-in-another-app). Full Google login and packaged OS dispatch still require an interactive smoke test.
+## Native companion and HUD
 
-For operational status, `CreateApi.ts` still routes `/health/ready` to `ReadServiceStatus.ts`. That service depends on a `DatabaseStatus` port, not Prisma or Fastify. `PrismaDatabaseStatus.ts` checks a mapped model and reports availability without exposing database diagnostics.
+`DesktopCompanion` composes cursor following and HUD presentation in main.
+`CompanionHudController` reduces voice/task events; `CompanionHudClient` owns a
+separate persistent presentation worker. Both task and HUD workers use main's
+shared native daemon. Private group registration and bounded leases bind only the
+associated cursors; host HUD tools are excluded from model discovery and dispatch.
 
-A future `createTryOnJob` follows the same path: validated contract → authorized route → application service → Prisma repository/provider port. Ownership checks belong on the backend even when the desktop already validated input.
+The native presentation owner is `HudState` in the pinned
+[CursorCompanion.patch](../driver-patches/CursorCompanion.patch). One immutable job
+owns the message, render token, deadline and watch-channel outcome. The token
+contains an owner epoch, increasing revision and render ID. The painter projects
+accepted messages; it makes no independent message admission decision.
 
-## Code organization
+```mermaid
+stateDiagram-v2
+  [*] --> Pending: Accept a new message
+  Pending --> Pending: Same message, lease or appearance update
+  Pending --> Presented: Current frame installed under the fence
+  Pending --> Superseded: New message accepted
+  Pending --> Cancelled: Clear, lease or owner ends
+  Pending --> Failed: Deadline, conversion or installation failure
+```
 
-### Classroom context
+| Operation             | Invariant                                                                                                                                                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Admission             | Validate live owner, lesson and sequence before changing message or receipt. Exact duplicates reuse token, waiter, deadline and outcome. Older messages and equal-identity content conflicts cannot replace the current job.                |
+| Lease / appearance    | `CompanionHudPublisher` serializes explicit `renew_lease` and `update_appearance` commands. They carry no cached teaching message. Only these intents coalesce; message/clear ordering is preserved.                                        |
+| Render and install    | An immutable scene/message token travels through painting, conversion and the main-queue mailbox. `install_current_composite` validates it while holding the same HUD fence across synchronous CALayer installation and receipt completion. |
+| Clear / failure       | Token-conditioned cleanup cannot clear a newer job. Watermarks survive clear/failure. Watch outcomes become terminal once; late callbacks cannot turn an old terminal job into Presented.                                                   |
+| Lesson / owner change | Explicit lesson binding and owner retirement invalidate old scenes. Retired lesson identities and cursor bindings are bounded. Delayed readback cannot replace newer observed tokens.                                                       |
 
-The [classroom context engineering spec](classroom/ClassroomContextEngineeringSpec.md)
-describes teacher-prepared activities and material roles, class enrollment and explicit
-session participation, per-student working resources, durable progress and submission
-receipts. Backend features own authorization and persistence; desktop main binds a
-student's session and supplies validated context to the existing teaching worker.
-Teacher-controlled explanation/practice phases preserve classroom teaching, while
-individual assistance retains paired instruction/drawing presentation. This is a
-target architecture. The initial implementation uses individual accounts and
-Scratch-link hand-ins. Account roles are stored in Prisma and granted by a backend
-operator by verified email; classroom invitation codes authorize enrollment only.
-The sidebar shows the account role and opens a role-specific Classroom page; see [ClassroomImplementation.md](classroom/ClassroomImplementation.md)
-for delivered behavior, setup and limits.
+The installation guard also fences empty composites and obsolete drawing frames.
+Current Presented jobs may animate without completing their receipt again. The
+lock order is HUD → unique guidance fences in pointer order → accessibility text;
+the callback does not await or acquire the render-controller lock. Coalesced or
+rejected images are released. The original one-second message deadline remains.
+Presented means CALayer accepted the current frame, not physical display scan-out.
+A message receipt alone does not satisfy a spatial teaching presentation.
 
-### Existing ownership boundaries
+The stale-refresh regression previously separated message 2 from its receipt when
+an old snapshot carried message 1. Common admission, explicit refresh commands and
+the installation fence remove that split ownership. Native build provenance is
+owned by [CuaCompanionBuild.ts](../src/contracts/CuaCompanionBuild.ts). The cleaned
+`0.30.4-tro.19` build passed the permanent regression and real native two-message
+and paired-receipt checks. Temporary render stages and socket profiling were removed;
+concise genuine failures remain. Earlier TLS errors are a separate transport issue.
 
-Keep a single pnpm root and one backend modular monolith. `src/contracts` has real desktop and API consumers; it does not need a published workspace package yet. Put new business features under `src/server/features/<feature>`, with domain, application, and infrastructure files as needed. Avoid empty layers for trivial functions.
+## Voice input and narration
 
-Domain code owns rules and fixed values, with no framework or I/O imports. Application services own workflows and ports. Adapters own Fastify, Prisma, storage, model providers, and browser integration. Startup composes them. Generated database types never become public HTTP contracts.
+The held shortcut is Command + Control on macOS and Control + Left Alt on Windows.
+The native key listener owns press/release/rearming. `VoiceInputController` owns
+capture identity, account checks, cancellation and exactly one final instruction
+submission. The sandboxed renderer owns microphone tracks and an AudioWorklet.
+Named preload methods carry bounded sequenced PCM frames to main.
 
-Use PascalCase hand-written filenames, specific action names, strict TypeScript, `unknown` for external data, runtime Zod validation, and typed test doubles. Keep each process's environment parsing in `Env.ts` using T3 Env. [AGENTS.md](../AGENTS.md) contains your complete formatting rules.
+Main's authenticated transcription WebSocket relays audio through the API to
+OpenAI live transcription. One provider session is created per capture. On release,
+the worklet flushes its tail; main/relay enforce sequence order before commit and
+correlate the final transcript to the committed item. Partial transcripts do not
+start agent tasks. Release stops tracks immediately; bounded buffering allows
+already captured speech to finish while the connection opens. Esc, account/window
+changes, sleep/lock or failure invalidate late finals. No microphone stays open
+between holds.
 
-Use `#contracts/SystemStatus.js` for shared contract imports across desktop and backend; keep feature-local imports relative. The package import resolves to source in the API development process and to compiled files in production Node; Electron and test builds also resolve to source. The `.js` suffix is required by the backend's ESM output.
+`Microphones`, `MicrophonePicker` and local preferences own input selection.
+Automatic selection follows OS routing; explicit selection uses exact constraints
+and fails visibly if missing. Suggestions are name-based hints. Ranking does not
+switch the selected route. Local quiet/speech comparisons use a main-owned exclusive
+lease, compute scalar measurements and stop every track. Test audio is neither
+uploaded nor saved. Transcription usage reservations and active captures are
+persisted through the backend allowance adapter.
 
-Tests live under `test/`, mirroring the production folders in `src/`. Unit and integration discovery is configured separately in Vitest. Teaching-flow fixtures live under `test/desktop/worker/teaching/flow`; `scripts/CheckTeachingFlow.ts` remains the command entry point. Production code never imports the test tree.
+HUD narration is a separate flow: installed native message readback →
+`VoiceoverController` → authenticated backend ElevenLabs stream → bounded renderer
+playback → speaking acknowledgments back to main/HUD. The backend owns voices,
+model settings, credentials and paid allowance. Speech stops before microphone
+capture and on context/account/window changes. Failure leaves visual guidance
+usable. Playback and speech are not completion evidence. English/Vietnamese locale
+is snapshotted for the operation. Live provider pronunciation and signed hardware
+acceptance remain separate checks.
 
-The worker is grouped by responsibility: `agent` composes SDK runs, `teaching` owns lesson progression, `observation` owns screen-change admission, `execution` owns action completion and verification, and `cua` adapts native tools. The worker startup entry points remain at the root to preserve bundle names. See the [worker ownership map](../src/desktop/worker/README.md).
+## Classroom and materials
 
-Feature documentation is grouped under `docs/agent`, `docs/teaching`, and `docs/companion`; the [documentation index](README.md) links the current specs and supporting artifacts.
+Classroom authorization lives in `ClassroomService` and its store port. Teachers
+and students are real signed-in accounts with backend-owned roles. Invitation/enrollment,
+live session availability, explicit joining, presence, progress and hand-in are
+separate facts. Sessions expose Explanation, Practice, Submission and Review;
+teacher-paced sessions bind the current activity, while self-paced sessions allow
+student selection. Class detail routes remain inside the installed renderer's hash
+router; a route does not authorize class access.
 
-## Local agent orchestration
+`ClassroomSessionController` loads fresh authorized context for each class-bound
+Show me request, including pinned course revision, stage, activity, criteria,
+working resource and durable student progress. Joined classroom Do it for me
+requests are refused. Rejoining restores participation and work; device leases
+prevent another device from writing with old authority. Context/version checks
+fence late commands. Esc cancels guidance without leaving the class. Switching
+accounts leaves desktop participation without ending a teacher's live session.
 
-The Agents SDK runs in a separate Electron utility process on the user's machine so automation does not block the UI. On macOS, Electron main starts a local companion-only worker after permission setup without a model credential. A task replaces that connection with a credentialed worker; following resumes after the task. Sign-out and window close stop it. Other platforms start on demand and stop after 15 idle minutes. [OpenAI Agents SDK](https://developers.openai.com/api/docs/guides/agents/sdk)
+Teachers upload originals, prepare suggestions, edit review and explicitly approve.
+`MaterialService` owns collection versions and approval; `MaterialPreparationRunner`
+and `PrepareMaterialCollection` own durable extraction, document briefs and composition.
+Provider/extractor/storage adapters operate behind ports. Class-scoped derivation
+claims and cache keys permit reuse of unchanged work. Each uncached preparation
+stage counts input tokens and reserves its job allowance before generation; this
+is separate from assistant gateway forwarding. Uncertain provider outcomes require
+explicit retry. A bounded citation repair validates referenced source ranges.
 
-The first implemented agent feature is a general computer-use text chat, specified in [ComputerUseSpec.md](agent/ComputerUseSpec.md). The Agents SDK discovers Cua Driver's MCP tools directly; Tro does not copy each action into an OpenAI `Computer` adapter. [ComputerUseInstructions.ts](../src/desktop/worker/agent/ComputerUseInstructions.ts) is the single place to edit the agent's standing instruction. General GUI actions can change content in any accessible app. Tro has no per-action approval UI; Cua's own runtime permission mode still applies. Voice input submits finalized instructions through the same controller; class context remains a later integration.
+```mermaid
+flowchart LR
+  Originals[Teacher uploads and instructions] --> Extract[Extract exact source units]
+  Extract --> Briefs[Reusable document briefs]
+  Briefs --> Compose[Class overview and suggested sections]
+  Compose --> Review[Teacher edits and approves]
+  Review --> Revision[Immutable published course revision]
+  Revision --> Packet[Authorized bounded student context]
+  Packet --> Tutor[Existing Show me teaching worker]
+  Tutor --> Sources[Authenticated source search and reads]
+  Sources --> Tutor
+```
 
-The worker owns the loop and tool execution. Model requests normally still go over the network. Screenshots or tool outputs sent to the model leave the machine; local orchestration is not an offline or all-local privacy guarantee.
+Originals, exact text, document briefs and teacher corrections remain distinct.
+Review revisions reuse extraction/briefs where inputs are unchanged; they do not
+approve automatically or alter a live session's pinned publication. Student material
+packets select dependencies, corrections and relevant passages under a token budget.
+`ReadMaterialSources` supplies authorized bounded search/reads; missing required
+context is reported rather than silently shortened. Legacy publications use a
+compatibility adapter. Preparation limits and provider settings belong in backend
+`Env.ts` and the owning preparation modules.
 
-Tro now signs users in with Google through backend Better Auth/Prisma. Better Auth's Electron client stores the Tro cookie with OS `safeStorage` when available, and main obtains a 15-minute model-only token from the backend. The local worker uses that token to call Tro's Responses gateway; the product OpenAI key and Google client secret remain on the backend. The gateway restricts the model and output tokens; it has no model request count cap and no longer writes per-account request counters. The companion keeps the macOS worker connected while the signed-in window is open; other platforms start on demand and stop after 15 idle minutes. Each message starts a fresh SDK run with no `Session` or previous message history. Joined classroom tasks also load their authorized activity and durable progress through the classroom service. React displays messages in memory until the window closes; screenshots and tool outputs are not persisted. See [ComputerUseSpec.md](agent/ComputerUseSpec.md) for limits and release work.
+An owning teacher can delete an inactive class through a confirmed command. The
+serializable transaction rechecks that no live session exists, tombstones the class,
+revokes invitation access and preserves work/history. Removing a material deletes
+unused originals but preserves files referenced by immutable approved revisions.
+Neither operation resets the database or rewrites applied migrations.
 
-The selected product direction remains a local worker. Desktop control needs Windows/macOS validation and permissions; a separate process alone does not make arbitrary model-generated GUI actions harmless.
+### Practice checks
 
-[CursorCompanion.md](companion/CursorCompanion.md) describes the Cua-owned teaching companion,
-requested through MCP by the Agents SDK. Tro's validated task mode gates observation,
-previews and existing-window focus separately from ordinary desktop actions. The native
-patch and reproducible build support macOS's primary display; other displays and native
-platform adapters remain future work. Tro imports only a built driver, never sibling source.
+`PracticeCheckService` is a separate formative evaluator, not the teaching completion
+gate. A teacher reviews and enables a checkpoint before publication. The student
+previews bounded text/code/image/file evidence and explicitly requests a check,
+then may request a hint or targeted Show me assistance. The checker uses approved
+criteria and submitted evidence; it cannot execute student work or change the rubric.
+Saved checks are versioned and private. `PrismaPracticeCheckStore` owns transactional
+reservations, evidence snapshots and append-only submission revisions.
 
-## Persistence and jobs
+Hand-in requires independent student confirmation and preserves the exact submitted
+version. Teacher views read the saved evidence and receipts. Existing Scratch-link
+submission and progress reports remain compatible; a report or saved URL is not a
+grade. Cmd/Ctrl + Shift + Enter opens practice review with an in-app fallback.
+The shortcut does not capture an open application. Native selected-window evidence,
+unlimited storage and automatic final grading are not implemented promises.
 
-Prisma is the ORM. PostgreSQL is the database. Zod validates boundaries; application services enforce ownership and product rules. Keep Prisma-generated types in persistence adapters.
+## Local presentation and app updates
 
-The starter schema includes `OutfitDraft` for a future user-owned feature. No draft endpoints exist. Readiness performs a small model query to confirm the database and migration are available.
+Mantine defaults and semantic styling belong in `Theme.ts` and
+`DesktopAppearance.ts`; renderer layout consumes those values. Locale is shared by
+typed and voice tasks. The optional pet is composed separately by `PetController`
+and `PetWindow`: account-scoped local preferences, bundled raster assets, restricted
+preload and a sandboxed transparent window. It hides during agent work and voice
+capture, captures no screen and makes no model request. Generated pets and cloud
+collections are not implemented.
 
-Implement durable try-on job records and one worker with the feature. Record provider request IDs and retry state. Schedule work durably with the job transaction; use an outbox if a separate queue is introduced. Queue delivery does not guarantee an external paid action occurs exactly once. Reconcile ambiguous provider responses before resubmitting.
+`AppUpdateController` owns update lifecycle and admission through an injected port;
+`ElectronAppUpdater` adapts the installed app's configured HTTPS feed. Updates are
+disabled in development or without a feed. Downloads and installation require user
+actions. Restart is blocked during active work and cleans up workers/driver first.
+Main validates events before preload exposes progress; the renderer has no arbitrary
+installer path or update URL capability. Signing, notarization and live installed-app
+update acceptance remain release work.
 
-Store images privately with short-lived signed access. Avoid binaries and permanent public image URLs in the database. Choose object storage when building uploads; PostgreSQL does not supply an image bucket.
+The backend deployment target is Railway using the repository Dockerfile and
+versioned migrations. `/health/live` reports the process, while `/health/ready`
+requires database readiness. Deployment is not implied by local tests. AWS and
+try-on generation remain future work; there is no implemented try-on job pipeline.
 
-## Railway first, AWS later
+## Code ownership
 
-Build the backend as a Docker image and supply its database URL at runtime. Railway supports Dockerfile deployments and managed PostgreSQL. [Dockerfiles](https://docs.railway.com/builds/dockerfiles), [PostgreSQL](https://docs.railway.com/databases/postgresql)
+| Responsibility                   | Start here                                                                                                                                                                                                                                                                                      |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Renderer and bridge              | [App.tsx](../src/desktop/renderer/App.tsx), [Preload.ts](../src/desktop/preload/Preload.ts), [Main.ts](../src/desktop/main/Main.ts)                                                                                                                                                             |
+| Public boundary schemas          | [contracts](../src/contracts/SystemStatus.ts); domain code consumes framework-free values, never persistence-generated types                                                                                                                                                                    |
+| Auth and saved accounts          | [AuthClient.ts](../src/desktop/main/AuthClient.ts), [AccountSessions.ts](../src/desktop/main/accounts/AccountSessions.ts), [EncryptedAccountVault.ts](../src/desktop/main/accounts/EncryptedAccountVault.ts)                                                                                    |
+| Native host and permissions      | [EmbeddedDesktopDriver.ts](../src/desktop/main/EmbeddedDesktopDriver.ts), [DesktopPermissions.ts](../src/desktop/main/DesktopPermissions.ts), [CursorCompanion.patch](../driver-patches/CursorCompanion.patch)                                                                                  |
+| Chat and worker composition      | [AgentChatController.ts](../src/desktop/main/AgentChatController.ts), [ComputerUseTaskRunner.ts](../src/desktop/worker/agent/ComputerUseTaskRunner.ts)                                                                                                                                          |
+| Execution and verification       | [TaskHarness.ts](../src/desktop/worker/execution/TaskHarness.ts), [TaskVerifier.ts](../src/desktop/worker/execution/TaskVerifier.ts), [CompletionGate.ts](../src/desktop/worker/execution/CompletionGate.ts)                                                                                    |
+| Teaching and native tool adapter | [TeachingTaskRunner.ts](../src/desktop/worker/teaching/TeachingTaskRunner.ts), [TeachingPresenter.ts](../src/desktop/worker/teaching/TeachingPresenter.ts), [LoggedCuaServer.ts](../src/desktop/worker/cua/LoggedCuaServer.ts)                                                                  |
+| Local observation                | [DesktopObservationClient.ts](../src/desktop/worker/observation/DesktopObservationClient.ts), [TeachingObservationPolicy.ts](../src/desktop/worker/observation/TeachingObservationPolicy.ts)                                                                                                    |
+| Companion presentation           | [DesktopCompanion.ts](../src/desktop/main/companion/DesktopCompanion.ts), [CompanionHudPublisher.ts](../src/desktop/worker/companion/CompanionHudPublisher.ts)                                                                                                                                  |
+| Voice and microphones            | [VoiceInputController.ts](../src/desktop/main/voice/VoiceInputController.ts), [VoiceoverController.ts](../src/desktop/main/voiceover/VoiceoverController.ts), [Microphones.ts](../src/desktop/renderer/voice/Microphones.ts)                                                                    |
+| Model gateway                    | [RegisterModelGateway.ts](../src/server/auth/RegisterModelGateway.ts), [ModelGatewayConfig.ts](../src/server/auth/ModelGatewayConfig.ts), [ForwardModelResponse.ts](../src/server/auth/ForwardModelResponse.ts)                                                                                 |
+| Classroom and practice           | [ClassroomService.ts](../src/server/features/classroom/application/ClassroomService.ts), [PracticeCheckService.ts](../src/server/features/classroom/application/PracticeCheckService.ts), [ClassroomSessionController.ts](../src/desktop/main/classroom/ClassroomSessionController.ts)          |
+| Materials and retrieval          | [MaterialService.ts](../src/server/features/materials/application/MaterialService.ts), [PrepareMaterialCollection.ts](../src/server/features/materials/application/PrepareMaterialCollection.ts), [ReadMaterialSources.ts](../src/server/features/materials/application/ReadMaterialSources.ts) |
+| Persistence                      | [PrismaClassroomStore.ts](../src/server/persistence/PrismaClassroomStore.ts), [schema.prisma](../prisma/schema.prisma), reviewed additive migrations                                                                                                                                            |
+| Updates and pets                 | [AppUpdateController.ts](../src/desktop/main/updates/AppUpdateController.ts), [PetController.ts](../src/desktop/main/pets/PetController.ts)                                                                                                                                                     |
+| Runtime configuration            | [backend Env.ts](../src/server/Env.ts), [main Env.ts](../src/desktop/main/Env.ts), [scripts Env.ts](../scripts/Env.ts)                                                                                                                                                                          |
 
-For AWS later, a possible target is ECS/Fargate, RDS PostgreSQL, S3, and Secrets Manager. Preserve HTTP contracts and application code; data transfer, IAM, networking, and deployment configuration still require work. Avoid building AWS infrastructure before it is needed.
+Tests mirror `src` under `test`. Production code never imports tests or sibling
+repository source. Framework-free domain rules depend on explicit ports; public
+contracts use strict runtime schemas. `CheckBoundaries.ts` enforces filenames and
+import boundaries. See [AGENTS.md](../AGENTS.md) for coding rules.
 
-The Dockerfile and Railway configuration are a deployment starting point, not a completed deployment. Run `prisma migrate deploy` in a controlled release step. Requests never run migrations. Configure the public desktop API URL before making an installer. See [Deployment.md](Deployment.md).
+## Verification and current limits
 
-## Next steps
+Unit and disposable-PostgreSQL integration tests cover contracts, authorization,
+state transitions, concurrency guards, cancellation, evidence and privacy. The
+teaching flow harness builds the actual renderer/preload/main/worker/SDK/MCP path
+with a scripted local model peer. Its native mode also exercises the real macOS
+host, capture comparison, HUD installations, paired receipts and teardown. A
+validated completion marker prevents a normal app launch from counting as a pass.
+These checks require no paid inference.
 
-1. Run and package the desktop on both target operating systems.
-2. Complete account recovery, verification, production abuse controls, and hosted deployment.
-3. Complete upload → durable try-on job → result → history.
-4. Smoke-test the agent worker, bundled Cua Driver MCP process, and OS permissions in signed Windows/macOS installers.
-5. Validate the signed-in model gateway and Cua actions end to end before public release.
+Signed macOS/Windows hardware checks still cover global shortcuts, mic routing,
+background capture, transparent-window interactions, physical click/drag/Esc,
+coordinate accuracy and installed updates. Synthetic receipts do not prove physical
+display scan-out or model quality. Native guidance currently targets the primary
+macOS display; Windows and multiple-display teaching parity are not established.
+Real provider quality, hosted deployment and production recovery need separate
+acceptance. Validation commands and manual smoke checks are in the root README.
 
-The earlier exploratory options remain in [ArchitecturePrevious.md](ArchitecturePrevious.md). This document is the current source of truth.
-
-## Voice input
-
-### Microphone selection
-
-The app-owned microphone picker persists a local device ID and makes explainable device-name suggestions. Each hold snapshots that choice; exact device constraints prevent silent substitution for a missing explicit input. Inventory access and device changes do not open streams.
-
-`UseMicrophones` owns app-level discovery and storage, `Microphones` owns deterministic suggestion rules, and `MicrophonePicker` renders the choices. `UseVoiceInput` passes one selected ID into `VoiceAudioCapture` per hold. Electron main owns the trusted-frame audio permission policy and the existing capture controller owns admission and relay transport. Device names/IDs stay local; held-key audio follows the existing remote transcription path. Selection, suggestion and the input of an active capture are separate values. Selection needs no backend, database or HTTP API change. Local comparison adds only narrow validated test start/stop operations and cancellation events to preload.
-
-See [MicrophoneSelection.md](MicrophoneSelection.md) for the ownership map, data lifetimes, sequence diagram, failure recovery, recommendation rules and implemented sound-comparison architecture. `MicrophoneTestLease` coordinates main-owned exclusive test admission with voice. A separate renderer worklet emits only scalar measurements, with no relay or agent calls. `MicrophoneRanking` stores an independent device order and never switches the selected route. Signed hardware checks remain a release requirement; see [MicrophoneHardwareChecks.md](MicrophoneHardwareChecks.md).
-
-### Transcription
-
-The desktop captures held-key microphone audio in an AudioWorklet, sends bounded PCM frames through validated preload operations, and uses a scoped authenticated WebSocket relay in the backend. The existing locale hook supplies each capture’s language. Main admits one final instruction and its capture locale into the existing agent controller and reports submission/result events to the in-memory UI. Typed instructions also carry the current locale. The worker builds each task's agent instructions in that reply language while reusing its Cua connection. Prisma owns atomic audio quota reservations and single-use stream claims. See [VoiceInputSpec.md](VoiceInputSpec.md) for module ownership, limits, native packaging, and release evidence.
-
-## Native V2 teaching guidance
-
-The implemented [teaching observation design](teaching/TeachingObservationDesign.md) describes
-goal-driven lessons across multiple SDK runs. It keeps suggesting the next reachable
-step until fresh evidence supports the original goal, retaining context through
-waiting, clarification and resource pauses. The document includes controller flow,
-native observer contracts and code ownership. A session-owned native observer
-now wakes the lesson for screen-content changes as well as student input.
-
-Show me uses host-bound V2 cursor guidance. The native companion approaches,
-traces, holds and clears one cue at a time, then returns to pointer following.
-Passive pointer movement is allowed. Click/key/scroll input interrupts the current
-preview segment; the host releases its epoch, observes again, and continues the
-same lesson. Only the student’s Esc key or workspace Esc control cancels a
-lesson. Presentation/transport failures end it with failed status. A typed `teaching`
-result carries demonstrated, needs_input, canceled or failed status through the
-existing main/preload and voice boundaries. Demonstrated requires native receipt
-evidence, independent of desktop-action verification. Host lifecycle tools remain
-private and the model cannot omit V2 to select legacy behavior. See
-[CursorCompanionEngineering.md](companion/CursorCompanionEngineering.md) for implemented
-modules, timings, compositor evidence and primary-display limits.
-
-Show me keeps the original requested outcome and guides one reachable checkpoint
-at a time. The host captures the initial desktop before each SDK segment; the model
-defines or explicitly revises its teaching goal and proposes one typed action through
-`present_teaching_step`. The presenter derives drawing geometry and input targets
-from that same action. Spatial steps require a correlated native acknowledgement
-for the localized bubble and a visible drawing; keyboard, focused typing and loading
-steps use an explicit text-only acknowledgement. The final model decision references
-the presentation instead of supplying a second instruction.
-
-Teaching watches settled student input locally, with on-demand screenshots. Passive
-pointer movement and unrelated animation do not schedule model calls. Failed target
-comparisons remain feedback in the same SDK conversation within a shared repair
-budget. Questions retain the current lesson, while follow-up messages after settlement
-start fresh tasks. Goal completion requires current capture references for every
-current criterion. These contracts validate provenance and wiring, not the correctness
-of model interpretation. See [TeachingLoopEngineeringSpec.md](teaching/TeachingLoopEngineeringSpec.md)
-for ownership, retired behavior and manual acceptance limits.
-
-## Companion presentation
-
-`DesktopCompanion` is the main-process entry point for desktop presentation. It composes `cursor` (the authenticated chat controller’s following port) and `hud` (`CompanionHudController`) through explicit injected ports. It checks presentation access, registers the HUD before cursor binding, and fences pending startup on disposal. The chat controller retains ownership of its shared cursor/task worker; the facade owns presentation cleanup. `CompanionHudController` reduces capture and worker progress events in Electron main. A narrow meter IPC accepts finite, capture-bound levels from the existing PCM stream. `CompanionHudClient` owns a persistent presentation utility worker, separate from task orchestration, and coalesces snapshots through Cua MCP. Both workers receive the same main-owned `DesktopDriverConnection` from `EmbeddedDesktopDriver`; neither starts an independent daemon. The embedded host survives task-worker replacement and stops when main quits, while both sessions clear on sign-out or window close. The native compositor owns the passive 88 × 22 pill, waveform smoothing, crossfades and primary-display placement. Private group registration binds only Tro cursors; bounded leases and native session cleanup prevent orphaned presentation. The model cannot discover or call HUD host tools. VoiceInputController remains the sole final-transcript submitter.
-
-## HUD voiceover
-
-HUD narration uses ElevenLabs through an authenticated backend voiceover
-feature, with keys, model/voice selection and paid usage admission owned by the
-backend. A dedicated desktop voiceover controller composes with chat; private
-native installed-message reads coordinate bounded renderer audio playback with
-visible localized guidance. Speech does not supply completion evidence. See the
-[voiceover specification](companion/HudVoiceoverSpec.md) and
-[engineering design](companion/HudVoiceoverEngineering.md). Local wiring is implemented; live provider and signed
-hardware acceptance remain unverified.
-
-## Task completion
-
-The utility worker creates a TaskHarness for each original request, immutable natural-language goal and task locale. The harness owns lifecycle, explicit verification scheduling, one continuation and final settlement. MainAgentRunner owns actor SDK history; a bounded evidence store retains actual text/images from both agents in memory. When the main agent believes its work is finished, its `verify_task` tool invokes a separate read-only SDK agent sequentially. That agent judges the request against actual observations and can make targeted read-only checks. CompletionGate validates one consistent decision, criterion coverage, evidence provenance, capture age and supersession, then accepts final output only when it references that current stored verdict. Response mode cannot bypass verification after any desktop tool use. One optional continuation retains the original history, goal and locale. Both agents share deadlines and tool limits, with bounded verifier attempts and model turns. Public contracts carry outcome counts and a limitation for typed and voice results. See [AgentHarnessSpec.md](agent/AgentHarnessSpec.md) and [TaskCompletionSpec.md](agent/TaskCompletionSpec.md) for file ownership, model-versus-code responsibilities and validation limits.
-
-The executable [teaching flow contract](teaching/TeachingFlowContract.md) checks the production renderer, preload, main dispatcher, worker, SDK, and MCP flow with local fixtures, plus an explicit native boundary check.
-
-## Student pets
-
-The optional local pet is composed in Electron main separately from the cursor/HUD
-and agent worker. A sandboxed overlay receives a restricted preload surface and
-renders bundled raster pets; the Settings gallery owns selection and naming.
-Validated local preferences are scoped by account. The pet hides during agent work
-and voice capture, and uses no model requests or screen observation. See
-[StudentPetEngineering](companion/StudentPetEngineering.md) for ownership, behavior
-and pending signed macOS/Windows acceptance. Generated pets remain planned.
-
-## Materials preparation
-
-Teacher uploads, batch preparation, editable notes, private original downloads and approved
-section context are implemented in `src/server/features/materials` with canonical contracts,
-application ports and worker/provider adapters. See [MaterialPreparationEngineering](classroom/MaterialPreparationEngineering.md)
-for the storage limits, durable jobs, source retention and live-session approval fence.
-
-Compact material preparation uses backend generation/counting ports, durable class-scoped
-derivations and immutable approved sources. The student agent receives a bounded packet
-and authorized source tools; the existing paired instruction/drawing presenter remains
-the only teaching presentation path. See [MaterialContextImplementation](classroom/MaterialContextImplementation.md).
-
-### Practice checks and work snapshots
-
-Classroom practice checking has a separate evaluator and persistence port. Checkpoint schemas in `src/contracts/PracticeCheck.ts` are optional additions to course/material contracts; existing progress and Scratch-link submission contracts remain intact. Teacher review enables criteria before publication. `PracticeCheckService` admits one bounded inference per request, snapshots evidence, validates all findings and fences late results against classroom versions. `PrismaPracticeCheckStore` owns serializable reservations, private bounded binary evidence and append-only submission receipts. The structured Responses adapter is read-only and cannot execute work or modify rubrics. Desktop main attaches authentication/device bindings; the renderer explicitly previews, checks, requests a hint and confirms hand-in. See [the engineering spec](classroom/PracticeCheckEngineeringSpec.md) for current limits and deferred capture/storage/review adapters.
+Operational logs record owned stage/reason, correlation IDs and bounded safe fields.
+Successful routine polls are quiet. Development exchange tracing is explicitly
+content-bearing and excludes image pixels, secrets and hidden reasoning. Ordinary
+logs never contain screenshots, typed keys, raw configuration or credentials.
+Gateway failures retain safe provider/network/TLS evidence; temporary per-stage
+render and successful-connection profiling is absent. When cause is uncertain,
+instrument the owning boundary before changing behavior.

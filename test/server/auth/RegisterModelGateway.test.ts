@@ -27,7 +27,6 @@ async function createLoggingFixture() {
     () => Promise.resolve('private-user-id'),
     environment,
     pino({ level: 'debug' }, output),
-    () => Promise.resolve(100),
   );
   const credential = await api.inject('/api/v1/model/credential');
   const body: unknown = credential.json();
@@ -36,19 +35,103 @@ async function createLoggingFixture() {
     api,
     token,
     readLogs: () => lines.join(''),
-    sendRequest: () =>
+    sendRequest: (fields: Record<string, unknown> = {}) =>
       api.inject({
         method: 'POST',
         url: '/api/v1/model/responses',
         headers: { authorization: 'Bearer ' + token },
-        payload: { model: 'gpt-5.4', input: 'private prompt and screenshot', stream: false },
+        payload: {
+          model: 'gpt-5.4',
+          input: 'private prompt and screenshot',
+          stream: false,
+          ...fields,
+        },
       }),
   };
 }
 
 describe('model gateway', () => {
+  it('forwards visual requests directly without a token-count preflight', async () => {
+    const fixture = await createLoggingFixture();
+    const input = [
+      {
+        role: 'user',
+        content: [{ type: 'input_image', image_url: 'data:image/png;base64,synthetic' }],
+      },
+    ];
+    const tools = [{ type: 'function', name: 'read', parameters: { type: 'object' } }];
+    const provider = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{"id":"direct"}'));
+    try {
+      const reply = await fixture.sendRequest({
+        input,
+        tools,
+        instructions: 'Synthetic instruction',
+        store: false,
+      });
+      expect(reply.statusCode).toBe(200);
+      expect(provider).toHaveBeenCalledOnce();
+      expect(provider.mock.calls[0]?.[0]).toBe('https://api.openai.com/v1/responses');
+      expect(provider.mock.calls[0]?.[1]?.body).toBe(
+        JSON.stringify({
+          model: 'gpt-5.4',
+          input,
+          stream: false,
+          tools,
+          instructions: 'Synthetic instruction',
+          store: false,
+          max_output_tokens: 4096,
+        }),
+      );
+    } finally {
+      provider.mockRestore();
+      await fixture.api.close();
+    }
+  });
+
+  it.each([
+    { requested: undefined, expected: 4096 },
+    { requested: 1024, expected: 1024 },
+    { requested: 10000, expected: 4096 },
+  ])(
+    'applies the configured output ceiling for $requested tokens',
+    async ({ requested, expected }) => {
+      const fixture = await createLoggingFixture();
+      const provider = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+      try {
+        const reply = await fixture.sendRequest(
+          requested === undefined ? {} : { max_output_tokens: requested },
+        );
+        expect(reply.statusCode).toBe(200);
+        expect(provider.mock.calls[0]?.[1]?.body).toContain(
+          '"max_output_tokens":' + String(expected),
+        );
+      } finally {
+        provider.mockRestore();
+        await fixture.api.close();
+      }
+    },
+  );
+
+  it.each([0, -1, 1.5, '4096'])(
+    'rejects invalid output limits (%s) before forwarding',
+    async (requested) => {
+      const fixture = await createLoggingFixture();
+      const provider = vi.spyOn(globalThis, 'fetch');
+      try {
+        expect((await fixture.sendRequest({ max_output_tokens: requested })).statusCode).toBe(400);
+        expect(provider).not.toHaveBeenCalled();
+      } finally {
+        provider.mockRestore();
+        await fixture.api.close();
+      }
+    },
+  );
+
   it.each([
     { status: 400, code: 'invalid_value', type: 'invalid_request_error' },
+    { status: 400, code: 'context_length_exceeded', type: 'invalid_request_error' },
     { status: 401, code: 'invalid_api_key', type: 'authentication_error' },
     { status: 429, code: 'insufficient_quota', type: 'insufficient_quota' },
     { status: 500, code: 'server_error', type: 'server_error' },
@@ -125,9 +208,35 @@ describe('model gateway', () => {
       expect(logs).toContain('"networkCode":"ECONNRESET"');
       expect(logs).toContain('"reason":"provider_network_failed"');
       expect(logs).toContain('"event":"model.gateway.retry"');
-      expect(logs).toContain('"event":"model.gateway.attempt","attemptNumber":1,"phase":"failed"');
-      expect(logs).toContain('"event":"model.gateway.attempt","attemptNumber":2,"phase":"failed"');
+      expect(logs).not.toContain('model.gateway.attempt');
       expect(logs).not.toContain('private');
+    } finally {
+      provider.mockRestore();
+      await fixture.api.close();
+    }
+  });
+
+  it('keeps supplied socket failure evidence API-only', async () => {
+    const fixture = await createLoggingFixture();
+    const provider = vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+      new TypeError('private', {
+        cause: {
+          code: 'UND_ERR_SOCKET',
+          message: 'other side closed',
+          socket: { bytesWritten: 1234, bytesRead: 0, remoteAddress: 'private address' },
+        },
+      }),
+    );
+    try {
+      const reply = await fixture.sendRequest();
+      expect(reply.statusCode).toBe(502);
+      expect(provider).toHaveBeenCalledTimes(2);
+      const logs = fixture.readLogs();
+      expect(logs).toContain('"socketFailureReason":"peer_closed"');
+      expect(logs).toContain('"socketBytesWritten":1234');
+      expect(logs).toContain('"socketBytesRead":0');
+      expect(logs).not.toContain('private');
+      expect(reply.body).not.toContain('"socketBytesWritten":');
     } finally {
       provider.mockRestore();
       await fixture.api.close();
@@ -151,6 +260,56 @@ describe('model gateway', () => {
       expect(logs).toContain('"attemptNumber":2');
       expect(logs).toContain('model.gateway.completed');
       expect(logs).not.toContain('private');
+    } finally {
+      provider.mockRestore();
+      await fixture.api.close();
+    }
+  });
+
+  it('reports setup failure without emitting successful connection traces', async () => {
+    const fixture = await createLoggingFixture();
+    const provider = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(
+        new TypeError('private host', { cause: { code: 'ENOTFOUND', syscall: 'getaddrinfo' } }),
+      );
+    try {
+      expect((await fixture.sendRequest()).statusCode).toBe(502);
+      expect(provider).toHaveBeenCalledOnce();
+      const logs = fixture.readLogs();
+      expect(logs).toContain('model.gateway.failed');
+      expect(logs).toContain('"networkCode":"ENOTFOUND"');
+      expect(logs).not.toContain('model.gateway.connection.');
+      expect(logs).not.toContain('model.gateway.attempt');
+      expect(logs).not.toContain('private');
+    } finally {
+      provider.mockRestore();
+      await fixture.api.close();
+    }
+  });
+
+  it('preserves the original TLS cause in one safe failure event without retrying it', async () => {
+    const fixture = await createLoggingFixture();
+    const native = Object.assign(new Error('private peer:error:0A0003FC:SSL routines:private'), {
+      code: 'ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC',
+      library: 'SSL routines',
+    });
+    const provider = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new TypeError('private request', { cause: native }));
+    try {
+      const reply = await fixture.sendRequest();
+      expect(reply.statusCode).toBe(502);
+      expect(provider).toHaveBeenCalledOnce();
+      const logs = fixture.readLogs();
+      expect(logs.match(/"event":"model.gateway.failed"/g)).toHaveLength(1);
+      expect(logs).toContain('"socketErrorCode":"ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC"');
+      expect(logs).toContain('"socketTlsAlertNumber":20');
+      expect(logs).toContain('"socketTlsErrorNumber":"0A0003FC"');
+      expect(logs).not.toContain('model.gateway.connection.');
+      expect(logs).not.toContain('model.gateway.attempt');
+      expect(logs).not.toContain('private');
+      expect(reply.body).not.toContain('socketTls');
     } finally {
       provider.mockRestore();
       await fixture.api.close();
@@ -194,6 +353,10 @@ describe('model gateway', () => {
         'Finished forwarding the model response to the desktop.',
       );
       expect(fixture.readLogs()).toContain('"responseBytes":' + String(Buffer.byteLength(body)));
+      expect(fixture.readLogs()).not.toContain('model.gateway.first_byte');
+      expect(fixture.readLogs()).not.toContain('model.gateway.attempt');
+      expect(fixture.readLogs()).not.toContain('model.gateway.connection.');
+      expect(fixture.readLogs()).not.toContain('transportObserved');
       expect(fixture.readLogs()).not.toContain('private');
     } finally {
       provider.mockRestore();
@@ -235,9 +398,7 @@ describe('model gateway', () => {
           Promise.resolve(headers.cookie === 'tro-test=session' ? 'signed-in-user' : null),
         );
       const api = Fastify();
-      registerModelGateway(api, readSignedInUserId, environment, api.log, () =>
-        Promise.resolve(100),
-      );
+      registerModelGateway(api, readSignedInUserId, environment, api.log);
 
       try {
         const denied = await api.inject('/api/v1/model/credential');

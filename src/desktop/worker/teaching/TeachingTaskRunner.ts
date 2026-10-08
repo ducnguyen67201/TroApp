@@ -178,6 +178,7 @@ export class TeachingTaskRunner {
     try {
       await this.companion.startFollowing();
       stage = TeachingFailureStage.START_OBSERVATION;
+      await this.server.bindTeachingLesson(lesson.id);
       await this.beginObservation(lesson, signal);
       for (;;) {
         signal.throwIfAborted();

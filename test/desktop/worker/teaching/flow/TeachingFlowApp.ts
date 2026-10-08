@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { writeFile } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { z } from 'zod';
@@ -478,5 +479,11 @@ void runContract()
     chat?.dispose();
     window?.destroy();
     await fixture.close();
+    if (code === 0) {
+      await writeFile(
+        join(root, 'ContractResult.json'),
+        JSON.stringify({ status: 'passed', native: process.argv.includes('--native') }),
+      );
+    }
     app.exit(code);
   });

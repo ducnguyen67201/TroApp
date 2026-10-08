@@ -2,11 +2,21 @@
 
 ## Read first and preserve boundaries
 
-Read README.md and docs/Architecture.md before changing code. This repository is a standalone pnpm root; never import sibling-repository source. Preserve others' edits and keep changes scoped. Read docs/CODEX-NAVIGATION-GUIDE.md for ownership and common change paths.
+Read README.md and docs/Architecture.md before changing code. This repository is a standalone pnpm root; never import sibling-repository source. Preserve others' edits and keep changes scoped. Use docs/Architecture.md for ownership, component communication and common change paths.
 
 Use Node.js and strict TypeScript with public contracts at boundaries and explicit application ports. Domain code has no framework or I/O imports. Keep a modular monolith; introduce shared packages, services, or event infrastructure only for demonstrated needs.
 
 Code must build and pass unit tests without private code, cloud credentials, or a live database. Integration checks may use a disposable local PostgreSQL database. Independent consumers use the versioned HTTP API or a published SDK, not sibling source. Do not automatically publish, push, deploy, or change licensing.
+
+## One maintained architecture document
+
+`docs/Architecture.md` is the single maintained description of the implemented system.
+Update it when component ownership, communication or architectural invariants change.
+Keep setup, validation and release commands in the root `README.md`. Link to owning
+contracts/configuration rather than duplicating their exact values. Do not add standalone
+feature plans, specs, implementation histories or a second architecture index.
+Keep historical research/product observations in `research/` and visual prototypes in
+`examples/previews/`, clearly distinguished from current runtime behavior.
 
 ## File naming — PascalCase
 

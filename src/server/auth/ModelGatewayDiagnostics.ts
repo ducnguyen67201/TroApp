@@ -20,10 +20,7 @@ export const ModelGatewayFailure = {
 export const ModelGatewayEvent = {
   REQUEST: 'model.gateway.request',
   REJECTED: 'model.gateway.rejected',
-  DISPATCH: 'model.gateway.dispatch',
   RETRY: 'model.gateway.retry',
-  ATTEMPT: 'model.gateway.attempt',
-  RESPONSE: 'model.gateway.response',
   FAILED: 'model.gateway.failed',
   COMPLETED: 'model.gateway.completed',
 } as const;
@@ -60,12 +57,62 @@ export function readProviderRequestId(headers: Headers): string | null {
   return value !== null && /^req_[A-Za-z0-9_-]{1,128}$/.test(value) ? value : null;
 }
 
+const SocketFailureReason = {
+  PEER_CLOSED: 'peer_closed',
+  CLOSED: 'closed',
+  BAD_RESPONSE: 'bad_response',
+  BAD_UPGRADE: 'bad_upgrade',
+  UNCLASSIFIED: 'unclassified',
+} as const;
+
+type SocketFailureReason = (typeof SocketFailureReason)[keyof typeof SocketFailureReason];
+
+interface SocketFailureDiagnostics {
+  socketFailureReason: SocketFailureReason;
+  socketBytesWritten: number | null;
+  socketBytesRead: number | null;
+}
+
+/** Socket counters cover the connection lifetime, including any earlier pooled requests. */
+function describeSocketFailure(message: unknown, socket: unknown): SocketFailureDiagnostics {
+  const parsed = z
+    .object({ bytesWritten: z.unknown().optional(), bytesRead: z.unknown().optional() })
+    .safeParse(socket);
+  let socketFailureReason: SocketFailureReason = SocketFailureReason.UNCLASSIFIED;
+  switch (message) {
+    case 'other side closed':
+      socketFailureReason = SocketFailureReason.PEER_CLOSED;
+      break;
+    case 'closed':
+      socketFailureReason = SocketFailureReason.CLOSED;
+      break;
+    case 'bad response':
+      socketFailureReason = SocketFailureReason.BAD_RESPONSE;
+      break;
+    case 'bad upgrade':
+      socketFailureReason = SocketFailureReason.BAD_UPGRADE;
+      break;
+  }
+  return {
+    socketFailureReason,
+    socketBytesWritten: readSocketByteCount(parsed.success ? parsed.data.bytesWritten : undefined),
+    socketBytesRead: readSocketByteCount(parsed.success ? parsed.data.bytesRead : undefined),
+  };
+}
+
+function readSocketByteCount(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
 export function describeNetworkFailure(error: unknown): {
   errorType: string;
   networkCode: string | null;
   networkSyscall: string | null;
   networkErrno: number | null;
   causeDepth: number | null;
+  socketFailureReason?: SocketFailureReason;
+  socketBytesWritten?: number | null;
+  socketBytesRead?: number | null;
 } {
   let current: unknown = error;
   for (let depth = 0; depth < 6; depth += 1) {
@@ -75,6 +122,8 @@ export function describeNetworkFailure(error: unknown): {
         syscall: z.unknown().optional(),
         errno: z.unknown().optional(),
         cause: z.unknown().optional(),
+        message: z.unknown().optional(),
+        socket: z.unknown().optional(),
       })
       .safeParse(current);
     if (!parsed.success) {
@@ -95,6 +144,9 @@ export function describeNetworkFailure(error: unknown): {
             ? errno
             : null,
         causeDepth: depth,
+        ...(code === 'UND_ERR_SOCKET'
+          ? describeSocketFailure(parsed.data.message, parsed.data.socket)
+          : {}),
       };
     }
     current = parsed.data.cause;

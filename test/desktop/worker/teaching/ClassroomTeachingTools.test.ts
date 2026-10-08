@@ -1,3 +1,4 @@
+import { RunContext } from '@openai/agents';
 import { describe, expect, it, vi } from 'vitest';
 import { ClassroomToolClient } from '../../../../src/desktop/worker/teaching/ClassroomToolClient.js';
 import { TeachingLessonContext } from '../../../../src/desktop/worker/teaching/TeachingLessonContext.js';
@@ -34,6 +35,63 @@ describe('classroom teaching context', () => {
       'prepare_task_submission',
     ]);
     expect(ClassroomToolCommandSchema.safeParse({ kind: 'submit-work' }).success).toBe(false);
+  });
+
+  it('publishes the workspace URL as a strict string without the unsupported URI format', () => {
+    const tools = createClassroomTeachingTools({
+      context: createTeachingContext(),
+      callTool: vi.fn<ClassroomTeachingSession['callTool']>(),
+    });
+    const workspaceTool = tools.find((entry) => entry.name === 'save_activity_workspace');
+    expect(workspaceTool?.strict).toBe(true);
+    expect(workspaceTool?.parameters).toMatchObject({
+      type: 'object',
+      properties: { url: { type: 'string', maxLength: 2000 } },
+      required: ['url'],
+      additionalProperties: false,
+    });
+    expect(JSON.stringify(workspaceTool?.parameters)).not.toContain('"format":"uri"');
+  });
+
+  it('saves a valid HTTPS workspace through the SDK execution boundary', async () => {
+    const callTool = vi
+      .fn<ClassroomTeachingSession['callTool']>()
+      .mockResolvedValue({ kind: 'ok' });
+    const workspaceTool = createClassroomTeachingTools({
+      context: createTeachingContext(),
+      callTool,
+    }).find((entry) => entry.name === 'save_activity_workspace');
+    if (!workspaceTool) {
+      throw new Error('Expected workspace tool.');
+    }
+    await workspaceTool.invoke(
+      new RunContext(),
+      JSON.stringify({ url: 'https://scratch.mit.edu/projects/123/' }),
+    );
+    expect(callTool).toHaveBeenCalledExactlyOnceWith({
+      kind: 'save-workspace',
+      url: 'https://scratch.mit.edu/projects/123/',
+    });
+  });
+
+  it.each([
+    { url: 'http://scratch.mit.edu/projects/123/' },
+    { url: 'https://user:password@example.test/project' },
+    { url: 'not a URL' },
+    { url: 'https://example.test/' + 'x'.repeat(2000) },
+    { url: 123 },
+    { url: 'https://example.test/project', extra: 'unexpected' },
+  ])('rejects invalid workspace arguments before dispatch: $url', async (input) => {
+    const callTool = vi.fn<ClassroomTeachingSession['callTool']>();
+    const workspaceTool = createClassroomTeachingTools({
+      context: createTeachingContext(),
+      callTool,
+    }).find((entry) => entry.name === 'save_activity_workspace');
+    if (!workspaceTool) {
+      throw new Error('Expected workspace tool.');
+    }
+    await workspaceTool.invoke(new RunContext(), JSON.stringify(input));
+    expect(callTool).not.toHaveBeenCalled();
   });
 
   it('settles correlated tools on cancellation and ignores late responses', async () => {

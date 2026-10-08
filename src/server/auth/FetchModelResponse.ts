@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { ModelGatewayConfig } from './ModelGatewayConfig.js';
 import { describeNetworkFailure } from './ModelGatewayDiagnostics.js';
 
 export const ModelAttemptPhase = {
@@ -13,11 +14,35 @@ export interface ModelAttemptDiagnostics {
   durationMs: number;
   aborted: boolean;
   failure?: ReturnType<typeof describeNetworkFailure>;
+  retryEligible?: boolean;
+  retryDelayMs?: number;
+  retryStopReason?: (typeof ModelRetryStopReason)[keyof typeof ModelRetryStopReason];
 }
 
-export const ModelGatewayRetry = { MAXIMUM_ATTEMPTS: 2, DELAY_MS: 250 } as const;
+const ModelRetryStopReason = {
+  CANCELED: 'canceled',
+  ATTEMPTS_EXHAUSTED: 'attempts_exhausted',
+  FAILURE_NOT_RETRYABLE: 'failure_not_retryable',
+} as const;
 
-const RetryableSocketCodes = new Set(['UND_ERR_SOCKET', 'ECONNRESET', 'EPIPE']);
+const RetryableSocketCodes = new Set<string>(ModelGatewayConfig.retry.socketCodes);
+
+function readModelRetryStopReason(
+  aborted: boolean,
+  attemptNumber: number,
+  networkCode: string | null,
+): (typeof ModelRetryStopReason)[keyof typeof ModelRetryStopReason] | undefined {
+  if (aborted) {
+    return ModelRetryStopReason.CANCELED;
+  }
+  if (attemptNumber >= ModelGatewayConfig.retry.maximumAttempts) {
+    return ModelRetryStopReason.ATTEMPTS_EXHAUSTED;
+  }
+  if (networkCode === null || !RetryableSocketCodes.has(networkCode)) {
+    return ModelRetryStopReason.FAILURE_NOT_RETRYABLE;
+  }
+  return undefined;
+}
 
 /** Retry only rejected fetches before response headers; never replay response streams or tools.
  * A broken connection can leave provider execution uncertain. The one retry is bounded and
@@ -40,7 +65,7 @@ export async function fetchModelResponse(
       aborted: signal.aborted,
     });
     try {
-      const response = await fetch('https://api.openai.com/v1/responses', {
+      const response = await fetch(ModelGatewayConfig.providerResponsesUrl, {
         method: 'POST',
         headers: { authorization: 'Bearer ' + providerKey, 'content-type': 'application/json' },
         body,
@@ -54,23 +79,26 @@ export async function fetchModelResponse(
       });
       return response;
     } catch (error) {
+      const failure = describeNetworkFailure(error);
+      const retryStopReason = readModelRetryStopReason(
+        signal.aborted,
+        attemptNumber,
+        failure.networkCode,
+      );
       reportAttempt?.({
         attemptNumber,
         phase: ModelAttemptPhase.FAILED,
         durationMs: Math.round(performance.now() - startedAt),
         aborted: signal.aborted,
-        failure: describeNetworkFailure(error),
+        failure,
+        retryEligible: retryStopReason === undefined,
+        retryDelayMs: retryStopReason === undefined ? ModelGatewayConfig.retry.delayMs : 0,
+        ...(retryStopReason ? { retryStopReason } : {}),
       });
-      const code = describeNetworkFailure(error).networkCode;
-      if (
-        signal.aborted ||
-        attemptNumber >= ModelGatewayRetry.MAXIMUM_ATTEMPTS ||
-        code === null ||
-        !RetryableSocketCodes.has(code)
-      ) {
+      if (retryStopReason !== undefined) {
         throw error;
       }
-      await delay(ModelGatewayRetry.DELAY_MS, undefined, { signal });
+      await delay(ModelGatewayConfig.retry.delayMs, undefined, { signal });
       signal.throwIfAborted();
       reportRetry(error);
       signal.throwIfAborted();

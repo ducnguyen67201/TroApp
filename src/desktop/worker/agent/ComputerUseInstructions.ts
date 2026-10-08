@@ -48,7 +48,7 @@ export function createComputerUseInstructions(
 }
 
 /**
- * Teaching lifecycle and tool/reply contracts; rationale lives in docs/agent/AgentPromptResearch.md.
+ * Teaching lifecycle and tool/reply contracts; rationale lives in research/AgentPromptResearch.md.
  * The host separately enforces permissions, capture freshness and native receipts.
  */
 export const TeachingInstructions = `# Role and outcome
