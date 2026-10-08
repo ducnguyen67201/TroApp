@@ -13,7 +13,11 @@ import {
   type AccountCommand,
   type AccountReply,
 } from '#contracts/DesktopAccounts.js';
-import { MaterialCommandSchema, MaterialReplySchema } from '#contracts/ClassroomMaterials.js';
+import {
+  MaterialCommandSchema,
+  MaterialReplySchema,
+  MaterialPreviewReplySchema,
+} from '#contracts/ClassroomMaterials.js';
 import {
   VoiceoverPlaybackSchema,
   VoiceoverStatusSchema,
@@ -116,6 +120,18 @@ const bridge: DesktopBridge = {
       MaterialCommandSchema.parse({ kind: 'download', classId, materialId }),
     );
     return result === true;
+  },
+  async previewClassMaterial(classId, materialId) {
+    try {
+      return MaterialPreviewReplySchema.parse(
+        await ipcRenderer.invoke(
+          'tro:class-material-preview',
+          MaterialCommandSchema.parse({ kind: 'download', classId, materialId }),
+        ),
+      );
+    } catch {
+      return { kind: 'failed', code: 'unavailable' };
+    }
   },
   subscribeVoiceover(listener) {
     const receive = (_event: Electron.IpcRendererEvent, raw: unknown): void => {

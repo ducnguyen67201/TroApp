@@ -34,6 +34,7 @@ it('names the material and requires confirmation before removing it', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Delete Lesson.py' }));
   fireEvent.click(screen.getByRole('button', { name: 'Confirm remove material' }));
   expect(onRemove).toHaveBeenCalledExactlyOnceWith(materialId);
+  expect(screen.getByRole('button', { name: 'Preview Lesson.py' })).toBeTruthy();
 });
 
 function renderFiles(disabled = false, materials: MaterialCollection = collection) {

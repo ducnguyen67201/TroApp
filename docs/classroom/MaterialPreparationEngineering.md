@@ -43,6 +43,42 @@ prepared context; it explicitly says that no reviewed material is available.
 
 ## Retention and processing
 
+Uploaded originals have a **Preview / Xem trước** action beside Download in both
+teacher materials and the student's published-material list. It works before AI
+preparation. PDF originals open in a read-only modal with continuous vertical scrolling;
+the minus/plus controls zoom from 50% to 250% in 25% steps. Click the percentage to
+reset to fit width (100%). Zoom preserves the current reading position and allows
+horizontal scrolling when pages exceed the viewer width. Nearby pages are repainted
+at the requested pixel width, capped at four million pixels per canvas.
+Python, Markdown and UTF-8 text are escaped plain text (120,000-character display
+limit, explicitly marked when shortened). PowerPoint and Scratch originals currently
+offer a download-to-open explanation; visual viewers for those formats are not implemented.
+Reference links remain metadata only and do not load third-party pages.
+
+`previewClassMaterial(classId, materialId)` is a narrow validated preload method.
+Main verifies the sender before and after the request and holds the account transition
+gate while fetching. It reuses the authenticated backend download command: teacher
+ownership or student enrollment plus published-source access is still required.
+No additional database table, public file URL, model request or local file write is
+needed. Closing the modal or changing class discards late responses and private bytes.
+PDF.js and its dedicated bundled worker load on demand. Lightweight page placeholders
+preserve document layout; IntersectionObserver renders pages within 300 pixels of the
+scroll viewport, cancels renders and clears pixel buffers for pages leaving that area.
+The first page provides the initial aspect ratio; each rendered page retains its own
+ratio for stable placeholders. Each page surface is bounded, and the document/worker
+is destroyed on close. No embedded
+PDF scripts, links or forms are made interactive. Unreadable/protected PDFs show a
+localized error and keep the original download available. Unusual PDF encodings may
+need the original desktop reader; this lightweight viewer does not bundle optional
+PDF.js CMap/WASM resources.
+
+To check manually: upload a multi-page PDF, preview it before processing, scroll
+through the pages and close/reopen; inspect an existing processed PDF the same way; preview a
+Python/Markdown file; verify students can preview only published originals. Also close
+or change class while the file request is pending. Unit checks cover sender/ID/account
+fences, inert text, lazy scrolling/cancellation and viewer cleanup. Packaging and
+visual checks remain necessary for signed macOS/Windows builds.
+
 Original bytes are private PostgreSQL `bytea` records in this bounded pilot, not public
 URLs. Supported inputs are PDF, PPTX, SB3, Python, Markdown and UTF-8 text. PDF text is
 retained per page; original PDFs are also supplied to the vision-capable model to

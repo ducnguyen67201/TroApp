@@ -3,6 +3,7 @@ import { Alert, Button, Group, Stack, Text } from '@mantine/core';
 import { IconDownload, IconFileDescription, IconLink } from '@tabler/icons-react';
 import type { TeachingContext } from '#contracts/Classroom.js';
 import type { ClassroomTranslate } from './ClassroomLabels.js';
+import { MaterialPreviewButton } from './MaterialPreviewButton.js';
 
 interface StudentMaterialsProps {
   context: TeachingContext;
@@ -50,6 +51,9 @@ export function StudentMaterials({ context, t }: StudentMaterialsProps): ReactEl
                 </Text>
               )}
             </div>
+            {!source.url && (
+              <MaterialPreviewButton classId={context.meeting.classId} source={source} t={t} />
+            )}
             {!source.url && (
               <Button
                 size="xs"

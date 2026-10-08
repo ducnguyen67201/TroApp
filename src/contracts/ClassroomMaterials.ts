@@ -274,18 +274,29 @@ export const MaterialCommandSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
+const materialDownloadReply = z.strictObject({
+  kind: z.literal('download'),
+  name: MaterialFilenameSchema,
+  data: z.string().max(Math.ceil(MaterialLimits.FILE_BYTES / 3) * 4),
+});
+const materialFailureReply = z.strictObject({
+  kind: z.literal('failed'),
+  code: z.enum(MaterialFailure),
+  issue: z.enum(MaterialIssue).optional(),
+});
+
+/** Original file bytes only; previews use the existing authorized download operation. */
+export const MaterialPreviewReplySchema = z.discriminatedUnion('kind', [
+  materialDownloadReply,
+  materialFailureReply,
+]);
+
+export type MaterialPreviewReply = z.infer<typeof MaterialPreviewReplySchema>;
+
 export const MaterialReplySchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('collection'), collection: MaterialCollectionSchema }),
-  z.strictObject({
-    kind: z.literal('download'),
-    name: MaterialFilenameSchema,
-    data: z.string().max(Math.ceil(MaterialLimits.FILE_BYTES / 3) * 4),
-  }),
-  z.strictObject({
-    kind: z.literal('failed'),
-    code: z.enum(MaterialFailure),
-    issue: z.enum(MaterialIssue).optional(),
-  }),
+  materialDownloadReply,
+  materialFailureReply,
 ]);
 
 export const LegacyMaterialLessonContextSchema = z.strictObject({

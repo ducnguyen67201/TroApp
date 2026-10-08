@@ -2,7 +2,7 @@ import type { PetCommand, PetReply, PetSnapshot } from './Pet.js';
 import type { PracticeShortcutEvent } from './PracticeShortcut.js';
 import type { PracticeCommand, PracticeReply } from './PracticeCheck.js';
 import type { AccountReply } from './DesktopAccounts.js';
-import type { MaterialCommand, MaterialReply } from './ClassroomMaterials.js';
+import type { MaterialCommand, MaterialReply, MaterialPreviewReply } from './ClassroomMaterials.js';
 import type {
   MicrophoneTestCommand,
   MicrophoneTestEvent,
@@ -35,6 +35,7 @@ export interface DesktopBridge {
     command: Exclude<MaterialCommand, { kind: 'download' }>,
   ) => Promise<MaterialReply>;
   downloadClassMaterial?: (classId: string, materialId: string) => Promise<boolean>;
+  previewClassMaterial?: (classId: string, materialId: string) => Promise<MaterialPreviewReply>;
   subscribeVoiceover?: (
     listener: (event: VoiceoverPlayback | VoiceoverStatus) => void,
   ) => () => void;

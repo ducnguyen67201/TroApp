@@ -116,3 +116,28 @@ it('validates practice shortcut navigation events and removes its listener', asy
   electron.invoke.mockResolvedValue('true');
   expect(await bridge.readPracticeShortcutAvailable()).toBe(false);
 });
+
+it('validates preview IDs and permits only original-file or failure replies', async () => {
+  await import('../../../src/desktop/preload/Preload.js');
+  electron.invoke.mockClear();
+  const bridge = electron.expose.mock.calls[0]?.[1];
+  if (!bridge?.previewClassMaterial) {
+    throw new Error('Missing preview bridge');
+  }
+  const classId = '11111111-1111-4111-8111-111111111111';
+  const materialId = '22222222-2222-4222-8222-222222222222';
+  expect((await bridge.previewClassMaterial(classId, '/private/file.pdf')).kind).toBe('failed');
+  expect(electron.invoke).not.toHaveBeenCalled();
+  const original = { kind: 'download', name: 'Lesson.pdf', data: 'cGRm' };
+  electron.invoke.mockResolvedValue(original);
+  expect(await bridge.previewClassMaterial(classId, materialId)).toEqual(original);
+  expect(electron.invoke).toHaveBeenCalledWith('tro:class-material-preview', {
+    kind: 'download',
+    classId,
+    materialId,
+  });
+  electron.invoke.mockResolvedValue({ ...original, name: '../Private.pdf' });
+  expect((await bridge.previewClassMaterial(classId, materialId)).kind).toBe('failed');
+  electron.invoke.mockResolvedValue({ kind: 'collection', collection: {} });
+  expect((await bridge.previewClassMaterial(classId, materialId)).kind).toBe('failed');
+});
