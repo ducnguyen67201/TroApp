@@ -908,7 +908,7 @@ async function startDesktop(): Promise<void> {
       petAccessGeneration += 1;
       petController.dispose();
       overlay.closePet();
-      await classroomController.leave();
+      classroomController.dispose();
       disableVoice();
       if (!chat) {
         return { kind: 'failed', message: 'The sign-in request is invalid.' };

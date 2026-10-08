@@ -296,6 +296,34 @@ export class ClassroomService {
       }
       return { kind: 'ok' };
     }
+    if (command.kind === 'resume') {
+      for (const participation of await store.listJoinedParticipations(userId)) {
+        const meeting = await store.readMeeting(participation.classSessionId);
+        if (
+          !meeting ||
+          meeting.status !== ClassroomStatus.LIVE ||
+          !(await store.readClass(meeting.classId)) ||
+          !(await store.isEnrolled(meeting.classId, userId))
+        ) {
+          continue;
+        }
+        // Membership survives disconnection; only this device's write lease is renewed.
+        await store.saveParticipation({ ...participation, deviceId: command.deviceId });
+        return {
+          kind: 'context',
+          context: await this.buildContext(
+            store,
+            userId,
+            participation.id,
+            command.deviceId,
+            meeting.currentActivityId,
+            true,
+            command.materialSchemaVersion,
+          ),
+        };
+      }
+      return { kind: 'ok' };
+    }
     if (command.kind === 'join') {
       const meeting = await this.readMeeting(store, command.classSessionId);
       requireLiveMeeting(meeting);
