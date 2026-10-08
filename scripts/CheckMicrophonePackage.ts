@@ -94,7 +94,7 @@ try {
         ...archive,
         microphoneMetadata,
         signing,
-        hardware: 'not exercised; use docs/MicrophoneHardwareChecks.md',
+        hardware: 'not exercised; use README.md#packaging-and-hardware-checks',
       },
       null,
       2,

@@ -132,6 +132,15 @@ it('reports every failed attempt separately and does not expose provider input',
       [2, 'started'],
       [2, 'failed'],
     ]);
+    expect(attempts[1]).toMatchObject({
+      retryEligible: true,
+      retryDelayMs: 250,
+    });
+    expect(attempts[3]).toMatchObject({
+      retryEligible: false,
+      retryDelayMs: 0,
+      retryStopReason: 'attempts_exhausted',
+    });
     expect(attempts[3]?.failure).toMatchObject({
       networkCode: 'EPIPE',
       networkSyscall: 'write',

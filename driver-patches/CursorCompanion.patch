@@ -1,5 +1,5 @@
 diff --git a/libs/cua-driver/rust/Cargo.lock b/libs/cua-driver/rust/Cargo.lock
-index 74051d8..ad62513 100644
+index 74051d8..3ac2ee9 100644
 --- a/libs/cua-driver/rust/Cargo.lock
 +++ b/libs/cua-driver/rust/Cargo.lock
 @@ -1205,7 +1205,7 @@ dependencies = [
@@ -7,7 +7,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cua-driver"
 -version = "0.30.4"
-+version = "0.30.4-tro.16"
++version = "0.30.4-tro.19"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -16,7 +16,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cua-driver-bindgen"
 -version = "0.30.4"
-+version = "0.30.4-tro.16"
++version = "0.30.4-tro.19"
  dependencies = [
   "cbindgen",
   "uniffi",
@@ -25,7 +25,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cua-driver-contract"
 -version = "0.30.4"
-+version = "0.30.4-tro.16"
++version = "0.30.4-tro.19"
  dependencies = [
   "schemars",
   "serde",
@@ -34,7 +34,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cua-driver-core"
 -version = "0.30.4"
-+version = "0.30.4-tro.16"
++version = "0.30.4-tro.19"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -43,7 +43,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cua-driver-e2e"
 -version = "0.30.4"
-+version = "0.30.4-tro.16"
++version = "0.30.4-tro.19"
  dependencies = [
   "base64",
   "core-foundation",
@@ -52,7 +52,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cua-driver-sdk"
 -version = "0.30.4"
-+version = "0.30.4-tro.16"
++version = "0.30.4-tro.19"
  dependencies = [
   "async-trait",
   "core-foundation",
@@ -61,7 +61,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cua-driver-testkit"
 -version = "0.30.4"
-+version = "0.30.4-tro.16"
++version = "0.30.4-tro.19"
  dependencies = [
   "arbitrary",
   "async-trait",
@@ -70,7 +70,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cua-driver-uia"
 -version = "0.30.4"
-+version = "0.30.4-tro.16"
++version = "0.30.4-tro.19"
  dependencies = [
   "anyhow",
   "cua-driver-core",
@@ -79,7 +79,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cursor-overlay"
 -version = "0.30.4"
-+version = "0.30.4-tro.16"
++version = "0.30.4-tro.19"
  dependencies = [
   "anyhow",
   "cua-driver-contract",
@@ -88,7 +88,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "cursor-theme-cli"
 -version = "0.30.4"
-+version = "0.30.4-tro.16"
++version = "0.30.4-tro.19"
  dependencies = [
   "anyhow",
   "cursor-overlay",
@@ -97,7 +97,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "pip-preview"
 -version = "0.30.4"
-+version = "0.30.4-tro.16"
++version = "0.30.4-tro.19"
  dependencies = [
   "serde_json",
  ]
@@ -106,7 +106,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "platform-linux"
 -version = "0.30.4"
-+version = "0.30.4-tro.16"
++version = "0.30.4-tro.19"
  dependencies = [
   "anyhow",
   "ashpd",
@@ -115,7 +115,7 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "platform-macos"
 -version = "0.30.4"
-+version = "0.30.4-tro.16"
++version = "0.30.4-tro.19"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -124,12 +124,12 @@ index 74051d8..ad62513 100644
  [[package]]
  name = "platform-windows"
 -version = "0.30.4"
-+version = "0.30.4-tro.16"
++version = "0.30.4-tro.19"
  dependencies = [
   "anyhow",
   "async-trait",
 diff --git a/libs/cua-driver/rust/Cargo.toml b/libs/cua-driver/rust/Cargo.toml
-index 53edeb0..a790540 100644
+index 53edeb0..0b32e40 100644
 --- a/libs/cua-driver/rust/Cargo.toml
 +++ b/libs/cua-driver/rust/Cargo.toml
 @@ -19,7 +19,7 @@ members = [
@@ -137,7 +137,7 @@ index 53edeb0..a790540 100644
  
  [workspace.package]
 -version = "0.30.4"
-+version = "0.30.4-tro.16"
++version = "0.30.4-tro.19"
  edition = "2021"
  authors = ["trycua"]
  license = "MIT"
@@ -756,10 +756,10 @@ index 0000000..0df370c
 +}
 diff --git a/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs
 new file mode 100644
-index 0000000..ef8d7d4
+index 0000000..8b1cb82
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs
-@@ -0,0 +1,197 @@
+@@ -0,0 +1,351 @@
 +//! Host-only content-free presentation vocabulary; no desktop action semantics.
 +use crate::{Platform, SchemaMode, ToolAnnotations, ToolContract, ToolInput, ToolOutput};
 +use schemars::JsonSchema;
@@ -850,16 +850,132 @@ index 0000000..ef8d7d4
 +        Ok(())
 +    }
 +}
++/// One native presentation identity; serialized integers stay exact in TypeScript.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++pub struct CompanionRenderToken {
++    pub owner_epoch: String,
++    pub revision: u64,
++    pub render_id: String,
++}
++impl CompanionRenderToken {
++    fn validate(&self) -> bool {
++        valid_group(&self.owner_epoch)
++            && valid_group(&self.render_id)
++            && self.revision <= 9_007_199_254_740_991
++    }
++}
++
++/// Private host commands separate message delivery from lease and animation state.
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
++pub enum CompanionHudCommand {
++    RenewLease,
++    UpdateAppearance {
++        phase: CompanionHudPhase,
++        locale: CompanionHudLocale,
++        level: f64,
++        #[serde(rename = "speakingSequence")]
++        speaking_sequence: Option<u64>,
++    },
++    PresentMessage {
++        locale: CompanionHudLocale,
++        message: CompanionTeachingMessage,
++    },
++    ClearMessage {
++        #[serde(rename = "expectedToken")]
++        expected_token: CompanionRenderToken,
++    },
++}
++#[derive(Debug, Clone, Serialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct SendCompanionHudCommandInput {
++    pub session: Option<String>,
++    pub group: String,
++    pub sequence: u64,
++    #[serde(flatten)]
++    pub command: CompanionHudCommand,
++}
++impl<'de> Deserialize<'de> for SendCompanionHudCommandInput {
++    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
++        // Serde's flattened unit variant can discard unknown fields. Check the complete
++        // object before decoding it, so a lease command cannot carry message state.
++        let value = serde_json::Value::deserialize(deserializer)?;
++        let fields = value
++            .as_object()
++            .ok_or_else(|| serde::de::Error::custom("HUD command must be an object."))?;
++        let payload_fields: &[&str] = match fields.get("kind").and_then(serde_json::Value::as_str) {
++            Some("renew_lease") => &[],
++            Some("update_appearance") => &["phase", "locale", "level", "speakingSequence"],
++            Some("present_message") => &["locale", "message"],
++            Some("clear_message") => &["expectedToken"],
++            _ => return Err(serde::de::Error::custom("Invalid HUD command kind.")),
++        };
++        if fields.keys().any(|key| {
++            !["session", "group", "sequence", "kind"].contains(&key.as_str())
++                && !payload_fields.contains(&key.as_str())
++        }) {
++            return Err(serde::de::Error::custom("Unexpected HUD command field."));
++        }
++        #[derive(Deserialize)]
++        struct CommandFields {
++            session: Option<String>,
++            group: String,
++            sequence: u64,
++            #[serde(flatten)]
++            command: CompanionHudCommand,
++        }
++        let parsed: CommandFields =
++            serde_json::from_value(value).map_err(serde::de::Error::custom)?;
++        Ok(Self {
++            session: parsed.session,
++            group: parsed.group,
++            sequence: parsed.sequence,
++            command: parsed.command,
++        })
++    }
++}
++impl ToolInput for SendCompanionHudCommandInput {
++    const TOOL_NAME: &'static str = "send_companion_hud_command";
++    fn validate(&self) -> Result<(), String> {
++        let bounded = match &self.command {
++            CompanionHudCommand::RenewLease => true,
++            CompanionHudCommand::UpdateAppearance {
++                level,
++                speaking_sequence,
++                ..
++            } => {
++                level.is_finite()
++                    && (0.0..=1.0).contains(level)
++                    && speaking_sequence.is_none_or(|sequence| sequence <= 9_007_199_254_740_991)
++            }
++            CompanionHudCommand::PresentMessage { message, .. } => message.validate(),
++            CompanionHudCommand::ClearMessage { expected_token } => expected_token.validate(),
++        };
++        if !valid_group(&self.group) || self.sequence > 9_007_199_254_740_991 || !bounded {
++            return Err("Invalid bounded HUD command.".into());
++        }
++        Ok(())
++    }
++}
++
 +#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 +#[serde(deny_unknown_fields)]
 +pub struct BindCompanionHudCursorInput {
 +    pub session: Option<String>,
 +    pub group: String,
++    #[serde(default, rename = "lessonId")]
++    pub lesson_id: Option<String>,
 +}
 +impl ToolInput for BindCompanionHudCursorInput {
 +    const TOOL_NAME: &'static str = "bind_companion_hud_cursor";
 +    fn validate(&self) -> Result<(), String> {
-+        if !valid_group(&self.group) {
++        if !valid_group(&self.group)
++            || self
++                .lesson_id
++                .as_ref()
++                .is_some_and(|lesson| !valid_group(lesson))
++        {
 +            return Err("Invalid HUD group.".into());
 +        }
 +        Ok(())
@@ -894,17 +1010,30 @@ index 0000000..ef8d7d4
 +#[serde(deny_unknown_fields)]
 +pub struct CompanionHudOutput {
 +    pub applied: bool,
++    #[serde(
++        default,
++        skip_serializing_if = "Option::is_none",
++        rename = "renderToken"
++    )]
++    pub render_token: Option<CompanionRenderToken>,
 +}
 +impl ToolOutput for CompanionHudOutput {}
 +#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 +#[serde(deny_unknown_fields)]
 +pub struct CompanionHudMessageOutput {
 +    pub message: Option<CompanionTeachingMessage>,
++    #[serde(
++        default,
++        skip_serializing_if = "Option::is_none",
++        rename = "renderToken"
++    )]
++    pub render_token: Option<CompanionRenderToken>,
 +}
 +impl ToolOutput for CompanionHudMessageOutput {}
 +pub fn contracts() -> Vec<ToolContract> {
 +    vec![
 +        contract::<SetCompanionHudInput>(),
++        contract::<SendCompanionHudCommandInput>(),
 +        contract::<BindCompanionHudCursorInput>(),
 +        ToolContract {
 +            success_output_schema: Some(CompanionHudMessageOutput::output_schema()),
@@ -938,6 +1067,31 @@ index 0000000..ef8d7d4
 +mod tests {
 +    use super::*;
 +    #[test]
++    fn companion_commands_parse_strictly_and_renewals_have_no_message() {
++        let base = serde_json::json!({ "group":"11111111-1111-4111-8111-111111111111", "sequence":1, "kind":"renew_lease" });
++        let parsed: SendCompanionHudCommandInput = serde_json::from_value(base.clone()).unwrap();
++        assert!(parsed.validate().is_ok());
++        let mut unexpected = base.clone();
++        unexpected["message"] = serde_json::Value::Null;
++        assert!(serde_json::from_value::<SendCompanionHudCommandInput>(unexpected).is_err());
++        let mut oversized = base;
++        oversized["sequence"] = serde_json::json!(9_007_199_254_740_992_u64);
++        assert!(
++            serde_json::from_value::<SendCompanionHudCommandInput>(oversized)
++                .unwrap()
++                .validate()
++                .is_err()
++        );
++        let clear = serde_json::json!({ "group":"11111111-1111-4111-8111-111111111111", "sequence":2, "kind":"clear_message",
++            "expectedToken": { "ownerEpoch":"11111111-1111-4111-8111-111111111111", "revision":1, "renderId":"22222222-2222-4222-8222-222222222222" } });
++        assert!(
++            serde_json::from_value::<SendCompanionHudCommandInput>(clear)
++                .unwrap()
++                .validate()
++                .is_ok()
++        );
++    }
++    #[test]
 +    fn companion_hud_rejects_unbounded_input() {
 +        let mut input = SetCompanionHudInput {
 +            session: None,
@@ -958,18 +1112,20 @@ index 0000000..ef8d7d4
 +    }
 +}
 diff --git a/libs/cua-driver/rust/crates/cua-driver-contract/src/lib.rs b/libs/cua-driver/rust/crates/cua-driver-contract/src/lib.rs
-index 5dceca8..f787402 100644
+index 5dceca8..63b6ed5 100644
 --- a/libs/cua-driver/rust/crates/cua-driver-contract/src/lib.rs
 +++ b/libs/cua-driver/rust/crates/cua-driver-contract/src/lib.rs
-@@ -14,9 +14,16 @@ use serde_json::Value;
+@@ -14,9 +14,18 @@ use serde_json::Value;
  use std::collections::{BTreeMap, BTreeSet};
  use std::sync::OnceLock;
  
 +mod companion;
 +mod companion_hud;
 +pub use companion_hud::{
-+    BindCompanionHudCursorInput, ReadCompanionHudMessageInput, CompanionHudLocale, CompanionHudOutput, CompanionHudPhase,
-+    SetCompanionHudInput, CompanionTeachingMessage, TeachingMessageKind,
++    BindCompanionHudCursorInput, CompanionHudCommand, CompanionHudLocale,
++    CompanionHudMessageOutput, CompanionHudOutput, CompanionHudPhase, CompanionRenderToken,
++    CompanionTeachingMessage, ReadCompanionHudMessageInput, SendCompanionHudCommandInput,
++    SetCompanionHudInput, TeachingMessageKind,
 +};
  pub mod compatibility;
  pub mod cursor;
@@ -978,7 +1134,7 @@ index 5dceca8..f787402 100644
  mod desktop;
  mod inputs;
  mod outputs;
-@@ -226,6 +233,8 @@ pub fn manifest() -> ContractManifest {
+@@ -226,6 +235,8 @@ pub fn manifest() -> ContractManifest {
      let mut tools = session::contracts();
      tools.extend(desktop::contracts());
      tools.extend(cursor_tools::contracts());
@@ -988,7 +1144,7 @@ index 5dceca8..f787402 100644
      tools.extend(visual::contracts());
      tools.sort_by(|left, right| left.name.cmp(&right.name));
 diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs
-index b0902a0..2956296 100644
+index b0902a0..8cd6086 100644
 --- a/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs
 +++ b/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs
 @@ -870,6 +870,9 @@ pub fn advertised_risk_for(tool: &str) -> RiskAssessment {
@@ -1001,13 +1157,14 @@ index b0902a0..2956296 100644
          | "get_agent_cursor_state"
          | "get_recording_state"
          | "check_for_update"
-@@ -898,6 +901,15 @@ pub fn advertised_risk_for(tool: &str) -> RiskAssessment {
+@@ -898,6 +901,16 @@ pub fn advertised_risk_for(tool: &str) -> RiskAssessment {
          | "set_window_frame"
          | "start_session"
          | "end_session"
 +        | "show_cursor_sequence"
 +        | "set_cursor_companion_mode"
 +        | "set_companion_hud"
++        | "send_companion_hud_command"
 +        | "bind_companion_hud_cursor"
 +        | "read_companion_hud_message"
 +        | "cancel_cursor_sequence"
@@ -1017,7 +1174,7 @@ index b0902a0..2956296 100644
          | "set_agent_cursor_enabled"
          | "set_agent_cursor_motion"
          | "set_agent_cursor_theme" => RiskClass::R1,
-@@ -918,6 +930,8 @@ pub fn advertised_risk_for(tool: &str) -> RiskAssessment {
+@@ -918,6 +931,8 @@ pub fn advertised_risk_for(tool: &str) -> RiskAssessment {
          | "set_config"
          | "escalate_session"
          | "start_recording"
@@ -1026,7 +1183,7 @@ index b0902a0..2956296 100644
          | "get_browser_state"
          | "browser_prepare"
          | "browser_navigate"
-@@ -1516,6 +1530,40 @@ mod tests {
+@@ -1516,6 +1531,40 @@ mod tests {
              .contains("no reviewed risk classification"));
      }
  
@@ -1746,7 +1903,7 @@ index 0000000..cceea34
 +}
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs
 new file mode 100644
-index 0000000..9516cb4
+index 0000000..b38c4f9
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs
 @@ -0,0 +1,472 @@
@@ -2224,10 +2381,10 @@ index 0000000..9516cb4
 +}
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/companion_message.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_message.rs
 new file mode 100644
-index 0000000..d6d3c14
+index 0000000..fca1462
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_message.rs
-@@ -0,0 +1,276 @@
+@@ -0,0 +1,252 @@
 +//! One bounded passive teaching message. Timing is independent of HUD meter frames.
 +use cua_driver_contract::{CompanionTeachingMessage, TeachingMessageKind};
 +use fontdue::{
@@ -2242,7 +2399,6 @@ index 0000000..d6d3c14
 +    pub message: Option<CompanionTeachingMessage>,
 +    elapsed: f32,
 +    speaking: Option<(u64, std::time::Instant)>,
-+    identity: Option<(String, String, u64, u64)>,
 +}
 +fn font() -> Option<&'static Font> {
 +    static FONT: OnceLock<Option<Font>> = OnceLock::new();
@@ -2257,30 +2413,9 @@ index 0000000..d6d3c14
 +}
 +impl MessagePainter {
 +    pub fn update(&mut self, message: Option<CompanionTeachingMessage>) {
-+        use std::hash::{Hash, Hasher};
-+        let identity = message.as_ref().map(|m| {
-+            let mut hash = std::collections::hash_map::DefaultHasher::new();
-+            m.text.hash(&mut hash);
-+            (
-+                m.lesson_id.clone(),
-+                m.step_id.clone(),
-+                m.sequence,
-+                hash.finish(),
-+            )
-+        });
-+        if self.identity == identity {
++        // Admission belongs to HudState. This painter is only a projection.
++        if self.message == message {
 +            return;
-+        }
-+        if let (Some(current), Some(next)) = (&self.identity, &identity) {
-+            if current.0 == next.0 && next.2 < current.2 {
-+                return;
-+            }
-+        }
-+        self.identity = identity;
-+        if let (Some(current), Some(next)) = (&self.message, &message) {
-+            if current.lesson_id == next.lesson_id && next.sequence < current.sequence {
-+                return;
-+            }
 +        }
 +        self.message = message;
 +        self.elapsed = 0.0;
@@ -2302,14 +2437,13 @@ index 0000000..d6d3c14
 +        }) {
 +            self.elapsed = self.elapsed.min(self.reveal_duration(reduced) + 1.0);
 +        }
-+        if self
-+            .message
++    }
++    /// Timing signal only; the owner performs the matching conditional clear.
++    pub fn has_finished_completion(&self, reduced: bool) -> bool {
++        self.message
 +            .as_ref()
-+            .is_some_and(|m| m.kind == TeachingMessageKind::Completion)
++            .is_some_and(|message| message.kind == TeachingMessageKind::Completion)
 +            && self.elapsed >= self.reveal_duration(reduced) + 2.0 + if reduced { 0.0 } else { 2.8 }
-+        {
-+            self.message = None;
-+        }
 +    }
 +    fn reveal_duration(&self, reduced: bool) -> f32 {
 +        if reduced {
@@ -2476,32 +2610,31 @@ index 0000000..d6d3c14
 +        }
 +    }
 +    #[test]
-+    fn companion_message_repeated_snapshots_do_not_restart_and_completion_fades() {
++    fn companion_message_projection_preserves_duplicate_timing_and_signals_completion() {
 +        let mut painter = MessagePainter::default();
 +        let completion = message(TeachingMessageKind::Completion, 2);
 +        painter.update(Some(completion.clone()));
 +        painter.tick(2.5, false);
-+        painter.update(Some(completion));
++        painter.update(Some(completion.clone()));
 +        assert!(painter.alpha(false) < 1.0);
-+        painter.update(Some(message(TeachingMessageKind::Instruction, 1)));
-+        assert_eq!(painter.message.as_ref().unwrap().sequence, 2);
 +        painter.tick(3.0, false);
-+        assert!(painter.message.is_none());
-+        painter.update(Some(message(TeachingMessageKind::Completion, 2)));
-+        assert!(painter.message.is_none());
++        assert!(painter.has_finished_completion(false));
++        assert_eq!(painter.message, Some(completion));
++        painter.update(None);
++        assert!(!painter.has_finished_completion(false));
 +    }
 +    #[test]
-+    fn companion_message_instruction_never_fades_and_new_message_cancels_completion() {
++    fn companion_message_kind_is_part_of_projection_and_instruction_never_fades() {
 +        let mut painter = MessagePainter::default();
 +        painter.update(Some(message(TeachingMessageKind::Completion, 1)));
 +        painter.tick(2.0, false);
-+        painter.update(Some(message(TeachingMessageKind::Instruction, 2)));
++        painter.update(Some(message(TeachingMessageKind::Instruction, 1)));
 +        painter.tick(100.0, false);
-+        assert!(painter.message.is_some());
++        assert!(!painter.has_finished_completion(false));
 +        assert_eq!(painter.alpha(false), 1.0);
 +        painter.update(Some(message(TeachingMessageKind::Completion, 3)));
 +        painter.tick(2.1, true);
-+        assert!(painter.message.is_none());
++        assert!(painter.has_finished_completion(true));
 +    }
 +}
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/guidance.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/guidance.rs
@@ -3236,156 +3369,572 @@ index 264c427..58e3a34 100644
          for swift in [false, true] {
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/cursor/companion_hud.rs b/libs/cua-driver/rust/crates/platform-macos/src/cursor/companion_hud.rs
 new file mode 100644
-index 0000000..145382b
+index 0000000..803290f
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/platform-macos/src/cursor/companion_hud.rs
-@@ -0,0 +1,261 @@
-+//! Independent presentation lease bound only to explicitly registered cursor sessions.
-+use cua_driver_contract::{CompanionHudLocale, CompanionHudPhase, SetCompanionHudInput};
+@@ -0,0 +1,1022 @@
++//! One presentation owner. Message admission, completion and CALayer installation share this mutex.
++use cua_driver_contract::{
++    CompanionHudCommand, CompanionHudLocale, CompanionHudPhase, CompanionRenderToken,
++    CompanionTeachingMessage, SendCompanionHudCommandInput, SetCompanionHudInput,
++};
 +use cursor_overlay::companion_hud::CompanionHudPainter;
 +use std::{
 +    collections::VecDeque,
-+    sync::atomic::AtomicBool,
-+    sync::Arc,
-+    sync::{Mutex, OnceLock},
++    sync::{Arc, Mutex, OnceLock},
 +    time::{Duration, Instant},
 +};
++use tokio::sync::watch;
 +
-+#[derive(Clone)]
-+pub(super) struct MessageFrame {
-+    pub message: cua_driver_contract::CompanionTeachingMessage,
-+    pub rendered: Arc<AtomicBool>,
++const LEASE_DURATION: Duration = Duration::from_secs(25);
++const RENDER_DEADLINE: Duration = Duration::from_secs(1);
++const MAX_REVISION: u64 = 9_007_199_254_740_991;
++
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub(super) enum CancelReason {
++    ExplicitClear,
++    LeaseExpired,
++    OwnerRetired,
++    BindingRetired,
++    CompletionFinished,
++}
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub(super) enum RenderFailure {
++    DeadlineExceeded,
++    ImageConversion,
++    FrameInstallation,
++}
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub(super) enum RenderOutcome {
++    Pending,
++    Presented,
++    Superseded,
++    Cancelled(CancelReason),
++    Failed(RenderFailure),
 +}
 +
-+#[derive(Default)]
++/// Frame consumers can observe completion, but cannot mutate it.
++#[derive(Clone)]
++pub(super) struct MessageFrame {
++    pub message: Arc<CompanionTeachingMessage>,
++    pub token: CompanionRenderToken,
++    pub deadline: Instant,
++    outcome: watch::Receiver<RenderOutcome>,
++}
++
++impl MessageFrame {
++    pub fn outcome(&self) -> RenderOutcome {
++        *self.outcome.borrow()
++    }
++
++    pub async fn wait(&self) -> RenderOutcome {
++        let mut outcome = self.outcome.clone();
++        loop {
++            let current = *outcome.borrow_and_update();
++            if current != RenderOutcome::Pending {
++                return current;
++            }
++            if outcome.changed().await.is_err() {
++                return RenderOutcome::Cancelled(CancelReason::OwnerRetired);
++            }
++        }
++    }
++}
++
++struct Presentation {
++    frame: MessageFrame,
++    sender: watch::Sender<RenderOutcome>,
++    sources: Vec<String>,
++}
++
++impl Presentation {
++    fn finish(&self, next: RenderOutcome) -> bool {
++        if next == RenderOutcome::Pending {
++            return false;
++        }
++        let changed = self.sender.send_if_modified(|outcome| {
++            if *outcome != RenderOutcome::Pending {
++                return false;
++            }
++            *outcome = next;
++            true
++        });
++        if changed {
++            if let RenderOutcome::Failed(reason) = next {
++                tracing::warn!(target: "companion_hud", render_id = %self.frame.token.render_id,
++                    message_sequence = self.frame.message.sequence, reason = ?reason,
++                    "Native message presentation failed.");
++            }
++        }
++        changed
++    }
++}
++
++/// Every composite, including empty scenes, is fenced against message and owner changes.
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub(super) struct SceneToken {
++    epoch: String,
++    revision: u64,
++}
++
 +pub(super) struct HudState {
 +    owner: Option<String>,
 +    group: Option<String>,
 +    sequence: Option<u64>,
 +    expires: Option<Instant>,
++    epoch: String,
++    revision: u64,
++    watermark: Option<CompanionTeachingMessage>,
++    active_lesson: Option<String>,
++    retired_lessons: VecDeque<String>,
++    current: Option<Presentation>,
 +    pub bindings: VecDeque<String>,
 +    pub painter: CompanionHudPainter,
-+    pub message_frame: Option<MessageFrame>,
 +}
++
++impl Default for HudState {
++    fn default() -> Self {
++        Self {
++            owner: None,
++            group: None,
++            sequence: None,
++            expires: None,
++            epoch: uuid::Uuid::new_v4().to_string(),
++            revision: 0,
++            watermark: None,
++            active_lesson: None,
++            retired_lessons: VecDeque::new(),
++            current: None,
++            bindings: VecDeque::new(),
++            painter: CompanionHudPainter::default(),
++        }
++    }
++}
++
 +pub(super) fn state() -> &'static Mutex<HudState> {
 +    static STATE: OnceLock<Mutex<HudState>> = OnceLock::new();
 +    STATE.get_or_init(|| Mutex::new(HudState::default()))
 +}
++
 +impl HudState {
-+    pub fn update(&mut self, session: &str, input: SetCompanionHudInput) -> bool {
-+        let live = self.expires.is_some_and(|expires| expires > Instant::now());
-+        if live && self.owner.as_deref().is_some_and(|owner| owner != session) {
++    fn has_live_lease(&self, now: Instant) -> bool {
++        self.expires.is_some_and(|expires| expires > now)
++    }
++
++    fn can_present(&self, session: &str, group: &str, now: Instant) -> bool {
++        self.group.as_deref() == Some(group)
++            && self.has_live_lease(now)
++            && (self.owner.as_deref() == Some(session)
++                || self.bindings.iter().any(|key| key == session))
++    }
++
++    fn advance_scene(&mut self) -> Result<(), &'static str> {
++        self.revision = self
++            .revision
++            .checked_add(1)
++            .filter(|revision| *revision <= MAX_REVISION)
++            .ok_or("revision_exhausted")?;
++        Ok(())
++    }
++
++    fn cancel_current(&mut self, reason: CancelReason) {
++        if let Some(current) = self.current.take() {
++            current.finish(RenderOutcome::Cancelled(reason));
++        }
++        self.painter.update_message(None);
++    }
++
++    fn retire_owner(&mut self, reason: CancelReason) {
++        self.cancel_current(reason);
++        self.epoch = uuid::Uuid::new_v4().to_string();
++        self.revision = 0;
++        self.watermark = None;
++        self.active_lesson = None;
++        self.retired_lessons.clear();
++        self.owner = None;
++        self.sequence = None;
++        self.expires = None;
++        self.painter
++            .update(CompanionHudPhase::Idle, CompanionHudLocale::English, 0.0);
++    }
++
++    fn claim_owner(&mut self, session: &str, group: &str, sequence: u64, now: Instant) -> bool {
++        if self.has_live_lease(now) && self.owner.as_deref() != Some(session) {
 +            return false;
 +        }
 +        if self.owner.as_deref() == Some(session)
-+            && self
-+                .sequence
-+                .is_some_and(|sequence| input.sequence <= sequence)
++            && self.group.as_deref() == Some(group)
++            && self.sequence.is_some_and(|previous| sequence <= previous)
 +        {
 +            return false;
 +        }
-+        if self.group.as_deref() != Some(&input.group) {
-+            self.bindings.clear();
++        if self.owner.as_deref() != Some(session)
++            || self.group.as_deref() != Some(group)
++            || !self.has_live_lease(now)
++        {
++            if self.group.as_deref() != Some(group) {
++                self.bindings.clear();
++            }
++            self.retire_owner(CancelReason::OwnerRetired);
 +        }
 +        self.owner = Some(session.into());
-+        self.group = Some(input.group);
-+        self.sequence = Some(input.sequence);
-+        self.expires = Some(Instant::now() + Duration::from_secs(25));
-+        if self.painter.message.message != input.message {
-+            self.message_frame = input.message.clone().map(|message| MessageFrame {
-+                message,
-+                rendered: Arc::new(AtomicBool::new(false)),
-+            });
++        self.group = Some(group.into());
++        self.sequence = Some(sequence);
++        self.expires = Some(now + LEASE_DURATION);
++        true
++    }
++    /// Legacy snapshots go through common admission. A stale payload can never rewrite the receipt.
++    pub fn update(&mut self, session: &str, input: SetCompanionHudInput) -> bool {
++        let now = Instant::now();
++        if !self.claim_owner(session, &input.group, input.sequence, now) {
++            return false;
 +        }
-+        self.painter.update_message(input.message);
++        if let Some(message) = input.message {
++            // Legacy refreshes cannot switch an established lesson context.
++            let _ = self.accept_message(session, message, now, false);
++        }
++        // Omitted legacy message is appearance-only. Explicit clears require the native token.
 +        self.painter.message.set_speaking(input.speaking_sequence);
 +        self.painter
 +            .update(input.phase, input.locale, input.level as f32);
 +        true
 +    }
++
++    pub fn apply_command(&mut self, session: &str, input: &SendCompanionHudCommandInput) -> bool {
++        let now = Instant::now();
++        if self.owner.as_deref() != Some(session)
++            || self.group.as_deref() != Some(&input.group)
++            || !self.has_live_lease(now)
++            || self
++                .sequence
++                .is_some_and(|sequence| input.sequence <= sequence)
++        {
++            return false;
++        }
++        self.sequence = Some(input.sequence);
++        self.expires = Some(now + LEASE_DURATION);
++        match &input.command {
++            CompanionHudCommand::UpdateAppearance {
++                phase,
++                locale,
++                level,
++                speaking_sequence,
++            } => {
++                self.painter.message.set_speaking(*speaking_sequence);
++                self.painter.update(*phase, *locale, *level as f32);
++            }
++            CompanionHudCommand::ClearMessage { expected_token } => {
++                self.clear_token(session, &input.group, expected_token);
++            }
++            _ => {}
++        }
++        true
++    }
++
++    fn accept_message(
++        &mut self,
++        session: &str,
++        message: CompanionTeachingMessage,
++        now: Instant,
++        allow_context_change: bool,
++    ) -> Result<MessageFrame, &'static str> {
++        if !message.validate() {
++            return Err("invalid_message");
++        }
++        if self
++            .retired_lessons
++            .iter()
++            .any(|lesson| lesson == &message.lesson_id)
++        {
++            return Err("foreign_lesson");
++        }
++        if self
++            .active_lesson
++            .as_ref()
++            .is_some_and(|lesson| lesson != &message.lesson_id)
++            && !allow_context_change
++        {
++            return Err("foreign_lesson");
++        }
++        if let Some(previous) = &self.watermark {
++            if previous.lesson_id != message.lesson_id && !allow_context_change {
++                return Err("foreign_lesson");
++            }
++            if previous.lesson_id == message.lesson_id {
++                if message.sequence < previous.sequence {
++                    return Err("stale_message");
++                }
++                if message.sequence == previous.sequence {
++                    if previous != &message {
++                        return Err("message_conflict");
++                    }
++                    let current = self.current.as_mut().ok_or("message_cleared")?;
++                    if current.frame.outcome() == RenderOutcome::Pending
++                        && !current.sources.iter().any(|source| source == session)
++                    {
++                        // At most the lease owner plus its eight registered cursor bindings.
++                        current.sources.push(session.into());
++                    }
++                    return Ok(current.frame.clone());
++                }
++            }
++        }
++        self.advance_scene()?;
++        let token = CompanionRenderToken {
++            owner_epoch: self.epoch.clone(),
++            revision: self.revision,
++            render_id: uuid::Uuid::new_v4().to_string(),
++        };
++        let (sender, outcome) = watch::channel(RenderOutcome::Pending);
++        let frame = MessageFrame {
++            token,
++            message: Arc::new(message.clone()),
++            deadline: now + RENDER_DEADLINE,
++            outcome,
++        };
++        if let Some(previous) = self.current.take() {
++            previous.finish(RenderOutcome::Superseded);
++        }
++        if self
++            .active_lesson
++            .as_ref()
++            .is_some_and(|lesson| lesson != &message.lesson_id)
++        {
++            if let Some(previous) = self.active_lesson.take() {
++                if self.retired_lessons.len() >= 8 {
++                    self.retired_lessons.pop_front();
++                }
++                self.retired_lessons.push_back(previous);
++            }
++        }
++        self.active_lesson = Some(message.lesson_id.clone());
++        self.watermark = Some(message.clone());
++        self.painter.update_message(Some(message));
++        self.current = Some(Presentation {
++            frame: frame.clone(),
++            sender,
++            sources: vec![session.into()],
++        });
++        Ok(frame)
++    }
++
 +    pub fn present_message(
 +        &mut self,
 +        session: &str,
 +        group: &str,
 +        locale: CompanionHudLocale,
-+        message: cua_driver_contract::CompanionTeachingMessage,
++        message: CompanionTeachingMessage,
++    ) -> Result<MessageFrame, &'static str> {
++        let now = Instant::now();
++        if !self.can_present(session, group, now) {
++            return Err("owner_unavailable");
++        }
++        let frame = self.accept_message(
++            session,
++            message,
++            now,
++            self.owner.as_deref() == Some(session),
++        )?;
++        self.painter.update(CompanionHudPhase::Showing, locale, 0.0);
++        Ok(frame)
++    }
++
++    pub fn scene_token(&self) -> SceneToken {
++        SceneToken {
++            epoch: self.epoch.clone(),
++            revision: self.revision,
++        }
++    }
++
++    pub fn message_frame(&self) -> Option<MessageFrame> {
++        self.current
++            .as_ref()
++            .filter(|current| {
++                self.painter.message.message.as_ref() == Some(current.frame.message.as_ref())
++            })
++            .map(|current| current.frame.clone())
++    }
++    /// Called on the main queue while holding HudState; installation is synchronous and cannot acquire RENDER.
++    /// Guidance fences are acquired after HudState everywhere; no callback holds them while acquiring HudState.
++    pub fn install_frame(
++        &mut self,
++        scene: &SceneToken,
++        message: Option<&CompanionRenderToken>,
++        now: Instant,
++        install: impl FnOnce() -> Result<bool, RenderFailure>,
 +    ) -> bool {
-+        if self.group.as_deref() != Some(group)
-+            || !self.bindings.iter().any(|key| key == session)
-+            || !self.expires.is_some_and(|expires| expires > Instant::now())
-+            || !message.validate()
-+        {
++        if &self.scene_token() != scene {
 +            return false;
 +        }
-+        self.painter.update_message(Some(message));
-+        self.painter.update(CompanionHudPhase::Showing, locale, 0.0);
-+        true
++        if message.is_some() && !self.has_live_lease(now) {
++            self.retire_owner(CancelReason::LeaseExpired);
++            return false;
++        }
++        if let Some(token) = message {
++            let Some(current) = &self.current else {
++                return false;
++            };
++            if &current.frame.token != token {
++                return false;
++            }
++            match current.frame.outcome() {
++                RenderOutcome::Pending if now >= current.frame.deadline => {
++                    self.fail_token(token, RenderFailure::DeadlineExceeded);
++                    return false;
++                }
++                RenderOutcome::Pending | RenderOutcome::Presented => {}
++                _ => return false,
++            }
++        }
++        match install() {
++            Ok(true) => {
++                if message.is_some() {
++                    if let Some(current) = &self.current {
++                        current.finish(RenderOutcome::Presented);
++                    }
++                }
++                true
++            }
++            Ok(false) => false,
++            Err(reason) => {
++                if let Some(token) = message {
++                    self.fail_token(token, reason);
++                }
++                false
++            }
++        }
 +    }
-+    /// Roll back only this request's bubble, never a newer message from main.
-+    pub fn clear_message(
++
++    pub fn fail_token(&mut self, token: &CompanionRenderToken, reason: RenderFailure) -> bool {
++        let failed = self
++            .current
++            .as_ref()
++            .filter(|current| &current.frame.token == token)
++            .is_some_and(|current| current.finish(RenderOutcome::Failed(reason)));
++        if failed {
++            // Retain the terminal job for exact duplicates, but invalidate queued pixels and clear its projection.
++            let _ = self.advance_scene();
++            self.painter.update_message(None);
++        }
++        failed
++    }
++
++    pub fn clear_token(
 +        &mut self,
 +        session: &str,
 +        group: &str,
-+        message: &cua_driver_contract::CompanionTeachingMessage,
++        token: &CompanionRenderToken,
 +    ) -> bool {
-+        if self.group.as_deref() != Some(group)
-+            || !self.bindings.iter().any(|key| key == session)
-+            || self.painter.message.message.as_ref() != Some(message)
++        if !self.can_present(session, group, Instant::now())
++            || !self
++                .current
++                .as_ref()
++                .is_some_and(|current| &current.frame.token == token)
++            || self.advance_scene().is_err()
 +        {
 +            return false;
 +        }
-+        self.painter.update_message(None);
-+        self.message_frame = None;
++        self.cancel_current(CancelReason::ExplicitClear);
 +        true
 +    }
-+    pub fn read_message(
-+        &self,
-+        session: &str,
-+        group: &str,
-+    ) -> Option<cua_driver_contract::CompanionTeachingMessage> {
++
++    pub fn read_message(&self, session: &str, group: &str) -> Option<MessageFrame> {
 +        if self.owner.as_deref() != Some(session)
 +            || self.group.as_deref() != Some(group)
-+            || !self.expires.is_some_and(|expires| expires > Instant::now())
++            || !self.has_live_lease(Instant::now())
 +        {
 +            return None;
 +        }
-+        self.message_frame
++        self.current
 +            .as_ref()
-+            .filter(|frame| {
-+                frame.rendered.load(std::sync::atomic::Ordering::Acquire)
-+                    && self.painter.message.message.as_ref() == Some(&frame.message)
-+            })
-+            .map(|frame| frame.message.clone())
++            .filter(|current| current.frame.outcome() == RenderOutcome::Presented)
++            .map(|current| current.frame.clone())
 +    }
 +
 +    pub fn bind(&mut self, session: &str, group: &str) -> bool {
-+        if self.group.as_deref() != Some(group)
-+            || !self.expires.is_some_and(|expires| expires > Instant::now())
-+        {
++        if self.group.as_deref() != Some(group) || !self.has_live_lease(Instant::now()) {
 +            return false;
 +        }
 +        self.bindings.retain(|key| key != session);
 +        if self.bindings.len() >= 8 {
-+            self.bindings.pop_front();
++            if let Some(removed) = self.bindings.pop_front() {
++                self.cancel_source(&removed);
++            }
 +        }
 +        self.bindings.push_back(session.into());
 +        true
 +    }
-+    pub fn tick(&mut self, dt: f32, reduced: bool) -> bool {
-+        if self
-+            .expires
-+            .is_some_and(|expires| expires <= Instant::now())
++
++    pub fn bind_lesson(&mut self, session: &str, group: &str, lesson: &str) -> bool {
++        if !self.can_present(session, group, Instant::now())
++            || self.bindings.back().map(String::as_str) != Some(session)
++            || self
++                .retired_lessons
++                .iter()
++                .any(|previous| previous == lesson)
 +        {
-+            self.owner = None;
-+            self.sequence = None;
-+            self.expires = None;
-+            self.painter.update_message(None);
-+            self.painter
-+                .update(CompanionHudPhase::Idle, CompanionHudLocale::English, 0.0);
++            return false;
++        }
++        if self.active_lesson.as_deref() == Some(lesson) {
++            return true;
++        }
++        if self.advance_scene().is_err() {
++            return false;
++        }
++        if let Some(previous) = self.active_lesson.take() {
++            if self.retired_lessons.len() >= 8 {
++                self.retired_lessons.pop_front();
++            }
++            self.retired_lessons.push_back(previous);
++        }
++        if let Some(current) = self.current.take() {
++            current.finish(RenderOutcome::Superseded);
++        }
++        self.painter.update_message(None);
++        self.watermark = None;
++        self.active_lesson = Some(lesson.into());
++        true
++    }
++
++    fn cancel_source(&mut self, session: &str) {
++        if self.current.as_ref().is_some_and(|current| {
++            current.sources.iter().any(|source| source == session)
++                && current.frame.outcome() == RenderOutcome::Pending
++        }) {
++            if self.advance_scene().is_ok() {
++                self.cancel_current(CancelReason::BindingRetired);
++            }
++        }
++    }
++
++    pub fn tick(&mut self, dt: f32, reduced: bool) -> bool {
++        let now = Instant::now();
++        if self.expires.is_some() && !self.has_live_lease(now) {
++            self.retire_owner(CancelReason::LeaseExpired);
++        }
++        let expired = self
++            .current
++            .as_ref()
++            .filter(|current| {
++                now >= current.frame.deadline && current.frame.outcome() == RenderOutcome::Pending
++            })
++            .map(|current| current.frame.token.clone());
++        if let Some(token) = expired {
++            self.fail_token(&token, RenderFailure::DeadlineExceeded);
 +        }
 +        self.painter.tick(dt, reduced);
++        if self
++            .current
++            .as_ref()
++            .is_some_and(|current| current.frame.outcome() == RenderOutcome::Presented)
++            && self.painter.message.has_finished_completion(reduced)
++            && self.advance_scene().is_ok()
++        {
++            self.cancel_current(CancelReason::CompletionFinished);
++        }
 +        self.painter.is_visible()
 +    }
++
 +    pub fn retire(&mut self, key: &str, prefix: bool) {
 +        let matches = |candidate: &str| {
 +            if prefix {
@@ -3394,111 +3943,456 @@ index 0000000..145382b
 +                candidate == key
 +            }
 +        };
++        let removed: Vec<_> = self
++            .bindings
++            .iter()
++            .filter(|candidate| matches(candidate))
++            .cloned()
++            .collect();
 +        self.bindings.retain(|candidate| !matches(candidate));
++        for session in removed {
++            self.cancel_source(&session);
++        }
 +        if self.owner.as_deref().is_some_and(matches) {
-+            self.owner = None;
-+            self.sequence = None;
-+            self.expires = None;
-+            self.painter.update_message(None);
-+            self.painter
-+                .update(CompanionHudPhase::Idle, CompanionHudLocale::English, 0.0);
++            self.retire_owner(CancelReason::OwnerRetired);
 +        }
 +    }
 +}
++
 +#[cfg(test)]
-+mod tests {
++mod companion_tests {
 +    use super::*;
-+    fn input(sequence: u64) -> SetCompanionHudInput {
++    use cua_driver_contract::TeachingMessageKind;
++    const GROUP: &str = "11111111-1111-4111-8111-111111111111";
++    fn snapshot(sequence: u64, message: Option<CompanionTeachingMessage>) -> SetCompanionHudInput {
 +        SetCompanionHudInput {
 +            session: None,
-+            group: "11111111-1111-4111-8111-111111111111".into(),
++            group: GROUP.into(),
 +            sequence,
 +            phase: CompanionHudPhase::Thinking,
 +            locale: CompanionHudLocale::English,
 +            level: 0.0,
-+            message: None,
++            message,
 +            speaking_sequence: None,
 +        }
 +    }
-+    #[test]
-+    fn companion_hud_reads_only_installed_messages_for_its_owner() {
++
++    fn message(sequence: u64) -> CompanionTeachingMessage {
++        CompanionTeachingMessage {
++            lesson_id: GROUP.into(),
++            step_id: GROUP.into(),
++            sequence,
++            kind: TeachingMessageKind::Instruction,
++            text: "Synthetic native instruction".into(),
++        }
++    }
++
++    fn fixture() -> HudState {
 +        let mut state = HudState::default();
-+        let mut snapshot = input(0);
-+        let group = snapshot.group.clone();
-+        snapshot.message = Some(cua_driver_contract::CompanionTeachingMessage {
-+            lesson_id: group.clone(),
-+            step_id: group.clone(),
-+            sequence: 1,
-+            kind: cua_driver_contract::TeachingMessageKind::Instruction,
-+            text: "Open Chrome".into(),
-+        });
-+        assert!(state.update("host", snapshot));
-+        assert!(state.read_message("host", &group).is_none());
++        assert!(state.update("host", snapshot(0, None)));
++        assert!(state.bind("cursor", GROUP));
 +        state
-+            .message_frame
-+            .as_ref()
++    }
++
++    fn present(state: &mut HudState, sequence: u64) -> MessageFrame {
++        state
++            .present_message(
++                "cursor",
++                GROUP,
++                CompanionHudLocale::English,
++                message(sequence),
++            )
 +            .unwrap()
-+            .rendered
-+            .store(true, std::sync::atomic::Ordering::Release);
-+        assert!(state.read_message("host", &group).is_some());
-+        assert!(state.read_message("foreign", &group).is_none());
-+        state.retire("host", false);
-+        assert!(state.read_message("host", &group).is_none());
++    }
++
++    fn install(state: &mut HudState, frame: &MessageFrame) -> bool {
++        state.install_frame(
++            &state.scene_token(),
++            Some(&frame.token),
++            Instant::now(),
++            || Ok(true),
++        )
 +    }
 +    #[test]
-+    fn companion_hud_fences_ownership_sequence_and_foreign_binding() {
-+        let mut state = HudState::default();
-+        assert!(state.update("host", input(0)));
-+        assert!(!state.update("foreign", input(1)));
-+        assert!(!state.update("host", input(0)));
-+        assert!(!state.bind("foreign", "another-group"));
-+        assert!(state.bind("cursor", &input(0).group));
-+        state.retire("cursor", false);
-+        assert_eq!(state.owner.as_deref(), Some("host"));
-+        state.retire("host", false);
-+        assert!(state.owner.is_none());
-+        assert_eq!(state.painter.phase, CompanionHudPhase::Idle);
++    fn companion_stale_refresh_preserves_pending_message_and_receipt() {
++        let mut state = fixture();
++        let first = present(&mut state, 1);
++        assert!(install(&mut state, &first));
++        let second = present(&mut state, 2);
++        assert!(state.update("host", snapshot(1, Some(message(1)))));
++        assert_eq!(state.message_frame().unwrap().token, second.token);
++        assert_eq!(state.painter.message.message, Some(message(2)));
++        assert_eq!(second.outcome(), RenderOutcome::Pending);
++        assert!(install(&mut state, &second));
++        assert_eq!(second.outcome(), RenderOutcome::Presented);
 +    }
 +    #[test]
-+    fn companion_hud_rolls_back_only_the_bound_failed_message() {
-+        let mut state = HudState::default();
-+        let group = input(0).group;
-+        state.update("host", input(0));
-+        state.bind("cursor", &group);
-+        let message = cua_driver_contract::CompanionTeachingMessage {
-+            lesson_id: group.clone(),
-+            step_id: group.clone(),
-+            sequence: 1,
-+            kind: cua_driver_contract::TeachingMessageKind::Instruction,
-+            text: "Click this control".into(),
-+        };
-+        assert!(state.present_message(
-+            "cursor",
-+            &group,
-+            CompanionHudLocale::English,
-+            message.clone()
++    fn companion_exact_duplicates_preserve_token_deadline_and_terminal_outcome() {
++        let mut state = fixture();
++        let pending = present(&mut state, 2);
++        let duplicate = present(&mut state, 2);
++        assert_eq!(pending.token, duplicate.token);
++        assert_eq!(pending.deadline, duplicate.deadline);
++        assert!(install(&mut state, &pending));
++        assert_eq!(duplicate.outcome(), RenderOutcome::Presented);
++        let repeated = present(&mut state, 2);
++        assert_eq!(repeated.token, pending.token);
++        assert_eq!(repeated.outcome(), RenderOutcome::Presented);
++    }
++    #[test]
++    fn companion_admission_rejects_kind_conflicts_old_messages_and_foreign_lessons() {
++        let mut state = fixture();
++        let pending = present(&mut state, 2);
++        let mut conflict = message(2);
++        conflict.kind = TeachingMessageKind::Question;
++        assert!(matches!(
++            state.present_message("cursor", GROUP, CompanionHudLocale::English, conflict),
++            Err("message_conflict")
 +        ));
-+        assert!(!state.clear_message("foreign", &group, &message));
-+        let mut newer = message.clone();
-+        newer.sequence = 2;
-+        assert!(!state.clear_message("cursor", &group, &newer));
-+        assert!(state.clear_message("cursor", &group, &message));
-+        assert!(state.painter.message.message.is_none());
++        assert!(matches!(
++            state.present_message("cursor", GROUP, CompanionHudLocale::English, message(1)),
++            Err("stale_message")
++        ));
++        let mut foreign = message(3);
++        foreign.lesson_id = uuid::Uuid::new_v4().to_string();
++        assert!(matches!(
++            state.present_message("cursor", GROUP, CompanionHudLocale::English, foreign),
++            Err("foreign_lesson")
++        ));
++        assert_eq!(state.message_frame().unwrap().token, pending.token);
++        assert!(install(&mut state, &pending));
 +    }
 +    #[test]
-+    fn companion_hud_bounds_binding_memory_and_reconnects_same_group() {
-+        let mut state = HudState::default();
-+        state.update("host", input(0));
++    fn companion_explicit_host_context_change_invalidates_old_frame() {
++        let mut state = fixture();
++        let old = present(&mut state, 2);
++        let scene = state.scene_token();
++        let mut next = message(1);
++        next.lesson_id = uuid::Uuid::new_v4().to_string();
++        let new = state
++            .present_message("host", GROUP, CompanionHudLocale::English, next)
++            .unwrap();
++        assert_eq!(old.outcome(), RenderOutcome::Superseded);
++        assert!(
++            !state.install_frame(&scene, Some(&old.token), Instant::now(), || panic!(
++                "obsolete frame installed"
++            ))
++        );
++        assert!(install(&mut state, &new));
++    }
++    #[tokio::test]
++    async fn companion_superseded_and_cancelled_waiters_finish_without_polling() {
++        let mut state = fixture();
++        let old = present(&mut state, 1);
++        let scene = state.scene_token();
++        let new = present(&mut state, 2);
++        assert_eq!(old.wait().await, RenderOutcome::Superseded);
++        assert!(
++            !state.install_frame(&scene, Some(&old.token), Instant::now(), || panic!(
++                "obsolete install"
++            ))
++        );
++        assert!(!state.fail_token(&old.token, RenderFailure::DeadlineExceeded));
++        assert!(!state.clear_token("cursor", GROUP, &old.token));
++        assert_eq!(new.outcome(), RenderOutcome::Pending);
++        assert!(state.clear_token("cursor", GROUP, &new.token));
++        assert_eq!(
++            new.wait().await,
++            RenderOutcome::Cancelled(CancelReason::ExplicitClear)
++        );
++        assert!(matches!(
++            state.present_message("cursor", GROUP, CompanionHudLocale::English, message(2)),
++            Err("message_cleared")
++        ));
++    }
++    #[test]
++    fn companion_lease_and_appearance_commands_do_not_mutate_delivery() {
++        let mut state = fixture();
++        let pending = present(&mut state, 2);
++        for (index, command) in [
++            CompanionHudCommand::RenewLease,
++            CompanionHudCommand::UpdateAppearance {
++                phase: CompanionHudPhase::Thinking,
++                locale: CompanionHudLocale::Vietnamese,
++                level: 0.75,
++                speaking_sequence: Some(2),
++            },
++        ]
++        .into_iter()
++        .enumerate()
++        {
++            assert!(state.apply_command(
++                "host",
++                &SendCompanionHudCommandInput {
++                    session: None,
++                    group: GROUP.into(),
++                    sequence: index as u64 + 1,
++                    command
++                }
++            ));
++            assert_eq!(state.message_frame().unwrap().token, pending.token);
++            assert_eq!(state.painter.message.message, Some(message(2)));
++        }
++        assert!(install(&mut state, &pending));
++    }
++    #[test]
++    fn companion_empty_and_cancelled_scenes_cannot_erase_a_new_message() {
++        let mut state = fixture();
++        let empty = state.scene_token();
++        let pending = present(&mut state, 2);
++        assert!(
++            !state.install_frame(&empty, None, Instant::now(), || panic!(
++                "obsolete empty frame installed"
++            ))
++        );
++        let scene = state.scene_token();
++        assert!(state.clear_token("host", GROUP, &pending.token));
++        assert!(
++            !state.install_frame(&scene, Some(&pending.token), Instant::now(), || panic!(
++                "cancelled frame installed"
++            ))
++        );
++        assert!(state.install_frame(&state.scene_token(), None, Instant::now(), || Ok(true)));
++    }
++    #[test]
++    fn companion_installation_deadline_failure_is_terminal_and_animation_still_installs() {
++        let mut state = fixture();
++        let pending = present(&mut state, 1);
++        assert!(!state.install_frame(
++            &state.scene_token(),
++            Some(&pending.token),
++            pending.deadline,
++            || panic!("late install")
++        ));
++        assert_eq!(
++            pending.outcome(),
++            RenderOutcome::Failed(RenderFailure::DeadlineExceeded)
++        );
++        assert!(!install(&mut state, &pending));
++        let repeated = present(&mut state, 1);
++        assert_eq!(repeated.outcome(), pending.outcome());
++        let next = present(&mut state, 2);
++        assert!(install(&mut state, &next));
++        assert!(state.install_frame(
++            &state.scene_token(),
++            Some(&next.token),
++            next.deadline + Duration::from_secs(1),
++            || Ok(true)
++        ));
++        assert!(!state.fail_token(&next.token, RenderFailure::ImageConversion));
++        assert_eq!(next.outcome(), RenderOutcome::Presented);
++    }
++    #[test]
++    fn companion_rejected_drawing_frame_does_not_poison_pending_message() {
++        let mut state = fixture();
++        let pending = present(&mut state, 1);
++        assert!(!state.install_frame(
++            &state.scene_token(),
++            Some(&pending.token),
++            Instant::now(),
++            || Ok(false)
++        ));
++        assert_eq!(pending.outcome(), RenderOutcome::Pending);
++        assert!(install(&mut state, &pending));
++    }
++    #[test]
++    fn companion_image_failure_does_not_complete_or_clear_newer_receipts() {
++        let mut state = fixture();
++        let first = present(&mut state, 1);
++        assert!(state.fail_token(&first.token, RenderFailure::ImageConversion));
++        assert!(!install(&mut state, &first));
++        let next = present(&mut state, 2);
++        assert!(!state.fail_token(&first.token, RenderFailure::ImageConversion));
++        assert!(install(&mut state, &next));
++    }
++    #[test]
++    fn companion_owner_binding_and_expiry_cancel_pending_jobs() {
++        for reason in [
++            CancelReason::OwnerRetired,
++            CancelReason::BindingRetired,
++            CancelReason::LeaseExpired,
++        ] {
++            let mut state = fixture();
++            let pending = present(&mut state, 2);
++            let scene = state.scene_token();
++            match reason {
++                CancelReason::OwnerRetired => state.retire("host", false),
++                CancelReason::BindingRetired => state.retire("cursor", false),
++                CancelReason::LeaseExpired => {
++                    state.expires = Some(Instant::now());
++                    state.tick(0.0, false);
++                }
++                _ => unreachable!(),
++            }
++            assert_eq!(pending.outcome(), RenderOutcome::Cancelled(reason));
++            assert!(
++                !state.install_frame(&scene, Some(&pending.token), Instant::now(), || panic!(
++                    "retired install"
++                ))
++            );
++        }
++    }
++    #[test]
++    fn companion_hud_fences_ownership_sequence_readback_and_bounded_bindings() {
++        let mut state = fixture();
++        assert!(!state.update("foreign", snapshot(1, None)));
++        assert!(!state.update("host", snapshot(0, None)));
++        assert!(!state.bind("cursor", "foreign-group"));
++        let pending = present(&mut state, 1);
++        assert!(state.read_message("host", GROUP).is_none());
++        assert!(install(&mut state, &pending));
++        assert_eq!(
++            state.read_message("host", GROUP).unwrap().token,
++            pending.token
++        );
++        assert!(state.read_message("foreign", GROUP).is_none());
 +        for index in 0..20 {
-+            state.bind(&format!("cursor-{index}"), &input(0).group);
++            assert!(state.bind(&format!("cursor-{index}"), GROUP));
 +        }
 +        assert_eq!(state.bindings.len(), 8);
 +        state.retire("host", false);
-+        assert!(state.update("new-host", input(0)));
++        assert!(state.update("new-host", snapshot(0, None)));
 +        assert_eq!(state.bindings.len(), 8);
-+        state.expires = Some(Instant::now() - Duration::from_secs(1));
-+        state.tick(0.3, false);
-+        assert!(!state.painter.is_visible());
++        assert!(state.read_message("new-host", GROUP).is_none());
++    }
++    #[test]
++    fn companion_completion_fade_is_owned_and_cannot_resurrect_from_stale_snapshot() {
++        let mut state = fixture();
++        let mut completion = message(2);
++        completion.kind = TeachingMessageKind::Completion;
++        let frame = state
++            .present_message(
++                "cursor",
++                GROUP,
++                CompanionHudLocale::English,
++                completion.clone(),
++            )
++            .unwrap();
++        assert!(install(&mut state, &frame));
++        state.tick(2.0, true);
++        assert!(state.message_frame().is_none());
++        assert!(state.update("host", snapshot(1, Some(completion))));
++        assert!(state.message_frame().is_none());
++    }
++    #[test]
++    fn companion_event_permutations_preserve_the_current_owner_and_terminal_result() {
++        for first in 0..4 {
++            for second in 0..4 {
++                for third in 0..4 {
++                    for fourth in 0..4 {
++                        let events = [first, second, third, fourth];
++                        if (0..4).any(|event| {
++                            events
++                                .iter()
++                                .filter(|candidate| **candidate == event)
++                                .count()
++                                != 1
++                        }) {
++                            continue;
++                        }
++                        let mut state = fixture();
++                        let old = present(&mut state, 1);
++                        let old_scene = state.scene_token();
++                        let new = present(&mut state, 2);
++                        for event in events {
++                            match event {
++                                0 => {
++                                    state.update("host", snapshot(1, Some(message(1))));
++                                }
++                                1 => {
++                                    assert!(!state.clear_token("cursor", GROUP, &old.token));
++                                }
++                                2 => {
++                                    assert!(!state
++                                        .fail_token(&old.token, RenderFailure::DeadlineExceeded));
++                                }
++                                3 => {
++                                    assert!(!state.install_frame(
++                                        &old_scene,
++                                        Some(&old.token),
++                                        Instant::now(),
++                                        || panic!("obsolete install")
++                                    ));
++                                }
++                                _ => unreachable!(),
++                            }
++                            assert_eq!(state.message_frame().unwrap().token, new.token);
++                            assert_eq!(new.outcome(), RenderOutcome::Pending);
++                            assert_eq!(old.outcome(), RenderOutcome::Superseded);
++                        }
++                        assert!(install(&mut state, &new));
++                    }
++                }
++            }
++        }
++    }
++    #[test]
++    fn companion_installation_failure_keeps_its_terminal_reason() {
++        let mut state = fixture();
++        let pending = present(&mut state, 1);
++        assert!(!state.install_frame(
++            &state.scene_token(),
++            Some(&pending.token),
++            Instant::now(),
++            || Err(RenderFailure::FrameInstallation)
++        ));
++        assert_eq!(
++            pending.outcome(),
++            RenderOutcome::Failed(RenderFailure::FrameInstallation)
++        );
++        assert!(!state.fail_token(&pending.token, RenderFailure::DeadlineExceeded));
++    }
++    #[test]
++    fn companion_explicit_lesson_binding_resets_order_and_rejects_delayed_context() {
++        let mut state = fixture();
++        let old = present(&mut state, 8);
++        let scene = state.scene_token();
++        let lesson = uuid::Uuid::new_v4().to_string();
++        assert!(state.bind_lesson("cursor", GROUP, &lesson));
++        assert_eq!(old.outcome(), RenderOutcome::Superseded);
++        let mut next = message(1);
++        next.lesson_id = lesson.clone();
++        let new = state
++            .present_message("cursor", GROUP, CompanionHudLocale::English, next)
++            .unwrap();
++        assert!(!state.bind_lesson("cursor", GROUP, GROUP));
++        assert!(matches!(
++            state.present_message("host", GROUP, CompanionHudLocale::English, message(9)),
++            Err("foreign_lesson")
++        ));
++        assert!(
++            !state.install_frame(&scene, Some(&old.token), Instant::now(), || panic!(
++                "old lesson install"
++            ))
++        );
++        assert!(install(&mut state, &new));
++    }
++    #[test]
++    fn companion_retiring_shared_pending_cursor_cancels_the_original_host_job() {
++        let mut state = fixture();
++        let host = state
++            .present_message("host", GROUP, CompanionHudLocale::English, message(1))
++            .unwrap();
++        let cursor = present(&mut state, 1);
++        assert_eq!(host.token, cursor.token);
++        state.retire("cursor", false);
++        assert_eq!(
++            host.outcome(),
++            RenderOutcome::Cancelled(CancelReason::BindingRetired)
++        );
++        assert_eq!(cursor.outcome(), host.outcome());
++    }
++    #[test]
++    fn companion_revision_exhaustion_preserves_current_job() {
++        let mut state = fixture();
++        let pending = present(&mut state, 1);
++        state.revision = MAX_REVISION;
++        assert!(matches!(
++            state.present_message("cursor", GROUP, CompanionHudLocale::English, message(2)),
++            Err("revision_exhausted")
++        ));
++        assert_eq!(state.message_frame().unwrap().token, pending.token);
++        assert_eq!(pending.outcome(), RenderOutcome::Pending);
 +    }
 +}
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/cursor/mod.rs b/libs/cua-driver/rust/crates/platform-macos/src/cursor/mod.rs
@@ -3514,10 +4408,10 @@ index cb5012c..37247b6 100644
  /// System cursor shape reporting (what the OS draws, not what Cua draws).
  pub mod shape;
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs b/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
-index 8a4c547..9dfe7cb 100644
+index 8a4c547..ce69806 100644
 --- a/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
 +++ b/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
-@@ -40,6 +40,88 @@ use cursor_overlay::{
+@@ -40,6 +40,143 @@ use cursor_overlay::{
      OverlayCommand, OverlayMsg, RenderEntry, RenderStateCore, ScreenFrame, ZOrderEnforcer,
  };
  
@@ -3543,50 +4437,105 @@ index 8a4c547..9dfe7cb 100644
 +    group: &str,
 +    locale: cua_driver_contract::CompanionHudLocale,
 +    message: cua_driver_contract::CompanionTeachingMessage,
-+) -> bool {
-+    let rendered = std::sync::Arc::new(AtomicBool::new(false));
-+    {
-+        let mut hud = super::companion_hud::state().lock().unwrap();
-+        if !hud.present_message(session, group, locale, message.clone()) {
-+            return false;
-+        }
-+        hud.message_frame = Some(super::companion_hud::MessageFrame {
-+            message,
-+            rendered: rendered.clone(),
-+        });
-+    }
++) -> Result<cua_driver_contract::CompanionRenderToken, &'static str> {
++    use super::companion_hud::{RenderFailure, RenderOutcome};
++    let frame = super::companion_hud::state()
++        .lock()
++        .unwrap()
++        .present_message(session, group, locale, message)?;
 +    send_command_default(OverlayCommand::WakeCompanionHud);
-+    let deadline = Instant::now() + Duration::from_millis(1000);
-+    while Instant::now() < deadline {
-+        if rendered.load(Ordering::Acquire) {
-+            return true;
++    let result =
++        tokio::time::timeout_at(tokio::time::Instant::from_std(frame.deadline), frame.wait()).await;
++    let outcome = match result {
++        Ok(outcome) => outcome,
++        Err(_) => {
++            super::companion_hud::state()
++                .lock()
++                .unwrap()
++                .fail_token(&frame.token, RenderFailure::DeadlineExceeded);
++            frame.outcome()
 +        }
-+        tokio::time::sleep(Duration::from_millis(10)).await;
++    };
++    match outcome {
++        RenderOutcome::Presented => Ok(frame.token),
++        RenderOutcome::Superseded => Err("message_superseded"),
++        RenderOutcome::Cancelled(_) => Err("message_cancelled"),
++        RenderOutcome::Failed(RenderFailure::ImageConversion) => Err("image_conversion_failed"),
++        RenderOutcome::Failed(RenderFailure::FrameInstallation) => Err("frame_installation_failed"),
++        RenderOutcome::Failed(RenderFailure::DeadlineExceeded) | RenderOutcome::Pending => {
++            send_command_default(OverlayCommand::WakeCompanionHud);
++            Err("render_timeout")
++        }
 +    }
-+    false
-+}
-+pub fn read_companion_hud_message(session: &str, group: &str) -> Option<cua_driver_contract::CompanionTeachingMessage> {
-+    super::companion_hud::state().lock().unwrap().read_message(session, group)
 +}
 +
++pub fn read_companion_hud_message(
++    session: &str,
++    group: &str,
++) -> cua_driver_contract::CompanionHudMessageOutput {
++    let frame = super::companion_hud::state()
++        .lock()
++        .unwrap()
++        .read_message(session, group);
++    cua_driver_contract::CompanionHudMessageOutput {
++        message: frame.as_ref().map(|frame| frame.message.as_ref().clone()),
++        render_token: frame.map(|frame| frame.token),
++    }
++}
 +pub fn clear_companion_message(
 +    session: &str,
 +    group: &str,
-+    message: &cua_driver_contract::CompanionTeachingMessage,
++    token: &cua_driver_contract::CompanionRenderToken,
 +) {
 +    if super::companion_hud::state()
 +        .lock()
 +        .unwrap()
-+        .clear_message(session, group, message)
++        .clear_token(session, group, token)
 +    {
 +        send_command_default(OverlayCommand::WakeCompanionHud);
 +    }
 +}
-+pub fn bind_companion_hud(session: &str, group: &str) -> bool {
-+    let applied = super::companion_hud::state()
++pub async fn send_companion_hud_command(
++    session: &str,
++    input: cua_driver_contract::SendCompanionHudCommandInput,
++) -> Result<cua_driver_contract::CompanionHudOutput, &'static str> {
++    if !super::companion_hud::state()
 +        .lock()
 +        .unwrap()
-+        .bind(session, group);
++        .apply_command(session, &input)
++    {
++        return Err("owner_unavailable");
++    }
++    let render_token =
++        if let cua_driver_contract::CompanionHudCommand::PresentMessage { locale, message } =
++            input.command
++        {
++            match present_companion_message(session, &input.group, locale, message).await {
++                Ok(token) => Some(token),
++                Err(
++                    "stale_message" | "message_cleared" | "message_superseded"
++                    | "message_cancelled",
++                ) => None,
++                Err(reason) => return Err(reason),
++            }
++        } else {
++            None
++        };
++    send_command_default(OverlayCommand::WakeCompanionHud);
++    Ok(cua_driver_contract::CompanionHudOutput {
++        applied: true,
++        render_token,
++    })
++}
++pub fn bind_companion_hud(session: &str, group: &str, lesson: Option<&str>) -> bool {
++    let applied = {
++        let mut hud = super::companion_hud::state().lock().unwrap();
++        if let Some(lesson) = lesson {
++            hud.bind_lesson(session, group, lesson)
++        } else {
++            hud.bind(session, group)
++        }
++    };
 +    if applied {
 +        send_command(
 +            session.to_owned(),
@@ -3606,7 +4555,7 @@ index 8a4c547..9dfe7cb 100644
  // ── Arrival-signal channels (one waiter slot per cursor key) ──────────────
  //
  // Each session's `animate_cursor_to` registers an arrival oneshot keyed by its
-@@ -163,6 +245,47 @@ fn apply_msg(map: &mut RenderMap, msg: OverlayMsg) -> Option<CursorKey> {
+@@ -163,6 +300,47 @@ fn apply_msg(map: &mut RenderMap, msg: OverlayMsg) -> Option<CursorKey> {
      outcome.applied_key().cloned()
  }
  
@@ -3654,7 +4603,7 @@ index 8a4c547..9dfe7cb 100644
  /// Initialise global overlay state (call once, before run_on_main_thread).
  pub fn init(cfg: CursorConfig) {
      static INITIALIZED: OnceLock<()> = OnceLock::new();
-@@ -232,6 +355,18 @@ pub fn send_command(key: CursorKey, cmd: OverlayCommand) {
+@@ -232,6 +410,18 @@ pub fn send_command(key: CursorKey, cmd: OverlayCommand) {
      }
  }
  
@@ -3673,7 +4622,7 @@ index 8a4c547..9dfe7cb 100644
  /// Convenience for callsites not yet threaded with a session key: drives the
  /// seeded `"default"` cursor (the anonymous / one-shot identity).
  pub fn send_command_default(cmd: OverlayCommand) {
-@@ -541,6 +676,10 @@ unsafe fn run_appkit(_cfg: CursorConfig, rx: std::sync::mpsc::Receiver<OverlayMs
+@@ -541,6 +731,10 @@ unsafe fn run_appkit(_cfg: CursorConfig, rx: std::sync::mpsc::Receiver<OverlayMs
      use objc2::{class, msg_send};
      use objc2_foundation::NSRect;
  
@@ -3684,7 +4633,7 @@ index 8a4c547..9dfe7cb 100644
      // ---- NSApplication ----
      // Verify main thread (MainThreadMarker is a zero-size compile-time token).
      let _mtm = objc2_foundation::MainThreadMarker::new()
-@@ -745,6 +884,19 @@ fn render_loop(
+@@ -745,6 +939,19 @@ fn render_loop(
                              last_key = Some(k);
                          }
                      }
@@ -3704,7 +4653,7 @@ index 8a4c547..9dfe7cb 100644
                      // Tick every cursor while an animation/fade is in progress
                      // or immediately after a command changed render state. The
                      // latter lets a just-created path/click/focus rect start on
-@@ -779,7 +931,11 @@ fn render_loop(
+@@ -779,7 +986,11 @@ fn render_loop(
                          .and_then(|k| map.cursors.get(k))
                          .is_some_and(cursor_is_externally_visible)
                          && pinned.is_none();
@@ -3717,7 +4666,7 @@ index 8a4c547..9dfe7cb 100644
                      let next_hover_poll_needed = map
                          .cursors
                          .values()
-@@ -815,7 +971,13 @@ fn render_loop(
+@@ -815,7 +1026,13 @@ fn render_loop(
              if pinned_wid.is_some() && (pin_changed || repin_frames >= 60) {
                  MacZOrderEnforcer { win_ptr }.reassert(pinned_wid);
                  repin_frames = 0;
@@ -3732,16 +4681,16 @@ index 8a4c547..9dfe7cb 100644
                  // A direct move_cursor has no target window to pin against.
                  // Raise the normal-level, click-through overlay without
                  // activating the driver so a later foreground application
-@@ -832,7 +994,7 @@ fn render_loop(
+@@ -832,7 +1049,7 @@ fn render_loop(
          // change pixels. A final frame is emitted as animations/fades finish so
          // the layer is left in the completed/cleared state before blocking.
          if had_msg || hover_changed || frame_tick_needed || next_frame_tick_needed {
 -            let pixmap = {
-+            let (pixmap, receipts, accessible_text, message_frame) = {
++            let (pixmap, receipts, accessible_text, scene_token, message_frame) = {
                  let guard = RENDER.lock().unwrap();
                  if let Some(map) = guard.as_ref() {
                      // Allocate the pixmap at the screen's PHYSICAL pixel
-@@ -843,8 +1005,9 @@ fn render_loop(
+@@ -843,8 +1060,9 @@ fn render_loop(
                      let scale = map.platform.backing_scale.max(1.0);
                      let w = (win_w * scale).max(1.0) as u32;
                      let h = (win_h * scale).max(1.0) as u32;
@@ -3753,7 +4702,7 @@ index 8a4c547..9dfe7cb 100644
                      let backing_scale_f32 = scale as f32;
                      note_overlay_frame(map.cursors.values().any(cursor_may_paint));
                      for (_k, rs) in &map.cursors {
-@@ -861,14 +1024,72 @@ fn render_loop(
+@@ -861,14 +1079,74 @@ fn render_loop(
                              backing_scale_f32,
                          );
                      }
@@ -3793,13 +4742,8 @@ index 8a4c547..9dfe7cb 100644
 +                                backing_scale_f32,
 +                                HUD_REDUCED_MOTION.load(Ordering::Acquire),
 +                            );
-+                            message_frame = hud
-+                                .message_frame
-+                                .as_ref()
-+                                .filter(|frame| {
-+                                    hud.painter.message.message.as_ref() == Some(&frame.message)
-+                                })
-+                                .cloned();
++                            message_frame = hud.message_frame();
++
 +                            note_overlay_frame(true);
 +                        }
 +                    }
@@ -3809,7 +4753,13 @@ index 8a4c547..9dfe7cb 100644
 +                        .filter_map(|rs| rs.core.guidance_frame.clone())
 +                        .filter(|frame| frame.is_current())
 +                        .collect();
-+                    (pm, receipts, accessible_text, message_frame)
++                    (
++                        pm,
++                        receipts,
++                        accessible_text,
++                        hud.scene_token(),
++                        message_frame,
++                    )
                  } else {
                      break;
                  }
@@ -3823,12 +4773,13 @@ index 8a4c547..9dfe7cb 100644
 +                pixmap,
 +                receipts,
 +                accessible_text,
++                scene_token,
 +                message_frame,
 +            );
          }
  
          frame_tick_needed = next_frame_tick_needed;
-@@ -905,24 +1126,55 @@ fn cursor_is_externally_visible(state: &RenderState) -> bool {
+@@ -905,24 +1183,68 @@ fn cursor_is_externally_visible(state: &RenderState) -> bool {
  
  /// Convert a `tiny_skia::Pixmap` to a `CGImage` and set it as the contents
  /// of the given `CALayer` via `dispatch_async(main_queue, ...)`.
@@ -3836,9 +4787,11 @@ index 8a4c547..9dfe7cb 100644
 -    // Build the CGImage from the pixmap bytes.
 -    let cg_image_ptr = match pixmap_to_cgimage(&pixmap) {
 -        Some(p) => p,
+-        None => return,
 +struct LayerImage {
 +    window: usize,
 +    accessible_text: String,
++    scene_token: super::companion_hud::SceneToken,
 +    message_frame: Option<super::companion_hud::MessageFrame>,
 +    layer: usize,
 +    image: usize,
@@ -3861,29 +4814,39 @@ index 8a4c547..9dfe7cb 100644
 +    pixmap: tiny_skia::Pixmap,
 +    frames: Vec<cursor_overlay::guidance::GuidanceFrame>,
 +    accessible_text: String,
++    scene_token: super::companion_hud::SceneToken,
 +    message_frame: Option<super::companion_hud::MessageFrame>,
 +) {
 +    let image = match pixmap_to_cgimage(&pixmap) {
 +        Some(image) => image,
-         None => return,
++        None => {
++            if let Some(frame) = &message_frame {
++                super::companion_hud::state().lock().unwrap().fail_token(
++                    &frame.token,
++                    super::companion_hud::RenderFailure::ImageConversion,
++                );
++            }
++            return;
++        }
      };
--
+ 
 -    // Box the payload for the C callback.
 -    let payload = Box::new((layer_ptr, cg_image_ptr));
--
--    // GCD symbols from libdispatch (part of the macOS system library stubs).
--    // `dispatch_get_main_queue()` is an inline C function; the underlying
--    // symbol is `_dispatch_main_q`, a *struct* (not a pointer).
--    // We declare it as `u8` (opaque placeholder) and take its ADDRESS to
--    // obtain the `dispatch_queue_t` (pointer to the struct).
 +    let previous = PENDING_LAYER_IMAGE.lock().unwrap().replace(LayerImage {
 +        window: window_ptr,
 +        accessible_text,
++        scene_token,
 +        message_frame,
 +        layer: layer_ptr,
 +        image,
 +        frames,
 +    });
+ 
+-    // GCD symbols from libdispatch (part of the macOS system library stubs).
+-    // `dispatch_get_main_queue()` is an inline C function; the underlying
+-    // symbol is `_dispatch_main_q`, a *struct* (not a pointer).
+-    // We declare it as `u8` (opaque placeholder) and take its ADDRESS to
+-    // obtain the `dispatch_queue_t` (pointer to the struct).
 +    if let Some(previous) = previous {
 +        unsafe {
 +            CGImageRelease(previous.image as *mut c_void);
@@ -3898,7 +4861,7 @@ index 8a4c547..9dfe7cb 100644
          static _dispatch_main_q: u8;
          fn dispatch_async_f(
              queue: *const c_void,
-@@ -930,28 +1182,67 @@ fn dispatch_set_layer_contents(layer_ptr: usize, pixmap: tiny_skia::Pixmap) {
+@@ -930,33 +1252,113 @@ fn dispatch_set_layer_contents(layer_ptr: usize, pixmap: tiny_skia::Pixmap) {
              work: unsafe extern "C" fn(*mut c_void),
          );
      }
@@ -3932,44 +4895,18 @@ index 8a4c547..9dfe7cb 100644
 +            mailbox.take()
 +        };
 +        if let Some(payload) = payload {
-+            let mut fences: Vec<_> = payload
-+                .frames
-+                .iter()
-+                .map(|frame| frame.fence.lock().unwrap())
-+                .collect();
-+            let valid = payload.frames.iter().zip(&fences).all(|(frame, fence)| {
-+                fence.generation == frame.generation && frame.revision >= fence.rendered_revision
-+            });
-+            if valid {
-+                let mut last_text = LAST_ACCESSIBILITY_TEXT.lock().unwrap();
-+                if *last_text != payload.accessible_text {
-+                    if let Ok(text) = std::ffi::CString::new(payload.accessible_text.as_str()) {
-+                        let window = payload.window as *mut objc2::runtime::AnyObject;
-+                        let view: *mut objc2::runtime::AnyObject =
-+                            objc2::msg_send![window, contentView];
-+                        let label: *mut objc2::runtime::AnyObject = objc2::msg_send![objc2::class!(NSString), stringWithUTF8String: text.as_ptr()];
-+                        let role: *mut objc2::runtime::AnyObject = objc2::msg_send![objc2::class!(NSString), stringWithUTF8String: c"AXStaticText".as_ptr()];
-+                        let _: () = objc2::msg_send![view, setAccessibilityRole: role];
-+                        let _: () = objc2::msg_send![view, setAccessibilityLabel: label];
-+                        let _: () = objc2::msg_send![view, setAccessibilityElement: objc2::runtime::Bool::new(!payload.accessible_text.is_empty())];
-+                        *last_text = payload.accessible_text.clone();
-+                    }
-+                }
-+                let layer = payload.layer as *mut objc2::runtime::AnyObject;
-+                let cg_id = payload.image as *mut objc2::runtime::AnyObject;
-+                let _: () = objc2::msg_send![layer, setContents: cg_id];
-+                if let Some(frame) = payload.message_frame {
-+                    frame.rendered.store(true, Ordering::Release);
-+                }
-+                let rendered_at = Instant::now();
-+                for (frame, fence) in payload.frames.iter().zip(&mut fences) {
-+                    fence.rendered_revision = frame.revision;
-+                    let mut receipt = frame.receipt.lock().unwrap();
-+                    if receipt.is_none() {
-+                        *receipt = Some(rendered_at);
-+                    }
-+                }
-+            }
++            install_current_composite(
++                &mut super::companion_hud::state().lock().unwrap(),
++                &payload.scene_token,
++                payload.message_frame.as_ref().map(|frame| &frame.token),
++                &payload.frames,
++                Instant::now(),
++                || {
++                    install_layer_image(&payload);
++                    Ok(())
++                },
++            );
++
 +            CGImageRelease(payload.image as *mut c_void);
 +        }
      }
@@ -3985,6 +4922,172 @@ index 8a4c547..9dfe7cb 100644
              set_contents_cb,
          );
      }
+ }
+ 
++/// The real callback and deterministic tests use the same installation guard.
++/// Lock order: HUD, unique guidance fences in pointer order, accessibility text.
++/// Neither the install port nor this function may acquire RENDER or await work.
++fn install_current_composite(
++    hud: &mut super::companion_hud::HudState,
++    scene: &super::companion_hud::SceneToken,
++    token: Option<&cua_driver_contract::CompanionRenderToken>,
++    frames: &[cursor_overlay::guidance::GuidanceFrame],
++    now: Instant,
++    install: impl FnOnce() -> Result<(), super::companion_hud::RenderFailure>,
++) -> bool {
++    hud.install_frame(scene, token, now, || {
++        let mut unique_fences: Vec<_> = frames.iter().map(|frame| frame.fence.clone()).collect();
++        unique_fences.sort_by_key(|fence| std::sync::Arc::as_ptr(fence) as usize);
++        unique_fences.dedup_by(|first, second| std::sync::Arc::ptr_eq(first, second));
++        let mut fences: Vec<_> = unique_fences
++            .iter()
++            .map(|fence| fence.lock().unwrap())
++            .collect();
++        let fence_index = |frame: &cursor_overlay::guidance::GuidanceFrame| {
++            unique_fences
++                .binary_search_by_key(&(std::sync::Arc::as_ptr(&frame.fence) as usize), |fence| {
++                    std::sync::Arc::as_ptr(fence) as usize
++                })
++                .expect("composite fence collected above")
++        };
++        if !frames.iter().all(|frame| {
++            let fence = &fences[fence_index(frame)];
++            fence.generation == frame.generation && frame.revision >= fence.rendered_revision
++        }) {
++            return Ok(false);
++        }
++        install()?;
++        let rendered_at = Instant::now();
++        for frame in frames {
++            let fence = &mut fences[fence_index(frame)];
++            fence.rendered_revision = fence.rendered_revision.max(frame.revision);
++            let mut receipt = frame.receipt.lock().unwrap();
++            if receipt.is_none() {
++                *receipt = Some(rendered_at);
++            }
++        }
++        Ok(true)
++    })
++}
++
++/// Main queue only. Called while both HUD ownership and guidance fences are held.
++unsafe fn install_layer_image(payload: &LayerImage) {
++    let mut last_text = LAST_ACCESSIBILITY_TEXT.lock().unwrap();
++    if *last_text != payload.accessible_text {
++        if let Ok(text) = std::ffi::CString::new(payload.accessible_text.as_str()) {
++            let window = payload.window as *mut objc2::runtime::AnyObject;
++            let view: *mut objc2::runtime::AnyObject = objc2::msg_send![window, contentView];
++            let label: *mut objc2::runtime::AnyObject =
++                objc2::msg_send![objc2::class!(NSString), stringWithUTF8String: text.as_ptr()];
++            let role: *mut objc2::runtime::AnyObject = objc2::msg_send![objc2::class!(NSString), stringWithUTF8String: c"AXStaticText".as_ptr()];
++            let _: () = objc2::msg_send![view, setAccessibilityRole: role];
++            let _: () = objc2::msg_send![view, setAccessibilityLabel: label];
++            let _: () = objc2::msg_send![view, setAccessibilityElement: objc2::runtime::Bool::new(!payload.accessible_text.is_empty())];
++            *last_text = payload.accessible_text.clone();
++        }
++    }
++    let layer = payload.layer as *mut objc2::runtime::AnyObject;
++    let image = payload.image as *mut objc2::runtime::AnyObject;
++    let _: () = objc2::msg_send![layer, setContents: image];
++}
++
+ /// Raise the normal-level overlay without activating the driver application.
+ ///
+ /// This is used only for an externally visible cursor with no target window.
+@@ -1362,3 +1764,93 @@ mod tests {
+         ));
+     }
+ }
++
++#[cfg(test)]
++mod companion_installation_tests {
++    use super::super::companion_hud::{HudState, RenderOutcome};
++    use super::*;
++    use cua_driver_contract::{
++        CompanionHudLocale, CompanionHudPhase, CompanionTeachingMessage, SetCompanionHudInput,
++        TeachingMessageKind,
++    };
++    fn fixture() -> (HudState, super::super::companion_hud::MessageFrame) {
++        let group = "11111111-1111-4111-8111-111111111111";
++        let mut hud = HudState::default();
++        hud.update(
++            "host",
++            SetCompanionHudInput {
++                session: None,
++                group: group.into(),
++                sequence: 0,
++                phase: CompanionHudPhase::Showing,
++                locale: CompanionHudLocale::English,
++                level: 0.0,
++                message: None,
++                speaking_sequence: None,
++            },
++        );
++        let message = CompanionTeachingMessage {
++            lesson_id: group.into(),
++            step_id: group.into(),
++            sequence: 1,
++            kind: TeachingMessageKind::Instruction,
++            text: "Synthetic boundary test".into(),
++        };
++        let frame = hud
++            .present_message("host", group, CompanionHudLocale::English, message)
++            .unwrap();
++        (hud, frame)
++    }
++    #[test]
++    fn companion_actual_composite_guard_rejects_invalid_drawing_and_old_hud_scene() {
++        let (mut hud, message) = fixture();
++        let scene = hud.scene_token();
++        let fence = std::sync::Arc::new(Mutex::new(cursor_overlay::guidance::FrameFence {
++            generation: 2,
++            rendered_revision: 0,
++        }));
++        let drawing = cursor_overlay::guidance::GuidanceFrame {
++            generation: 1,
++            revision: 1,
++            fence: fence.clone(),
++            receipt: std::sync::Arc::new(Mutex::new(None)),
++            pointer: (1.0, 1.0),
++            cue: vec![],
++            cue_alpha: 1.0,
++            teaching: true,
++            visible: true,
++            pressed: false,
++        };
++        assert!(!install_current_composite(
++            &mut hud,
++            &scene,
++            Some(&message.token),
++            &[drawing.clone()],
++            Instant::now(),
++            || panic!("invalid drawing installed")
++        ));
++        assert_eq!(message.outcome(), RenderOutcome::Pending);
++        assert!(drawing.receipt.lock().unwrap().is_none());
++        fence.lock().unwrap().generation = 1;
++        // Shared fences in a composite are locked exactly once, avoiding a self-deadlock.
++        assert!(install_current_composite(
++            &mut hud,
++            &scene,
++            Some(&message.token),
++            &[drawing.clone(), drawing.clone()],
++            Instant::now(),
++            || Ok(())
++        ));
++        assert_eq!(message.outcome(), RenderOutcome::Presented);
++        assert!(drawing.receipt.lock().unwrap().is_some());
++        hud.retire("host", false);
++        assert!(!install_current_composite(
++            &mut hud,
++            &scene,
++            Some(&message.token),
++            &[],
++            Instant::now(),
++            || panic!("retired scene installed")
++        ));
++    }
++}
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/tools/GuidanceCapture.rs b/libs/cua-driver/rust/crates/platform-macos/src/tools/GuidanceCapture.rs
 new file mode 100644
 index 0000000..d15807a
@@ -4447,10 +5550,10 @@ index 280f81c..50d0291 100644
  
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_guidance.rs b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_guidance.rs
 new file mode 100644
-index 0000000..b0d168c
+index 0000000..fb49a1a
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_guidance.rs
-@@ -0,0 +1,691 @@
+@@ -0,0 +1,694 @@
 +//! Host-bound V2 teaching. No desktop input executor dependency.
 +use super::*;
 +use cua_driver_contract::{
@@ -4801,8 +5904,16 @@ index 0000000..b0d168c
 +        }
 +        let message_shown = AtomicBool::new(false);
 +        let drawing_shown = AtomicBool::new(false);
++        let mut render_token = None;
 +        let result = self
-+            .admit_and_play_guidance(session, args, &input, &message_shown, &drawing_shown)
++            .admit_and_play_guidance(
++                session,
++                args,
++                &input,
++                &message_shown,
++                &drawing_shown,
++                &mut render_token,
++            )
 +            .await;
 +        let interrupted = result == Err("user_takeover");
 +        let paired = input
@@ -4835,12 +5946,8 @@ index 0000000..b0d168c
 +            }
 +        }
 +        if result.is_err() {
-+            if let Some((group, message)) = input
-+                .hud_group
-+                .as_deref()
-+                .zip(input.teaching_message.as_ref())
-+            {
-+                crate::cursor::overlay::clear_companion_message(session, group, message);
++            if let Some((group, token)) = input.hud_group.as_deref().zip(render_token.as_ref()) {
++                crate::cursor::overlay::clear_companion_message(session, group, token);
 +            }
 +        }
 +        match result {
@@ -4870,6 +5977,7 @@ index 0000000..b0d168c
 +        input: &ShowCursorSequenceInput,
 +        message_shown: &AtomicBool,
 +        drawing_shown: &AtomicBool,
++        render_token: &mut Option<cua_driver_contract::CompanionRenderToken>,
 +    ) -> Result<(), &'static str> {
 +        let captures = &self.state.companion_captures;
 +        let binding = captures
@@ -4920,11 +6028,10 @@ index 0000000..b0d168c
 +                    return Err("user_takeover");
 +                }
 +            }
-+            if !crate::cursor::overlay::present_companion_message(session, group, locale, message)
-+                .await
-+            {
-+                return Err("render_timeout");
-+            }
++            *render_token = Some(
++                crate::cursor::overlay::present_companion_message(session, group, locale, message)
++                    .await?,
++            );
 +            message_shown.store(true, Ordering::Release);
 +            return Ok(());
 +        }
@@ -4964,11 +6071,10 @@ index 0000000..b0d168c
 +                .zip(input.teaching_locale)
 +                .ok_or("invalid_request")?;
 +            check()?;
-+            if !crate::cursor::overlay::present_companion_message(session, group, locale, message)
-+                .await
-+            {
-+                return Err("render_timeout");
-+            }
++            *render_token = Some(
++                crate::cursor::overlay::present_companion_message(session, group, locale, message)
++                    .await?,
++            );
 +            message_shown.store(true, Ordering::Release);
 +        }
 +        self.play_guidance(session, generation, start, &plan, &check, drawing_shown)
@@ -5144,14 +6250,15 @@ index 0000000..b0d168c
 +}
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_hud_tools.rs b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_hud_tools.rs
 new file mode 100644
-index 0000000..bf480e7
+index 0000000..f6f9d9a
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_hud_tools.rs
-@@ -0,0 +1,88 @@
+@@ -0,0 +1,112 @@
 +use super::{cursor_tools::resolve_cursor_key, ToolState};
 +use async_trait::async_trait;
 +use cua_driver_contract::{
-+    BindCompanionHudCursorInput, ReadCompanionHudMessageInput, SetCompanionHudInput, ToolInput,
++    BindCompanionHudCursorInput, ReadCompanionHudMessageInput, SendCompanionHudCommandInput,
++    SetCompanionHudInput, ToolInput,
 +};
 +use cua_driver_core::{
 +    protocol::ToolResult,
@@ -5185,7 +6292,25 @@ index 0000000..bf480e7
 +            if let Err(error) = input.validate() {
 +                return ToolResult::error(error);
 +            }
-+            return ToolResult::text("message").with_structured(json!({"message":crate::cursor::overlay::read_companion_hud_message(&session, &input.group)}));
++            return ToolResult::text("message").with_structured(json!(
++                crate::cursor::overlay::read_companion_hud_message(&session, &input.group)
++            ));
++        }
++        if self.definition.name == SendCompanionHudCommandInput::TOOL_NAME {
++            let input = match parse_typed_input::<SendCompanionHudCommandInput>(
++                &self.definition.name,
++                args,
++            ) {
++                Ok(input) => input,
++                Err(error) => return error,
++            };
++            if let Err(error) = input.validate() {
++                return ToolResult::error(error);
++            }
++            return match crate::cursor::overlay::send_companion_hud_command(&session, input).await {
++                Ok(output) => ToolResult::text("applied").with_structured(json!(output)),
++                Err(reason) => ToolResult::error(reason),
++            };
 +        }
 +        let applied = if self.definition.name == SetCompanionHudInput::TOOL_NAME {
 +            let input = match parse_typed_input::<SetCompanionHudInput>(&self.definition.name, args)
@@ -5207,7 +6332,11 @@ index 0000000..bf480e7
 +            if let Err(error) = input.validate() {
 +                return ToolResult::error(error);
 +            }
-+            crate::cursor::overlay::bind_companion_hud(&session, &input.group)
++            crate::cursor::overlay::bind_companion_hud(
++                &session,
++                &input.group,
++                input.lesson_id.as_deref(),
++            )
 +        };
 +        if !applied {
 +            return ToolResult::error("HUD lease, cursor binding or sequence refused.");
@@ -5218,6 +6347,7 @@ index 0000000..bf480e7
 +pub(super) fn register_tools(registry: &mut ToolRegistry, state: Arc<ToolState>) {
 +    for name in [
 +        SetCompanionHudInput::TOOL_NAME,
++        SendCompanionHudCommandInput::TOOL_NAME,
 +        BindCompanionHudCursorInput::TOOL_NAME,
 +        ReadCompanionHudMessageInput::TOOL_NAME,
 +    ] {

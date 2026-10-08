@@ -17,7 +17,6 @@ export interface ServerEnv {
   PRACTICE_CHECK_DAILY_LIMIT?: number;
   PRACTICE_CHECK_MINUTE_LIMIT?: number;
   MATERIAL_JOB_CALLS: number;
-  MODEL_CONTEXT_TOKENS: number;
   MATERIAL_JOB_INPUT_TOKENS: number;
   MATERIAL_JOB_OUTPUT_TOKENS: number;
   MATERIAL_STAGE_INPUT_TOKENS: number;
@@ -49,7 +48,6 @@ export function readServerEnv(environment: NodeJS.ProcessEnv): ServerEnv {
       PRACTICE_CHECK_DAILY_LIMIT: z.coerce.number().int().min(1).max(100).default(30),
       PRACTICE_CHECK_MINUTE_LIMIT: z.coerce.number().int().min(1).max(10).default(5),
       MATERIAL_JOB_CALLS: z.coerce.number().int().min(1).max(100).default(24),
-      MODEL_CONTEXT_TOKENS: z.coerce.number().int().min(8192).max(1000000).default(100000),
       MATERIAL_JOB_INPUT_TOKENS: z.coerce.number().int().positive().max(1000000).default(150000),
       MATERIAL_JOB_OUTPUT_TOKENS: z.coerce
         .number()

@@ -14,6 +14,8 @@ export interface ClassroomTeachingSession {
   callTool(command: ClassroomToolCommand): Promise<ClassroomReply>;
 }
 
+const SaveActivityWorkspaceSchema = z.strictObject({ url: ResourceUrlSchema });
+
 /** Classroom operations never replace the spatial teaching presenter. */
 export function createClassroomTeachingTools(session: ClassroomTeachingSession) {
   return [
@@ -67,8 +69,21 @@ export function createClassroomTeachingTools(session: ClassroomTeachingSession) 
       name: 'save_activity_workspace',
       description:
         'Register the actual student working project URL visible in current evidence. A tutorial, starter or demonstration URL is not the student project. If uncertain ask the student. This does not open a resource or submit it.',
-      parameters: z.strictObject({ url: ResourceUrlSchema }),
-      execute: (input) => session.callTool({ kind: 'save-workspace', url: input.url }),
+      /* OpenAI strict tools reject the URI format emitted by z.url(). Publish the
+       * canonical shape without that format; keep full URL validation at execution. */
+      parameters: {
+        ...z.toJSONSchema(SaveActivityWorkspaceSchema, {
+          override: ({ jsonSchema }) => {
+            if (jsonSchema.format === 'uri') {
+              delete jsonSchema.format;
+            }
+          },
+        }),
+      },
+      execute: (input) => {
+        const workspace = SaveActivityWorkspaceSchema.parse(input);
+        return session.callTool({ kind: 'save-workspace', url: workspace.url });
+      },
     }),
     tool({
       name: 'report_activity_progress',

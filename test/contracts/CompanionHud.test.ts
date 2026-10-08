@@ -4,6 +4,8 @@ import {
   CompanionHudSnapshotSchema,
   AgentProgressSchema,
   VoiceMeterSchema,
+  CompanionHudCommandKind,
+  CompanionHudCommandSchema,
 } from '../../src/contracts/CompanionHud.js';
 describe('content-free companion boundaries', () => {
   it('rejects unbounded, invalid and content-bearing payloads', () => {
@@ -28,6 +30,32 @@ describe('content-free companion boundaries', () => {
       }).success,
     ).toBe(false);
   });
+});
+
+it('validates message-free lease commands and conditional native clear tokens', () => {
+  const group = '11111111-1111-4111-8111-111111111111';
+  const renewal = { kind: CompanionHudCommandKind.RENEW_LEASE, group, sequence: 1 };
+  expect(CompanionHudCommandSchema.safeParse(renewal).success).toBe(true);
+  expect(CompanionHudCommandSchema.safeParse({ ...renewal, message: null }).success).toBe(false);
+  expect(
+    CompanionHudCommandSchema.safeParse({ ...renewal, sequence: Number.MAX_SAFE_INTEGER + 1 })
+      .success,
+  ).toBe(false);
+  expect(
+    CompanionHudCommandSchema.safeParse({
+      kind: CompanionHudCommandKind.CLEAR_MESSAGE,
+      group,
+      sequence: 2,
+    }).success,
+  ).toBe(false);
+  expect(
+    CompanionHudCommandSchema.safeParse({
+      kind: CompanionHudCommandKind.CLEAR_MESSAGE,
+      group,
+      sequence: 2,
+      expectedToken: { ownerEpoch: group, revision: 1, renderId: group },
+    }).success,
+  ).toBe(true);
 });
 
 it('accepts content-free practice progress without carrying student evidence', () => {

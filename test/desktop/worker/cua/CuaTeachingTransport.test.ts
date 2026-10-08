@@ -4,8 +4,67 @@ import { describe, expect, it, vi } from 'vitest';
 import { AgentTaskMode, GuidanceReason, CursorCompanionTool } from '#contracts/CursorCompanion.js';
 import { TaskIssue } from '../../../../src/desktop/worker/cua/CuaTaskEvidence.js';
 import { LoggedCuaServer } from '../../../../src/desktop/worker/cua/LoggedCuaServer.js';
+import { DesktopLocale } from '#contracts/DesktopLocale.js';
 
 describe('Cua tool schemas presented to the Agents SDK', () => {
+  it('reports a native text-only render timeout without replaying or logging its content', async () => {
+    const epoch = '11111111-1111-4111-8111-111111111111';
+    const presentationId = '33333333-3333-4333-8333-333333333333';
+    const native: CallToolResult = {
+      content: [{ type: 'text', text: 'Private native message' }],
+      isError: true,
+      structuredContent: {
+        status: 'failed',
+        active: false,
+        following: true,
+        task_epoch: epoch,
+        sequence_id: '44444444-4444-4444-8444-444444444444',
+        code: GuidanceReason.RENDER_TIMEOUT,
+      },
+    };
+    const call = vi.spyOn(MCPServerStdio.prototype, 'callToolResult').mockResolvedValue(native);
+    const logs: string[] = [];
+    const server = new LoggedCuaServer(
+      { name: 'Render diagnostics test', command: 'unused' },
+      pino({ level: 'info' }, { write: (line: string) => logs.push(line) }),
+    );
+    const terminal = vi.fn<() => void>();
+    server.beginTeachingTask(epoch, terminal);
+    server.setHudGroup('private-group');
+    try {
+      const result = await server.showTeachingCue(
+        {
+          capture_id: 'private-capture',
+          presentation_id: presentationId,
+          presentation_version: 2,
+          text_only: true,
+          steps: [],
+        },
+        {
+          lessonId: epoch,
+          stepId: '22222222-2222-4222-8222-222222222222',
+          sequence: 3,
+          kind: 'instruction',
+          text: 'Private typing instruction',
+        },
+        DesktopLocale.ENGLISH,
+      );
+      expect(result.structuredContent).toEqual(native.structuredContent);
+      expect(result.isError).toBe(true);
+      expect(call).toHaveBeenCalledOnce();
+      expect(terminal).toHaveBeenCalledOnce();
+      const encoded = logs.join('');
+      expect(encoded).toContain('cua.response');
+      expect(encoded).not.toContain('cua.render.');
+      expect(encoded).toContain('render_timeout');
+      expect(encoded).not.toContain('Private');
+      expect(encoded).not.toContain('private-capture');
+      expect(encoded).not.toContain('private-group');
+    } finally {
+      call.mockRestore();
+    }
+  });
+
   it.each(['silent', 'debug'])(
     'passes capture IDs and screenshots through the SDK with %s logging',
     async (level) => {
@@ -512,6 +571,10 @@ it('never advertises or dispatches private HUD tools to a model in either task m
       name: 'bind_companion_hud_cursor',
       inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
     },
+    {
+      name: 'send_companion_hud_command',
+      inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
+    },
   ]);
   const server = new LoggedCuaServer(
     { name: 'HUD policy', command: 'unused' },
@@ -526,6 +589,7 @@ it('never advertises or dispatches private HUD tools to a model in either task m
       );
       expect((await server.callToolResult('set_companion_hud', {})).isError).toBe(true);
       expect((await server.callToolResult('bind_companion_hud_cursor', {})).isError).toBe(true);
+      expect((await server.callToolResult('send_companion_hud_command', {})).isError).toBe(true);
     }
     expect(native).not.toHaveBeenCalled();
   } finally {
@@ -723,4 +787,26 @@ it('keeps successful following renewals quiet while retaining transitions and fa
   } finally {
     native.mockRestore();
   }
+});
+
+it('binds a new native lesson through the private host path and refuses failed context admission', async () => {
+  const server = new LoggedCuaServer(
+    { name: 'HUD lesson context', command: 'unused' },
+    pino({ level: 'silent' }),
+  );
+  const host = vi
+    .spyOn(server, 'callHostTool')
+    .mockResolvedValue({ content: [], structuredContent: { applied: true } });
+  const group = '11111111-1111-4111-8111-111111111111';
+  const lessonId = '22222222-2222-4222-8222-222222222222';
+  await server.bindTeachingLesson(lessonId);
+  expect(host).not.toHaveBeenCalled();
+  server.setHudGroup(group);
+  await server.bindTeachingLesson(lessonId);
+  expect(host).toHaveBeenCalledWith('bind_companion_hud_cursor', { group, lessonId });
+  host.mockResolvedValueOnce({ content: [], isError: true });
+  await expect(server.bindTeachingLesson(lessonId)).rejects.toThrow(
+    'Native teaching context unavailable',
+  );
+  host.mockRestore();
 });

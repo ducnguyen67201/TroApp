@@ -1,74 +1,127 @@
 # Tro
 
-An Electron + React desktop foundation with a strict TypeScript API and Prisma/PostgreSQL persistence boundary. Railway is the first backend deployment target; AWS remains a later option.
+Electron + React desktop, strict TypeScript API and Prisma/PostgreSQL persistence.
+Tro supports authenticated computer use, student-controlled teaching, classroom
+materials, voice input and a native macOS companion.
 
-The desktop includes a local computer-use chat prototype with Google sign-in through the system browser. A backend model gateway is implemented; try-on remains planned.
+Read [Architecture](docs/Architecture.md) for the current system, component
+communication, ownership and limits. It is the single maintained architecture
+document. This README owns setup, commands and release checks. [AGENTS.md](AGENTS.md)
+owns repository coding rules. [Research](research/TeachingPainPoints.md) and
+[visual prototypes](examples/previews/ClassroomExperienceDemo.html) are reference
+material; they do not define current runtime behavior.
 
-Read [Architecture](docs/Architecture.md) for the local/cloud split, [Development](docs/Development.md) for commands, and [repository instructions](AGENTS.md) for naming and formatting.
+## Start locally
 
-## Quick start
-
-Installed macOS/Windows builds support a sidebar update button above Settings: click to download, then restart when ready. Updates require a configured HTTPS release feed and signed release artifacts; they stay disabled in development and without a feed. See [App updates](docs/AppUpdates.md) for packaging and release setup.
-
-Use Node.js 24 LTS and pnpm 11. Install the Doppler CLI and make sure the shared development
-PostgreSQL container is already running.
+Use Node.js 24 LTS, pnpm 11, Docker and the Doppler CLI. From this standalone root:
 
 ```sh
 pnpm install
+pnpm db:start
 doppler login
 pnpm select
 pnpm dev
 ```
 
-`pnpm select` delegates selection to Doppler: choose the `tro-api` project, then the appropriate
-development environment/config (`dev` or `dev_personal`). Doppler saves that choice for this
-checkout. Run it again whenever you need to change the selection. `pnpm dev` then applies committed
-migrations and regenerates the Prisma client before starting the API with Doppler's injected
-environment, alongside the desktop without backend secrets. Startup stops if migration fails.
+At `pnpm select`, choose the backend `tro-api` project and intended development
+config. `pnpm dev` injects that configuration into the API only; it applies committed
+migrations and generates Prisma before startup. It launches the desktop without
+backend secrets. Ctrl-C stops both processes. The API defaults to
+`http://127.0.0.1:3000`; local PostgreSQL uses port 54329.
 
-The selected development config owns `APP_ENV`, `DATABASE_URL`, and any provider settings. The
-only browser-visible settings are the public `MAIN_VITE_API_BASE_URL` and `MAIN_VITE_APP_ENV`.
-See [Development](docs/Development.md) for setup and database commands.
+For separate terminals, with the corresponding configs selected:
 
-Google sign-in needs backend-only `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` plus the redirect URI in [Development](docs/Development.md). Give the backend a unique `AUTH_SECRET`; development startup applies the authentication migration automatically. Chat also needs a backend-only `OPENAI_API_KEY`; the API can start without it.
+```sh
+doppler run --project tro-api --config dev -- pnpm dev:api
+```
 
-Click the sidebar avatar to add or switch saved Google accounts on this device. Each account keeps its own encrypted session; switching clears local task state while retaining other logins and the teacher's live class. See [account switching](docs/classroom/AccountSwitching.md) for engineering and a one-machine test flow.
+```sh
+doppler run --project tro-local --config dev -- pnpm dev:desktop
+```
 
-The desktop build includes a pinned Cua Driver release. The development launcher downloads and verifies that release once before starting Electron. On macOS, Tro checks Screen Recording and Accessibility after Google sign-in and guides you to enable Tro in System Settings before showing chat. Tro requests these permissions in its own main process and starts a private embedded Cua daemon only after both grants are verified. The standard macOS development launcher and installed builds display Tro; their permission grants remain separate. With the macOS companion installed, Tro starts a local pointer-following worker after permission setup without model credentials or requests. It stays connected while the signed-in window is open. Without the companion, Tro starts the worker on the first task and keeps it warm for 15 minutes after a completed task. Each message starts a fresh agent run; joined classroom tasks also receive their current authorized activity and saved progress. Only the current app window displays its messages, and they disappear when it closes. Model calls and screenshots sent to OpenAI require network access and may incur charges. See [ComputerUseSpec.md](docs/agent/ComputerUseSpec.md) for details and validation limits.
+`pnpm db:stop` preserves the development database volume. Never reset a database
+containing real data. `pnpm db:migrate` authors a new reviewed migration;
+`pnpm db:deploy` applies existing ones. Integration tests use their own disposable
+container, not the development database.
 
-A per-task harness gates desktop completion: task replies distinguish succeeded, partial, blocked and unverified results after the main agent explicitly requests a read-only verification agent. Current evidence from both agents is retained only in task memory. See [ComputerUseSpec.md](docs/agent/ComputerUseSpec.md) and [TaskCompletionSpec.md](docs/agent/TaskCompletionSpec.md) for details and validation limits.
+## Configuration
 
-Voice input starts automatically after signing in: hold Command + Control on Mac or Control + Left Alt on Windows, speak, and release to send the final transcript to the agent. It uses GPT Live Transcribe through the authenticated backend and follows the existing English/Vietnamese language choice. The companion HUD shows voice capture and task progress; the workspace has no separate voice panel. If the global shortcut is unavailable, use typed messages until OS access is restored and you sign in again. Development startup applies the transcription migration automatically; hosted releases use the normal reviewed migration workflow. Backend defaults allow one capture at a time and 3,600 audio seconds per account per UTC day. See [VoiceInputSpec.md](docs/VoiceInputSpec.md) for implementation and live/packaged verification limits.
+| Process                                     | Settings                                                                                                                                                                                                       |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend                                     | `DATABASE_URL` and unique `AUTH_SECRET` are required. `APP_ENV=dev                                                                                                                                             | stage | prod`, `HOST`, `PORT`and`AUTH_BASE_URL` select the API environment/address. |
+| Google sign-in                              | Backend-only `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Register the web OAuth redirect as `AUTH_BASE_URL + /api/auth/callback/google`; local default is `http://127.0.0.1:3000/api/auth/callback/google`. |
+| Chat, transcription, materials and practice | Backend-only `OPENAI_API_KEY`. Feature budgets and settings are validated in [server Env.ts](src/server/Env.ts) and owning config modules. The API can start with provider features unavailable.               |
+| HUD narration                               | Backend-only `ELEVENLABS_API_KEY`; locale/voice mapping belongs in [VoiceoverConfig.ts](src/server/features/voiceover/VoiceoverConfig.ts).                                                                     |
+| Desktop                                     | Public `MAIN_VITE_API_BASE_URL` and `MAIN_VITE_APP_ENV`. Local defaults work without overrides; `.env.local` may override these public values. `ELECTRON_RENDERER_URL` is supplied by electron-vite.           |
+| Installed updates                           | Public build-time `MAIN_VITE_UPDATE_FEED_URL`, an HTTPS release directory. Unset disables updates.                                                                                                             |
 
-Choose an input from **Microphone** in the sidebar or Settings. Auto-detect follows your computer settings; a specific choice is saved locally. Tro suggests recognized wired or built-in inputs using device-name hints, with explanations for wireless/virtual inputs. Use **Edit ranking** to save your preferred order, or **Compare microphones** to run a six-second local quiet/speech test for each input. Tests show levels, clipping and startup time without uploading or saving audio. Ranking never changes the selected route. Missing explicit choices never silently switch to another microphone. See [MicrophoneSelection.md](docs/MicrophoneSelection.md) for engineering details and hardware checks.
+Keep backend credentials in `tro-api`, never `tro-local` or Electron. T3 Env modules
+validate runtime values; they do not inject secrets. JSON file configuration is
+validated separately. Check the selected Doppler config before any migration.
+Hosted URLs and secrets must be configured explicitly; this checkout does not
+create cloud resources or deploy automatically.
 
-HUD teaching bubbles can be read aloud through ElevenLabs in the selected English
-or Vietnamese language. **Read guidance aloud** and **Stop speaking** are in Settings.
-Speech stops before microphone capture and leaves visual guidance usable if it
-fails. Set backend-only `ELEVENLABS_API_KEY` in Doppler. The locale-to-voice map lives
-in `src/server/features/voiceover/VoiceoverConfig.ts`; voiceover is unavailable
-without the key. Rebuild
-with `pnpm build:cua` for the `0.30.4-tro.16` native message reader. No live provider
-or signed playback acceptance has been completed. See the
-[voiceover engineering record](docs/companion/HudVoiceoverEngineering.md).
+## Desktop and native companion
 
-## Ownership
+```sh
+pnpm build:cua
+pnpm dev:desktop
+```
 
-| Folder          | Owns                                                               |
-| --------------- | ------------------------------------------------------------------ |
-| `src/desktop`   | Electron main, preload, React, local agent worker, Cua MCP client  |
-| `src/contracts` | Runtime schemas and public response types                          |
-| `src/server`    | API composition, application services, database ports/adapters     |
-| `prisma`        | Schema and versioned migrations                                    |
-| `scripts`       | Build tools and validation command entry points                    |
-| `test`          | Unit/integration tests mirroring `src`, and teaching-flow fixtures |
-| `docs`          | Architecture, development workflow, deployment decisions           |
+`build:cua` fetches the pinned Cua source, applies `CursorCompanion.patch`, runs
+selected native tests, builds/signs the local executable and records checksums in
+`~/.cache/tro/cua-companion`. Restart the desktop after rebuilding so its daemon
+loads that executable. [CuaCompanionBuild.ts](src/contracts/CuaCompanionBuild.ts)
+owns the required version/source commit. Packaged driver resources take precedence
+over development caches.
 
-See the [documentation index](docs/README.md) and [worker ownership map](src/desktop/worker/README.md) for feature navigation.
+The macOS launcher uses the checkout-owned `.tro-development/Tro.app`. Quit it
+before rebuilding its static host. The development bundle has a separate identity
+from installed `app.tro.desktop`; grant each its own Screen Recording, Accessibility
+and microphone access when requested. The launcher preserves saved accounts and
+OS grants. Keep the same app instance open throughout browser OAuth. If a different
+checkout owns the callback, restart the intended launcher before signing in.
+
+Choose **Show me** for student-controlled guidance and **Do it for me** for general
+execution. Joined classroom tasks admit Show me only. Voice holds Command + Control
+on Mac or Control + Left Alt on Windows; release submits one final transcript.
+Microphone selection/ranking/comparison is in Settings. Narration and bundled pets
+are optional. Model requests, transcription and provider narration may incur charges.
+
+To inspect tool schemas without performing desktop actions:
+
+```sh
+pnpm inspect:cua:mcp --list
+pnpm inspect:cua:mcp browser_click
+```
+
+## Classroom pilot
+
+Apply committed migrations through normal startup. Accounts default to Student;
+a backend operator can grant/revoke a role by verified email:
+
+```sh
+doppler run -- pnpm account:role teacher@example.com teacher
+```
+
+Use `student` to revoke teacher access. Sign in as the teacher, create a class,
+upload materials, prepare/review and approve an immutable publication. Enroll a
+student who has signed in or provide an invitation code. Start a session and select
+its section, stage and pacing. Sign in as an enrolled student and explicitly join.
+Account switching permits sequential teacher/student checks on one device; it does
+not establish simultaneous two-device behavior.
+
+Enable and approve a practice checkpoint before testing **Check my work**. In a
+joined Practice activity, Cmd/Ctrl + Shift + Enter opens evidence review; the button
+and in-app shortcut remain fallbacks. Check selected evidence, inspect feedback,
+request a hint or targeted Show me, then independently confirm hand-in. Confirm
+teacher results show the exact saved evidence/version. A live class must end before
+confirmed deletion. Class deletion preserves work/history; removing a material
+preserves originals referenced by approved revisions.
 
 ## Validation
 
-Finish related edits first, then run:
+Finish all related edits, then run the required checks:
 
 ```sh
 pnpm format
@@ -80,54 +133,83 @@ pnpm build
 pnpm test:integration
 ```
 
-Integration tests require a running Docker daemon and use a disposable PostgreSQL container. Packaging requires separate macOS/Windows validation and signing.
+Unit tests require no credentials or live database. Integration tests need Docker
+and create/migrate/remove a disposable PostgreSQL container. Run
+`pnpm test:worker` for worker bundling/startup changes. These checks use local
+fixtures and do not call a paid provider.
 
-## Cursor guidance
+For worker, SDK, preload, teaching or gateway wiring:
 
-Run `pnpm build:cua` on macOS to build the pinned companion-enabled Cua Driver,
-then run `pnpm dev:desktop`. Allow desktop permissions for Tro.
-Select **Show me** to demonstrate circles, arrows, selections and drag/click
-previews while the student controls the real pointer. **Do it for me** uses
-ordinary Cua actions. The companion follows while idle after permission setup.
-Esc cancels the lesson and returns to idle following. V2 guides approach, trace,
-hold and clear each cue; you can move your pointer while watching. Clicking,
-typing or scrolling ends the current preview, then the same lesson observes again
-and guides the next reachable step until its original goal is visibly reached.
-This first adapter supports the primary macOS display. See
-[CursorCompanion.md](docs/companion/CursorCompanion.md) for setup, boundaries and limits.
+```sh
+pnpm test:teaching
+```
 
-The macOS companion includes a compact voice bar with live audio levels,
-transcription/submission transitions and actual task progress. `DesktopCompanion`
-composes cursor and HUD behind one main-process entry point. Both workers share
-Tro's embedded driver endpoint, while the HUD transport survives task handoffs.
-See [CursorCompanionVoiceBarPlan.md](docs/companion/CursorCompanionVoiceBarPlan.md).
+For native watch, capture, input or rendering changes, rebuild first, then run on
+an authorized macOS desktop:
 
-Teaching orchestration checks: `pnpm test:teaching` (local scripted flow) and `pnpm test:teaching:native` (also verifies the real macOS capture boundary). See [TeachingFlowContract](docs/teaching/TeachingFlowContract.md) for coverage and manual acceptance.
+```sh
+pnpm build:cua
+pnpm test:teaching:native
+```
 
-## Classroom pilot
+The native contract requires a validated completion marker and checks two-message
+HUD installation under stale refresh/renewal/speaking, token-conditioned clears,
+lesson changes, paired drawing receipts, capture isolation and teardown. Exit zero
+alone is insufficient. It does not inject physical input or prove physical scan-out.
 
-Teachers can delete an inactive class from its detail panel after confirmation.
-Student work and history are retained. Materials have a labeled Delete control;
-unused originals are removed, while approved lesson sources remain available to
-their existing revisions. See the classroom implementation notes for migration
-and retention behavior.
+## Packaging and hardware checks
 
-Teachers can upload PDF/slides/Scratch/Python/text materials, prepare and edit their
-summary, sections and detailed notes, then approve them for student assistance. Originals
-remain available for authorized download. See [materials preparation](docs/classroom/MaterialPreparationEngineering.md)
-for supported formats and limits. Teachers enroll signed-in students and run teacher-paced or
-self-paced sessions. Students explicitly join, ask Tro for help with the current
-activity, save a working project link and confirm a Scratch-link submission.
-Stored account roles control teacher permissions. A backend operator can grant a
-teacher by verified email using `doppler run -- pnpm account:role teacher@example.com teacher`.
-Classroom appears in the sidebar with a Teacher/Student badge; teachers prepare
-lessons and issue invitation codes, while students enroll by code and join live sessions.
-See [classroom setup and implementation](docs/classroom/ClassroomImplementation.md)
-for the migration, walkthrough and current limits.
+Set the public HTTPS API URL before `pnpm package:desktop` on the target OS. Keep
+provider/database secrets out of that command. The package stages the native driver,
+SDK, native hook prebuilds and microphone entitlement. macOS updates need the ZIP
+and metadata as well as the DMG installer; Windows uses NSIS and its update metadata.
+Set the HTTPS update feed during the same build/package invocation. Development
+updates remain disabled. Signing/notarization and distribution require a separate
+reviewed release; ad hoc local signing is not release signing.
 
-Materials now prepare a compact brief per document and a class overview, retaining
-original sources for authorized retrieval. Student context uses token limits and
-question-based source selection. See [compact material context implementation](docs/classroom/MaterialContextImplementation.md)
-for the additive migration, backend budget settings, compatibility and manual checks.
+After building, use the local artifact probes where applicable:
 
-In a joined student Practice activity, **Cmd/Ctrl + Shift + Enter** opens the current work review. Check selected evidence there; hand-in requires separate confirmation. The native HUD shows checking and submission progress. A Review work button and an in-app shortcut fallback remain available.
+```sh
+pnpm check:pet-presentation
+pnpm check:microphone-package -- /absolute/path/to/unpacked/app
+```
+
+Before a signed macOS/Windows release, perform these manual checks:
+
+- Complete Google callback/session restoration, add/switch/sign out accounts, and
+  verify stale callbacks cannot select another account or receive another user's data.
+- Test held shortcuts, both-release rearming, AltGr on Windows, background recording,
+  cancel/close/sleep/lock, fast release while connecting and final transcription once.
+- Test USB/Bluetooth/built-in microphones, unplug an explicitly selected device,
+  change OS default routing, compare locally, cancel tests and verify tracks stop.
+- Ask Show me to open YouTube: follow its browser/address-bar cues with real input,
+  include input during a preview/model turn, wait through loading, and verify the
+  original goal against the visible result. Passive movement must not advance it.
+  Esc during waiting/thinking must prevent later guidance.
+- Exercise native cue position, click/drag interruption, focus and display scaling.
+  Synthetic receipts do not establish these physical behaviors or model quality.
+- Test pet click-through padding, drag/release/cancel, focus, fullscreen/OS menus,
+  monitor changes, hide, account changes and restart on both operating systems.
+- Install a signed older build and test a signed update: availability, failure/retry,
+  explicit download, busy restart blocking, relaunch/version, saved sessions and Cua
+  resources. Normal quit must not silently install the update.
+- Review real-provider material quality/citations, approved-source retrieval, narration
+  pronunciation/cancellation, practice findings and two-device classroom authority.
+
+Record actual results at handoff. Source builds and synthetic tests do not establish
+signed hardware, live-provider quality or a hosted production release.
+
+## Backend deployment
+
+Railway is the initial target; deployment requires explicit authorization. The
+Dockerfile contains the API, not Electron. Supply the intended database/auth/Google/
+provider settings and public HTTPS `AUTH_BASE_URL`. The container binds `0.0.0.0`;
+Railway supplies `PORT` or the API default applies. The reviewed pre-deploy step
+uses Prisma `migrate deploy`; never use schema resets or `migrate dev` in production.
+`/health/live` reports process availability; `/health/ready` requires the migrated DB.
+
+The ingress must support WebSocket upgrades on `/api/v1/transcription/stream`, retain
+authentication and permit a full bounded capture. Desktop production uses HTTPS/WSS.
+Validate database TLS, backups/recovery, session restoration, provider allowances,
+billing/abuse controls and release artifacts before a paid public deployment.
+AWS migration and try-on generation are outside the implemented runtime.

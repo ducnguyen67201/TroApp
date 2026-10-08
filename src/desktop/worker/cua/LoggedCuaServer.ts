@@ -1,3 +1,8 @@
+import {
+  CompanionHudTool,
+  CompanionHudAckSchema,
+  CompanionHudBindingSchema,
+} from '#contracts/CompanionHud.js';
 import { logAgentExchange } from '../agent/AgentExchangeLog.js';
 import { MCPServerStdio, type CallToolResult, type MCPCallToolOptions } from '@openai/agents';
 import type { Logger } from 'pino';
@@ -397,6 +402,18 @@ export class LoggedCuaServer extends MCPServerStdio {
 
   setHudGroup(group: string): void {
     this.hudGroup = group;
+  }
+
+  /** New lessons explicitly replace native context; delayed previous-lesson messages remain fenced. */
+  async bindTeachingLesson(lessonId: string): Promise<void> {
+    if (!this.hudGroup) {
+      return;
+    }
+    const binding = CompanionHudBindingSchema.parse({ group: this.hudGroup, lessonId });
+    const result = await this.callHostTool(CompanionHudTool.BIND_CURSOR, binding);
+    if (result.isError || !CompanionHudAckSchema.parse(result.structuredContent).applied) {
+      throw new Error('Native teaching context unavailable.');
+    }
   }
 
   setTeachingPresenterRequired(required: boolean): void {
@@ -1007,7 +1024,7 @@ export class LoggedCuaServer extends MCPServerStdio {
       if (this.taskEvidence.hasTerminalGuidance()) {
         this.onTeachingTerminal?.();
       }
-      this.log.debug(
+      this.log[result.isError ? 'warn' : 'debug'](
         {
           toolName,
           durationMs: Math.round(performance.now() - startedAt),
@@ -1015,6 +1032,7 @@ export class LoggedCuaServer extends MCPServerStdio {
         },
         'cua.response',
       );
+
       logAgentExchange(this.log, {
         operation: 'native.tool',
         context: { toolName },
@@ -1035,7 +1053,7 @@ export class LoggedCuaServer extends MCPServerStdio {
         this.taskEvidence.failGuidance(GuidanceReason.TRANSPORT_FAILED);
         this.onTeachingTerminal?.();
       }
-      this.log.debug(
+      this.log.error(
         {
           toolName,
           errorType: error instanceof Error ? error.name : typeof error,

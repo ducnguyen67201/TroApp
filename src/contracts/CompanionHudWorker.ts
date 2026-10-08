@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { DesktopDriverConnectionSchema } from './DesktopDriver.js';
 import { TeachingMessageSchema } from './TeachingStep.js';
-import { CompanionHudSnapshotSchema } from './CompanionHud.js';
+import { CompanionHudSnapshotSchema, CompanionRenderTokenSchema } from './CompanionHud.js';
 
 export const CompanionHudWorkerCommandSchema = z.discriminatedUnion('kind', [
   z.strictObject({
@@ -20,4 +20,7 @@ export const CompanionHudWorkerReplySchema = z.union([
 
 export const CompanionHudMessageSchema = z.strictObject({
   message: TeachingMessageSchema.nullable(),
+  renderToken: CompanionRenderTokenSchema.optional(),
 });
+
+export type CompanionHudMessage = z.infer<typeof CompanionHudMessageSchema>;

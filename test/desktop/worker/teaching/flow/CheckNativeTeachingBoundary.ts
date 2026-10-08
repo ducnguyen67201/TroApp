@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { checkNativeHudRendering } from './CheckNativeHudRendering.js';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { MCPServerStdio, type CallToolResult } from '@openai/agents';
@@ -63,6 +64,7 @@ export async function checkNativeTeachingBoundary(): Promise<void> {
         `Native teaching tool missing: ${name}`,
       );
     }
+    await checkNativeHudRendering(peer);
     const message = {
       lessonId: watchId,
       stepId: taskEpoch,

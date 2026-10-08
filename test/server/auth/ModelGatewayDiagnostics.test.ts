@@ -78,3 +78,49 @@ it('reports nested broken-pipe operation and errno without raw messages or addre
   });
   expect(JSON.stringify(diagnostic)).not.toContain('private');
 });
+
+it('retains safe socket closure and byte counters without addresses or arbitrary messages', () => {
+  const diagnostics = describeNetworkFailure(
+    new TypeError('private provider URL', {
+      cause: {
+        code: 'UND_ERR_SOCKET',
+        message: 'other side closed',
+        socket: {
+          bytesWritten: 1984000,
+          bytesRead: 0,
+          remoteAddress: 'private address',
+          localPort: 12345,
+        },
+      },
+    }),
+  );
+  expect(diagnostics).toMatchObject({
+    networkCode: 'UND_ERR_SOCKET',
+    socketFailureReason: 'peer_closed',
+    socketBytesWritten: 1984000,
+    socketBytesRead: 0,
+  });
+  expect(JSON.stringify(diagnostics)).not.toContain('private');
+  expect(JSON.stringify(diagnostics)).not.toContain('localPort');
+});
+
+it.each([-1, 1.5, Infinity, Number.MAX_SAFE_INTEGER + 1, 'private counter'])(
+  'omits malformed socket counters (%s) and arbitrary socket messages',
+  (value) => {
+    const diagnostics = describeNetworkFailure(
+      new TypeError('private', {
+        cause: {
+          code: 'UND_ERR_SOCKET',
+          message: 'private credential and prompt',
+          socket: { bytesWritten: value, bytesRead: value },
+        },
+      }),
+    );
+    expect(diagnostics).toMatchObject({
+      socketFailureReason: 'unclassified',
+      socketBytesWritten: null,
+      socketBytesRead: null,
+    });
+    expect(JSON.stringify(diagnostics)).not.toContain('private');
+  },
+);
