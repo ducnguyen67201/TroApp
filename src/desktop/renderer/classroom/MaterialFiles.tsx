@@ -7,6 +7,7 @@ import {
   type MaterialCollection,
 } from '#contracts/ClassroomMaterials.js';
 import type { ClassroomTranslate } from './ClassroomLabels.js';
+import { MaterialPreviewButton } from './MaterialPreviewButton.js';
 
 /** File selection and dropping share one upload path; links remain references only. */
 export function MaterialFiles({
@@ -77,6 +78,9 @@ export function MaterialFiles({
                     >
                       {status.label}
                     </Badge>
+                    {!source.url && (
+                      <MaterialPreviewButton classId={collection.classId} source={source} t={t} />
+                    )}
                     {!source.url && (
                       <Button
                         size="compact-xs"

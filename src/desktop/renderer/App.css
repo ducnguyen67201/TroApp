@@ -890,6 +890,60 @@ textarea:focus-visible {
   margin-top: 4px;
 }
 
+.material-pdf-preview {
+  overflow: auto;
+  max-height: 65vh;
+  position: relative;
+  overscroll-behavior: contain;
+  padding: 12px;
+  background: var(--tro-sidebar);
+  border-radius: 8px;
+}
+
+.material-pdf-preview canvas {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.material-pdf-page + .material-pdf-page {
+  margin-top: 16px;
+}
+
+.material-pdf-pages {
+  margin-inline: auto;
+}
+
+.material-pdf-page-surface {
+  position: relative;
+  background: white;
+  margin-top: 6px;
+}
+
+.material-pdf-page-status {
+  position: absolute;
+  inset: 0;
+  align-content: center;
+}
+
+.material-pdf-preview canvas[hidden] {
+  display: none;
+}
+
+.material-text-preview {
+  max-height: 65vh;
+  overflow: auto;
+  padding: 16px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--tro-sidebar);
+  border-radius: 8px;
+  margin: 0;
+}
+
 .material-processing-tag {
   display: flex;
   width: fit-content;

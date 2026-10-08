@@ -26,6 +26,7 @@ import {
 import { AccountTransitionGate } from './accounts/AccountTransitionGate.js';
 import { MaterialCommandSchema } from '#contracts/ClassroomMaterials.js';
 import { MaterialApiClient } from './classroom/MaterialApiClient.js';
+import { MaterialPreviewController } from './classroom/MaterialPreviewController.js';
 import { writeFile } from 'node:fs/promises';
 import { dialog } from 'electron';
 import { VoiceoverController } from './voiceover/VoiceoverController.js';
@@ -548,6 +549,10 @@ async function startDesktop(): Promise<void> {
       code: 'unavailable',
     });
   });
+  const materialPreview = new MaterialPreviewController(materialApi, accountGate);
+  ipcMain.handle('tro:class-material-preview', (event, raw: unknown) =>
+    materialPreview.readOriginal(raw, () => isTrustedSender(event)),
+  );
   ipcMain.handle('tro:class-material-download', async (event, raw: unknown) => {
     if (!isTrustedSender(event)) {
       return false;
