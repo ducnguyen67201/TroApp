@@ -1,6 +1,21 @@
 import type { ReactElement } from 'react';
-import { Button, Checkbox, Group, Stack, Text, TextInput, Textarea } from '@mantine/core';
-import type { PracticeCheckpoint } from '#contracts/PracticeCheck.js';
+import {
+  Button,
+  Checkbox,
+  Group,
+  Stack,
+  Text,
+  TextInput,
+  Textarea,
+  Select,
+  MultiSelect,
+} from '@mantine/core';
+import {
+  PracticeCheckpointSchema,
+  PracticeCriterionSchema,
+  type PracticeCheckpoint,
+} from '#contracts/PracticeCheck.js';
+import { PracticeVerification, PracticeCapability } from '#contracts/PracticeAssessment.js';
 import type { ClassroomTranslate } from './ClassroomLabels.js';
 /** Editing a requirement revokes local approval; publication freezes a new rubric revision. */
 export function PracticeCheckpointEditor({
@@ -90,6 +105,162 @@ export function PracticeCheckpointEditor({
                   });
                 }}
               />
+              <Select
+                label={t('Verification method', 'Cách kiểm tra')}
+                value={criterion.verification?.kind ?? PracticeVerification.LLM}
+                data={[
+                  {
+                    value: PracticeVerification.LLM,
+                    label: t('AI reviews observable evidence', 'AI xem bằng chứng quan sát được'),
+                  },
+                  {
+                    value: PracticeVerification.EXACT_OUTPUT,
+                    label: t(
+                      'Compare supplied text exactly',
+                      'So sánh chính xác văn bản được cung cấp',
+                    ),
+                  },
+                  {
+                    value: PracticeVerification.SCRATCH_STRUCTURE,
+                    label: t('Scratch connected block chain', 'Chuỗi khối Scratch được nối'),
+                  },
+                  {
+                    value: PracticeVerification.TEACHER,
+                    label: t('Teacher review required', 'Cần giáo viên kiểm tra'),
+                  },
+                ]}
+                disabled={disabled}
+                onChange={(value) => {
+                  const verification =
+                    value === PracticeVerification.EXACT_OUTPUT
+                      ? { kind: PracticeVerification.EXACT_OUTPUT, expectedText: '' }
+                      : value === PracticeVerification.SCRATCH_STRUCTURE
+                        ? {
+                            kind: PracticeVerification.SCRATCH_STRUCTURE,
+                            eventOpcode: 'event_whenflagclicked' as const,
+                            blockOpcode: 'motion_movesteps',
+                          }
+                        : value === PracticeVerification.TEACHER
+                          ? { kind: PracticeVerification.TEACHER }
+                          : { kind: PracticeVerification.LLM };
+                  update(checkpoint.id, {
+                    criteria: checkpoint.criteria.map((item) =>
+                      item.id === criterion.id ? { ...item, verification } : item,
+                    ),
+                  });
+                }}
+              />
+              {criterion.verification?.kind === PracticeVerification.EXACT_OUTPUT && (
+                <Textarea
+                  label={t('Expected supplied text', 'Văn bản cung cấp mong đợi')}
+                  description={t(
+                    'Only line endings and surrounding whitespace are ignored. This does not run code.',
+                    'Chỉ bỏ qua kiểu xuống dòng và khoảng trắng đầu/cuối. Không chạy mã.',
+                  )}
+                  value={criterion.verification.expectedText}
+                  maxLength={2000}
+                  disabled={disabled}
+                  onChange={(event) => {
+                    const expectedText = event.currentTarget.value;
+                    update(checkpoint.id, {
+                      criteria: checkpoint.criteria.map((item) =>
+                        item.id === criterion.id
+                          ? {
+                              ...item,
+                              verification: {
+                                kind: PracticeVerification.EXACT_OUTPUT,
+                                expectedText,
+                              },
+                            }
+                          : item,
+                      ),
+                    });
+                  }}
+                />
+              )}
+              {criterion.verification?.kind === PracticeVerification.SCRATCH_STRUCTURE && (
+                <Stack gap={5}>
+                  <Select
+                    label={t('Starting event', 'Sự kiện bắt đầu')}
+                    value={criterion.verification.eventOpcode}
+                    data={[
+                      'event_whenflagclicked',
+                      'event_whenthisspriteclicked',
+                      'event_whenkeypressed',
+                    ]}
+                    disabled={disabled}
+                    onChange={(value) => {
+                      if (
+                        value !== 'event_whenflagclicked' &&
+                        value !== 'event_whenthisspriteclicked' &&
+                        value !== 'event_whenkeypressed'
+                      ) {
+                        return;
+                      }
+                      const rule = criterion.verification;
+                      if (rule?.kind === PracticeVerification.SCRATCH_STRUCTURE) {
+                        update(checkpoint.id, {
+                          criteria: checkpoint.criteria.map((item) =>
+                            item.id === criterion.id
+                              ? { ...item, verification: { ...rule, eventOpcode: value } }
+                              : item,
+                          ),
+                        });
+                      }
+                    }}
+                  />
+                  <TextInput
+                    label={t('Required block opcode', 'Mã khối cần có')}
+                    value={criterion.verification.blockOpcode}
+                    disabled={disabled}
+                    maxLength={101}
+                    onChange={(event) => {
+                      const rule = criterion.verification;
+                      if (rule?.kind === PracticeVerification.SCRATCH_STRUCTURE) {
+                        update(checkpoint.id, {
+                          criteria: checkpoint.criteria.map((item) =>
+                            item.id === criterion.id
+                              ? {
+                                  ...item,
+                                  verification: { ...rule, blockOpcode: event.currentTarget.value },
+                                }
+                              : item,
+                          ),
+                        });
+                      }
+                    }}
+                  />
+                </Stack>
+              )}
+              <MultiSelect
+                label={t('Required evidence capabilities', 'Khả năng bằng chứng cần có')}
+                value={criterion.capabilities ?? []}
+                data={[
+                  { value: PracticeCapability.TEXT, label: t('Readable text', 'Văn bản đọc được') },
+                  { value: PracticeCapability.IMAGE, label: t('Visible image', 'Hình ảnh') },
+                  {
+                    value: PracticeCapability.PROJECT_STRUCTURE,
+                    label: t('Scratch project structure', 'Cấu trúc dự án Scratch'),
+                  },
+                  {
+                    value: PracticeCapability.VERIFIED_EXECUTION,
+                    label: t(
+                      'Verified execution (not yet supported)',
+                      'Chạy được xác minh (chưa hỗ trợ)',
+                    ),
+                  },
+                ]}
+                disabled={disabled}
+                onChange={(values) => {
+                  const capabilities =
+                    PracticeCriterionSchema.shape.capabilities.parse(values) ?? [];
+                  update(checkpoint.id, {
+                    criteria: checkpoint.criteria.map((item) =>
+                      item.id === criterion.id ? { ...item, capabilities } : item,
+                    ),
+                  });
+                }}
+              />
               <Group>
                 <Checkbox
                   label={t('Required', 'Bắt buộc')}
@@ -149,6 +320,7 @@ export function PracticeCheckpointEditor({
             checked={checkpoint.approved}
             disabled={
               disabled ||
+              !PracticeCheckpointSchema.safeParse(checkpoint).success ||
               !checkpoint.title.trim() ||
               !checkpoint.task.trim() ||
               checkpoint.criteria.some(

@@ -1,3 +1,7 @@
+import {
+  PracticeCaptureCommandSchema,
+  PracticeCaptureReplySchema,
+} from '#contracts/PracticeCapture.js';
 import { petOverlayBridge } from './PetPreload.js';
 import {
   ClassroomInsightCommandSchema,
@@ -194,6 +198,15 @@ const bridge: DesktopBridge = {
   },
   async cancelGuidance() {
     await ipcRenderer.invoke('tro:cancel-guidance');
+  },
+  async controlPracticeCapture(command) {
+    const parsed = PracticeCaptureCommandSchema.safeParse(command);
+    if (!parsed.success) {
+      return { kind: 'failed', code: PracticeFailure.INVALID };
+    }
+    const raw: unknown = await ipcRenderer.invoke('tro:practice-capture', parsed.data);
+    const reply = PracticeCaptureReplySchema.safeParse(raw);
+    return reply.success ? reply.data : { kind: 'failed', code: PracticeFailure.UNAVAILABLE };
   },
   async readPracticeShortcutAvailable() {
     const available: unknown = await ipcRenderer.invoke('tro:practice-shortcut-available');

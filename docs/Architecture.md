@@ -509,20 +509,45 @@ Neither operation resets the database or rewrites applied migrations.
 
 ### Practice checks
 
-`PracticeCheckService` is a separate formative evaluator, not the teaching completion
-gate. A teacher reviews and enables a checkpoint before publication. The student
-previews bounded text/code/image/file evidence and explicitly requests a check,
-then may request a hint or targeted Show me assistance. The checker uses approved
-criteria and submitted evidence; it cannot execute student work or change the rubric.
-Saved checks are versioned and private. `PrismaPracticeCheckStore` owns transactional
-reservations, evidence snapshots and append-only submission revisions.
+`PracticeCheckService` owns student authorization, admission budgets, immutable snapshots,
+idempotent checks and independently confirmed hand-ins. It delegates assessment through
+an application port. `PracticeAssessmentService` prepares evidence and batches criteria
+by their teacher-approved verification method. `PracticeCriterionEvaluator` is the extension
+point; the Responses adapter, exact supplied-text comparison and connected Scratch block
+checker implement it. Missing required class sources, unsupported evidence capabilities
+(including verified execution) and teacher-only criteria produce insufficient evidence.
+There is no implicit fallback from an approved deterministic rule to an LLM.
 
-Hand-in requires independent student confirmation and preserves the exact submitted
-version. Teacher views read the saved evidence and receipts. Existing Scratch-link
-submission and progress reports remain compatible; a report or saved URL is not a
-grade. Cmd/Ctrl + Shift + Enter opens practice review with an in-app fallback.
-The shortcut does not capture an open application. Native selected-window evidence,
-unlimited storage and automatic final grading are not implemented promises.
+`PrismaPracticeCheckStore.readGrounding` resolves the pinned course publication and rubric
+source IDs into passages and teacher corrections. Each grounding source retains both its
+passage ID and source-unit/page ID so criterion references remain traceable. `ExtractPracticeArtifact` reuses the
+bounded material parser worker for PDF text and static sb3 target graphs. Pasted code is
+text evidence; it is never executed. PDF layout/scans and Scratch runtime behavior require
+additional evidence or teacher review. Extraction is separate from judgment. Saved checks
+include extractor/evaluator versions, source IDs, warnings and derived units tied to original
+evidence IDs. These private units are scrubbed with the original work on removal/expiry.
+The offline quality runner in `test/server/features/classroom/evaluation` measures disagreement,
+false passes, missing results and invalid citations. Synthetic test cases verify the runner;
+real teacher-reviewed reference labels and live-model calibration remain release work.
+
+`PracticeCaptureController` owns expiring local drafts bound to the joined device and current
+activity/attempt/context/progress versions. Its Electron adapter lists opaque window choices,
+excludes Tro windows and captures the selected window. Electron enumerates window thumbnails
+locally; only the selected image is retained. It does not capture entire displays. The student
+reviews the image before explicitly sending it. Command + K on macOS and Alt + K on Windows
+capture the remembered selection before focusing Tro; first use opens a window picker.
+Manual text, supported images, PDF and sb3 uploads remain available. Capture provenance records
+time, dimensions and a digest, not proof of authorship or execution. Preload validates narrow
+capture commands/replies; main rejects changed or expired captured evidence.
+
+The HUD uses the request locale for Checking work / Đang kiểm tra, feedback ready,
+submission and failure phases. Request IDs, history matching and a bounded presentation timer
+fence late replies. Active voice or teaching guidance retains HUD priority; the practice panel
+still displays check progress. A successful check is formative feedback, never a grade.
+Students can request teacher review tied to an authorized saved check and criterion through
+the existing insights help queue. Teacher results retain the original evidence and hand-in
+receipts; hand-in remains a separate confirmation of the exact checked version. Both practice
+review and the Insights work gallery offer original-file downloads for PDF and sb3 evidence.
 
 ### Learning history and parent reports
 

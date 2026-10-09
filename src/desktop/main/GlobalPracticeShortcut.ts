@@ -6,13 +6,23 @@ export class GlobalPracticeShortcut {
   private registered = false;
   private generation = 0;
 
-  constructor(private readonly shortcuts: GlobalShortcutPort) {}
+  private readonly accelerator: string;
+
+  constructor(
+    private readonly shortcuts: GlobalShortcutPort,
+    platform: NodeJS.Platform = process.platform,
+  ) {
+    this.accelerator =
+      platform === 'darwin'
+        ? PracticeShortcut.MAC_ACCELERATOR
+        : PracticeShortcut.WINDOWS_ACCELERATOR;
+  }
 
   enable(openReview: () => void): boolean {
     this.disable();
     const generation = this.generation;
     try {
-      this.registered = this.shortcuts.register(PracticeShortcut.ACCELERATOR, () => {
+      this.registered = this.shortcuts.register(this.accelerator, () => {
         if (this.registered && generation === this.generation) {
           openReview();
         }
@@ -30,7 +40,7 @@ export class GlobalPracticeShortcut {
   disable(): void {
     this.generation += 1;
     if (this.registered) {
-      this.shortcuts.unregister(PracticeShortcut.ACCELERATOR);
+      this.shortcuts.unregister(this.accelerator);
     }
     this.registered = false;
   }

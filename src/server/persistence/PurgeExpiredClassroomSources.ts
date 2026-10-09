@@ -5,7 +5,7 @@ import {
   InsightRecordSchema,
   LearningEventSchema,
 } from '#contracts/ClassroomInsights.js';
-import type { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '../generated/prisma/client.js';
 import { appendClassroomLearningEvent } from './AppendClassroomLearningEvent.js';
 
 /** Policy-owned rolling expiry. Minimal IDs/timestamps survive; content and cached derived prose do not. */
@@ -88,7 +88,7 @@ export async function purgeExpiredClassroomSources(
       });
       await client.classroomPracticeCheck.updateMany({
         where: { snapshotId: snapshot.id },
-        data: { rubric: {}, finding: null },
+        data: { rubric: {}, finding: null, assessment: Prisma.DbNull },
       });
       await client.classroomWorkSnapshot.update({
         where: { id: snapshot.id },

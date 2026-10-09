@@ -2,7 +2,11 @@ import { useLocale } from '../localization/UseLocale.js';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { Button, Modal, Stack, Text } from '@mantine/core';
 import { AssessmentMethod, type InsightStudentProgress } from '#contracts/ClassroomInsights.js';
-import { PracticeFinding, type PracticeEvidence } from '#contracts/PracticeCheck.js';
+import {
+  PracticeEvidenceKind,
+  PracticeFinding,
+  type PracticeEvidence,
+} from '#contracts/PracticeCheck.js';
 import { formatAssistance, formatInsightFailure } from './InsightLabels.js';
 import { useInsightRequest } from './UseInsightRequest.js';
 
@@ -202,8 +206,12 @@ export function StudentWorkGallery({
           {evidence.map((item) => (
             <div key={item.id}>
               <Text fw={600}>{item.name}</Text>
-              {item.kind === 'text' ? (
+              {item.kind === PracticeEvidenceKind.TEXT ? (
                 <pre className="learning-evidence-text">{item.text}</pre>
+              ) : item.kind === PracticeEvidenceKind.DOCUMENT ? (
+                <a href={`data:${item.mediaType};base64,${item.base64}`} download={item.name}>
+                  {t('Save original file')}
+                </a>
               ) : (
                 <img
                   className="learning-evidence-image"

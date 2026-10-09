@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
+  PracticeEvidenceKind,
   PracticeFailure,
   PracticeLimits,
   type PracticeEvidence,
@@ -14,7 +15,9 @@ export function countPracticeInput(rubric: unknown, evidence: PracticeEvidence[]
       JSON.stringify({
         rubric,
         evidence: evidence.map((item) =>
-          item.kind === 'text' ? item : { id: item.id, kind: item.kind, name: item.name },
+          item.kind === PracticeEvidenceKind.TEXT
+            ? item
+            : { id: item.id, kind: item.kind, name: item.name },
         ),
       }),
     ) + 1000
@@ -31,13 +34,34 @@ export function describePracticeEvidence(evidence: PracticeEvidence[]): Practice
   const ids = new Set<string>();
   return evidence.map((item) => {
     const bytes =
-      item.kind === 'text' ? Buffer.from(item.text, 'utf8') : Buffer.from(item.base64, 'base64');
+      item.kind === PracticeEvidenceKind.TEXT
+        ? Buffer.from(item.text, 'utf8')
+        : Buffer.from(item.base64, 'base64');
     total += bytes.length;
     if (ids.has(item.id) || total > PracticeLimits.TOTAL_BYTES) {
       throw new PracticeError(PracticeFailure.INVALID);
     }
     ids.add(item.id);
-    if (item.kind === 'image') {
+    if (item.kind === PracticeEvidenceKind.DOCUMENT) {
+      const validHeader =
+        item.mediaType === 'application/pdf'
+          ? bytes.subarray(0, 5).toString() === '%PDF-'
+          : bytes[0] === 80 && bytes[1] === 75;
+      if (
+        !validHeader ||
+        bytes.length > PracticeLimits.IMAGE_BYTES ||
+        bytes.toString('base64') !== item.base64
+      ) {
+        throw new PracticeError(PracticeFailure.INVALID);
+      }
+    }
+    if (item.kind === PracticeEvidenceKind.IMAGE) {
+      if (
+        item.capture &&
+        item.capture.digest !== createHash('sha256').update(bytes).digest('hex')
+      ) {
+        throw new PracticeError(PracticeFailure.INVALID);
+      }
       const png = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
       const jpeg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
       if (
@@ -52,6 +76,9 @@ export function describePracticeEvidence(evidence: PracticeEvidence[]): Practice
       id: item.id,
       kind: item.kind,
       name: item.name,
+      ...(item.kind === PracticeEvidenceKind.IMAGE && item.capture
+        ? { capture: item.capture }
+        : {}),
       byteCount: bytes.length,
       digest: createHash('sha256').update(bytes).digest('hex'),
     };

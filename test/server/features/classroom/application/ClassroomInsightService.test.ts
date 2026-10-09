@@ -498,3 +498,57 @@ it('enables all classes without an allowlist while keeping access checks', async
     service.execute('outsider', { kind: 'status', classId: packet.classId }),
   ).rejects.toThrow();
 });
+
+it.each([true, false])(
+  'accepts a review request only for the student’s own check (own=%s)',
+  async (own) => {
+    const { createTeachingContext } = await import('../ClassroomFixtures.js');
+    const f = createStore();
+    f.access.isTeacher = false;
+    const activity = f.access.activities[0];
+    if (!activity) {
+      throw new Error('Missing activity');
+    }
+    const context = createTeachingContext();
+    context.meeting = {
+      ...context.meeting,
+      id: insightId(2),
+      classId: f.access.classId,
+      currentActivityId: activity.id,
+    };
+    context.participation = {
+      ...context.participation,
+      studentId: 'child',
+      classSessionId: context.meeting.id,
+      leaseUntil: '2030-01-01T00:00:00Z',
+    };
+    f.store.readStudentAuthority.mockResolvedValue({
+      participation: context.participation,
+      meeting: context.meeting,
+      studentId: 'child',
+      activity,
+    });
+    const pending = f.service.execute('child', {
+      kind: 'request-help',
+      requestId: insightId(900),
+      id: insightId(901),
+      classId: f.access.classId,
+      participationId: context.participation.id,
+      deviceId: context.participation.deviceId,
+      activityId: activity.id,
+      criterionId: insightId(9),
+      checkId: own ? insightId(6) : insightId(999),
+      category: 'Please review this feedback.',
+    });
+    if (own) {
+      expect((await pending).kind).toBe('saved');
+      expect(f.store.appendRecord.mock.calls[0]?.[0].record).toMatchObject({
+        kind: 'support',
+        value: { checkId: insightId(6), sourceIds: [insightId(901), insightId(100)] },
+      });
+    } else {
+      await expect(pending).rejects.toThrow('forbidden');
+      expect(f.store.appendRecord).not.toHaveBeenCalled();
+    }
+  },
+);

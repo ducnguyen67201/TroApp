@@ -115,8 +115,14 @@ Account switching permits sequential teacher/student checks on one device; it do
 not establish simultaneous two-device behavior.
 
 Enable and approve a practice checkpoint before testing **Check my work**. In a
-joined Practice activity, Cmd/Ctrl + Shift + Enter opens evidence review; the button
-and in-app shortcut remain fallbacks. Check selected evidence, inspect feedback,
+joined Practice activity, choose a work window, then use **Check current window**,
+Command + K on macOS, or Alt + K on Windows to capture and review it. Captures stay
+local until **Check my work**. macOS requires Screen Recording permission; reopen Tro
+after changing that permission if necessary. Manual text/code, PNG/JPEG, PDF and sb3
+uploads are also supported within the [evidence limits](src/contracts/PracticeCheck.ts).
+PDF checking reads text; Scratch checking reads structure without running the project.
+The HUD shows localized checking and feedback status when voice/teaching is idle;
+the practice panel always shows request progress. Inspect feedback,
 request a hint or targeted Show me, then independently confirm hand-in. Confirm
 teacher results show the exact saved evidence/version. A live class must end before
 confirmed deletion. Class deletion preserves work/history; removing a material

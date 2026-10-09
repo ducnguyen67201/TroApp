@@ -10,9 +10,13 @@ import {
   type PetReply,
 } from '#contracts/Pet.js';
 import { randomUUID } from 'node:crypto';
+import { PracticeCaptureController } from './classroom/PracticeCaptureController.js';
+import { ElectronPracticeWindowCapture } from './classroom/ElectronPracticeWindowCapture.js';
+import type { PracticeCaptureReply } from '#contracts/PracticeCapture.js';
 import { GlobalPracticeShortcut } from './GlobalPracticeShortcut.js';
 import { PracticeShortcutEventSchema } from '#contracts/PracticeShortcut.js';
 import {
+  PracticeEvidenceKind,
   PracticeCommandSchema,
   PracticeFailure,
   type PracticeReply,
@@ -481,6 +485,9 @@ async function startDesktop(): Promise<void> {
   );
 
   const practiceShortcut = new GlobalPracticeShortcut(globalShortcut);
+  const practiceCapture = new PracticeCaptureController(new ElectronPracticeWindowCapture(), () =>
+    classroomController.readPracticeContext(),
+  );
   const classroomController: ClassroomSessionController = new ClassroomSessionController(
     new ClassroomApiClient(environment.API_BASE_URL, () => auth.readCookie()),
     () => {
@@ -490,42 +497,85 @@ async function startDesktop(): Promise<void> {
     (context) => {
       if (!context) {
         practiceShortcut.disable();
+        practiceCapture.dispose();
         return;
       }
       if (practiceShortcut.isAvailable()) {
         return;
       }
       practiceShortcut.enable(() => {
-        const current = classroomController.readPracticeContext();
-        const window = mainWindow;
-        if (
-          !current ||
-          accountGate.isChanging() ||
-          auth.isAddingAccount() ||
-          !window ||
-          window.isDestroyed() ||
-          window.webContents.isDestroyed() ||
-          !isTrustedFrameUrl(window.webContents.getURL(), documentUrl)
-        ) {
-          return;
-        }
-        const intent = PracticeShortcutEventSchema.parse({
-          requestId: randomUUID(),
-          classId: current.meeting.classId,
-          participationId: current.participation.id,
-          activityId: current.activity.id,
-          attemptId: current.attempt.id,
-          contextVersion: current.meeting.contextVersion,
-        });
-        if (window.isMinimized()) {
-          window.restore();
-        }
-        window.show();
-        window.focus();
-        window.webContents.send('tro:practice-shortcut', intent);
+        void openPracticeCapture();
       });
     },
   );
+  let openingPracticeCapture = false;
+
+  async function openPracticeCapture(): Promise<void> {
+    if (openingPracticeCapture) {
+      return;
+    }
+    openingPracticeCapture = true;
+    try {
+      const current = classroomController.readPracticeContext();
+      const window = mainWindow;
+      if (
+        !current ||
+        accountGate.isChanging() ||
+        auth.isAddingAccount() ||
+        !window ||
+        window.isDestroyed() ||
+        window.webContents.isDestroyed() ||
+        !isTrustedFrameUrl(window.webContents.getURL(), documentUrl)
+      ) {
+        return;
+      }
+      const captured = await practiceCapture.execute({ kind: 'capture' });
+      const latest = classroomController.readPracticeContext();
+      if (
+        !latest ||
+        latest.participation.id !== current.participation.id ||
+        latest.activity.id !== current.activity.id ||
+        latest.meeting.contextVersion !== current.meeting.contextVersion ||
+        latest.attempt.progressVersion !== current.attempt.progressVersion ||
+        window.isDestroyed() ||
+        window.webContents.isDestroyed() ||
+        !isTrustedFrameUrl(window.webContents.getURL(), documentUrl)
+      ) {
+        return;
+      }
+      const intent = PracticeShortcutEventSchema.parse({
+        ...(captured.kind === 'captured' &&
+        captured.evidence.kind === PracticeEvidenceKind.IMAGE &&
+        captured.evidence.capture
+          ? { captureId: captured.evidence.capture.id }
+          : {}),
+        requestId: randomUUID(),
+        classId: current.meeting.classId,
+        participationId: current.participation.id,
+        activityId: current.activity.id,
+        attemptId: current.attempt.id,
+        contextVersion: current.meeting.contextVersion,
+      });
+      if (window.isMinimized()) {
+        window.restore();
+      }
+      window.show();
+      window.focus();
+      window.webContents.send('tro:practice-shortcut', intent);
+    } finally {
+      openingPracticeCapture = false;
+    }
+  }
+
+  ipcMain.handle('tro:practice-capture', (event, raw: unknown): Promise<PracticeCaptureReply> => {
+    if (!isTrustedSender(event)) {
+      return Promise.resolve({ kind: 'failed', code: PracticeFailure.FORBIDDEN });
+    }
+    return accountGate.runRequest(() => practiceCapture.execute(raw), {
+      kind: 'failed',
+      code: PracticeFailure.UNAVAILABLE,
+    });
+  });
   ipcMain.handle(
     'tro:practice-shortcut-available',
     (event) => isTrustedSender(event) && practiceShortcut.isAvailable(),
@@ -635,6 +685,9 @@ async function startDesktop(): Promise<void> {
     return accountGate.runRequest(
       async () => {
         const command = parsed.data;
+        if (command.kind === 'check' && !practiceCapture.validatesEvidence(command.evidence)) {
+          return { kind: 'failed', code: PracticeFailure.STALE };
+        }
         const operation = command.kind === 'check' || command.kind === 'submit-snapshot';
         if (
           operation &&
@@ -951,6 +1004,7 @@ async function startDesktop(): Promise<void> {
       petController.dispose();
       overlay.closePet();
       classroomController.dispose();
+      practiceCapture.dispose();
       insightController.dispose();
       reportExports.dispose();
       disableVoice();

@@ -3,6 +3,12 @@ import { registerClassroomInsightRoutes } from './features/classroom/infrastruct
 import { ClassroomInsightRetentionRunner } from './features/classroom/infrastructure/ClassroomInsightRetentionRunner.js';
 import { createPrismaClassroomInsightStore } from './persistence/PrismaClassroomInsightStore.js';
 import { MaterialProviderRequestState } from './features/materials/application/MaterialGeneration.js';
+import { PracticeAssessmentService } from './features/classroom/application/PracticeAssessmentService.js';
+import { PreparePracticeEvidence } from './features/classroom/application/PreparePracticeEvidence.js';
+import { ExactOutputEvaluator } from './features/classroom/application/ExactOutputEvaluator.js';
+import { ScratchStructureEvaluator } from './features/classroom/application/ScratchStructureEvaluator.js';
+import { LlmCriterionEvaluator } from './features/classroom/infrastructure/LlmCriterionEvaluator.js';
+import { ExtractPracticeArtifact } from './features/classroom/infrastructure/ExtractPracticeArtifact.js';
 import { PracticeCheckService } from './features/classroom/application/PracticeCheckService.js';
 import { OpenAiPracticeCheckEvaluator } from './features/classroom/infrastructure/OpenAiPracticeCheckEvaluator.js';
 import { registerPracticeCheckRoutes } from './features/classroom/infrastructure/RegisterPracticeCheckRoutes.js';
@@ -89,9 +95,18 @@ async function startApi(): Promise<void> {
     authentication.readSignedInUserId,
     new PracticeCheckService(
       practice.store,
-      new OpenAiPracticeCheckEvaluator(
-        environment.OPENAI_API_KEY,
-        environment.PRACTICE_CHECK_MODEL ?? 'gpt-5.4',
+      new PracticeAssessmentService(
+        [
+          new LlmCriterionEvaluator(
+            new OpenAiPracticeCheckEvaluator(
+              environment.OPENAI_API_KEY,
+              environment.PRACTICE_CHECK_MODEL ?? 'gpt-5.4',
+            ),
+          ),
+          new ExactOutputEvaluator(),
+          new ScratchStructureEvaluator(),
+        ],
+        new PreparePracticeEvidence(new ExtractPracticeArtifact(new MaterialExtractorWorker())),
       ),
       {
         dailyChecks: environment.PRACTICE_CHECK_DAILY_LIMIT ?? 30,

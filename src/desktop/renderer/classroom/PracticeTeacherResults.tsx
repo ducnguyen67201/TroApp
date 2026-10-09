@@ -92,6 +92,20 @@ export function PracticeTeacherResults({
                     ? t('Checking', 'Đang kiểm tra')
                     : t('Could not check', 'Chưa kiểm tra được')}
               </Text>
+              {check.assessment && (
+                <details>
+                  <summary>{t('Evaluation evidence', 'Bằng chứng đánh giá')}</summary>
+                  <Text size="xs">
+                    {check.assessment.evaluators.map((evaluator) => evaluator.id).join(', ')}
+                  </Text>
+                  {check.assessment.units.map((unit, index) => (
+                    <Stack key={`${unit.evidenceId}:${String(index)}`} gap={2}>
+                      <Text size="xs">{unit.location}</Text>
+                      <pre className="practice-evidence-text">{unit.text}</pre>
+                    </Stack>
+                  ))}
+                </details>
+              )}
               {check.results
                 .filter((result) => result.finding !== 'met')
                 .map((result) => (

@@ -1,5 +1,19 @@
 import { z } from 'zod';
 import { DesktopLocaleSchema } from './DesktopLocale.js';
+import {
+  PracticeAssessmentTraceSchema,
+  PracticeCaptureProvenanceSchema,
+  PracticeCapability,
+  PracticeVerificationSchema,
+} from './PracticeAssessment.js';
+
+export const PracticeEvidenceKind = {
+  TEXT: 'text',
+  IMAGE: 'image',
+  DOCUMENT: 'document',
+} as const;
+
+export type PracticeEvidenceKind = (typeof PracticeEvidenceKind)[keyof typeof PracticeEvidenceKind];
 
 export const PracticeFinding = {
   MET: 'met',
@@ -39,6 +53,8 @@ export const PracticeCriterionSchema = z.strictObject({
   required: z.boolean(),
   evidenceNeeded: z.string().trim().min(1).max(500),
   sourceIds: z.array(z.uuid()).max(8),
+  verification: PracticeVerificationSchema.optional(),
+  capabilities: z.array(z.enum(PracticeCapability)).max(4).optional(),
 });
 
 export const PracticeCheckpointSchema = z
@@ -65,7 +81,7 @@ export const PracticeSuggestionSchema = z.strictObject({
   task: z.string().min(1).max(2000),
   origin: z.enum(['source', 'suggestion']),
   criteria: z
-    .array(PracticeCriterionSchema.omit({ id: true }))
+    .array(PracticeCriterionSchema.omit({ id: true, verification: true, capabilities: true }))
     .min(1)
     .max(8),
 });
@@ -73,15 +89,27 @@ export const PracticeSuggestionSchema = z.strictObject({
 export const PracticeEvidenceSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     id: z.uuid(),
-    kind: z.literal('text'),
+    kind: z.literal(PracticeEvidenceKind.DOCUMENT),
+    name: z.string().trim().min(1).max(200),
+    mediaType: z.enum(['application/pdf', 'application/x.scratch.sb3']),
+    base64: z
+      .string()
+      .min(4)
+      .max(1333336)
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/),
+  }),
+  z.strictObject({
+    id: z.uuid(),
+    kind: z.literal(PracticeEvidenceKind.TEXT),
     name: z.string().trim().min(1).max(200),
     text: z.string().trim().min(1).max(PracticeLimits.TEXT_CHARACTERS),
   }),
   z.strictObject({
     id: z.uuid(),
-    kind: z.literal('image'),
+    kind: z.literal(PracticeEvidenceKind.IMAGE),
     name: z.string().trim().min(1).max(200),
     mediaType: z.enum(['image/png', 'image/jpeg']),
+    capture: PracticeCaptureProvenanceSchema.optional(),
     base64: z
       .string()
       .min(4)
@@ -100,6 +128,7 @@ export const PracticeCriterionResultSchema = z.strictObject({
 });
 
 export const PracticeEvaluationSchema = z.strictObject({
+  assessment: PracticeAssessmentTraceSchema.optional(),
   results: z.array(PracticeCriterionResultSchema).min(1).max(8),
 });
 
@@ -116,16 +145,18 @@ export const PracticeRecordSchema = z.strictObject({
   finding: z.enum(PracticeFinding).nullable(),
   results: z.array(PracticeCriterionResultSchema).max(8),
   evaluator: z.string().max(200),
+  assessment: PracticeAssessmentTraceSchema.optional(),
   createdAt: z.iso.datetime(),
   completedAt: z.iso.datetime().nullable(),
   evidence: z
     .array(
       z.strictObject({
         id: z.uuid(),
-        kind: z.enum(['text', 'image']),
+        kind: z.enum(PracticeEvidenceKind),
         name: z.string().max(200),
         byteCount: z.number().int().nonnegative(),
         digest: z.string().regex(/^[a-f0-9]{64}$/),
+        capture: PracticeCaptureProvenanceSchema.optional(),
       }),
     )
     .min(1)

@@ -17,7 +17,7 @@ import {
   ClassMeetingSchema,
   ParticipationSchema,
 } from '#contracts/Classroom.js';
-import { PracticeEvidenceSchema } from '#contracts/PracticeCheck.js';
+import { PracticeEvidenceKind, PracticeEvidenceSchema } from '#contracts/PracticeCheck.js';
 import {
   ClassroomInsightReplySchema,
   InsightCoverage,
@@ -436,17 +436,18 @@ class PrismaClassroomInsightStore implements ClassroomInsightStore {
     });
     return rows.map((row) =>
       PracticeEvidenceSchema.parse(
-        row.kind === 'text'
+        row.kind === PracticeEvidenceKind.TEXT
           ? {
               id: row.id,
-              kind: 'text',
+              kind: PracticeEvidenceKind.TEXT,
               name: row.name,
               text: Buffer.from(row.content).toString('utf8'),
             }
           : {
               id: row.id,
-              kind: 'image',
+              kind: row.kind,
               name: row.name,
+              ...(row.capture ? { capture: row.capture } : {}),
               mediaType: row.mediaType,
               base64: Buffer.from(row.content).toString('base64'),
             },
@@ -514,6 +515,10 @@ class PrismaClassroomInsightStore implements ClassroomInsightStore {
     });
     await this.client.classroomPracticeResult.deleteMany({
       where: { check: { attemptId: { in: ids } } },
+    });
+    await this.client.classroomPracticeCheck.updateMany({
+      where: { attemptId: { in: ids } },
+      data: { assessment: Prisma.DbNull },
     });
     await this.client.classroomAttempt.updateMany({
       where: { id: { in: ids } },

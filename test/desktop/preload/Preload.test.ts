@@ -182,3 +182,20 @@ it('validates preview IDs and permits only original-file or failure replies', as
   electron.invoke.mockResolvedValue({ kind: 'collection', collection: {} });
   expect((await bridge.previewClassMaterial(classId, materialId)).kind).toBe('failed');
 });
+
+it('validates narrow practice capture requests and rejects native window IDs in replies', async () => {
+  await import('../../../src/desktop/preload/Preload.js');
+  electron.invoke.mockClear();
+  const bridge = electron.expose.mock.calls[0]?.[1];
+  if (!bridge?.controlPracticeCapture) {
+    throw new Error('Missing capture bridge');
+  }
+  electron.invoke.mockResolvedValue({
+    kind: 'windows',
+    windows: [{ id: 'native:123', name: 'Scratch' }],
+  });
+  expect(await bridge.controlPracticeCapture({ kind: 'list' })).toMatchObject({ kind: 'failed' });
+  expect(electron.invoke).toHaveBeenCalledWith('tro:practice-capture', { kind: 'list' });
+  electron.invoke.mockResolvedValue({ kind: 'discarded' });
+  expect(await bridge.controlPracticeCapture({ kind: 'discard' })).toEqual({ kind: 'discarded' });
+});

@@ -352,6 +352,7 @@ model ClassroomPracticeEvidence {
  kind String
  name String
  mediaType String
+ capture Json?
  byteCount Int
  digest String @db.VarChar(64)
  content Bytes
@@ -372,6 +373,7 @@ model ClassroomPracticeCheck {
  status String
  finding String?
  evaluator String
+ assessment Json?
  createdAt DateTime
  completedAt DateTime?
  results ClassroomPracticeResult[]

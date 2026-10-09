@@ -78,3 +78,33 @@ function render(view: ReactNode): ReturnType<typeof renderView> {
   window.localStorage.setItem('tro.desktop.locale', 'en');
   return renderView(view, { wrapper: LocaleProvider });
 }
+
+it.each(['application/pdf', 'application/x.scratch.sb3'] as const)(
+  'offers the original %s artifact without trying to render it as an image',
+  async (mediaType) => {
+    const progress = createStudentProgress();
+    progress.assessments = [createInsightAssessment()];
+    const name = mediaType === 'application/pdf' ? 'Work.pdf' : 'Work.sb3';
+    const base64 = Buffer.from('original bytes').toString('base64');
+    const send = vi.fn<NonNullable<DesktopBridge['controlClassroomInsights']>>().mockResolvedValue({
+      kind: 'evidence',
+      evidence: [{ id: crypto.randomUUID(), kind: 'document', name, mediaType, base64 }],
+    });
+    vi.stubGlobal('tro', { controlClassroomInsights: send });
+    render(
+      createElement(MantineProvider, {
+        env: 'test',
+        children: createElement(StudentWorkGallery, {
+          userId: 'teacher',
+          progress,
+          selectedSessionId: null,
+        }),
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'View saved work' }));
+    const download = await screen.findByRole('link', { name: 'Save original file' });
+    expect(download.getAttribute('download')).toBe(name);
+    expect(download.getAttribute('href')).toBe(`data:${mediaType};base64,${base64}`);
+    expect(screen.queryByRole('img', { name })).toBeNull();
+  },
+);

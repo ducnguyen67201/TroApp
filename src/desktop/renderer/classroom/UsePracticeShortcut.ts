@@ -49,16 +49,17 @@ export function usePracticeShortcut(
       openClass(event.classId, ClassView.ACTIVITIES);
     };
     const unsubscribe = window.tro.subscribePracticeShortcut?.(openReview);
+    const usesMacShortcut = navigator.userAgent.includes('Mac');
     const onKeyDown = (event: KeyboardEvent): void => {
       if (
         !availabilityKnown ||
         globalAvailable ||
         event.repeat ||
         event.isComposing ||
-        event.altKey ||
-        !event.shiftKey ||
-        !(event.metaKey || event.ctrlKey) ||
-        event.key !== 'Enter'
+        event.shiftKey ||
+        event.ctrlKey ||
+        (usesMacShortcut ? !event.metaKey || event.altKey : !event.altKey || event.metaKey) ||
+        event.key.toLowerCase() !== 'k'
       ) {
         return;
       }

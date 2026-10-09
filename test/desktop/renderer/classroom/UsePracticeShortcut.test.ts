@@ -12,6 +12,7 @@ import type { DesktopNavigation } from '../../../../src/desktop/renderer/navigat
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 function Harness({
@@ -59,30 +60,38 @@ it('scopes global intents to the joined activity and navigates without sending e
   await waitFor(() => {
     expect(screen.getByText(intent.requestId)).toBeTruthy();
   });
-  fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true, shiftKey: true });
+  fireEvent.keyDown(window, { key: 'k', altKey: true });
   expect(open).toHaveBeenCalledOnce();
   mounted.unmount();
   expect(unsubscribe).toHaveBeenCalledOnce();
 });
 
-it('uses the local chord fallback, ignoring repeats and closed Practice phases', async () => {
-  const context = createTeachingContext();
-  context.meeting.phase = 'practice';
-  context.activity.practiceCheckpoints = [createPracticeCheckpoint()];
-  const open = vi.fn<DesktopNavigation['openClass']>();
-  vi.stubGlobal('tro', { readPracticeShortcutAvailable: () => Promise.resolve(false) });
-  const mounted = render(createElement(Harness, { context, open }));
-  await Promise.resolve();
-  fireEvent.keyDown(window, { key: 'Enter', metaKey: true, shiftKey: true, repeat: true });
-  expect(open).not.toHaveBeenCalled();
-  fireEvent.keyDown(window, { key: 'Enter', metaKey: true, shiftKey: true });
-  expect(open).toHaveBeenCalledOnce();
-  mounted.rerender(
-    createElement(Harness, {
-      context: { ...context, meeting: { ...context.meeting, phase: 'explanation' } },
-      open,
-    }),
-  );
-  fireEvent.keyDown(window, { key: 'Enter', metaKey: true, shiftKey: true });
-  expect(open).toHaveBeenCalledOnce();
-});
+it.each(['Macintosh', 'Windows'])(
+  'uses the %s fallback, ignoring other chords, repeats and closed Practice phases',
+  async (platform) => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(platform);
+    const modifiers = platform === 'Macintosh' ? { metaKey: true } : { altKey: true };
+    const context = createTeachingContext();
+    context.meeting.phase = 'practice';
+    context.activity.practiceCheckpoints = [createPracticeCheckpoint()];
+    const open = vi.fn<DesktopNavigation['openClass']>();
+    vi.stubGlobal('tro', { readPracticeShortcutAvailable: () => Promise.resolve(false) });
+    const mounted = render(createElement(Harness, { context, open }));
+    await Promise.resolve();
+    fireEvent.keyDown(window, { key: 'Enter', metaKey: true, shiftKey: true });
+    fireEvent.keyDown(window, { key: 'k', ...modifiers, ctrlKey: true });
+    fireEvent.keyDown(window, { key: 'k', ...modifiers, shiftKey: true });
+    fireEvent.keyDown(window, { key: 'k', ...modifiers, repeat: true });
+    expect(open).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: 'k', ...modifiers });
+    expect(open).toHaveBeenCalledOnce();
+    mounted.rerender(
+      createElement(Harness, {
+        context: { ...context, meeting: { ...context.meeting, phase: 'explanation' } },
+        open,
+      }),
+    );
+    fireEvent.keyDown(window, { key: 'k', ...modifiers });
+    expect(open).toHaveBeenCalledOnce();
+  },
+);
