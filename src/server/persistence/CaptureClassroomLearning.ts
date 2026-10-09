@@ -172,7 +172,11 @@ export async function captureClassroomSubmission(
 ) {
   const attempt = await client.classroomAttempt.findUniqueOrThrow({
     where: { id: attemptId },
-    include: { participation: { include: { meeting: true } } },
+    include: {
+      participation: {
+        include: { meeting: { include: { schoolClass: { select: { courseRevisionId: true } } } } },
+      },
+    },
   });
   const classId = attempt.participation.meeting.classId,
     studentId = attempt.participation.studentId;
@@ -198,6 +202,13 @@ export async function captureClassroomSubmission(
   ) {
     return;
   }
+  /* A live accepted link can use the class revision in this transaction. Imports
+     keep unknown historical revisions; snapshots use their caller-pinned revision. */
+  const submissionCourseRevisionId =
+    courseRevisionId ??
+    (!imported && snapshotId === null
+      ? attempt.participation.meeting.schoolClass.courseRevisionId
+      : null);
   await appendClassroomLearningEvent(client, {
     classId,
     actorId: studentId,
@@ -214,7 +225,7 @@ export async function captureClassroomSubmission(
         studentId,
         classSessionId: attempt.participation.classSessionId,
         activityId: attempt.activityId,
-        courseRevisionId,
+        courseRevisionId: submissionCourseRevisionId,
         sourceKind: snapshotId ? 'snapshot' : 'link',
         snapshotId,
         checkId,

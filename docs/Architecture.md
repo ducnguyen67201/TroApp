@@ -376,6 +376,8 @@ the reviewed collection-policy identifier and a rolling retention duration.
 `PrismaClassroomStore` and `PrismaPracticeCheckStore` append accepted progress,
 confirmed snapshot/link hand-ins, check admission and terminal results inside the
 source transaction. Rejected or stale writes cannot create a learning event.
+New link hand-ins pin the task's accepted course revision; imported links with no
+known revision retain that unknown context.
 This captures explicit work and requests; it does not measure attention, keyboard
 activity, motivation or the delivery of native tutoring assistance.
 
@@ -439,7 +441,9 @@ unapproved revision.
 Approval and export recheck authorization, current source invalidation and exact
 version in a serializable transaction. Corrections, changed referenced definitions,
 removal and expiry invalidate affected snapshots; new ordinary work does not
-rewrite an approved report. `ParentReportExportController` accepts only the
+rewrite an approved report.
+Course and enrollment changes invalidate retained reports even while collection is
+disabled. `ParentReportExportController` accepts only the
 validated single-child approved revision after the native save dialog. Main
 escapes report text and atomically replaces the chosen HTML file under its account
 fence. The file has no scripts, remote assets or private evidence links and includes

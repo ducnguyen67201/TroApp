@@ -57,7 +57,11 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   private async invalidateClassroomInsights(classId: string) {
-    if (!this.capturePolicy.captureClassIds.includes(classId)) {
+    const retainedState = await this.client.classroomInsightState.findUnique({
+      where: { classId },
+      select: { classId: true },
+    });
+    if (!retainedState && !this.capturePolicy.captureClassIds.includes(classId)) {
       return;
     }
     await this.client.classroomInsightState.upsert({
@@ -223,7 +227,7 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async updateClassCourse(classId: string, courseRevisionId: string) {
-    if (this.transact && this.capturePolicy.captureClassIds.length) {
+    if (this.transact) {
       return this.runAtomically((store) => store.updateClassCourse(classId, courseRevisionId));
     }
     await this.client.classroomGroup.update({ where: { id: classId }, data: { courseRevisionId } });
@@ -341,7 +345,7 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async deleteClass(classId: string, deletedAt: Date): Promise<void> {
-    if (this.transact && this.capturePolicy.captureClassIds.length) {
+    if (this.transact) {
       return this.runAtomically((store) => store.deleteClass(classId, deletedAt));
     }
     const updated = await this.client.classroomGroup.updateMany({
@@ -366,7 +370,7 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async enrollStudent(classId: string, studentId: string, active: boolean) {
-    if (this.transact && this.capturePolicy.captureClassIds.length) {
+    if (this.transact) {
       return this.runAtomically((store) => store.enrollStudent(classId, studentId, active));
     }
     if (
