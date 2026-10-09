@@ -22,6 +22,17 @@ const proposal = {
     kind: 'click',
     target: { label: 'Block', bounds: { x: 0.1, y: 0.2, width: 0.2, height: 0.9 } },
   },
+  drawing: {
+    strokes: [
+      {
+        points: [
+          { x: 0.1, y: 0.2 },
+          { x: 0.3, y: 0.2 },
+        ],
+        closed: false,
+      },
+    ],
+  },
 };
 
 function createPresenter(
@@ -145,5 +156,68 @@ it('reports a typed limit failure for repeatedly invalid rectangle bounds', asyn
     code: TeachingFailureCode.MODEL_INPUT_INVALID,
     reason: 'invalid_request',
   });
+  expect(presentStep).not.toHaveBeenCalled();
+});
+
+it('corrects invalid drawing geometry without another observation or weakening action targets', async () => {
+  const presentStep = vi
+    .fn<TeachingAgentControls['presentStep']>()
+    .mockResolvedValue({ admitted: true });
+  const presenter = createPresenter({ presentStep });
+  const correctedAction = {
+    ...proposal.action,
+    target: {
+      ...proposal.action.target,
+      bounds: { ...proposal.action.target.bounds, height: 0.5 },
+    },
+  };
+  const feedback: unknown = await presenter.invoke(
+    new RunContext(),
+    JSON.stringify({
+      ...proposal,
+      action: correctedAction,
+      drawing: {
+        strokes: [
+          {
+            points: [
+              { x: 0.1, y: 0.2 },
+              { x: 0.1, y: 0.2 },
+            ],
+            closed: false,
+          },
+        ],
+      },
+    }),
+  );
+  expect(feedback).toContain('drawing.strokes.0.points');
+  expect(feedback).toContain('three distinct noncollinear points');
+  expect(presentStep).not.toHaveBeenCalled();
+  await presenter.invoke(
+    new RunContext(),
+    JSON.stringify({ ...proposal, action: correctedAction }),
+  );
+  expect(presentStep).toHaveBeenCalledWith(
+    expect.objectContaining({ action: correctedAction, drawing: proposal.drawing }),
+  );
+});
+
+it('rejects a spatial null drawing through SDK parsing before native presentation', async () => {
+  const presentStep = vi.fn<TeachingAgentControls['presentStep']>();
+  const presenter = createPresenter({ presentStep });
+  const feedback: unknown = await presenter.invoke(
+    new RunContext(),
+    JSON.stringify({
+      ...proposal,
+      action: {
+        ...proposal.action,
+        target: {
+          ...proposal.action.target,
+          bounds: { ...proposal.action.target.bounds, height: 0.5 },
+        },
+      },
+      drawing: null,
+    }),
+  );
+  expect(feedback).toContain('drawing');
   expect(presentStep).not.toHaveBeenCalled();
 });

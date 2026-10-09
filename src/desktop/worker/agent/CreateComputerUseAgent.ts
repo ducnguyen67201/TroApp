@@ -108,7 +108,7 @@ export function createTeachingAgent(
       tool({
         name: 'present_teaching_step',
         description:
-          'Present one reachable checkpoint with a typed action. The host derives drawing and input targets together. Click, drag, scroll, highlight and unfocused typing require a paired native drawing receipt. Read admitted and presentationId before yielding. A final chat cannot substitute for this tool.',
+          'Present one reachable checkpoint with a typed student action and drawing. Supply 1–3 short strokes, each with 2–32 normalized screenshot points and an explicit closed value. Target boxes define the student action; strokes explain it visually. Click, drag, scroll, highlight and unfocused typing require valid drawing strokes; keyboard, focused typing and loading waits require drawing: null. Read admitted and presentationId before yielding. A final chat cannot substitute for this tool.',
         /* Publish the JSON shape, then validate semantic refinements ourselves.
          * The SDK redacts invalid-input diagnostics before its error callback. */
         /* Spreading strips Zod's non-enumerable Standard Schema validator so

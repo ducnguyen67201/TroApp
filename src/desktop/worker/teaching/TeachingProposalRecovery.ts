@@ -52,7 +52,7 @@ export class TeachingProposalRecovery {
       issues,
       correctionAttemptsRemaining: 3 - this.rejectedCount,
       instruction:
-        'The proposal was rejected before presentation; no message or drawing was shown. Correct the listed fields and resubmit present_teaching_step using a current capture. Rectangle x/y must be within [0,1], width/height must be positive, x + width <= 1 and y + height <= 1. Preserve the original goal. Do not claim presentation succeeded.',
+        'The proposal was rejected before presentation; no message or drawing was shown. Correct the listed fields and resubmit present_teaching_step using a current capture. Target x/y and drawing point x/y must be finite numbers within [0,1]. Target width/height must be positive, x + width <= 1 and y + height <= 1. Spatial actions require drawing with 1–3 strokes and 2–32 points per stroke. Open strokes need at least two distinct points; closed strokes need at least three distinct noncollinear points. Keyboard, focused typing and loading waits require drawing: null. Preserve the original goal. Do not claim presentation succeeded.',
     });
   }
 }

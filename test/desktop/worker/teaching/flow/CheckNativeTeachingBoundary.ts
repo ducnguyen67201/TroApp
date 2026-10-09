@@ -14,8 +14,10 @@ import {
   CursorGuidanceTaskSchema,
   CursorGuidanceResultSchema,
   CursorCompanionStateSchema,
-  GuidanceCaptureRefreshSchema,
+  GuidancePresentationRefusalSchema,
+  GuidanceComparisonDiagnosticsSchema,
   GuidanceCoordinateTraceSchema,
+  GuidanceTimingSchema,
 } from '../../../../../src/contracts/CursorCompanion.js';
 import { describeCuaResult } from '../../../../../src/desktop/worker/cua/LoggedCuaServer.js';
 import { z } from 'zod';
@@ -24,17 +26,53 @@ import {
   CompanionHudTool,
 } from '../../../../../src/contracts/CompanionHud.js';
 
+let nativeProbeCallNumber = 0;
+const nativeProbeStartedAt = performance.now();
+
 /** Bound each native boundary independently so a stalled call names its stage. */
 async function callNativeTool(
   server: MCPServerStdio,
   toolName: string,
   args: Record<string, unknown>,
 ): Promise<CallToolResult> {
-  console.info(`Native probe request: ${toolName}`);
+  const callNumber = ++nativeProbeCallNumber;
+  const startedAt = performance.now();
+  console.info(
+    `Native probe request: ${toolName} ${JSON.stringify({ callNumber, elapsedMs: Math.round(startedAt - nativeProbeStartedAt) })}`,
+  );
   const result = await server.callToolResult(toolName, args, null, {
     signal: AbortSignal.timeout(10000),
   });
-  console.info(`Native probe response: ${toolName} ${JSON.stringify(describeCuaResult(result))}`);
+  console.info(
+    `Native probe response: ${toolName} ${JSON.stringify({ callNumber, elapsedMs: Math.round(performance.now() - nativeProbeStartedAt), durationMs: Math.round(performance.now() - startedAt), ...describeCuaResult(result) })}`,
+  );
+  if (toolName === 'get_desktop_state') {
+    const geometry = z
+      .object({
+        screen_width: z.number().int().positive(),
+        screen_height: z.number().int().positive(),
+        screenshot_width: z.number().int().positive(),
+        screenshot_height: z.number().int().positive(),
+        scale_factor: z.number().positive(),
+      })
+      .safeParse(result.structuredContent);
+    if (geometry.success) {
+      console.info(`Native probe capture geometry: ${JSON.stringify(geometry.data)}`);
+    }
+  }
+  if (toolName === CursorCompanionTool.PRESENT_GUIDANCE) {
+    const refusal = GuidancePresentationRefusalSchema.safeParse(result.structuredContent);
+    if (refusal.success) {
+      console.info(`Native probe freshness refusal: ${JSON.stringify(refusal.data)}`);
+    } else {
+      const timing = z
+        .object({ timings_ms: GuidanceTimingSchema })
+        .safeParse(result.structuredContent);
+      if (timing.success) {
+        console.info(`Native probe presentation timing: ${JSON.stringify(timing.data)}`);
+      }
+    }
+  }
   return result;
 }
 
@@ -94,7 +132,7 @@ export async function checkNativeTeachingBoundary(): Promise<void> {
     assert.ok(
       CursorCompanionCapabilitiesSchema.parse(
         capabilities.structuredContent,
-      ).presentation_versions.includes(2),
+      ).presentation_versions.includes(3),
     );
     const follow = await callNativeTool(server, CursorCompanionTool.SET_MODE, {
       mode: 'follow',
@@ -103,7 +141,7 @@ export async function checkNativeTeachingBoundary(): Promise<void> {
     assert.ok(!follow.isError, 'Native follow presentation must start.');
     const task = await callNativeTool(server, CursorCompanionTool.BEGIN_TASK, {
       task_epoch: taskEpoch,
-      presentation_version: 2,
+      presentation_version: 3,
     });
     assert.ok(!task.isError, 'Native preview epoch must be admitted.');
     assert.equal(CursorGuidanceTaskSchema.parse(task.structuredContent).status, 'task_ready');
@@ -123,42 +161,6 @@ export async function checkNativeTeachingBoundary(): Promise<void> {
     assert.equal(
       CursorCompanionStateSchema.parse(state.structuredContent).guidance?.task_epoch,
       taskEpoch,
-    );
-    const cueCapture = await callNativeTool(server, 'get_desktop_state', {
-      max_image_dimension: 1200,
-    });
-    assert.ok(!cueCapture.isError, 'Native cue reference capture must succeed.');
-    const cueMetadata = z
-      .object({ capture_id: z.string().min(1) })
-      .parse(cueCapture.structuredContent);
-    const cueArgs = {
-      capture_id: cueMetadata.capture_id,
-      max_image_dimension: 1200,
-      steps: [{ kind: 'click', at: { x: 0.5, y: 0.5 }, duration_ms: 300 }],
-    };
-    const refreshed = await callNativeTool(server, CursorCompanionTool.REFRESH_CAPTURE, cueArgs);
-    assert.ok(
-      !refreshed.isError,
-      'Native cue comparison must pass risk, input and output contracts.',
-    );
-    const comparison = GuidanceCaptureRefreshSchema.parse(refreshed.structuredContent);
-    assert.ok(
-      comparison.diagnostics,
-      'The rebuilt native driver must return comparison measurements.',
-    );
-    assert.equal(comparison.diagnostics.regions.length, 1);
-    assert.equal(comparison.diagnostics.regions[0]?.step_kind, 'click');
-    console.info(`PASS native comparison diagnostics: ${JSON.stringify(comparison.diagnostics)}`);
-    assert.ok(
-      !refreshed.content.some((part) => part.type === 'image'),
-      'Local cue comparison must return no pixels.',
-    );
-    const foreignCapture = await callNativeTool(peer, CursorCompanionTool.REFRESH_CAPTURE, cueArgs);
-    const foreignComparison = GuidanceCaptureRefreshSchema.parse(foreignCapture.structuredContent);
-    assert.equal(foreignComparison.matched, false, 'Another connection cannot renew this capture.');
-    assert.equal(foreignComparison.reason, 'capture_unavailable');
-    console.info(
-      `PASS native cue comparison: risk/input/output contracts, image-free result, capture isolation; live target ${comparison.reason}.`,
     );
     const begin = await callNativeTool(server, DesktopObservationTool.BEGIN, {
       watch_id: watchId,
@@ -205,16 +207,46 @@ export async function checkNativeTeachingBoundary(): Promise<void> {
       1,
       'A teaching observation needs exactly one image.',
     );
-    const preview = await callNativeTool(server, CursorCompanionTool.SHOW_SEQUENCE, {
+    const drawing = {
+      strokes: [
+        {
+          points: [
+            { x: 0.45, y: 0.45 },
+            { x: 0.55, y: 0.45 },
+            { x: 0.55, y: 0.55 },
+            { x: 0.45, y: 0.55 },
+          ],
+          closed: true,
+        },
+        {
+          points: [
+            { x: 0.4, y: 0.6 },
+            { x: 0.6, y: 0.6 },
+          ],
+          closed: false,
+        },
+        {
+          points: [
+            { x: 0.4, y: 0.65 },
+            { x: 0.5, y: 0.68 },
+            { x: 0.6, y: 0.65 },
+          ],
+          closed: false,
+        },
+      ],
+    };
+    const request = {
       capture_id: metadata.data.capture_id,
-      presentation_version: 2,
+      presentation_version: 3,
       presentation_id: randomUUID(),
       text_only: false,
       hud_group: group,
       teaching_locale: 'vi',
       teaching_message: message,
-      steps: [{ kind: 'circle', center: { x: 0.5, y: 0.5 }, radius: 0.03, duration_ms: 300 }],
-    });
+      targets: [{ x: 0.45, y: 0.45, width: 0.1, height: 0.1 }],
+      drawing,
+    };
+    const preview = await callNativeTool(server, CursorCompanionTool.PRESENT_GUIDANCE, request);
     const playback = CursorGuidanceResultSchema.parse(preview.structuredContent);
     if (playback.status === 'canceled' && playback.reason === 'user_takeover') {
       console.info(
@@ -230,28 +262,100 @@ export async function checkNativeTeachingBoundary(): Promise<void> {
       assert.equal(playback.receipt.drawing_presented, true);
       assert.equal(playback.receipt.lesson_id, watchId);
       const coordinates = GuidanceCoordinateTraceSchema.parse(playback.coordinate_trace);
-      assert.equal(coordinates.capture_id, metadata.data.capture_id);
-      const planned = coordinates.planned_steps[0];
-      const painted = coordinates.painted_steps[0];
-      assert.ok(
-        planned?.cue_bounds_points && painted,
-        'Native playback must report painter geometry.',
+      assert.equal(coordinates.requested_capture_id, metadata.data.capture_id);
+      assert.notEqual(
+        coordinates.capture_id,
+        coordinates.requested_capture_id,
+        'Drawing uses a refreshed capture.',
       );
-      assert.equal(painted.trace_progress, 1, 'Completed playback must include the complete cue.');
-      for (const [index, coordinate] of planned.cue_bounds_points.entries()) {
-        const origin = painted.geometry.origin_points[index % 2];
-        const actual = painted.geometry.cue_bounds_px[index];
-        assert.ok(origin !== undefined && actual !== undefined);
-        const expected = (coordinate - origin) * painted.geometry.backing_scale;
-        assert.ok(
-          Math.abs(actual - expected) < 0.1,
-          'Painter bounds must match the converted native plan.',
+      assert.equal(playback.receipt.strokes_presented.length, 3);
+      for (const [strokeIndex, stroke] of playback.receipt.strokes_presented.entries()) {
+        assert.equal(stroke.stroke_index, strokeIndex);
+        assert.equal(stroke.trace_progress, 1);
+        assert.ok(stroke.hold_ms_observed >= 1100);
+      }
+      const comparison = GuidanceComparisonDiagnosticsSchema.parse(playback.comparison_diagnostics);
+      assert.equal(comparison.matched, true);
+      assert.equal(comparison.regions.length, 4);
+      assert.equal(comparison.regions[0]?.region_kind, 'target');
+      assert.ok(comparison.regions.slice(1).every((region) => region.region_kind === 'stroke'));
+      assert.equal(coordinates.planned_strokes.length, 3);
+      assert.equal(coordinates.painted_strokes.length, 3);
+      for (const [strokeIndex, planned] of coordinates.planned_strokes.entries()) {
+        const painted = coordinates.painted_strokes.find(
+          (stroke) => stroke.stroke_index === strokeIndex,
         );
+        assert.equal(planned.stroke_index, strokeIndex);
+        assert.ok(painted, 'Native playback must report painter geometry.');
+        assert.equal(
+          painted.trace_progress,
+          1,
+          'Completed playback must include the complete cue.',
+        );
+        for (const [index, coordinate] of planned.cue_bounds_points.entries()) {
+          const origin = painted.geometry.origin_points[index % 2];
+          const actual = painted.geometry.cue_bounds_px[index];
+          assert.ok(origin !== undefined && actual !== undefined);
+          const expected = (coordinate - origin) * painted.geometry.backing_scale;
+          assert.ok(
+            Math.abs(actual - expected) < 0.1,
+            'Painter bounds must match the converted native plan.',
+          );
+        }
       }
       console.info(`PASS native coordinate trace: ${JSON.stringify(coordinates)}`);
       console.info(
-        'PASS native message/cue: compositor accepted the message before V2 playback and returned a current receipt.',
+        'PASS native message/cue: compositor accepted the message before V3 scribble playback and returned a current receipt.',
       );
+    }
+
+    if (playback.status === 'presented') {
+      /* All native requests below retain the same epoch; freshness refusals must not end it. */
+      const unavailable = await callNativeTool(server, CursorCompanionTool.PRESENT_GUIDANCE, {
+        ...request,
+        presentation_id: randomUUID(),
+        capture_id: randomUUID(),
+      });
+      assert.equal(unavailable.isError, true);
+      assert.equal(
+        GuidancePresentationRefusalSchema.parse(unavailable.structuredContent).reason,
+        'capture_unavailable',
+      );
+      assert.ok(!unavailable.content.some((part) => part.type === 'image'));
+      console.info('PASS V3 freshness: unavailable capture refuses without returning pixels.');
+    }
+
+    if (playback.status === 'presented') {
+      const interruptCapture = await callNativeTool(server, 'get_desktop_state', {
+        max_image_dimension: 1200,
+      });
+      const interruptMetadata = z
+        .object({ capture_id: z.string().min(1) })
+        .parse(interruptCapture.structuredContent);
+      const interruptPromise = callNativeTool(server, CursorCompanionTool.PRESENT_GUIDANCE, {
+        ...request,
+        capture_id: interruptMetadata.capture_id,
+        presentation_id: randomUUID(),
+        max_image_dimension: 1200,
+      });
+      await delay(350);
+      await callNativeTool(server, CursorCompanionTool.CANCEL_SEQUENCE, {});
+      const interruptedDrawing = await interruptPromise;
+      const interruptedResult = CursorGuidanceResultSchema.parse(
+        interruptedDrawing.structuredContent,
+      );
+      assert.equal(interruptedDrawing.isError, true);
+      assert.equal(interruptedResult.status, 'canceled');
+      assert.ok(['explicit_stop', 'user_takeover'].includes(interruptedResult.reason));
+      if (interruptedResult.reason === 'explicit_stop') {
+        console.info(
+          'PASS controlled V3 cancellation: explicit host stop never produces a success receipt.',
+        );
+      } else {
+        console.info(
+          'NOT VERIFIED: explicit host cancellation; real user input ended the disposable epoch first.',
+        );
+      }
     }
     const endTask = await callNativeTool(server, CursorCompanionTool.END_TASK, {
       task_epoch: taskEpoch,
@@ -261,17 +365,47 @@ export async function checkNativeTeachingBoundary(): Promise<void> {
       endTask.isError === true &&
       interrupted.success &&
       interrupted.data.status === 'canceled' &&
-      interrupted.data.reason === 'user_takeover' &&
+      ['user_takeover', 'explicit_stop'].includes(interrupted.data.reason) &&
       interrupted.data.task_epoch === taskEpoch;
     assert.ok(
       !endTask.isError || releasedAfterInput,
       'Native preview epoch must end or release after real user input.',
     );
     if (releasedAfterInput) {
-      console.info(
-        'Native probe observed real user input; the preview epoch was released with user_takeover.',
-      );
+      console.info('Native probe released the canceled preview epoch.');
     }
+
+    /* Transfer the one native following lease before testing another connection. */
+    await callNativeTool(server, CursorCompanionTool.SET_MODE, { mode: 'hidden' });
+    const peerFollow = await callNativeTool(peer, CursorCompanionTool.SET_MODE, {
+      mode: 'follow',
+      label: 'Tro',
+    });
+    assert.ok(!peerFollow.isError);
+    /* A separate native connection cannot use this connection's capture. */
+    const foreignEpoch = randomUUID();
+    const foreignTask = await callNativeTool(peer, CursorCompanionTool.BEGIN_TASK, {
+      task_epoch: foreignEpoch,
+      presentation_version: 3,
+    });
+    assert.ok(!foreignTask.isError);
+    const foreignBinding = await callNativeTool(peer, CompanionHudTool.BIND_CURSOR, { group });
+    assert.ok(!foreignBinding.isError);
+    const foreignCapture = await callNativeTool(peer, CursorCompanionTool.PRESENT_GUIDANCE, {
+      ...request,
+      presentation_id: randomUUID(),
+    });
+    assert.equal(foreignCapture.isError, true);
+    assert.equal(
+      GuidancePresentationRefusalSchema.parse(foreignCapture.structuredContent).reason,
+      'capture_unavailable',
+    );
+    await callNativeTool(peer, CursorCompanionTool.END_TASK, { task_epoch: foreignEpoch });
+
+    await callNativeTool(peer, CursorCompanionTool.SET_MODE, { mode: 'hidden' });
+    console.info(
+      'PASS V3 capture isolation: another admitted native connection cannot present this connection’s capture.',
+    );
     const end = await callNativeTool(server, DesktopObservationTool.END, { watch_id: watchId });
     assert.ok(!end.isError, 'Native watch must end.');
     const after = await callNativeTool(server, DesktopObservationTool.READ, { watch_id: watchId });
@@ -304,7 +438,7 @@ export async function checkNativeTeachingBoundary(): Promise<void> {
       'PASS input-only native watch: ready without a comparison frame; on-demand capture remains available.',
     );
     console.info(
-      `PASS native boundary: owned host, V2 epoch, watch admission, first frame (${String(Math.round(performance.now() - startedAt))}ms), capture snapshot, active-lesson renewal/state contracts, connection isolation, teardown.`,
+      `PASS native boundary: owned host, V3 epoch, watch admission, first frame (${String(Math.round(performance.now() - startedAt))}ms), capture snapshot, active-lesson renewal/state contracts, connection isolation, teardown.`,
     );
     console.info(
       'NOT VERIFIED: physical click/drag hooks, global Esc interception, visible cue rendering, and real-model decision quality. Use the documented manual acceptance flow.',
@@ -315,6 +449,7 @@ export async function checkNativeTeachingBoundary(): Promise<void> {
       ?.callToolResult(CursorCompanionTool.END_TASK, { task_epoch: taskEpoch })
       .catch(() => {});
     await server?.callToolResult(CursorCompanionTool.SET_MODE, { mode: 'hidden' }).catch(() => {});
+    await peer?.callToolResult(CursorCompanionTool.SET_MODE, { mode: 'hidden' }).catch(() => {});
     await peer?.close().catch(() => {});
     await server?.close().catch(() => {});
     await driver.stop();

@@ -71,22 +71,23 @@ describe('Cua companion lifecycle', () => {
   });
 });
 
-describe('host-only V2 negotiation', () => {
+describe('host-only V3 negotiation', () => {
   const epoch = '11111111-1111-4111-8111-111111111111';
   const capabilities = {
-    presentation_versions: [1, 2],
+    presentation_versions: [3],
     task_lifecycle: true,
     paired_presentation: true,
     display_scope: 'primary',
-    gestures: ['circle'],
-    max_steps: 8,
+    gestures: ['scribble'],
+    max_strokes: 3,
+    max_points_per_stroke: 32,
     max_duration_ms: 15000,
   };
 
   it('refuses unsupported drivers without beginning a legacy task', async () => {
     const callHostTool = vi.fn<CompanionTransport['callHostTool']>().mockResolvedValue({
       content: [],
-      structuredContent: { ...capabilities, presentation_versions: [1] },
+      structuredContent: { ...capabilities, presentation_versions: [2] },
     });
     const client = new CuaCompanionClient({ callHostTool });
     await expect(client.beginGuidanceTask(epoch)).rejects.toThrow('unsupported_version');
@@ -122,7 +123,7 @@ describe('host-only V2 negotiation', () => {
     await client.beginGuidanceTask(epoch);
     expect(callHostTool).toHaveBeenNthCalledWith(2, 'begin_cursor_guidance_task', {
       task_epoch: epoch,
-      presentation_version: 2,
+      presentation_version: 3,
     });
     await expect(client.endGuidanceTask(epoch)).rejects.toMatchObject({
       reason: 'user_takeover',

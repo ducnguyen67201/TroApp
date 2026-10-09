@@ -58,7 +58,7 @@ const deadline = setTimeout(() => {
 
 async function checkPresentationContract(): Promise<void> {
   await beginLesson(FlowScenario.CHAT_ONLY);
-  await waitForState('chat-only repair draws before waiting', (state) => state.phase === 'waiting');
+  await waitForWaiting(2);
   assert.equal(fixture.segments, 2);
   assert.equal(fixture.previews, 1);
   fixture.changeScreen('youtube');
@@ -69,7 +69,7 @@ async function checkPresentationContract(): Promise<void> {
 
   await assertCleanup();
   await beginLesson(FlowScenario.CHAT_ONLY_AFTER_STEP);
-  await waitForState('initial presentation receipt', (state) => state.phase === 'waiting');
+  await waitForWaiting(1);
   fixture.changeScreen('browser');
   await waitForState('bounded missing presentation failure', (state) => state.outcome === 'failed');
   assert.equal(
@@ -108,8 +108,18 @@ async function waitForState(
     }
     await delay(50);
   }
+  const latest = progress.at(-1);
   throw new Error(
-    `Timed out at ${label}; segments=${String(fixture.segments)}, captures=${String(fixture.captures)}, previews=${String(fixture.previews)}.`,
+    `Timed out at ${label}; ${JSON.stringify({
+      segments: fixture.segments,
+      requests: fixture.requests,
+      captures: fixture.captures,
+      previews: fixture.previews,
+      epochStarts: fixture.epochStarts,
+      epochEnds: fixture.epochEnds,
+      phase: latest?.phase ?? null,
+      canAcceptAnswer: latest?.canAcceptAnswer ?? false,
+    })}.`,
   );
 }
 
@@ -125,14 +135,31 @@ async function beginLesson(scenario: FlowScenario): Promise<void> {
 }
 
 async function waitForWaiting(segment: number): Promise<void> {
+  // The presenter publishes a visible cue while its SDK segment is still
+  // awaiting the model's final disposition. Idle assertions start only after
+  // epoch teardown and the runner's explicit local-wait acknowledgment.
   await waitForState(
     `waiting after segment ${String(segment)}`,
-    (state) => state.phase === 'waiting' && fixture.segments === segment,
+    (state) =>
+      state.phase === 'waiting' &&
+      fixture.segments === segment &&
+      fixture.epochStarts === segment &&
+      fixture.epochEnds === segment &&
+      progress.at(-1)?.phase === 'waiting' &&
+      progress.at(-1)?.canAcceptAnswer === true,
   );
   assert.equal(
     (await readState()).sending,
     'true',
     'A cue must leave the original request pending.',
+  );
+  console.info(
+    `Teaching flow waiting locally: ${JSON.stringify({
+      segment,
+      requests: fixture.requests,
+      epochStarts: fixture.epochStarts,
+      epochEnds: fixture.epochEnds,
+    })}`,
   );
 }
 
@@ -150,6 +177,7 @@ async function checkJourney(): Promise<void> {
   await beginLesson(FlowScenario.JOURNEY);
   await waitForWaiting(1);
   const requestCount = fixture.requests;
+  assert.equal(requestCount, 3, 'The first segment must finish its final model disposition.');
   await delay(800);
   assert.equal(fixture.requests, requestCount, 'Idle waiting must not request the model.');
   // Pointer movement alone does not increment either native revision.
@@ -178,7 +206,7 @@ async function checkJourney(): Promise<void> {
   await waitForWaiting(4);
   const typingMessage = hudSnapshots.at(-1)?.message;
   assert.ok(typingMessage);
-  assert.equal(fixture.previews, previews, 'Focused typing requires no new circle.');
+  assert.equal(fixture.previews, previews, 'Focused typing requires no drawing.');
   fixture.changeScreen('partial');
   await waitForWaiting(5);
   assert.equal(hudSnapshots.at(-1)?.message?.stepId, typingMessage.stepId);
@@ -380,15 +408,15 @@ async function checkTargetRecovery(): Promise<void> {
 async function checkFailures(): Promise<void> {
   await beginLesson(FlowScenario.REFRESH_FAILURE);
   await waitForState(
-    'native cue refresh failure',
+    'native presentation capture failure',
     (state) => state.outcome === 'failed' && state.sending === 'false',
   );
-  assert.equal(fixture.segments, 1, 'Native refresh failure cannot start a stale recovery loop.');
+  assert.equal(fixture.segments, 1, 'Native capture failure cannot start a stale recovery loop.');
   assert.equal(fixture.requests, 2, 'Native failure aborts the SDK before another model request.');
   assert.equal(fixture.previews, 0);
   await assertCleanup();
   console.info(
-    'PASS cue refresh failure: one segment, typed diagnostic, no playback or model retry.',
+    'PASS native capture failure: one segment, typed diagnostic, no playback or model retry.',
   );
 
   await beginLesson(FlowScenario.BAD_RECEIPT);

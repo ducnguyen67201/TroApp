@@ -2,9 +2,92 @@ import { MCPServerStdio, mcpToFunctionTool, RunContext, type CallToolResult } fr
 import pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import { AgentTaskMode, GuidanceReason, CursorCompanionTool } from '#contracts/CursorCompanion.js';
-import { TaskIssue } from '../../../../src/desktop/worker/cua/CuaTaskEvidence.js';
 import { LoggedCuaServer } from '../../../../src/desktop/worker/cua/LoggedCuaServer.js';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
+
+const epoch = '11111111-1111-4111-8111-111111111111';
+const presentationId = '33333333-3333-4333-8333-333333333333';
+const teachingMessage = {
+  lessonId: epoch,
+  stepId: '22222222-2222-4222-8222-222222222222',
+  sequence: 1,
+  kind: 'instruction' as const,
+  text: 'Private instruction',
+};
+const spatialRequest = {
+  presentation_version: 3,
+  presentation_id: presentationId,
+  capture_id: 'original-capture',
+  text_only: false,
+  targets: [{ x: 0.4, y: 0.4, width: 0.1, height: 0.1 }],
+  drawing: {
+    strokes: [
+      {
+        points: [
+          { x: 0.4, y: 0.4 },
+          { x: 0.5, y: 0.4 },
+        ],
+        closed: false,
+      },
+    ],
+  },
+};
+
+function captureResult(captureId = 'original-capture'): CallToolResult {
+  return {
+    content: [{ type: 'image', data: 'cHJpdmF0ZS1zY3JlZW5zaG90', mimeType: 'image/png' }],
+    structuredContent: {
+      capture_id: captureId,
+      display: 'primary',
+      screen_width: 1200,
+      screen_height: 800,
+      screenshot_width: 1200,
+      screenshot_height: 800,
+      scale_factor: 1,
+    },
+  };
+}
+
+function presentationResult(receiptPresentationId = presentationId): CallToolResult {
+  return {
+    content: [],
+    structuredContent: {
+      status: 'presented',
+      following: true,
+      active: false,
+      receipt: {
+        presentation_version: 3,
+        task_epoch: epoch,
+        sequence_id: '44444444-4444-4444-8444-444444444444',
+        presentation_id: receiptPresentationId,
+        lesson_id: teachingMessage.lessonId,
+        step_id: teachingMessage.stepId,
+        message_presented: true,
+        drawing_presented: true,
+        text_only: false,
+        interrupted: false,
+        strokes_presented: [{ stroke_index: 0, trace_progress: 1, hold_ms_observed: 1100 }],
+      },
+    },
+  };
+}
+
+function createNativeResponse(state: string): CallToolResult {
+  if (state === 'unchanged') {
+    return presentationResult();
+  }
+  if (state === 'foreign_receipt') {
+    return presentationResult('66666666-6666-4666-8666-666666666666');
+  }
+  if (state === 'accepted' || state === 'completed') {
+    return { content: [], structuredContent: { status: state, following: true, active: false } };
+  }
+  return {
+    isError: true,
+    content: [{ type: 'text', text: 'Private native comparison' }],
+    structuredContent: { status: 'refused', code: 'fresh_observation_required', reason: state },
+  };
+}
 
 describe('Cua tool schemas presented to the Agents SDK', () => {
   it('reports a native text-only render timeout without replaying or logging its content', async () => {
@@ -22,7 +105,10 @@ describe('Cua tool schemas presented to the Agents SDK', () => {
         code: GuidanceReason.RENDER_TIMEOUT,
       },
     };
-    const call = vi.spyOn(MCPServerStdio.prototype, 'callToolResult').mockResolvedValue(native);
+    const call = vi
+      .spyOn(MCPServerStdio.prototype, 'callToolResult')
+      .mockResolvedValueOnce(captureResult('private-capture'))
+      .mockResolvedValue(native);
     const logs: string[] = [];
     const server = new LoggedCuaServer(
       { name: 'Render diagnostics test', command: 'unused' },
@@ -32,13 +118,14 @@ describe('Cua tool schemas presented to the Agents SDK', () => {
     server.beginTeachingTask(epoch, terminal);
     server.setHudGroup('private-group');
     try {
+      await server.callToolResult('get_desktop_state', {});
       const result = await server.showTeachingCue(
         {
           capture_id: 'private-capture',
           presentation_id: presentationId,
-          presentation_version: 2,
+          presentation_version: 3,
           text_only: true,
-          steps: [],
+          drawing: null,
         },
         {
           lessonId: epoch,
@@ -51,7 +138,7 @@ describe('Cua tool schemas presented to the Agents SDK', () => {
       );
       expect(result.structuredContent).toEqual(native.structuredContent);
       expect(result.isError).toBe(true);
-      expect(call).toHaveBeenCalledOnce();
+      expect(call).toHaveBeenCalledTimes(2);
       expect(terminal).toHaveBeenCalledOnce();
       const encoded = logs.join('');
       expect(encoded).toContain('cua.response');
@@ -272,295 +359,161 @@ describe('Cua tool schemas presented to the Agents SDK', () => {
       call.mockRestore();
     }
   });
-
-  it('requires a completed native preview result, not an acceptance receipt', async () => {
-    const call = vi
-      .spyOn(MCPServerStdio.prototype, 'callToolResult')
-      .mockResolvedValue({ content: [], structuredContent: { status: 'accepted' } });
-    const server = new LoggedCuaServer(
-      { name: 'Preview evidence test', command: 'unused' },
-      pino({ level: 'silent' }),
-    );
-    try {
-      expect((await server.callToolResult('show_cursor_sequence', {})).isError).toBe(true);
-      expect(server.taskEvidence.readIssue()).toBe(TaskIssue.GUIDANCE_FAILED);
-      call.mockResolvedValue({
-        content: [],
-        structuredContent: { status: 'completed', following: true, active: false },
-      });
-      expect((await server.callToolResult('show_cursor_sequence', {})).isError).not.toBe(true);
-      expect(server.taskEvidence.readIssue()).toBeNull();
-    } finally {
-      call.mockRestore();
-    }
-  });
 });
 
-describe('host-pinned V2 guidance', () => {
-  const epoch = '11111111-1111-4111-8111-111111111111';
-  const sequence = '22222222-2222-4222-8222-222222222222';
-  const request = { presentation_version: 2, capture_id: 'capture', steps: [{ kind: 'circle' }] };
-
-  it('requires literal V2 in the advertised schema and rejects omission before dispatch', async () => {
+describe('host-owned V3 presentation', () => {
+  it('keeps the native presentation private and refuses legacy model tools', async () => {
     const list = vi.spyOn(MCPServerStdio.prototype, 'listTools').mockResolvedValue([
       {
-        name: 'show_cursor_sequence',
-        inputSchema: {
-          type: 'object',
-          properties: { session: { type: 'string' }, presentation_version: { type: 'integer' } },
-          required: [],
-          additionalProperties: false,
-        },
+        name: CursorCompanionTool.PRESENT_GUIDANCE,
+        inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
       },
       {
-        name: 'begin_cursor_guidance_task',
+        name: CursorCompanionTool.BEGIN_TASK,
         inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
       },
     ]);
-    const call = vi.spyOn(MCPServerStdio.prototype, 'callToolResult');
-    const stop = vi.fn();
+    const native = vi.spyOn(MCPServerStdio.prototype, 'callToolResult');
     const server = new LoggedCuaServer(
-      { name: 'V2', command: 'unused' },
+      { name: 'Private V3', command: 'unused' },
       pino({ level: 'silent' }),
     );
-    server.beginTeachingTask(epoch, stop);
+    server.beginTeachingTask(epoch, () => {});
     try {
-      const tools = await server.listTools();
-      expect(tools).toHaveLength(1);
-      expect(tools[0]?.inputSchema.properties).toEqual({
-        presentation_version: { type: 'integer', const: 2 },
-      });
-      expect(tools[0]?.inputSchema.required).toContain('presentation_version');
-      expect((await server.callToolResult('show_cursor_sequence', { steps: [] })).isError).toBe(
-        true,
-      );
-      expect(call).not.toHaveBeenCalled();
-      expect(stop).toHaveBeenCalledOnce();
+      expect(await server.listTools()).toEqual([]);
+      expect(
+        (await server.callToolResult(CursorCompanionTool.PRESENT_GUIDANCE, spatialRequest)).isError,
+      ).toBe(true);
+      expect((await server.callToolResult('show_cursor_sequence', {})).isError).toBe(true);
+      expect(native).not.toHaveBeenCalled();
     } finally {
       list.mockRestore();
-      call.mockRestore();
+      native.mockRestore();
+      server.endTeachingTask();
     }
   });
 
+  it.each([
+    'unchanged',
+    'target_changed',
+    'geometry_changed',
+    'capture_unavailable',
+    'accepted',
+    'completed',
+    'foreign_receipt',
+  ])(
+    'uses one native refresh/render request and validates %s evidence without private content logs',
+    async (state) => {
+      const logs: string[] = [];
+      const terminal = vi.fn<() => void>();
+      const server = new LoggedCuaServer(
+        { name: 'V3 native freshness', command: 'unused' },
+        pino({ level: 'debug' }, { write: (line: string) => logs.push(line) }),
+      );
+      server.beginTeachingTask(epoch, terminal);
+      server.setHudGroup('55555555-5555-4555-8555-555555555555');
+      const response = createNativeResponse(state);
+      const native = vi
+        .spyOn(MCPServerStdio.prototype, 'callToolResult')
+        .mockResolvedValueOnce(captureResult())
+        .mockResolvedValue(response);
+      try {
+        await server.callToolResult('get_desktop_state', { max_image_dimension: 1200 });
+        const result = await server.showTeachingCue(
+          spatialRequest,
+          teachingMessage,
+          DesktopLocale.ENGLISH,
+        );
+        expect(native.mock.calls.map(([name]) => name)).toEqual([
+          'get_desktop_state',
+          CursorCompanionTool.PRESENT_GUIDANCE,
+        ]);
+        expect(native.mock.calls[1]?.[1]).toMatchObject({
+          ...spatialRequest,
+          max_image_dimension: 1200,
+          teaching_message: teachingMessage,
+          teaching_locale: 'en',
+        });
+        expect(native.mock.calls[1]?.[1]?.drawing).toEqual(spatialRequest.drawing);
+        if (state === 'unchanged') {
+          expect(result.isError).not.toBe(true);
+          expect(server.taskEvidence.readTeachingResult('Continue')).toEqual({
+            outcome: 'demonstrated',
+            answer: 'Continue',
+          });
+          expect(terminal).not.toHaveBeenCalled();
+        } else if (['target_changed', 'geometry_changed', 'capture_unavailable'].includes(state)) {
+          expect(result.isError).toBe(true);
+          expect(server.taskEvidence.hasPendingGuidance()).toBe(false);
+          expect(server.taskEvidence.hasTerminalGuidance()).toBe(false);
+          expect(terminal).not.toHaveBeenCalled();
+          native.mockResolvedValue(presentationResult());
+          expect(
+            (await server.showTeachingCue(spatialRequest, teachingMessage, DesktopLocale.ENGLISH))
+              .isError,
+          ).not.toBe(true);
+        } else {
+          expect(result.isError).toBe(true);
+          expect(server.taskEvidence.readTeachingResult('Continue')).toEqual({
+            outcome: 'failed',
+            reason: 'transport_failed',
+          });
+          expect(terminal).toHaveBeenCalledOnce();
+        }
+        const encoded = logs.join('');
+        expect(encoded).not.toContain('Private instruction');
+        expect(encoded).not.toContain('Private native comparison');
+        expect(encoded).not.toContain('cHJpdmF0ZS1zY3JlZW5zaG90');
+      } finally {
+        native.mockRestore();
+        server.endTeachingTask();
+      }
+    },
+  );
+
   it('retains takeover as terminal and never dispatches a later replay', async () => {
-    const call = vi
+    const canceled: CallToolResult = {
+      content: [],
+      isError: true,
+      structuredContent: {
+        status: 'canceled',
+        active: false,
+        following: true,
+        task_epoch: epoch,
+        sequence_id: '44444444-4444-4444-8444-444444444444',
+        reason: 'user_takeover',
+      },
+    };
+    const native = vi
       .spyOn(MCPServerStdio.prototype, 'callToolResult')
-      .mockImplementation(async (name) => {
-        await Promise.resolve();
-        if (name === 'get_desktop_state') {
-          return {
-            content: [{ type: 'image', data: 'aW1hZ2U=', mimeType: 'image/png' }],
-            structuredContent: {
-              capture_id: 'capture',
-              display: 'primary',
-              screen_width: 1000,
-              screen_height: 800,
-              screenshot_width: 1000,
-              screenshot_height: 800,
-              scale_factor: 1,
-            },
-          };
-        }
-        if (name === CursorCompanionTool.REFRESH_CAPTURE) {
-          return {
-            content: [],
-            structuredContent: {
-              matched: true,
-              capture_id: 'refreshed',
-              reason: 'target_unchanged',
-            },
-          };
-        }
-        return {
-          content: [],
-          isError: true,
-          structuredContent: {
-            status: 'canceled',
-            active: false,
-            following: true,
-            task_epoch: epoch,
-            sequence_id: sequence,
-            reason: 'user_takeover',
-          },
-        };
-      });
-    const stop = vi.fn();
+      .mockResolvedValueOnce(captureResult())
+      .mockResolvedValue(canceled);
     const server = new LoggedCuaServer(
-      { name: 'V2', command: 'unused' },
+      { name: 'V3 takeover', command: 'unused' },
       pino({ level: 'silent' }),
     );
-    server.beginTeachingTask(epoch, stop);
+    server.beginTeachingTask(epoch, () => {});
     try {
       await server.callToolResult('get_desktop_state', {});
-      await server.callToolResult('show_cursor_sequence', request);
-      await server.callToolResult('show_cursor_sequence', request);
-      expect(call.mock.calls.map(([name]) => name)).toEqual([
-        'get_desktop_state',
-        CursorCompanionTool.REFRESH_CAPTURE,
-        CursorCompanionTool.SHOW_SEQUENCE,
-      ]);
+      await server.showTeachingCue(spatialRequest, teachingMessage, DesktopLocale.ENGLISH);
+      await server.showTeachingCue(spatialRequest, teachingMessage, DesktopLocale.ENGLISH);
+      expect(native).toHaveBeenCalledTimes(2);
       expect(server.taskEvidence.readTeachingResult('Done')).toEqual({
         outcome: 'canceled',
         reason: 'user_takeover',
       });
     } finally {
-      call.mockRestore();
+      native.mockRestore();
+      server.endTeachingTask();
     }
   });
-});
-
-describe('capture renewal before V2 native dispatch', () => {
-  it.each([
-    'unchanged',
-    'changed',
-    'geometry',
-    'takeover',
-    'refused',
-    'malformed',
-    'input_during_refresh',
-  ])(
-    'handles a delayed model with a %s capture without replay or private logging',
-    async (state) => {
-      const epoch = '11111111-1111-4111-8111-111111111111';
-      const sequence = '22222222-2222-4222-8222-222222222222';
-      const logs: string[] = [];
-      const server = new LoggedCuaServer(
-        { name: 'Capture renewal', command: 'unused' },
-        pino({ level: 'debug' }, { write: (line: string) => logs.push(line) }),
-      );
-      let nowMs = 0;
-      let canShow = true;
-      server.setPreviewAdmission(() => Promise.resolve(canShow));
-      const clock = vi.spyOn(performance, 'now').mockImplementation(() => nowMs);
-      const terminal = vi.fn<() => void>();
-      server.beginTeachingTask(epoch, terminal);
-      const call = vi
-        .spyOn(MCPServerStdio.prototype, 'callToolResult')
-        .mockImplementation(async (name) => {
-          await Promise.resolve();
-          if (name === 'get_desktop_state') {
-            return {
-              content: [{ type: 'image', data: 'aW1hZ2U=', mimeType: 'image/png' }],
-              structuredContent: {
-                capture_id: 'private-original-capture',
-                display: 'primary',
-                screen_width: 1200,
-                screen_height: 800,
-                screenshot_width: 1200,
-                screenshot_height: 800,
-                scale_factor: 1,
-              },
-            };
-          }
-          if (name === CursorCompanionTool.REFRESH_CAPTURE) {
-            if (state === 'input_during_refresh') {
-              canShow = false;
-            }
-            if (state === 'takeover') {
-              server.taskEvidence.cancelGuidance(GuidanceReason.USER_TAKEOVER);
-            }
-            const matched =
-              state === 'unchanged' || state === 'takeover' || state === 'input_during_refresh';
-            return {
-              content: [{ type: 'text', text: 'Private native diagnostic' }],
-              isError: state === 'refused',
-              structuredContent:
-                state === 'malformed'
-                  ? { matched: true }
-                  : {
-                      matched,
-                      capture_id: matched ? 'private-refreshed-capture' : null,
-                      reason: matched
-                        ? 'target_unchanged'
-                        : state === 'geometry'
-                          ? 'geometry_changed'
-                          : 'target_changed',
-                    },
-            };
-          }
-          return {
-            content: [],
-            structuredContent: {
-              status: 'completed',
-              following: true,
-              active: false,
-              receipt: {
-                presentation_version: 2,
-                task_epoch: epoch,
-                sequence_id: sequence,
-                completed_steps: 1,
-              },
-            },
-          };
-        });
-      try {
-        await server.callToolResult('get_desktop_state', { max_image_dimension: 1200 });
-        nowMs = 6000;
-        const pending = server.callToolResult('show_cursor_sequence', {
-          presentation_version: 2,
-          capture_id: 'private-original-capture',
-          steps: [{ kind: 'circle', center: { x: 0.5, y: 0.5 }, radius: 0.05, duration_ms: 600 }],
-        });
-        if (state === 'refused' || state === 'malformed') {
-          await expect(pending).rejects.toMatchObject({ code: 'capture_refresh_failed' });
-          expect(terminal).toHaveBeenCalledOnce();
-          expect(logs.join('')).toContain('cua.guidance.refresh_failed');
-          expect(logs.join('')).not.toContain('Private native');
-          expect(call.mock.calls.map(([name]) => name)).toEqual([
-            'get_desktop_state',
-            CursorCompanionTool.REFRESH_CAPTURE,
-          ]);
-          return;
-        }
-        const result = await pending;
-        expect(call.mock.calls[1]?.[0]).toBe(CursorCompanionTool.REFRESH_CAPTURE);
-        expect(call.mock.calls[1]?.[1]).toMatchObject({
-          max_image_dimension: 1200,
-          capture_id: 'private-original-capture',
-        });
-        if (state === 'unchanged') {
-          expect(call.mock.calls.at(-1)?.[1]).toMatchObject({
-            capture_id: 'private-refreshed-capture',
-          });
-          expect(result.isError).not.toBe(true);
-          expect(server.taskEvidence.readTeachingResult('Click the highlighted control')).toEqual({
-            outcome: 'demonstrated',
-            answer: 'Click the highlighted control',
-          });
-          expect(terminal).not.toHaveBeenCalled();
-        } else {
-          expect(call.mock.calls.map(([name]) => name)).toEqual([
-            'get_desktop_state',
-            CursorCompanionTool.REFRESH_CAPTURE,
-          ]);
-          expect(result.isError).toBe(true);
-          expect(server.taskEvidence.readTeachingResult('Done')).toEqual(
-            state === 'takeover'
-              ? { outcome: 'canceled', reason: 'user_takeover' }
-              : { outcome: 'needs_input', reason: 'no_demonstration' },
-          );
-          expect(terminal).not.toHaveBeenCalled();
-        }
-        const output = logs.join('');
-        expect(output).toContain('cua.guidance.capture_refreshed');
-        expect(output).toContain('"captureAgeMs":6000');
-        expect(output).not.toContain('private-');
-        expect(output).not.toContain('Private native');
-        expect(output).not.toContain('aW1hZ2U=');
-      } finally {
-        server.endTeachingTask();
-        clock.mockRestore();
-        call.mockRestore();
-      }
-    },
-  );
 });
 
 it('never advertises or dispatches private HUD tools to a model in either task mode', async () => {
   const native = vi.spyOn(MCPServerStdio.prototype, 'callToolResult');
   const list = vi.spyOn(MCPServerStdio.prototype, 'listTools').mockResolvedValue([
     {
-      name: CursorCompanionTool.REFRESH_CAPTURE,
+      name: CursorCompanionTool.PRESENT_GUIDANCE,
       inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
     },
     {
@@ -584,7 +537,7 @@ it('never advertises or dispatches private HUD tools to a model in either task m
     for (const mode of Object.values(AgentTaskMode)) {
       server.setTaskMode(mode);
       expect(await server.listTools()).toEqual([]);
-      expect((await server.callToolResult(CursorCompanionTool.REFRESH_CAPTURE, {})).isError).toBe(
+      expect((await server.callToolResult(CursorCompanionTool.PRESENT_GUIDANCE, {})).isError).toBe(
         true,
       );
       expect((await server.callToolResult('set_companion_hud', {})).isError).toBe(true);
@@ -628,11 +581,11 @@ it('requires a fresh observation before stale coordinates without ending the les
   server.setPreviewAdmission(() => Promise.resolve(false));
   const stale = vi.fn<() => void>();
   try {
-    const result = await server.callToolResult(CursorCompanionTool.SHOW_SEQUENCE, {
-      presentation_version: 2,
-      capture_id: 'old',
-      steps: [{ kind: 'circle' }],
-    });
+    const result = await server.showTeachingCue(
+      { ...spatialRequest, capture_id: 'old' },
+      teachingMessage,
+      DesktopLocale.ENGLISH,
+    );
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result)).toContain('fresh_observation_required');
     expect(stale).not.toHaveBeenCalled();
@@ -715,11 +668,11 @@ it('refuses an unobserved capture instead of bypassing the local target check', 
   const stale = vi.fn<() => void>();
   server.beginTeachingTask('11111111-1111-4111-8111-111111111111', () => {});
   try {
-    const result = await server.callToolResult(CursorCompanionTool.SHOW_SEQUENCE, {
-      presentation_version: 2,
-      capture_id: 'not-observed',
-      steps: [{ kind: 'circle' }],
-    });
+    const result = await server.showTeachingCue(
+      { ...spatialRequest, capture_id: 'not-observed' },
+      teachingMessage,
+      DesktopLocale.ENGLISH,
+    );
     expect(result.isError).toBe(true);
     expect(native).not.toHaveBeenCalled();
     expect(stale).not.toHaveBeenCalled();

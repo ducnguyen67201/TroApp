@@ -246,7 +246,7 @@ flowchart LR
   Request[Original request and authorized classroom context] --> Observe[Capture fresh desktop]
   Observe --> Model[SDK segment: assess goal and propose one action]
   Model --> Admit[Validate goal, evidence and action]
-  Admit --> Present[Publish one message and its derived cue]
+  Admit --> Present[Publish one message and its model-supplied strokes]
   Present --> Receipt[Require native presentation receipt]
   Receipt --> Wait[Wait locally for relevant input or bounded loading]
   Wait --> Observe
@@ -256,18 +256,49 @@ flowchart LR
 ```
 
 The model defines or explicitly revises a typed teaching goal, then proposes one
-reachable action through `present_teaching_step`. Message, cue geometry and expected
-input targets derive from that same action. The final decision references the
-presentation rather than introducing another unacknowledged instruction. Spatial
-actions require a current message and drawing receipt. Keyboard, focused typing and
-loading actions require an explicit text-only receipt.
+reachable action through `present_teaching_step`, together with an explicit nullable
+[drawing](../src/contracts/TeachingDrawing.ts). Spatial actions require bounded
+model-supplied stroke points in the same normalized coordinate system as action
+target boxes. The native host smooths and animates these paths. Action bounds alone
+supply student input matching; decorative stroke bounds never become click targets.
+Keyboard, focused typing and loading actions require a null drawing and an explicit
+text-only receipt. The final decision references the presentation rather than
+introducing another unacknowledged instruction.
 
-`LoggedCuaServer` restricts model tools, binds the lesson, pins V2, checks capture
-freshness and validates native replies. Host-generated epochs and presentation IDs
-cannot be overridden by the model. Native `refresh_cursor_guidance_capture` compares
-cue regions, rather than requiring a still whole desktop; it returns bounded
-measurements without an image. Changed targets/input/geometry refuse playback.
-Unknown transport results may mean an operation executed and are not replayed.
+`LoggedCuaServer` restricts model tools, binds the lesson and pins drawing version 3.
+Host-generated epochs and presentation IDs cannot be overridden by the model.
+The private native `present_teaching_guidance` tool compiles the bound capture's
+stroke geometry once, refreshes the screen locally, compares action target boxes
+and stroke-covered regions, then renders that same compiled plan. It refuses
+changed targets, input or display geometry without comparing an entire long path's
+bounding rectangle. The worker does not make a separate refresh dispatch or model
+call. A stale screen returns bounded repair feedback; unknown transport outcomes
+are terminal and are not replayed.
+
+A paired receipt requires the current HUD message and actual drawing installation.
+An uninterrupted presentation must cover every requested stroke with full reveal
+and the required visible hold. An interrupted presentation reports only strokes
+that appeared, with their actual progress. Pointer-only and clear-only frames
+cannot count as spatial guidance. Fixed teaching gesture generation and V1/V2
+playback compatibility have been removed; incompatible drivers fail admission.
+
+In the native companion, `ScribbleRenderer` owns curve compilation and bounded
+playback timing. `TeachingGuidanceAdapter` joins capture comparison and paired
+presentation; `CompanionSession` retains session ownership and cursor following.
+`TeachingPresenter` binds pending narration and input matching to the current
+segment. Closing a segment revokes its pending presentation, ends the native epoch
+and drains outstanding calls. A late response cannot commit or clear a newer step;
+an already committed receipt remains available to the runner.
+
+Both native MCP transport paths admit companion stop, teardown, lease renewal and
+bounded HUD controls outside the desktop action queue. A reader-owned FIFO queue
+starts one drawing or ordinary executor request at a time. Controls use the same
+argument validation, transport session identity, authorization and ownership
+checks, so cancellation can invalidate a pending drawing without waiting for its
+playback to finish.
+Disconnect discards queued calls and retires the connection's transport owner at
+core session admission. A delayed first request cannot create a new session after
+that owner has closed.
 
 `DesktopObservationClient` and `TeachingObservationPolicy` read the session-owned
 native watch and structured input history. Settled clicks, keys and scrolling can
@@ -667,28 +698,38 @@ instrument the owning boundary before changing behavior.
 Teaching coordinate diagnostics emit one `agent.teaching.coordinates.requested`
 event and, after a valid paired receipt, one
 `agent.teaching.coordinates.converted` event per presentation. Join them by
-`presentationId`. The requested event contains normalized target boxes; the native
-trace contains the refreshed capture ID, capture pixels, logical screen points,
-display scale, planned cue bounds and the last acknowledged painted bounds for
-each reached step. The painter records its actual origin, backing scale, raster
-size and stroke width. Bounds describe path centerlines, so the visible stroke
-extends by half its width. `trace_progress` below one identifies a partial cue.
+`presentationId`. The requested event contains normalized target boxes and bounded
+stroke points/counts. The native trace distinguishes the requested and refreshed
+capture IDs and includes capture pixels, logical screen points, display scale,
+planned stroke bounds and the last acknowledged painted bounds for each reached
+stroke. The painter records its actual origin, backing scale, raster
+size and stroke width. Planned and painted bounds include half the stroke width,
+so they describe the visible stroke extent. `trace_progress` below one identifies
+a partial cue.
 Interrupted presentations keep their reached geometry; an empty painted list
-means no drawable frame was recorded. A null trace means text-only guidance or an
-older driver, not a successful conversion measurement. These events contain no
-instruction text, target labels, screenshots, pixel colors or typed content.
-The instrumented native build is `0.30.4-tro.20`; rebuild and restart the desktop
-before comparing a new capture with its drawing. Painter geometry and CALayer
+means no drawable frame was recorded. A null trace means geometry diagnostics are
+unavailable, including text-only guidance; it is not a conversion measurement.
+These events contain no instruction text, target labels, screenshots, pixel colors
+or typed content.
+[CuaCompanionBuild.ts](../src/contracts/CuaCompanionBuild.ts) owns the required
+scribble-enabled build. Rebuild and restart the desktop before comparing a new
+capture with its drawing. Painter geometry and CALayer
 acknowledgments do not measure physical display scan-out.
 
 ### Teaching target admission
 
 The teaching model selects normalized target bounds from the current captured
-screen. `TeachingPresenter` validates the lesson, goal revision and capture before
-sending the same typed action to the native host for its drawing and input matcher.
-The native refresh compares the proposed cue regions with the live screen and
-refuses stale input, changed regions or invalid geometry. Drawing admission requires
-the paired native presentation receipt.
+screen and supplies a bounded drawing in the same presentation proposal.
+`TeachingPresenter` validates the lesson, goal revision, capture and action/drawing
+agreement, then sends the drawing and independently derived action targets to the
+native host. Native refresh compares targets and stroke coverage with the live
+screen and refuses stale input, changed regions or invalid geometry. Drawing
+admission requires correlated message and per-stroke presentation evidence.
+`cua.guidance.prepared` records capture age and stroke count; the bounded
+`cua.guidance.capture_refreshed` event reports comparison regions and native refusal
+reasons, together with bounded native compile, refresh, comparison and presentation
+timings. Model response time remains a separate gateway/worker measurement. These
+events contain no screen pixels or message content.
 
 These checks validate geometry, freshness and presentation; they do not establish
 that the model selected the correct control or content. Target selection remains

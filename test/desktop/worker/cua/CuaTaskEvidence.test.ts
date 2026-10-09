@@ -117,19 +117,35 @@ function result(structuredContent: Record<string, unknown>, isError = false): Ca
 
 const taskEpoch = '11111111-1111-4111-8111-111111111111';
 const sequenceId = '22222222-2222-4222-8222-222222222222';
+const identity = {
+  presentationId: '33333333-3333-4333-8333-333333333333',
+  lessonId: '44444444-4444-4444-8444-444444444444',
+  stepId: '55555555-5555-4555-8555-555555555555',
+};
 const completedGuide = {
-  status: 'completed',
+  status: 'presented',
   following: true,
   active: false,
   receipt: {
-    presentation_version: 2,
+    presentation_version: 3,
     task_epoch: taskEpoch,
     sequence_id: sequenceId,
-    completed_steps: 2,
+    presentation_id: identity.presentationId,
+    lesson_id: identity.lessonId,
+    step_id: identity.stepId,
+    message_presented: true,
+    drawing_presented: true,
+    text_only: false,
+    interrupted: false,
+    strokes_presented: [0, 1].map((stroke_index) => ({
+      stroke_index,
+      trace_progress: 1,
+      hold_ms_observed: 1100,
+    })),
   },
 };
 
-describe('positive V2 teaching evidence', () => {
+describe('positive V3 teaching evidence', () => {
   it('exposes only explicit questions without a demonstrated guide', () => {
     const evidence = new CuaTaskEvidence();
     evidence.beginGuidanceTask(taskEpoch);
@@ -147,7 +163,7 @@ describe('positive V2 teaching evidence', () => {
   it('never replaces a pending, failed or canceled guide with a question', () => {
     const evidence = new CuaTaskEvidence();
     evidence.beginGuidanceTask(taskEpoch);
-    evidence.beginGuidanceRequest(2);
+    evidence.beginGuidanceRequest(2, identity);
     expect(evidence.readTeachingResult('Which app?', 'needs_input')).toEqual({
       outcome: 'failed',
       reason: 'transport_failed',
@@ -177,7 +193,7 @@ describe('positive V2 teaching evidence', () => {
   it('accepts matching receipts once, independent of action verification', () => {
     const evidence = new CuaTaskEvidence();
     evidence.beginGuidanceTask(taskEpoch);
-    const request = evidence.beginGuidanceRequest(2);
+    const request = evidence.beginGuidanceRequest(2, identity);
     if (!request) {
       throw new Error('Missing live guidance request');
     }
@@ -189,38 +205,88 @@ describe('positive V2 teaching evidence', () => {
     expect(evidence.settleGuidanceRequest(request, result(completedGuide))).toBe(false);
   });
 
-  it.each(['wrong epoch', 'wrong step count', 'legacy receipt'])('rejects %s evidence', (kind) => {
+  it.each(['wrong epoch', 'wrong stroke count', 'foreign presentation', 'legacy receipt'])(
+    'rejects %s evidence',
+    (kind) => {
+      const evidence = new CuaTaskEvidence();
+      evidence.beginGuidanceTask(taskEpoch);
+      const request = evidence.beginGuidanceRequest(2, identity);
+      if (!request) {
+        throw new Error('Missing live guidance request');
+      }
+      const receipt = {
+        ...completedGuide.receipt,
+        ...(kind === 'wrong epoch'
+          ? { task_epoch: sequenceId }
+          : kind === 'foreign presentation'
+            ? { presentation_id: sequenceId }
+            : { strokes_presented: completedGuide.receipt.strokes_presented.slice(0, 1) }),
+      };
+      expect(
+        evidence.settleGuidanceRequest(
+          request,
+          result(
+            kind === 'legacy receipt'
+              ? { status: 'completed', following: true, active: false }
+              : { ...completedGuide, receipt },
+          ),
+        ),
+      ).toBe(false);
+      evidence.record('verify_state', result({ status: 'satisfied' }));
+      expect(evidence.readTeachingResult('Done')).toEqual({
+        outcome: 'failed',
+        reason: 'transport_failed',
+      });
+    },
+  );
+
+  it('retires a stale capture refusal so a fresh proposal can be admitted', () => {
     const evidence = new CuaTaskEvidence();
     evidence.beginGuidanceTask(taskEpoch);
-    const request = evidence.beginGuidanceRequest(2);
+    const request = evidence.beginGuidanceRequest(2, identity);
     if (!request) {
       throw new Error('Missing live guidance request');
     }
-    const receipt = {
-      ...completedGuide.receipt,
-      ...(kind === 'wrong epoch' ? { task_epoch: sequenceId } : { completed_steps: 1 }),
-    };
     expect(
       evidence.settleGuidanceRequest(
         request,
         result(
-          kind === 'legacy receipt'
-            ? { status: 'completed', following: true, active: false }
-            : { ...completedGuide, receipt },
+          { status: 'refused', code: 'fresh_observation_required', reason: 'target_changed' },
+          true,
         ),
       ),
     ).toBe(false);
-    evidence.record('verify_state', result({ status: 'satisfied' }));
-    expect(evidence.readTeachingResult('Done')).toEqual({
-      outcome: 'failed',
-      reason: 'transport_failed',
+    expect(evidence.hasPendingGuidance()).toBe(false);
+    expect(evidence.hasTerminalGuidance()).toBe(false);
+    expect(evidence.beginGuidanceRequest(2, identity)).not.toBeNull();
+  });
+
+  it('accepts interrupted visibility only for the correlated strokes actually shown', () => {
+    const evidence = new CuaTaskEvidence();
+    evidence.beginGuidanceTask(taskEpoch);
+    const request = evidence.beginGuidanceRequest(2, identity);
+    if (!request) {
+      throw new Error('Missing live guidance request');
+    }
+    const interrupted = {
+      ...completedGuide,
+      receipt: {
+        ...completedGuide.receipt,
+        interrupted: true,
+        strokes_presented: [{ stroke_index: 0, trace_progress: 0.2, hold_ms_observed: 0 }],
+      },
+    };
+    expect(evidence.settleGuidanceRequest(request, result(interrupted))).toBe(true);
+    expect(evidence.readTeachingResult('Visible start')).toEqual({
+      outcome: 'demonstrated',
+      answer: 'Visible start',
     });
   });
 
   it('keeps takeover terminal after later observations and rejects replay', () => {
     const evidence = new CuaTaskEvidence();
     evidence.beginGuidanceTask(taskEpoch);
-    const request = evidence.beginGuidanceRequest(2);
+    const request = evidence.beginGuidanceRequest(2, identity);
     if (!request) {
       throw new Error('Missing live guidance request');
     }
@@ -240,13 +306,13 @@ describe('positive V2 teaching evidence', () => {
     );
     evidence.record('get_desktop_state', result({}));
     evidence.record('verify_state', result({ status: 'satisfied' }));
-    expect(evidence.beginGuidanceRequest(2)).toBeNull();
+    expect(evidence.beginGuidanceRequest(2, identity)).toBeNull();
     expect(evidence.readTeachingResult('Done')).toEqual({
       outcome: 'canceled',
       reason: 'user_takeover',
     });
     evidence.beginGuidanceTask(sequenceId);
-    expect(evidence.beginGuidanceRequest(1)).not.toBeNull();
+    expect(evidence.beginGuidanceRequest(1, identity)).not.toBeNull();
     expect(evidence.settleGuidanceRequest(request, result(completedGuide))).toBe(false);
   });
 });

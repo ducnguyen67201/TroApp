@@ -521,7 +521,19 @@ it('pairs actual model messages and function output in readable development exch
             name: 'present_teaching_step',
             arguments: JSON.stringify({
               instruction: 'Move your pointer to the bottom edge.',
-              cue: { steps: [{ kind: 'circle', center: { x: 0.5, y: 0.98 } }] },
+              cue: {
+                drawing: {
+                  strokes: [
+                    {
+                      points: [
+                        { x: 0.5, y: 0.9 },
+                        { x: 0.6, y: 0.98 },
+                      ],
+                      closed: false,
+                    },
+                  ],
+                },
+              },
             }),
           },
         ],

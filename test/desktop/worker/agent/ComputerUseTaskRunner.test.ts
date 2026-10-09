@@ -40,16 +40,6 @@ async function createRunner(log: Logger = pino({ level: 'silent' })) {
       if (Object.values(DesktopObservationTool).some((tool) => tool === name)) {
         return { content: [], structuredContent: observation() };
       }
-      if (name === CursorCompanionTool.REFRESH_CAPTURE) {
-        return {
-          content: [],
-          structuredContent: {
-            matched: !scene.targetChanged,
-            capture_id: scene.targetChanged ? null : 'refreshed',
-            reason: scene.targetChanged ? 'target_changed' : 'target_unchanged',
-          },
-        };
-      }
       if (name === 'get_desktop_state') {
         return {
           content: [{ type: 'image', data: 'aW1hZ2U=', mimeType: 'image/png' }],
@@ -69,11 +59,13 @@ async function createRunner(log: Logger = pino({ level: 'silent' })) {
         return {
           content: [],
           structuredContent: {
-            presentation_versions: [1, 2],
+            presentation_versions: [3],
             task_lifecycle: true,
+            paired_presentation: true,
             display_scope: 'primary',
-            gestures: ['circle'],
-            max_steps: 8,
+            gestures: ['scribble'],
+            max_strokes: 3,
+            max_points_per_stroke: 32,
             max_duration_ms: 15000,
           },
         };
@@ -102,22 +94,6 @@ async function createRunner(log: Logger = pino({ level: 'silent' })) {
             task_epoch: epoch,
             following: true,
             active: false,
-          },
-        };
-      }
-      if (name === CursorCompanionTool.SHOW_SEQUENCE) {
-        return {
-          content: [],
-          structuredContent: {
-            status: 'completed',
-            following: true,
-            active: false,
-            receipt: {
-              presentation_version: 2,
-              task_epoch: epoch,
-              sequence_id: '22222222-2222-4222-8222-222222222222',
-              completed_steps: 1,
-            },
           },
         };
       }

@@ -36,6 +36,17 @@ export function createLesson() {
     instruction: 'Click the address bar.',
     expectedResult: 'Address bar is focused',
     action: { kind: 'click', target: { label: 'Address bar', bounds } },
+    drawing: {
+      strokes: [
+        {
+          points: [
+            { x: 0.1, y: 0.2 },
+            { x: 0.2, y: 0.2 },
+          ],
+          closed: false,
+        },
+      ],
+    },
   };
   return {
     lesson,

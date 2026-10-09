@@ -18,7 +18,6 @@ export const TeachingFailureCode = {
   OBSERVATION_TOOL_FAILED: 'observation_tool_failed',
   OBSERVATION_INVALID_SNAPSHOT: 'observation_invalid_snapshot',
   OBSERVATION_OWNER_MISMATCH: 'observation_owner_mismatch',
-  CAPTURE_REFRESH_FAILED: 'capture_refresh_failed',
   CAPTURE_BASELINE_MISSING: 'capture_baseline_missing',
   COMPANION_RENEWAL_FAILED: 'companion_renewal_failed',
   COMPANION_MODE_FAILED: 'companion_mode_failed',
@@ -52,8 +51,6 @@ const FailureMessages = {
     'The model exhausted presentation repairs without an acknowledged message and required drawing. Teaching cannot wait on a chat-only spatial instruction.',
   [TeachingFailureCode.MODEL_INPUT_INVALID]:
     'The model exhausted the teaching proposal correction limit. Inspect invalidFields for the rejected contract fields.',
-  [TeachingFailureCode.CAPTURE_REFRESH_FAILED]:
-    'The native cue comparison failed or returned invalid metadata. Inspect nativeResult for the driver diagnostic.',
   [TeachingFailureCode.OBSERVATION_READY_TIMEOUT]:
     'The native observer accepted the watch but did not report a usable screen frame before the readiness deadline.',
   [TeachingFailureCode.OBSERVATION_TOOL_FAILED]: 'The native desktop watch tool returned an error.',

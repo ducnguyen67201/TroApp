@@ -8,6 +8,7 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 import { TaskContext } from '../../../../src/desktop/worker/execution/TaskContext.js';
 import { LoggedCuaServer } from '../../../../src/desktop/worker/cua/LoggedCuaServer.js';
+import { DesktopLocale } from '#contracts/DesktopLocale.js';
 import { enableAgentExchangeLog } from '../../../../src/desktop/worker/agent/AgentExchangeLog.js';
 
 it('logs the comparison input and failing cue region without screenshots or pixel colors', async () => {
@@ -36,21 +37,22 @@ it('logs the comparison input and failing cue region without screenshots or pixe
           },
         };
       }
-      if (name === 'refresh_cursor_guidance_capture') {
+      if (name === 'present_teaching_guidance') {
         return {
+          isError: true,
           content: [{ type: 'text', text: 'guidance_capture_comparison' }],
           structuredContent: {
-            matched: false,
-            capture_id: null,
+            status: 'refused',
+            code: 'fresh_observation_required',
             reason: 'target_changed',
-            diagnostics: {
+            comparison_diagnostics: {
               matched: false,
               capture_width_px: 1000,
               capture_height_px: 800,
               regions: [
                 {
-                  step_index: 0,
-                  step_kind: 'circle',
+                  region_index: 0,
+                  region_kind: 'stroke',
                   bounds_px: [400, 300, 600, 500],
                   compared_pixels: 40000,
                   changed_pixels: 2,
@@ -67,16 +69,38 @@ it('logs the comparison input and failing cue region without screenshots or pixe
     });
   try {
     await server.callToolResult('get_desktop_state', {});
-    const result = await server.showTeachingCue({
-      capture_id: 'original-capture',
-      presentation_version: 2,
-      steps: [{ kind: 'circle', center: { x: 0.5, y: 0.5 }, radius: 0.04, duration_ms: 300 }],
-    });
+    const result = await server.showTeachingCue(
+      {
+        capture_id: 'original-capture',
+        presentation_id: '33333333-3333-4333-8333-333333333333',
+        presentation_version: 3,
+        text_only: false,
+        drawing: {
+          strokes: [
+            {
+              points: [
+                { x: 0.4, y: 0.4 },
+                { x: 0.6, y: 0.6 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      },
+      {
+        lessonId: '11111111-1111-4111-8111-111111111111',
+        stepId: '22222222-2222-4222-8222-222222222222',
+        sequence: 1,
+        kind: 'instruction',
+        text: 'Highlight the synthetic target',
+      },
+      DesktopLocale.ENGLISH,
+    );
     expect(result.isError).toBe(true);
     const logs = lines.join('');
-    expect(logs).toContain('teaching.capture_comparison');
-    expect(logs).toContain('"cueSteps"');
-    expect(logs).toContain('"comparisonDiagnosticsAvailable":true');
+    expect(logs).toContain('cua.guidance.capture_refreshed');
+    expect(logs).toContain('"drawing"');
+    expect(logs).toContain('"region_kind":"stroke"');
     expect(logs).toContain('"changed_pixels":2');
     expect(logs).toContain('"first_changed_pixel":[500,400]');
     expect(logs).toContain('"bounds_px":[400,300,600,500]');

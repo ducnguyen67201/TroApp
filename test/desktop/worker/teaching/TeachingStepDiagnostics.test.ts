@@ -11,7 +11,12 @@ it('logs action/receipt identities and lengths without instructional or screen c
     instruction: 'private-instruction',
     expectedResult: 'private-result',
   });
-  expect(diagnostic).toMatchObject({ actionKind: 'click', checkpointId: null });
+  expect(diagnostic).toMatchObject({
+    actionKind: 'click',
+    checkpointId: null,
+    strokeCount: 1,
+    pointCount: 2,
+  });
   const message = describeTeachingMessage({
     lessonId: 'private-lesson',
     stepId: 'private-step',

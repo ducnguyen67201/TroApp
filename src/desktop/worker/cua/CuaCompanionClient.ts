@@ -33,18 +33,12 @@ export class CuaCompanionClient {
       {},
     );
     const parsed = CursorCompanionCapabilitiesSchema.safeParse(capabilities.structuredContent);
-    if (
-      capabilities.isError ||
-      !parsed.success ||
-      !parsed.data.task_lifecycle ||
-      !parsed.data.paired_presentation ||
-      !parsed.data.presentation_versions.includes(2)
-    ) {
+    if (capabilities.isError || !parsed.success) {
       throw new GuidanceTaskError(GuidanceReason.UNSUPPORTED_VERSION);
     }
     const result = await this.transport.callHostTool(CursorCompanionTool.BEGIN_TASK, {
       task_epoch: taskEpoch,
-      presentation_version: 2,
+      presentation_version: 3,
     });
     const state = CursorGuidanceTaskSchema.parse(result.structuredContent);
     if (result.isError || state.status !== 'task_ready' || state.task_epoch !== taskEpoch) {
@@ -60,7 +54,6 @@ export class CuaCompanionClient {
     if (
       result.isError &&
       terminal.success &&
-      terminal.data.status !== 'completed' &&
       terminal.data.status !== 'presented' &&
       terminal.data.task_epoch === taskEpoch
     ) {

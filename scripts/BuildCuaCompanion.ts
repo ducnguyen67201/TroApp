@@ -47,28 +47,37 @@ try {
   console.log('Building the pinned native Cua companion…');
   // Cargo resolves toolchain/runtime settings from its normal environment;
   // the only task override is a Tro-owned build cache, not user configuration.
-  const nativeTests = await runFile(
-    'cargo',
-    [
-      'test',
-      '--locked',
-      '-p',
-      'cua-driver',
-      '-p',
-      'cua-driver-contract',
-      '-p',
-      'cua-driver-core',
-      '-p',
-      'cursor-overlay',
-      '-p',
-      'platform-macos',
-      'companion',
-      '--target-dir',
-      targetDirectory,
-    ],
-    { cwd: rustDirectory, maxBuffer: 16 * 1024 * 1024 },
-  );
-  console.log(nativeTests.stdout.trim());
+  // Include transport and session lifecycle checks when changing control dispatch.
+  const nativeTestSelections = [
+    {
+      packages: [
+        'cua-driver',
+        'cua-driver-contract',
+        'cua-driver-core',
+        'cursor-overlay',
+        'platform-macos',
+      ],
+      filter: 'companion',
+    },
+    { packages: ['cua-driver'], filter: 'proxy::tests::' },
+    { packages: ['cua-driver'], filter: 'mcp_envelope::tests::' },
+    { packages: ['cua-driver-core'], filter: 'session::tests::' },
+  ] as const;
+  for (const selection of nativeTestSelections) {
+    const nativeTests = await runFile(
+      'cargo',
+      [
+        'test',
+        '--locked',
+        ...selection.packages.flatMap((packageName) => ['-p', packageName]),
+        selection.filter,
+        '--target-dir',
+        targetDirectory,
+      ],
+      { cwd: rustDirectory, maxBuffer: 16 * 1024 * 1024 },
+    );
+    console.log(nativeTests.stdout.trim());
+  }
   await runFile(
     'cargo',
     ['build', '--locked', '--release', '-p', 'cua-driver', '--target-dir', targetDirectory],

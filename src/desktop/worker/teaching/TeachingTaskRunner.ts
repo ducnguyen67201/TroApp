@@ -171,7 +171,6 @@ export class TeachingTaskRunner {
           true,
         ),
     );
-    this.server.setTeachingPresenterRequired(true);
     this.server.setObservationListener((result) => {
       this.observation.recordCapture(result);
       lesson.recordObservation(result);
@@ -412,7 +411,6 @@ export class TeachingTaskRunner {
     } finally {
       this.lesson = null;
       this.receiveStep = undefined;
-      this.server.setTeachingPresenterRequired(false);
       this.server.setObservationListener(null);
       this.server.setPreviewAdmission(null);
       this.companion.setFollowingFailureListener(null);
@@ -440,6 +438,8 @@ export class TeachingTaskRunner {
       }
     });
     let started = false;
+    let segmentActive = true;
+    const isSegmentActive = (): boolean => segmentActive;
     try {
       await this.waitForStableScreen(signal);
       await this.companion.beginGuidanceTask(epoch);
@@ -473,8 +473,14 @@ export class TeachingTaskRunner {
               });
             },
             presentStep: async (proposal) => {
+              if (!isSegmentActive()) {
+                return { admitted: false, reason: 'presentation_superseded' };
+              }
               const baseline = this.observation.readBaseline();
               const current = await this.observation.read();
+              if (!isSegmentActive()) {
+                return { admitted: false, reason: 'presentation_superseded' };
+              }
               if (
                 baseline &&
                 (baseline.input_revision !== current.input_revision || current.buttons_down)
@@ -520,10 +526,17 @@ export class TeachingTaskRunner {
       }
       return { reply, inputCount: input.length };
     } finally {
+      segmentActive = false;
+      presenter.endSegment();
       this.companion.setFollowingFailureListener(null);
-      await this.server.settleCalls();
-      if (started && !signal.aborted) {
-        await this.endGuidanceSegment(epoch);
+      try {
+        // End the native epoch first so any pending drawing loses its render fence.
+        if (started && !signal.aborted) {
+          await this.endGuidanceSegment(epoch);
+        }
+      } finally {
+        this.server.endTeachingTask();
+        await this.server.settleCalls();
       }
     }
   }

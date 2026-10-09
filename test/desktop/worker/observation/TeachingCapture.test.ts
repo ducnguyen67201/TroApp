@@ -25,18 +25,18 @@ describe('local renewal of every grounded teaching cue', () => {
     const capture = new TeachingCapture(() => nowMs);
     capture.recordDesktopCapture(createCapture(), { max_image_dimension: 1200 });
     nowMs = 500;
-    expect(capture.readRefreshRequest({ capture_id: 'original-capture' })).toEqual({
+    expect(capture.readPresentationCapture({ capture_id: 'original-capture' })).toEqual({
       captureId: 'original-capture',
       ageMs: 500,
       observationArgs: { max_image_dimension: 1200 },
     });
     nowMs = 6000;
-    const request = capture.readRefreshRequest({ capture_id: 'original-capture' });
+    const request = capture.readPresentationCapture({ capture_id: 'original-capture' });
     expect(request?.ageMs).toBe(6000);
     expect(JSON.stringify(request)).not.toContain('aW1hZ2U=');
-    expect(capture.readRefreshRequest({ capture_id: 'unobserved-capture' })).toBeNull();
+    expect(capture.readPresentationCapture({ capture_id: 'unobserved-capture' })).toBeNull();
     capture.reset();
-    expect(capture.readRefreshRequest({ capture_id: 'original-capture' })).toBeNull();
+    expect(capture.readPresentationCapture({ capture_id: 'original-capture' })).toBeNull();
   });
 
   it('rejects refused, missing and malformed capture sources', () => {
@@ -48,7 +48,7 @@ describe('local renewal of every grounded teaching cue', () => {
       { ...createCapture(), structuredContent: { ...metadata, scale_factor: 0 } },
     ] satisfies CallToolResult[]) {
       capture.recordDesktopCapture(invalid, {});
-      expect(capture.readRefreshRequest({ capture_id: 'original-capture' })).toBeNull();
+      expect(capture.readPresentationCapture({ capture_id: 'original-capture' })).toBeNull();
     }
   });
 });

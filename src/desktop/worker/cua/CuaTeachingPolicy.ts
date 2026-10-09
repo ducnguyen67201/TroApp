@@ -15,12 +15,12 @@ const TeachingTools = new Set<string>([
   'get_browser_state',
   'verify_state',
   'bring_to_front',
-  CursorCompanionTool.SHOW_SEQUENCE,
   CursorCompanionTool.READ_STATE,
   CursorCompanionTool.READ_CAPABILITIES,
 ]);
 const HostTools = new Set<string>([
-  CursorCompanionTool.REFRESH_CAPTURE,
+  CursorCompanionTool.PRESENT_GUIDANCE,
+  CursorCompanionTool.CANCEL_SEQUENCE,
   ...Object.values(CompanionHudTool),
   ...Object.values(DesktopObservationTool),
   CursorCompanionTool.SET_MODE,

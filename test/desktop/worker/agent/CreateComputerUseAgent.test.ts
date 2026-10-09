@@ -29,6 +29,12 @@ describe('computer-use agent tools', () => {
       'revise_teaching_goal',
       'present_teaching_step',
     ]);
+    const presentationTool = agent.tools.find((tool) => tool.name === 'present_teaching_step');
+    expect(presentationTool?.type).toBe('function');
+    if (presentationTool?.type === 'function') {
+      expect(presentationTool.parameters.required).toContain('drawing');
+      expect(JSON.stringify(presentationTool.parameters)).toContain('strokes');
+    }
     expect(agent.outputType).toBe(TeachingReplySchema);
     expect(agent.modelSettings.toolChoice).toBeUndefined();
     expect(agent.resetToolChoice).toBe(true);

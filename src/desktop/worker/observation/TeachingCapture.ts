@@ -27,7 +27,7 @@ interface DesktopCapture {
   captureId: string;
 }
 
-export interface CaptureRefreshRequest extends DesktopCapture {
+export interface PresentationCapture extends DesktopCapture {
   ageMs: number;
   observationArgs: z.infer<typeof CaptureOptionsSchema>;
 }
@@ -50,7 +50,7 @@ function readDesktopCapture(result: CallToolResult): DesktopCapture | null {
 
 /**
  * Retains the latest capture ID and safe options, never screenshot content.
- * Every grounded cue requests a fresh, local native comparison before dispatch.
+ * Each presentation forwards these options to its native refresh/comparison.
  */
 export class TeachingCapture {
   private capture: DesktopCapture | null = null;
@@ -76,7 +76,7 @@ export class TeachingCapture {
     this.receivedAtMs = this.readTime();
   }
 
-  readRefreshRequest(args: Record<string, unknown> | null): CaptureRefreshRequest | null {
+  readPresentationCapture(args: Record<string, unknown> | null): PresentationCapture | null {
     const capture = this.capture;
     const ageMs = this.readTime() - this.receivedAtMs;
     if (!capture || args?.['capture_id'] !== capture.captureId) {

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DesktopObservationRegionSchema } from './DesktopObservation.js';
+import { TeachingDrawingSchema } from './TeachingDrawing.js';
 
 export const TeachingMessageKind = {
   INSTRUCTION: 'instruction',
@@ -99,16 +100,33 @@ export const TeachingActionSchema = z.discriminatedUnion('kind', [
 
 export type TeachingAction = z.infer<typeof TeachingActionSchema>;
 
-export const PresentTeachingStepSchema = z.strictObject({
-  captureId: z.string().min(1).max(256),
-  goalRevisionId: z.uuid(),
-  checkpointId: z.uuid().nullable(),
-  previousStepAssessment: z.enum(TeachingAssessment).nullable(),
-  assessmentEvidence: z.string().trim().min(1).max(600),
-  instruction: z.string().trim().min(1).max(TeachingPresentationLimits.MAX_CHARACTERS),
-  expectedResult: z.string().trim().min(1).max(750),
-  action: TeachingActionSchema,
-});
+export const PresentTeachingStepSchema = z
+  .strictObject({
+    captureId: z.string().min(1).max(256),
+    goalRevisionId: z.uuid(),
+    checkpointId: z.uuid().nullable(),
+    previousStepAssessment: z.enum(TeachingAssessment).nullable(),
+    assessmentEvidence: z.string().trim().min(1).max(600),
+    instruction: z.string().trim().min(1).max(TeachingPresentationLimits.MAX_CHARACTERS),
+    expectedResult: z.string().trim().min(1).max(750),
+    action: TeachingActionSchema,
+    drawing: TeachingDrawingSchema.nullable(),
+  })
+  .superRefine((proposal, context) => {
+    const isTextOnly =
+      proposal.action.kind === TeachingActionKind.KEYBOARD ||
+      proposal.action.kind === TeachingActionKind.WAIT ||
+      (proposal.action.kind === TeachingActionKind.TYPE && proposal.action.focused);
+    if (isTextOnly !== (proposal.drawing === null)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['drawing'],
+        message: isTextOnly
+          ? 'Keyboard, focused typing and loading waits require drawing: null.'
+          : 'Spatial actions require a drawing with valid strokes.',
+      });
+    }
+  });
 
 export type PresentTeachingStep = z.infer<typeof PresentTeachingStepSchema>;
 

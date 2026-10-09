@@ -8,6 +8,9 @@ export function describeTeachingProposal(proposal: PresentTeachingStep) {
     goalRevisionId: proposal.goalRevisionId,
     checkpointId: proposal.checkpointId,
     previousStepAssessment: proposal.previousStepAssessment,
+    strokeCount: proposal.drawing?.strokes.length ?? 0,
+    pointCount:
+      proposal.drawing?.strokes.reduce((count, stroke) => count + stroke.points.length, 0) ?? 0,
   };
 }
 

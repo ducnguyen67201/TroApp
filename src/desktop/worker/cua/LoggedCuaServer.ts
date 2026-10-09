@@ -26,19 +26,16 @@ import {
   CursorCompanionTool,
   AgentTaskMode,
   CursorGuidanceRequestHeaderSchema,
+  GuidanceComparisonDiagnosticsSchema,
+  GuidancePresentationRefusalSchema,
+  GuidanceTimingSchema,
   GuidanceReason,
 } from '#contracts/CursorCompanion.js';
 import { canCallCuaTool, isCursorPresentationTool } from './CuaTeachingPolicy.js';
 import { DesktopObservationTool } from '#contracts/DesktopObservation.js';
 import type { GuidanceRequest } from './CuaTaskEvidence.js';
-import { GuidanceCaptureRefreshSchema } from '#contracts/CursorCompanion.js';
-import {
-  TeachingFailure,
-  TeachingFailureCode,
-  describeTeachingFailure,
-} from '../teaching/TeachingFailure.js';
 import { TeachingCapture } from '../observation/TeachingCapture.js';
-import type { TeachingMessage } from '#contracts/TeachingStep.js';
+import { TeachingMessageSchema, type TeachingMessage } from '#contracts/TeachingStep.js';
 import type { DesktopLocale } from '#contracts/DesktopLocale.js';
 
 type CuaTool = Awaited<ReturnType<MCPServerStdio['listTools']>>[number];
@@ -362,23 +359,10 @@ export function describeCuaResult(value: unknown): {
       ? { code }
       : {}),
     ...(status !== null &&
-    /^(satisfied|unsatisfied|unknown|refused|completed|canceled|failed)$/.test(status)
+    /^(satisfied|unsatisfied|unknown|refused|presented|completed|canceled|failed)$/.test(status)
       ? { status }
       : {}),
   };
-}
-
-function validatePreviewResult(toolName: string, result: CallToolResult): CallToolResult {
-  if (toolName !== CursorCompanionTool.SHOW_SEQUENCE || result.isError) {
-    return result;
-  }
-  const state = CursorCompanionStateSchema.safeParse(result.structuredContent);
-  return state.success && state.data.status === 'completed'
-    ? result
-    : {
-        isError: true,
-        content: [{ type: 'text', text: 'Cua did not acknowledge completed visual playback.' }],
-      };
 }
 
 /** The SDK's default MCP path sends content only. Cua puts targeting IDs and
@@ -397,7 +381,6 @@ function includeCuaMetadata(result: CallToolResult): CallToolResult {
 
 /** Trace the real SDK-to-Cua MCP boundary; the SDK calls this method for each tool. */
 export class LoggedCuaServer extends MCPServerStdio {
-  private requiresTeachingPresenter = false;
   private hudGroup: string | undefined;
 
   setHudGroup(group: string): void {
@@ -416,10 +399,6 @@ export class LoggedCuaServer extends MCPServerStdio {
     }
   }
 
-  setTeachingPresenterRequired(required: boolean): void {
-    this.requiresTeachingPresenter = required;
-  }
-
   readTeachingCaptureId(): string | null {
     return this.teachingCapture.readCaptureId();
   }
@@ -430,12 +409,17 @@ export class LoggedCuaServer extends MCPServerStdio {
     message?: TeachingMessage,
     locale?: DesktopLocale,
   ): Promise<CallToolResult> {
-    return this.callTeachingTool(CursorCompanionTool.SHOW_SEQUENCE, {
-      ...args,
-      ...(this.hudGroup && message && locale
-        ? { hud_group: this.hudGroup, teaching_locale: locale, teaching_message: message }
-        : {}),
-    });
+    return this.callTeachingTool(
+      CursorCompanionTool.PRESENT_GUIDANCE,
+      {
+        ...args,
+        ...(this.hudGroup ? { hud_group: this.hudGroup } : {}),
+        ...(message && locale ? { teaching_locale: locale, teaching_message: message } : {}),
+      },
+      undefined,
+      undefined,
+      true,
+    );
   }
   readonly taskEvidence = new CuaTaskEvidence();
   private readonly teachingCapture = new TeachingCapture();
@@ -443,12 +427,14 @@ export class LoggedCuaServer extends MCPServerStdio {
 
   private refuseStaleCapture(
     validationReason: string = 'input_or_geometry_changed',
+    identity: { presentationId?: string; captureId?: string } = {},
   ): CallToolResult {
     this.log.warn(
       {
-        toolName: CursorCompanionTool.SHOW_SEQUENCE,
+        toolName: CursorCompanionTool.PRESENT_GUIDANCE,
         reasonCode: 'fresh_observation_required',
         validationReason,
+        ...identity,
       },
       'cua.guidance.refused',
     );
@@ -503,7 +489,6 @@ export class LoggedCuaServer extends MCPServerStdio {
 
   hasCompanionTools(): boolean {
     return [
-      'show_cursor_sequence',
       'set_cursor_companion_mode',
       'cancel_cursor_sequence',
       'get_cursor_companion_state',
@@ -515,6 +500,7 @@ export class LoggedCuaServer extends MCPServerStdio {
       CursorCompanionTool.READ_CAPABILITIES,
       CursorCompanionTool.BEGIN_TASK,
       CursorCompanionTool.END_TASK,
+      CursorCompanionTool.PRESENT_GUIDANCE,
     ].every((name) => this.discoveredTools?.has(name));
   }
 
@@ -608,6 +594,7 @@ export class LoggedCuaServer extends MCPServerStdio {
 
   private task: TaskContext | null = null;
   private pendingCalls: Promise<void> = Promise.resolve();
+  private readonly pendingTeachingCalls = new Set<Promise<void>>();
   private nextDispatch = 0;
 
   bindTask(task: TaskContext | null): void {
@@ -631,6 +618,9 @@ export class LoggedCuaServer extends MCPServerStdio {
 
   async settleCalls(): Promise<void> {
     await this.pendingCalls;
+    while (this.pendingTeachingCalls.size > 0) {
+      await Promise.all([...this.pendingTeachingCalls]);
+    }
   }
 
   constructor(
@@ -651,15 +641,7 @@ export class LoggedCuaServer extends MCPServerStdio {
     );
     this.taskEvidence.setReadOnlyTools(tools.filter(isReadOnlyCuaTool).map((tool) => tool.name));
     return tools
-      .filter(
-        (tool) =>
-          canCallCuaTool(tool.name, this.taskMode) &&
-          !(
-            this.taskMode === AgentTaskMode.TEACH &&
-            this.requiresTeachingPresenter &&
-            tool.name === CursorCompanionTool.SHOW_SEQUENCE
-          ),
-      )
+      .filter((tool) => canCallCuaTool(tool.name, this.taskMode))
       .map((tool) => {
         const required = z.array(z.string()).default([]).parse(tool.inputSchema.required);
         const properties = { ...tool.inputSchema.properties };
@@ -673,15 +655,11 @@ export class LoggedCuaServer extends MCPServerStdio {
         delete properties.presentation_id;
         delete properties.targets;
         delete properties.text_only;
-        const guided =
-          this.taskMode === AgentTaskMode.TEACH && tool.name === CursorCompanionTool.SHOW_SEQUENCE;
         return prepareCuaToolForAgent({
           ...tool,
           inputSchema: {
             ...tool.inputSchema,
-            properties: guided
-              ? { ...properties, presentation_version: { type: 'integer', const: 2 } }
-              : properties,
+            properties,
             required: [
               ...new Set([
                 ...required.filter(
@@ -699,7 +677,6 @@ export class LoggedCuaServer extends MCPServerStdio {
                       'text_only',
                     ].includes(name),
                 ),
-                ...(guided ? ['presentation_version'] : []),
               ]),
             ],
           },
@@ -713,18 +690,18 @@ export class LoggedCuaServer extends MCPServerStdio {
     meta?: Record<string, unknown> | null,
     options?: MCPCallToolOptions,
   ): Promise<CallToolResult> {
+    if (toolName === CursorCompanionTool.PRESENT_GUIDANCE) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'Use present_teaching_step to publish an instruction with its cue.',
+          },
+        ],
+      };
+    }
     if (this.taskMode === AgentTaskMode.TEACH) {
-      if (this.requiresTeachingPresenter && toolName === CursorCompanionTool.SHOW_SEQUENCE) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: 'text',
-              text: 'Use present_teaching_step to publish an instruction with its cue.',
-            },
-          ],
-        };
-      }
       if (
         args &&
         [
@@ -867,7 +844,7 @@ export class LoggedCuaServer extends MCPServerStdio {
             }
           : options,
       );
-      const result = validatePreviewResult(toolName, native);
+      const result = native;
       this.taskEvidence.record(toolName, result);
       const recorded = this.taskEvidence.recordToolResult(call, args, result);
       task?.recordProgress(recorded.fingerprint, recorded.observations.length > 0);
@@ -918,11 +895,32 @@ export class LoggedCuaServer extends MCPServerStdio {
     args: Record<string, unknown> | null,
     meta?: Record<string, unknown> | null,
     options?: MCPCallToolOptions,
+    trustedPresentation = false,
+  ): Promise<CallToolResult> {
+    const call = this.executeTeachingTool(toolName, args, meta, options, trustedPresentation);
+    const settled = call.then(
+      () => {},
+      () => {},
+    );
+    this.pendingTeachingCalls.add(settled);
+    void settled.then(() => {
+      this.pendingTeachingCalls.delete(settled);
+    });
+    return call;
+  }
+
+  private async executeTeachingTool(
+    toolName: string,
+    args: Record<string, unknown> | null,
+    meta?: Record<string, unknown> | null,
+    options?: MCPCallToolOptions,
+    trustedPresentation = false,
   ): Promise<CallToolResult> {
     let guidanceRequest: GuidanceRequest | null = null;
     let dispatchArgs = args;
     if (
-      !canCallCuaTool(toolName, this.taskMode) ||
+      (!canCallCuaTool(toolName, this.taskMode) &&
+        !(trustedPresentation && toolName === CursorCompanionTool.PRESENT_GUIDANCE)) ||
       (this.taskMode === AgentTaskMode.TEACH && this.taskEvidence.hasTerminalGuidance()) ||
       (this.taskMode === AgentTaskMode.TEACH && this.taskEvidence.hasPendingGuidance()) ||
       (args !== null &&
@@ -948,28 +946,46 @@ export class LoggedCuaServer extends MCPServerStdio {
       }
       return includeCuaMetadata(result);
     }
-    if (this.taskMode === AgentTaskMode.TEACH && toolName === CursorCompanionTool.SHOW_SEQUENCE) {
+    if (toolName === CursorCompanionTool.PRESENT_GUIDANCE) {
       const parsed = CursorGuidanceRequestHeaderSchema.safeParse(args);
-      if (parsed.success) {
+      const identity = z
+        .object({
+          presentation_id: z.uuid(),
+          teaching_message: TeachingMessageSchema,
+        })
+        .safeParse(args);
+      if (parsed.success && identity.success) {
+        const capture = this.teachingCapture.readPresentationCapture(args);
+        if (!capture) {
+          return this.refuseStaleCapture('unobserved_capture', {
+            presentationId: identity.data.presentation_id,
+          });
+        }
         if (this.previewAdmission && !(await this.previewAdmission())) {
-          return this.refuseStaleCapture();
+          return this.refuseStaleCapture('input_or_geometry_changed', {
+            presentationId: identity.data.presentation_id,
+            captureId: capture.captureId,
+          });
         }
-        try {
-          const refreshed =
-            args?.['text_only'] === true ? { args } : await this.refreshGuidanceCapture(args);
-          if ('refusal' in refreshed) {
-            return refreshed.refusal;
-          }
-          dispatchArgs = refreshed.args;
-        } catch (error) {
-          // SDK tool errors can become model-visible text. Latch and abort the
-          // segment so a broken boundary cannot be retried by the model.
-          this.taskEvidence.failGuidance(GuidanceReason.TRANSPORT_FAILED);
-          this.log.error({ ...describeTeachingFailure(error) }, 'cua.guidance.refresh_failed');
-          this.onTeachingTerminal?.();
-          throw error;
-        }
-        guidanceRequest = this.taskEvidence.beginGuidanceRequest(parsed.data.steps.length);
+        dispatchArgs = { ...args, ...capture.observationArgs };
+        guidanceRequest = this.taskEvidence.beginGuidanceRequest(
+          parsed.data.drawing?.strokes.length ?? 0,
+          {
+            presentationId: identity.data.presentation_id,
+            lessonId: identity.data.teaching_message.lessonId,
+            stepId: identity.data.teaching_message.stepId,
+          },
+        );
+        this.log.debug(
+          {
+            toolName,
+            presentationId: identity.data.presentation_id,
+            captureId: capture.captureId,
+            captureAgeMs: Math.round(capture.ageMs),
+            strokeCount: parsed.data.drawing?.strokes.length ?? 0,
+          },
+          'cua.guidance.prepared',
+        );
       }
       if (!guidanceRequest) {
         this.taskEvidence.failGuidance(GuidanceReason.INVALID_REQUEST);
@@ -979,7 +995,7 @@ export class LoggedCuaServer extends MCPServerStdio {
           content: [
             {
               type: 'text',
-              text: 'A live V2 guidance task and explicit presentation_version: 2 are required.',
+              text: 'A live V3 guidance task and a host-bound presentation are required.',
             },
           ],
         };
@@ -997,8 +1013,28 @@ export class LoggedCuaServer extends MCPServerStdio {
       if (toolName === 'bring_to_front') {
         this.teachingCapture.reset();
       }
-      let result = guidanceRequest ? native : validatePreviewResult(toolName, native);
+      let result = native;
       if (guidanceRequest) {
+        const comparison = z
+          .object({ comparison_diagnostics: GuidanceComparisonDiagnosticsSchema })
+          .safeParse(native.structuredContent);
+        const timing = z
+          .object({ timings_ms: GuidanceTimingSchema })
+          .safeParse(native.structuredContent);
+        const refusal = GuidancePresentationRefusalSchema.safeParse(native.structuredContent);
+        this.log[native.isError ? 'warn' : 'debug'](
+          {
+            toolName,
+            presentationId: guidanceRequest.presentationId,
+            durationMs: Math.round(performance.now() - startedAt),
+            comparisonDiagnostics: comparison.success
+              ? comparison.data.comparison_diagnostics
+              : null,
+            timingsMs: timing.success ? timing.data.timings_ms : null,
+            ...(refusal.success ? { validationReason: refusal.data.reason } : {}),
+          },
+          'cua.guidance.capture_refreshed',
+        );
         const valid = this.taskEvidence.settleGuidanceRequest(guidanceRequest, result);
         if (!valid && !result.isError) {
           result = {
@@ -1063,83 +1099,6 @@ export class LoggedCuaServer extends MCPServerStdio {
       );
       throw error;
     }
-  }
-
-  /** One host read, no extra model turn or native replay after a terminal result. */
-  private async refreshGuidanceCapture(
-    args: Record<string, unknown> | null,
-  ): Promise<{ args: Record<string, unknown> | null } | { refusal: CallToolResult }> {
-    const request = this.teachingCapture.readRefreshRequest(args);
-    if (!request) {
-      return { refusal: this.refuseStaleCapture('unobserved_capture') };
-    }
-    const startedAt = performance.now();
-    const refreshed = await this.callTaskTool(CursorCompanionTool.REFRESH_CAPTURE, {
-      ...request.observationArgs,
-      capture_id: request.captureId,
-      steps: args?.['steps'],
-      ...(args?.['targets'] ? { targets: args['targets'] } : {}),
-    });
-    const comparison = GuidanceCaptureRefreshSchema.safeParse(refreshed.structuredContent);
-    if (refreshed.isError || !comparison.success) {
-      this.log.error(
-        {
-          toolName: CursorCompanionTool.REFRESH_CAPTURE,
-          input: { captureId: request.captureId, captureAgeMs: Math.round(request.ageMs) },
-          output: describeCuaResult(refreshed),
-          invalidFields: comparison.success
-            ? []
-            : comparison.error.issues.map((issue) => issue.path.map(String).join('.')).slice(0, 8),
-        },
-        'cua.guidance.comparison.failed',
-      );
-      throw new TeachingFailure(
-        TeachingFailureCode.CAPTURE_REFRESH_FAILED,
-        GuidanceReason.TRANSPORT_FAILED,
-        {
-          toolName: CursorCompanionTool.REFRESH_CAPTURE,
-          nativeResult: describeCuaResult(refreshed),
-        },
-      );
-    }
-    const canShow = comparison.data.matched && !this.taskEvidence.hasTerminalGuidance();
-    const comparisonDetails = {
-      captureAgeMs: Math.round(request.ageMs),
-      durationMs: Math.round(performance.now() - startedAt),
-      matched: canShow,
-      validationReason: comparison.data.reason,
-      comparisonDiagnosticsAvailable: comparison.data.diagnostics !== undefined,
-      comparisonDiagnostics: comparison.data.diagnostics ?? null,
-      ...describeCuaResult(refreshed),
-    };
-    if (canShow) {
-      this.log.debug(comparisonDetails, 'cua.guidance.capture_refreshed');
-    } else {
-      this.log.warn(comparisonDetails, 'cua.guidance.capture_refreshed');
-    }
-    logAgentExchange(this.log, {
-      operation: 'teaching.capture_comparison',
-      context: { toolName: CursorCompanionTool.REFRESH_CAPTURE },
-      input: {
-        captureId: request.captureId,
-        captureAgeMs: Math.round(request.ageMs),
-        observationOptions: request.observationArgs,
-        cueSteps: args?.['steps'],
-      },
-      output: {
-        ...comparison.data,
-        canShow,
-        terminalGuidance: this.taskEvidence.hasTerminalGuidance(),
-      },
-    });
-    if (!canShow) {
-      return { refusal: this.refuseStaleCapture(comparison.data.reason) };
-    }
-    // Input/display may change while the fresh capture and comparison run.
-    if (this.previewAdmission && !(await this.previewAdmission())) {
-      return { refusal: this.refuseStaleCapture() };
-    }
-    return { args: { ...args, capture_id: comparison.data.capture_id } };
   }
 
   private async callTaskTool(
