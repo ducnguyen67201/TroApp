@@ -905,3 +905,144 @@ it('allocates new captured episodes above retained orders after earlier episodes
     await policyStore.close();
   }
 });
+
+it('pins live link hand-ins to their accepted course revision and counts them against the approved plan', async () => {
+  const data = await fixture();
+  await insights.store.appendRecord({
+    classId: data.classId,
+    actorId: data.teacherId,
+    sourceId: randomUUID(),
+    imported: false,
+    recordedAt: '2026-10-08T12:00:00.000Z',
+    record: data.record,
+    expectedVersion: 0,
+  });
+  const activityId = data.record.value.activityIds[0];
+  if (!activityId) {
+    throw new Error('Missing activity.');
+  }
+  const meeting = await client.classroomMeeting.create({
+    data: {
+      id: randomUUID(),
+      classId: data.classId,
+      status: 'live',
+      phase: 'practice',
+      pacing: 'teacher',
+      currentActivityId: activityId,
+    },
+  });
+  const participation = await client.classroomParticipation.create({
+    data: {
+      id: randomUUID(),
+      classSessionId: meeting.id,
+      studentId: data.studentId,
+      deviceId: randomUUID(),
+      leaseUntil: new Date('2026-10-09'),
+    },
+  });
+  const attempt = await client.classroomAttempt.create({
+    data: { id: randomUUID(), participationId: participation.id, activityId, evidence: [] },
+  });
+  const collecting = createPrismaClassroomStore(environment.DATABASE_URL, {
+    captureClassIds: [data.classId],
+  });
+  try {
+    await collecting.store.saveSubmission(
+      {
+        id: randomUUID(),
+        attemptId: attempt.id,
+        url: 'https://scratch.mit.edu/projects/123/',
+        submittedAt: '2026-10-08T12:01:00.000Z',
+      },
+      randomUUID(),
+    );
+  } finally {
+    await collecting.close();
+  }
+  const packet = await insights.store.readPacket(data.classId, window);
+  expect(packet.submissions[0]?.courseRevisionId).toBe(data.record.value.courseRevisionId);
+  const { calculateStudentProgress } =
+    await import('../../../src/server/features/classroom/domain/CalculateStudentProgress.js');
+  const progress = calculateStudentProgress(packet, data.studentId);
+  expect(progress.assigned).toBe(1);
+  expect(progress.handedIn).toBe(1);
+});
+
+it('atomically invalidates retained reports on course and roster changes while collection is disabled', async () => {
+  const data = await fixture();
+  await insights.store.appendRecord({
+    classId: data.classId,
+    actorId: data.teacherId,
+    sourceId: randomUUID(),
+    imported: false,
+    recordedAt: '2026-10-08T12:00:00.000Z',
+    record: data.record,
+    expectedVersion: 0,
+  });
+  const { ClassroomInsightService } =
+    await import('../../../src/server/features/classroom/application/ClassroomInsightService.js');
+  const { ReportStatus } = await import('#contracts/ClassroomInsights.js');
+  const service = new ClassroomInsightService(
+    insights.store,
+    { captureClassIds: [data.classId] },
+    () => new Date('2026-10-09T12:00:00.000Z'),
+  );
+  const reportId = randomUUID();
+  const created = await service.execute(data.teacherId, {
+    kind: 'create-parent-report',
+    classId: data.classId,
+    requestId: randomUUID(),
+    id: reportId,
+    studentId: data.studentId,
+    window,
+  });
+  if (created.kind !== 'parent-report') {
+    throw new Error('Missing report.');
+  }
+  const approved = await service.execute(data.teacherId, {
+    kind: 'approve-parent-report',
+    classId: data.classId,
+    requestId: randomUUID(),
+    id: reportId,
+    expectedVersion: created.report.version,
+  });
+  if (approved.kind !== 'parent-report') {
+    throw new Error('Missing approved report.');
+  }
+  expect(approved.report.status).toBe(ReportStatus.APPROVED);
+  const nextCourse = await classrooms.store.saveCourse(
+    data.teacherId,
+    'Updated course',
+    createCourseContent(),
+  );
+  const originalPrivacy = (await insights.store.readPacket(data.classId, window)).privacyRevision;
+  await expect(
+    classrooms.store.runAtomically(async (store) => {
+      await store.updateClassCourse(data.classId, nextCourse.id);
+      throw new Error('Abort course update');
+    }),
+  ).rejects.toThrow('Abort course update');
+  expect((await classrooms.store.readClass(data.classId))?.courseRevisionId).toBe(
+    data.record.value.courseRevisionId,
+  );
+  expect((await insights.store.readPacket(data.classId, window)).privacyRevision).toBe(
+    originalPrivacy,
+  );
+  await classrooms.store.updateClassCourse(data.classId, nextCourse.id);
+  const afterCourse = (await insights.store.readPacket(data.classId, window)).privacyRevision;
+  expect(BigInt(afterCourse)).toBe(BigInt(originalPrivacy) + 1n);
+  await classrooms.store.enrollStudent(data.classId, data.studentId, false);
+  await classrooms.store.enrollStudent(data.classId, data.studentId, true);
+  expect(BigInt((await insights.store.readPacket(data.classId, window)).privacyRevision)).toBe(
+    BigInt(afterCourse) + 2n,
+  );
+  await expect(
+    service.execute(data.teacherId, {
+      kind: 'export-parent-report',
+      classId: data.classId,
+      requestId: randomUUID(),
+      id: reportId,
+      expectedVersion: approved.report.version,
+    }),
+  ).rejects.toMatchObject({ code: 'stale' });
+});
