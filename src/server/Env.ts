@@ -13,6 +13,9 @@ export interface ServerEnv {
   GOOGLE_CLIENT_ID?: string | undefined;
   GOOGLE_CLIENT_SECRET?: string | undefined;
   OPENAI_API_KEY?: string | undefined;
+  CLASSROOM_INSIGHT_CLASS_IDS?: string[];
+  CLASSROOM_INSIGHT_COLLECTION_POLICY?: string | undefined;
+  CLASSROOM_INSIGHT_RETENTION_DAYS?: number | undefined;
   PRACTICE_CHECK_MODEL?: string;
   PRACTICE_CHECK_DAILY_LIMIT?: number;
   PRACTICE_CHECK_MINUTE_LIMIT?: number;
@@ -42,6 +45,15 @@ export function readServerEnv(environment: NodeJS.ProcessEnv): ServerEnv {
       GOOGLE_CLIENT_ID: z.string().min(1).optional(),
       GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
       OPENAI_API_KEY: z.string().min(20).optional(),
+      CLASSROOM_INSIGHT_CLASS_IDS: z
+        .string()
+        .max(100000)
+        .default('')
+        .transform((value) => (value.trim() === '' ? [] : value.split(',').map((id) => id.trim())))
+        .pipe(z.array(z.uuid()).max(200))
+        .refine((ids) => new Set(ids).size === ids.length),
+      CLASSROOM_INSIGHT_COLLECTION_POLICY: z.string().trim().min(1).max(200).optional(),
+      CLASSROOM_INSIGHT_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).optional(),
       PRACTICE_CHECK_MODEL: z.string().min(1).max(100).default('gpt-5.4'),
       PRACTICE_CHECK_DAILY_LIMIT: z.coerce.number().int().min(1).max(100).default(30),
       PRACTICE_CHECK_MINUTE_LIMIT: z.coerce.number().int().min(1).max(10).default(5),
@@ -106,6 +118,14 @@ export function readServerEnv(environment: NodeJS.ProcessEnv): ServerEnv {
 
   if (Boolean(validated.GOOGLE_CLIENT_ID) !== Boolean(validated.GOOGLE_CLIENT_SECRET)) {
     throw new Error('Google sign-in needs both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.');
+  }
+
+  if (
+    validated.CLASSROOM_INSIGHT_CLASS_IDS.length > 0 &&
+    (!validated.CLASSROOM_INSIGHT_COLLECTION_POLICY ||
+      validated.CLASSROOM_INSIGHT_RETENTION_DAYS === undefined)
+  ) {
+    throw new Error('Classroom insight capture requires a collection policy and retention period.');
   }
 
   return validated;
