@@ -119,49 +119,6 @@ teacher results show the exact saved evidence/version. A live class must end bef
 confirmed deletion. Class deletion preserves work/history; removing a material
 preserves originals referenced by approved revisions.
 
-### Learning insights pilot
-
-Capture is disabled by default. To enable reviewed classes, configure backend-only
-`CLASSROOM_INSIGHT_CLASS_IDS` with a comma-separated class UUID allowlist,
-`CLASSROOM_INSIGHT_COLLECTION_POLICY` with the center's documented collection-policy
-identifier, and `CLASSROOM_INSIGHT_RETENTION_DAYS` with its approved rolling retention
-duration. [Env.ts](src/server/Env.ts) validates these together. Choose the duration
-with the center before enabling collection. The approved duration is retained so
-removing a class from the capture allowlist continues its expiry policy.
-Startup and periodic bounded retention
-remove expired learning content and invalidate cached reports; this also applies
-to the existing private work snapshots for classes with a retained policy. Review legacy
-standalone workspace values separately when they have no recorded save date.
-
-Open **Learning insights** in an enabled class. As the teacher, approve an assigned
-learning plan and roster, inspect a student's lesson chart and saved work, and
-select a next task. Approve skills and comparable task variants before recording
-individual fresh, delayed or transfer checks. Students can view their own journey
-and explicitly request help during joined Practice; teachers record interventions
-and the reported outcome. Missing support stays unknown.
-
-Parent reports freeze one child's sourced facts and lesson table. Add commentary,
-review and approve the exact revision, then use **Export** to save print-ready HTML
-through the native dialog. Editing clears approval. Corrections, changed referenced
-definitions, removal or expiry require a new draft. Charts and report templates
-use deterministic calculations and require no model key. PDF, AI wording, parent
-delivery and center-wide analytics are future work.
-
-Historical import is read-only by default and does not recover overwritten progress
-or unrecorded help. With the intended backend configuration selected:
-
-```sh
-doppler run -- node --conditions=development --import tsx scripts/BackfillClassroomInsights.ts CLASS_UUID
-```
-
-After reviewing the dry-run counts, add `--apply` to import retained checks and
-snapshot/link hand-ins in resumable batches. Apply requires that class's explicit
-capture policy and enforces retention first. Missing historical assignment and
-support data remain visible as partial coverage. Keep collection disabled during
-mixed-version upgrades until sources reconcile; an older writer can omit events.
-Review [Architecture](docs/Architecture.md#learning-history-and-parent-reports) for
-the owning contracts and current limits.
-
 ## Validation
 
 Finish all related edits, then run the required checks:

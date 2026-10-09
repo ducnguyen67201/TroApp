@@ -371,7 +371,7 @@ Student reads require current enrollment and return that student's progress and
 assigned plans. Help requests additionally require main's private joined-device
 binding, a current lease and the permitted live Practice activity.
 
-Capture defaults to disabled. Backend configuration selects permitted classes,
+Capture defaults to disabled. [Backend configuration](../src/server/Env.ts) selects permitted classes,
 the reviewed collection-policy identifier and a rolling retention duration.
 `PrismaClassroomStore` and `PrismaPracticeCheckStore` append accepted progress,
 confirmed snapshot/link hand-ins, check admission and terminal results inside the
@@ -454,8 +454,10 @@ approved policy in bounded startup and periodic batches. The state store retains
 the policy identifier and duration, so disabling capture does not disable expiry
 for previously enabled classes. Expiry removes old
 private source content, marks partial coverage and retains minimal source markers
-so backfill cannot restore expired or removed work. Operator backfill is explicit,
-bounded and idempotent; it recovers retained checks and hand-ins without inventing
+so backfill cannot restore expired or removed work. [Operator backfill](../scripts/BackfillClassroomInsights.ts)
+is read-only by default; explicit apply requires the class's approved collection
+policy. Keep capture disabled during mixed-version upgrades until sources reconcile.
+Backfill is bounded and idempotent; it recovers retained checks and hand-ins without inventing
 overwritten progress, assignment eligibility or unrecorded support. Current attempt
 writes record their save time for expiry. Legacy standalone workspace values with
 no dated source have unknown age and require operator review; the new policy does
