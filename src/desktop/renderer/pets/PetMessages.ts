@@ -19,7 +19,7 @@ const english = {
   quietHint: 'Turn off occasional encouragement.',
   reduced: 'Reduce motion',
   reducedHint: 'Use still poses. Otherwise, follow your system preference.',
-  hint: 'Click a preview to pet it, or right-click for a playful slap. You can also interact with the desktop pet and drag it to move. One pet is active at a time.',
+  hint: 'Click a cat or fox to see its expressions. Slime also reacts to right-clicks. Drag the desktop pet to move it. Reduced motion keeps cats and foxes still. One pet is active at a time.',
   error: 'Could not update your pet. Try again.',
   unavailable: 'Pet controls are unavailable. Reopen Tro and try again.',
   presentationError:
@@ -51,7 +51,7 @@ const vietnamese: PetMessages = {
   quietHint: 'Tắt lời động viên thỉnh thoảng xuất hiện.',
   reduced: 'Giảm chuyển động',
   reducedHint: 'Dùng hình tĩnh. Nếu tắt, làm theo cài đặt hệ thống.',
-  hint: 'Nhấp vào hình thú cưng để vuốt ve, hoặc nhấp chuột phải để vỗ nhẹ. Bạn cũng có thể tương tác với thú cưng trên màn hình và kéo để di chuyển. Mỗi lần chỉ hiện một thú cưng.',
+  hint: 'Nhấp vào mèo hoặc cáo để xem biểu cảm. Slime còn phản ứng khi nhấp chuột phải. Kéo thú cưng trên màn hình để di chuyển. Chế độ giảm chuyển động giữ mèo và cáo đứng yên. Mỗi lần chỉ hiện một thú cưng.',
   error: 'Không thể cập nhật thú cưng. Hãy thử lại.',
   unavailable: 'Chưa thể dùng thú cưng. Hãy mở lại Tro và thử lại.',
   presentationError:

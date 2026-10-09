@@ -22,7 +22,7 @@
   border-radius: 12px;
   cursor: pointer;
 }
-.pet-card-preview:focus-visible {
+.pet-card-preview button:focus-visible {
   outline: 2px solid var(--mantine-color-text);
   outline-offset: 3px;
 }
@@ -134,4 +134,31 @@ body.pet-document {
   .pet-gallery {
     grid-template-columns: 1fr;
   }
+}
+
+.pet-mascot,
+.pet-mascot-still,
+.pet-mascot-button {
+  display: block;
+  width: 96px;
+  height: 96px;
+}
+.pet-mascot-still {
+  background-size: 300% 300%;
+  background-position: 50% 50%;
+  background-repeat: no-repeat;
+}
+.pet-mascot-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.pet-hit-region button {
+  border-radius: 50%;
+  touch-action: none;
+  cursor: grab !important;
+}
+.pet-hit-region button:active {
+  cursor: grabbing !important;
 }

@@ -646,7 +646,21 @@ typed and voice tasks. The optional pet is composed separately by `PetController
 and `PetWindow`: account-scoped local preferences, bundled raster assets, restricted
 preload and a sandboxed transparent window. It hides during agent work and voice
 capture, captures no screen and makes no model request. Generated pets and cloud
-collections are not implemented.
+collections are not implemented. `PetPresentation.ts` selects one shared
+`PetRenderer` implementation for the gallery and overlay. The stateless
+`PageMascotRenderer` class adapts the pinned, unmodified `page-mascot` dependency
+for bundled cat/fox direction and reaction sheets; slime retains `PetSprite`.
+`PetMascot` applies app/OS motion preferences through the renderer contract.
+Provider rendering and supported reaction controls belong to the adapter, so
+switching the implementation in `PetPresentation.ts` requires no gallery or
+overlay provider branches. The package owns click expressions, while Tro owns drag
+suppression, localized accessible names and a static center pose when app or OS
+reduced motion is enabled. Cat/fox reactions are local to the clicked surface;
+remote Pet/Slap controls and right-click reactions remain slime-only. Pointer
+tracking is renderer-local, not desktop-wide. Existing pet IDs, names and saved
+preferences remain compatible. Asset provenance and the MIT notice live in
+`src/desktop/assets/pets/PageMascotLicense.txt`; packaging includes that notice in
+the renderer resources.
 
 `AppUpdateController` owns update lifecycle and admission through an injected port;
 `ElectronAppUpdater` adapts the installed app's configured HTTPS feed. Updates are

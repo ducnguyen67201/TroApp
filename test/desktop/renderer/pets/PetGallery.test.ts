@@ -113,8 +113,8 @@ it('lets hidden pet previews react locally without adopting or showing them', as
   const bridge = createBridge();
   Object.defineProperty(window, 'tro', { configurable: true, value: bridge });
   renderGallery();
-  const fox = await screen.findByRole('region', { name: 'Fox' });
-  const preview = within(fox).getByRole('button', { name: 'Pet Maple' });
+  const slime = await screen.findByRole('region', { name: 'Slime' });
+  const preview = within(slime).getByRole('button', { name: 'Pet Jelly' });
   fireEvent.click(preview);
   expect(preview.querySelector('img')?.dataset.reaction).toBe(PetReaction.HAPPY);
   fireEvent.contextMenu(preview);
@@ -137,5 +137,50 @@ it('keeps a failed adoption visible and retryable instead of pretending it was s
   fireEvent.click(within(fox).getByRole('button', { name: 'Adopt pet' }));
   await waitFor(() => {
     expect(bridge.controlPet).toHaveBeenCalledTimes(2);
+  });
+});
+
+it('offers remote reaction controls only for slime', async () => {
+  const bridge = createBridge();
+  Object.defineProperty(window, 'tro', { configurable: true, value: bridge });
+  renderGallery();
+  await screen.findByRole('region', { name: 'Fox' });
+  expect(screen.queryByRole('button', { name: 'Playful slap' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Pet' })).toBeNull();
+  expect(screen.getByText(/Slime also reacts to right-clicks/)).toBeTruthy();
+});
+
+it('lets fox reactions stay local without adopting or showing a pet', async () => {
+  const bridge = createBridge();
+  Object.defineProperty(window, 'tro', { configurable: true, value: bridge });
+  renderGallery();
+  const fox = await screen.findByRole('region', { name: 'Fox' });
+  const preview = within(fox).getByRole('button', { name: 'Pet Maple' });
+  fireEvent.click(preview);
+  expect(bridge.controlPet).not.toHaveBeenCalled();
+  expect(preview.querySelector('button')).toBeNull();
+  fireEvent.contextMenu(preview);
+  expect(bridge.controlPet).not.toHaveBeenCalled();
+});
+
+it('uses the renderer capability to keep slime remote reaction controls available', async () => {
+  const bridge = createBridge();
+  bridge.readPets.mockResolvedValue({
+    kind: 'ok',
+    snapshot: {
+      ...initialSnapshot,
+      isVisible: true,
+      preferences: { ...initialSnapshot.preferences, activePetId: PetId.SLIME, enabled: true },
+    },
+  });
+  Object.defineProperty(window, 'tro', { configurable: true, value: bridge });
+  renderGallery();
+  const slap = await screen.findByRole('button', { name: 'Playful slap' });
+  fireEvent.click(slap);
+  await waitFor(() => {
+    expect(bridge.controlPet).toHaveBeenCalledWith({
+      kind: PetAction.REACT,
+      reaction: PetReaction.STARTLED,
+    });
   });
 });

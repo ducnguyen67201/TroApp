@@ -1,11 +1,13 @@
 import { PetId } from '#contracts/Pet.js';
-import catImage from '../../assets/pets/Cat.png';
-import foxImage from '../../assets/pets/Fox.png';
+import catDirections from '../../assets/pets/CatDirections.webp';
+import catReactions from '../../assets/pets/CatReactions.webp';
+import foxDirections from '../../assets/pets/FoxDirections.webp';
+import foxReactions from '../../assets/pets/FoxReactions.webp';
 import slimeImage from '../../assets/pets/Slime.png';
 
-/** Only bundled raster images enter the first catalog. No user-supplied paths or URLs. */
+/** Asset provenance and permission notice live in assets/pets/PageMascotLicense.txt. */
 export const petCatalog = {
-  [PetId.CAT]: { imageUrl: catImage },
-  [PetId.FOX]: { imageUrl: foxImage },
+  [PetId.CAT]: { directions: catDirections, reactions: catReactions },
+  [PetId.FOX]: { directions: foxDirections, reactions: foxReactions },
   [PetId.SLIME]: { imageUrl: slimeImage },
-} satisfies Record<PetId, { imageUrl: string }>;
+};
