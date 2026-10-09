@@ -18,6 +18,10 @@ import {
   type PracticeReply,
 } from '#contracts/PracticeCheck.js';
 import { PracticeCheckApiClient } from './classroom/PracticeCheckApiClient.js';
+import { ClassroomInsightApiClient } from './classroom/ClassroomInsightApiClient.js';
+import { ClassroomInsightController } from './classroom/ClassroomInsightController.js';
+import { ParentReportExportController } from './classroom/ParentReportExportController.js';
+import { AtomicReportFile } from './classroom/AtomicReportFile.js';
 import {
   AccountCommandKind,
   AccountCommandSchema,
@@ -108,6 +112,8 @@ let pets: PetController | undefined;
 let petWindow: PetWindow | undefined;
 let chat: AgentChatController | undefined;
 let classroom: ClassroomSessionController | undefined;
+let classroomInsights: ClassroomInsightController | undefined;
+let parentReportExports: ParentReportExportController | undefined;
 let voice: VoiceInputController | undefined;
 let microphoneTests: MicrophoneTestLease | undefined;
 let desktopCompanion: DesktopCompanion | undefined;
@@ -525,6 +531,37 @@ async function startDesktop(): Promise<void> {
     (event) => isTrustedSender(event) && practiceShortcut.isAvailable(),
   );
   classroom = classroomController;
+  const insightApi = new ClassroomInsightApiClient(environment.API_BASE_URL, () =>
+    auth.readCookie(),
+  );
+  const insightController = new ClassroomInsightController(
+    insightApi,
+    accountGate,
+    classroomController,
+  );
+  classroomInsights = insightController;
+  const reportExports = new ParentReportExportController(
+    insightApi,
+    accountGate,
+    {
+      choose: async () => {
+        const destination = await dialog.showSaveDialog({
+          defaultPath: 'LearningReport.html',
+          filters: [{ name: 'Learning report', extensions: ['html'] }],
+        });
+        return destination.canceled ? null : destination.filePath;
+      },
+    },
+    new AtomicReportFile(),
+    () => auth.readCookie(),
+  );
+  parentReportExports = reportExports;
+  ipcMain.handle('tro:classroom-insights', (event, raw: unknown) =>
+    insightController.execute(raw, () => isTrustedSender(event)),
+  );
+  ipcMain.handle('tro:parent-report-export', (event, raw: unknown) =>
+    reportExports.export(raw, () => isTrustedSender(event)),
+  );
   agentWorker.setClassroomToolHandler((command, context) =>
     classroomController.executeTool(command, context),
   );
@@ -909,6 +946,8 @@ async function startDesktop(): Promise<void> {
       petController.dispose();
       overlay.closePet();
       classroomController.dispose();
+      insightController.dispose();
+      reportExports.dispose();
       disableVoice();
       if (!chat) {
         return { kind: 'failed', message: 'The sign-in request is invalid.' };
@@ -1124,6 +1163,8 @@ async function startDesktop(): Promise<void> {
       overlay.closePet();
       practiceShortcut.disable();
       classroom?.dispose();
+      classroomInsights?.dispose();
+      parentReportExports?.dispose();
       mainWindow = undefined;
       disableVoice();
       chat?.dispose();
@@ -1176,6 +1217,8 @@ app.on('before-quit', (event) => {
   pets?.dispose();
   petWindow?.dispose();
   classroom?.dispose();
+  classroomInsights?.dispose();
+  parentReportExports?.dispose();
   chat?.dispose();
   void desktopDriver
     .stop()

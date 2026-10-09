@@ -1,6 +1,12 @@
 import type { PetCommand, PetReply, PetSnapshot } from './Pet.js';
 import type { PracticeShortcutEvent } from './PracticeShortcut.js';
 import type { PracticeCommand, PracticeReply } from './PracticeCheck.js';
+import type {
+  ClassroomInsightCommand,
+  ClassroomInsightReply,
+  ParentReportExportCommand,
+  ParentReportExportReply,
+} from './ClassroomInsights.js';
 import type { AccountReply } from './DesktopAccounts.js';
 import type { MaterialCommand, MaterialReply, MaterialPreviewReply } from './ClassroomMaterials.js';
 import type {
@@ -46,6 +52,8 @@ export interface DesktopBridge {
   readPracticeShortcutAvailable?: () => Promise<boolean>;
   subscribePracticeShortcut?: (listener: (event: PracticeShortcutEvent) => void) => () => void;
   controlPractice?: (command: PracticeCommand) => Promise<PracticeReply>;
+  controlClassroomInsights?: (command: ClassroomInsightCommand) => Promise<ClassroomInsightReply>;
+  exportParentReport?: (command: ParentReportExportCommand) => Promise<ParentReportExportReply>;
   controlClassroom?: (command: ClassroomCommand) => Promise<ClassroomReply>;
   readPreparedClassroomSubmission?(): Promise<ClassroomReply>;
   updateTeachingLocale?: (sessionId: string, locale: DesktopLocale) => Promise<AgentResult>;

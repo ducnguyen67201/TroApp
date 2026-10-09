@@ -20,6 +20,7 @@ import { MaterialEditor } from './MaterialEditor.js';
 import type { ClassroomTranslate } from './ClassroomLabels.js';
 import { TeacherSessionPanel } from './TeacherSessionPanel.js';
 import { TeacherLiveLesson } from './TeacherLiveLesson.js';
+import { ClassroomInsightsPanel } from './ClassroomInsightsPanel.js';
 
 interface TeacherClassroomProps {
   home: ClassroomHome;
@@ -428,6 +429,15 @@ export function TeacherClassroomPanel({
                     ))}
                   </div>
                 </section>
+              )}
+              {isClassPage && selectedClass && (
+                <ClassroomInsightsPanel
+                  key={`${userId}:${selectedClass.schoolClass.id}`}
+                  userId={userId}
+                  classId={selectedClass.schoolClass.id}
+                  teacher
+                  classSessionId={liveMeeting?.id ?? null}
+                />
               )}
             </Stack>
           </Tabs.Panel>

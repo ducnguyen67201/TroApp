@@ -8,8 +8,62 @@ import {
 } from '../../../../src/desktop/main/classroom/ClassroomSessionController.js';
 import { ClassroomFailure, ClassroomPacing, type ClassroomReply } from '#contracts/Classroom.js';
 import { createTeachingContext } from '../../../server/features/classroom/ClassroomFixtures.js';
+import type {
+  ClassroomInsightCommand,
+  ClassroomInsightReply,
+} from '#contracts/ClassroomInsights.js';
 
 describe('desktop classroom binding', () => {
+  it('binds insight help to main’s current device and rejects another activity or stale replies', async () => {
+    const context = createTeachingContext();
+    const execute = vi
+      .fn<ClassroomApi['execute']>()
+      .mockResolvedValue({ kind: 'context', context });
+    const controller = new ClassroomSessionController({ execute }, () => {});
+    const send = vi
+      .fn<(command: ClassroomInsightCommand) => Promise<ClassroomInsightReply>>()
+      .mockResolvedValue({ kind: 'failed', code: 'unavailable' });
+    const id = randomUUID();
+    const command: ClassroomInsightCommand = {
+      kind: 'request-help',
+      classId: context.meeting.classId,
+      requestId: id,
+      id,
+      participationId: context.participation.id,
+      deviceId: randomUUID(),
+      activityId: context.activity.id,
+      criterionId: null,
+      category: 'Stop condition',
+    };
+    try {
+      await controller.execute({
+        kind: 'join',
+        classSessionId: context.meeting.id,
+        deviceId: randomUUID(),
+      });
+      await controller.executeInsights(command, send);
+      const privateDevice = execute.mock.calls.find(([request]) => request.kind === 'join')?.[0];
+      expect(send.mock.calls[0]?.[0]).toMatchObject({
+        deviceId: privateDevice && 'deviceId' in privateDevice ? privateDevice.deviceId : null,
+      });
+      expect(
+        await controller.executeInsights({ ...command, activityId: randomUUID() }, send),
+      ).toEqual({ kind: 'failed', code: 'forbidden' });
+      let finish: (reply: ClassroomInsightReply) => void = () => {};
+      send.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const pending = controller.executeInsights(command, send);
+      controller.dispose();
+      finish({ kind: 'failed', code: 'unavailable' });
+      expect(await pending).toEqual({ kind: 'failed', code: 'stale' });
+    } finally {
+      controller.dispose();
+    }
+  });
   it('replaces old context on teacher updates and fails closed on connection loss', async () => {
     const context = createTeachingContext();
     const invalidate = vi.fn<() => void>();

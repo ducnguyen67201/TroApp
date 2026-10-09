@@ -16,6 +16,7 @@ import { ClassSessionBadge } from './ClassSessionBadge.js';
 import { StudentActivityPanel } from './StudentActivityPanel.js';
 import { StudentMaterials } from './StudentMaterials.js';
 import type { ClassroomTranslate } from './ClassroomLabels.js';
+import { ClassroomInsightsPanel } from './ClassroomInsightsPanel.js';
 
 const StudentClassroomView = {
   CLASSES: 'classes',
@@ -259,7 +260,19 @@ export function StudentClassroomPanel({
               </Text>
             </div>
           </Tabs.Panel>
-          <Tabs.Panel value={StudentClassroomView.ACTIVITIES}>{sections}</Tabs.Panel>
+          <Tabs.Panel value={StudentClassroomView.ACTIVITIES}>
+            {sections}
+            {selected && (
+              <ClassroomInsightsPanel
+                key={`${userId}:${selected.schoolClass.id}`}
+                userId={userId}
+                classId={selected.schoolClass.id}
+                teacher={false}
+                classSessionId={joined?.meeting.id ?? null}
+                context={joined}
+              />
+            )}
+          </Tabs.Panel>
           <Tabs.Panel value={StudentClassroomView.MATERIALS}>
             {joined ? (
               <StudentMaterials context={joined} t={t} />

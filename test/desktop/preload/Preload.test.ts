@@ -19,8 +19,49 @@ vi.mock('electron', () => ({
   },
 }));
 
+it('exposes only validated feature commands and narrow parent export identity', async () => {
+  await import('../../../src/desktop/preload/Preload.js');
+  electron.invoke.mockClear();
+  const bridge = electron.expose.mock.calls[0]?.[1];
+  if (!bridge?.controlClassroomInsights || !bridge.exportParentReport) {
+    throw new Error('Missing insight bridge');
+  }
+  const id = '11111111-1111-4111-8111-111111111111';
+  electron.invoke.mockResolvedValue({
+    kind: 'status',
+    enabled: false,
+    teacher: true,
+    students: [],
+    activities: [],
+    plans: [],
+    mappings: [],
+  });
+  expect((await bridge.controlClassroomInsights({ kind: 'status', classId: id })).kind).toBe(
+    'status',
+  );
+  expect(electron.invoke).toHaveBeenCalledWith('tro:classroom-insights', {
+    kind: 'status',
+    classId: id,
+  });
+  const calls = electron.invoke.mock.calls.length;
+  expect(
+    await bridge.exportParentReport({ classId: '/private', reportId: id, expectedVersion: 1 }),
+  ).toEqual({ saved: false, code: 'unavailable' });
+  expect(electron.invoke.mock.calls).toHaveLength(calls);
+  electron.invoke.mockResolvedValue({ saved: true, code: null, path: '/private' });
+  expect(
+    await bridge.exportParentReport({ classId: id, reportId: id, expectedVersion: 1 }),
+  ).toEqual({ saved: false, code: 'unavailable' });
+  electron.invoke.mockResolvedValue({ kind: 'status', enabled: true, cookie: 'secret' });
+  expect(await bridge.controlClassroomInsights({ kind: 'status', classId: id })).toEqual({
+    kind: 'failed',
+    code: 'unavailable',
+  });
+});
+
 it('routes a validated lesson answer over the registered agent IPC and rejects malformed replies', async () => {
   await import('../../../src/desktop/preload/Preload.js');
+  electron.invoke.mockClear();
   const bridge = electron.expose.mock.calls[0]?.[1];
   if (!bridge) {
     throw new Error('Missing preload bridge');
