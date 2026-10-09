@@ -1,3 +1,7 @@
+import {
+  canCaptureClassroomLearning,
+  hasClassroomLearningCapture,
+} from '../features/classroom/application/ClassroomInsightPolicy.js';
 import { runClassroomTransactionWithRetries } from './RetryClassroomTransaction.js';
 import { InsightRecordKind } from '#contracts/ClassroomInsights.js';
 import {
@@ -61,7 +65,7 @@ class PrismaClassroomStore implements ClassroomStore {
       where: { classId },
       select: { classId: true },
     });
-    if (!retainedState && !this.capturePolicy.captureClassIds.includes(classId)) {
+    if (!retainedState && !canCaptureClassroomLearning(this.capturePolicy, classId)) {
       return;
     }
     await this.client.classroomInsightState.upsert({
@@ -527,7 +531,7 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async saveProgressEvent(attemptId: string, eventId: string) {
-    if (this.transact && this.capturePolicy.captureClassIds.length) {
+    if (this.transact && hasClassroomLearningCapture(this.capturePolicy)) {
       return this.runAtomically((store) => store.saveProgressEvent(attemptId, eventId));
     }
     await this.client.classroomProgressEvent.create({ data: { attemptId, eventId } });
@@ -577,7 +581,7 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async saveSubmission(receipt: SubmissionReceipt, idempotencyKey: string) {
-    if (this.transact && this.capturePolicy.captureClassIds.length) {
+    if (this.transact && hasClassroomLearningCapture(this.capturePolicy)) {
       return this.runAtomically((store) => store.saveSubmission(receipt, idempotencyKey));
     }
     await this.client.classroomSubmission.create({

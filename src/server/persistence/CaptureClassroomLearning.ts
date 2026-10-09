@@ -1,3 +1,4 @@
+import { canCaptureClassroomLearning } from '../features/classroom/application/ClassroomInsightPolicy.js';
 import { StudentAttemptSchema } from '#contracts/Classroom.js';
 import { createHash, randomUUID } from 'node:crypto';
 import {
@@ -53,7 +54,7 @@ async function recordCaptureCoverage(
   });
 }
 
-/** Capture is allowlisted, never inferred from browser activity or heartbeat timing. */
+/** Capture uses the configured class scope, never inferred from browser activity or heartbeat timing. */
 export async function capturePracticeAssessment(
   client: Prisma.TransactionClient,
   policy: LearningCapturePolicy,
@@ -67,7 +68,7 @@ export async function capturePracticeAssessment(
   const participation = snapshot.attempt.participation;
   const classId = participation.meeting.classId;
   if (
-    !policy.captureClassIds.includes(classId) ||
+    !canCaptureClassroomLearning(policy, classId) ||
     snapshot.expiredAt ||
     (await client.classroomExpiredSource.findFirst({
       where: { classId, sourceId: { in: [record.id, snapshot.id] } },
@@ -181,7 +182,7 @@ export async function captureClassroomSubmission(
   const classId = attempt.participation.meeting.classId,
     studentId = attempt.participation.studentId;
   if (
-    !policy.captureClassIds.includes(classId) ||
+    !canCaptureClassroomLearning(policy, classId) ||
     (await client.classroomExpiredSource.findFirst({
       where: { classId, sourceId: { in: [id, ...(snapshotId ? [snapshotId] : [])] } },
     })) ||
@@ -249,7 +250,7 @@ export async function captureClassroomProgress(
   const classId = attempt.participation.meeting.classId,
     studentId = attempt.participation.studentId;
   if (
-    !policy.captureClassIds.includes(classId) ||
+    !canCaptureClassroomLearning(policy, classId) ||
     (await client.classroomInsightRecord.findFirst({
       where: { classId, kind: InsightRecordKind.REMOVAL, studentId },
     }))

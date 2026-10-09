@@ -1,3 +1,5 @@
+import { DesktopPage } from '../navigation/DesktopRoute.js';
+import { ClassroomInsightsPage } from './ClassroomInsightsPage.js';
 import { usePracticeShortcut } from './UsePracticeShortcut.js';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import {
@@ -268,6 +270,7 @@ export function ClassroomPage({
     }
   }
 
+  const showsInsights = navigation.route.page === DesktopPage.INSIGHTS;
   const participantClasses =
     home?.classes.filter((entry) => entry.schoolClass.teacherId !== userId) ?? [];
   const enrollment = (
@@ -314,7 +317,9 @@ export function ClassroomPage({
               variant="subtle"
               size="lg"
               aria-label={t('All classes', 'Tất cả lớp học')}
-              onClick={navigation.openClassroom}
+              onClick={() => {
+                navigation.openClassroom(showsInsights);
+              }}
             >
               <IconArrowLeft size={20} />
             </ActionIcon>
@@ -322,13 +327,15 @@ export function ClassroomPage({
         )}
         <header className="classroom-page-heading">
           <h1>
-            {home?.role === AccountRole.TEACHER
-              ? (home.classes.find((entry) => entry.schoolClass.id === navigation.route.classId)
-                  ?.schoolClass.name ?? t('Your classroom', 'Lớp học của bạn'))
-              : `${t('Welcome', 'Chào bạn')}${userName ? `, ${userName.trim().split(' ')[0] ?? ''}` : ''}`}
+            {showsInsights
+              ? t('Learning insights', 'Tiến độ học tập')
+              : home?.role === AccountRole.TEACHER
+                ? (home.classes.find((entry) => entry.schoolClass.id === navigation.route.classId)
+                    ?.schoolClass.name ?? t('Your classroom', 'Lớp học của bạn'))
+                : `${t('Welcome', 'Chào bạn')}${userName ? `, ${userName.trim().split(' ')[0] ?? ''}` : ''}`}
           </h1>
         </header>
-        {navigation.route.classId === null && (
+        {!showsInsights && navigation.route.classId === null && (
           <TextInput
             className="classroom-search"
             aria-label={t('Find a class', 'Tìm lớp học')}
@@ -362,7 +369,7 @@ export function ClassroomPage({
         </Alert>
       )}
       {!home && <Text c="dimmed">{t('Loading your classroom…', 'Đang tải lớp học…')}</Text>}
-      {home?.role === AccountRole.TEACHER && (
+      {!showsInsights && home?.role === AccountRole.TEACHER && (
         <TeacherClassroomPanel
           refresh={refresh}
           error={error}
@@ -390,7 +397,7 @@ export function ClassroomPage({
           t={t}
         />
       )}
-      {home && home.role !== AccountRole.TEACHER && (
+      {!showsInsights && home && home.role !== AccountRole.TEACHER && (
         <StudentClassroomPanel
           home={home}
           navigation={navigation}
@@ -406,8 +413,19 @@ export function ClassroomPage({
           {...(onOpenWorkspace ? { onAskForHelp: onOpenWorkspace } : {})}
         />
       )}
+      {showsInsights && home && (
+        <ClassroomInsightsPage
+          home={home}
+          userId={userId}
+          classId={navigation.route.classId}
+          context={context}
+          t={t}
+        />
+      )}
       <details
-        hidden={home?.role === AccountRole.TEACHER && navigation.route.classId !== null}
+        hidden={
+          showsInsights || (home?.role === AccountRole.TEACHER && navigation.route.classId !== null)
+        }
         className="classroom-disclosure classroom-enrollment"
         open={(home?.role === AccountRole.STUDENT && participantClasses.length === 0) || undefined}
       >
@@ -418,7 +436,7 @@ export function ClassroomPage({
         </summary>
         {enrollment}
       </details>
-      {home?.role === AccountRole.TEACHER && participantClasses.length > 0 && (
+      {!showsInsights && home?.role === AccountRole.TEACHER && participantClasses.length > 0 && (
         <div className="classroom-enrolled-activity">
           <StudentClassroomPanel
             home={home}

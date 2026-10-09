@@ -106,38 +106,22 @@ it('validates configurable composition timeouts independently of the overall job
   );
 });
 
-it('keeps classroom insight capture disabled by default and validates an explicit policy', () => {
+it('provides classroom learning collection and retention defaults and validates overrides', () => {
   const base = { DATABASE_URL: databaseUrl, AUTH_SECRET: authSecret };
-  expect(readServerEnv(base).CLASSROOM_INSIGHT_CLASS_IDS).toEqual([]);
-  const classId = '00000000-0000-4000-8000-000000000001';
-  const secondClassId = '00000000-0000-4000-8000-000000000002';
+  expect(readServerEnv(base)).toMatchObject({
+    CLASSROOM_INSIGHT_COLLECTION_POLICY: 'classroom-learning-v1',
+    CLASSROOM_INSIGHT_RETENTION_DAYS: 180,
+  });
   expect(
     readServerEnv({
       ...base,
-      CLASSROOM_INSIGHT_CLASS_IDS: ` ${classId}, ${secondClassId} `,
       CLASSROOM_INSIGHT_COLLECTION_POLICY: 'pilot-v1',
-      CLASSROOM_INSIGHT_RETENTION_DAYS: '180',
+      CLASSROOM_INSIGHT_RETENTION_DAYS: '30',
     }),
   ).toMatchObject({
-    CLASSROOM_INSIGHT_CLASS_IDS: [classId, secondClassId],
     CLASSROOM_INSIGHT_COLLECTION_POLICY: 'pilot-v1',
-    CLASSROOM_INSIGHT_RETENTION_DAYS: 180,
+    CLASSROOM_INSIGHT_RETENTION_DAYS: 30,
   });
-  expect(() => readServerEnv({ ...base, CLASSROOM_INSIGHT_CLASS_IDS: classId })).toThrow(
-    'collection policy and retention period',
-  );
-  expect(() =>
-    readServerEnv({
-      ...base,
-      CLASSROOM_INSIGHT_CLASS_IDS: classId,
-      CLASSROOM_INSIGHT_COLLECTION_POLICY: 'pilot-v1',
-    }),
-  ).toThrow('collection policy and retention period');
-  for (const value of ['not-a-class', `${classId},`, `${classId},${classId}`]) {
-    expect(() => readServerEnv({ ...base, CLASSROOM_INSIGHT_CLASS_IDS: value })).toThrow(
-      'Backend configuration is invalid.',
-    );
-  }
   for (const value of ['0', '3651', '1.5', '']) {
     expect(() => readServerEnv({ ...base, CLASSROOM_INSIGHT_RETENTION_DAYS: value })).toThrow(
       'Backend configuration is invalid.',

@@ -55,9 +55,10 @@ async function startApi(): Promise<void> {
     }),
   );
   const capturePolicy = {
-    captureClassIds: environment.CLASSROOM_INSIGHT_CLASS_IDS ?? [],
-    collectionPolicy: environment.CLASSROOM_INSIGHT_COLLECTION_POLICY,
-    retentionDays: environment.CLASSROOM_INSIGHT_RETENTION_DAYS,
+    captureClassIds: [],
+    captureAllClasses: true,
+    collectionPolicy: environment.CLASSROOM_INSIGHT_COLLECTION_POLICY ?? 'classroom-learning-v1',
+    retentionDays: environment.CLASSROOM_INSIGHT_RETENTION_DAYS ?? 180,
   };
   const classroom = createPrismaClassroomStore(environment.DATABASE_URL, capturePolicy);
   const insights = createPrismaClassroomInsightStore(environment.DATABASE_URL, capturePolicy, {

@@ -1,3 +1,4 @@
+import { hasClassroomLearningCapture } from '../features/classroom/application/ClassroomInsightPolicy.js';
 import { runClassroomTransactionWithRetries } from './RetryClassroomTransaction.js';
 import { InsightRecordKind } from '#contracts/ClassroomInsights.js';
 import {
@@ -273,7 +274,7 @@ class PrismaPracticeCheckStore implements PracticeCheckStore {
     record: PracticeRecord,
     evidence: PracticeEvidence[],
   ): Promise<void> {
-    if (!this.inTransaction && this.capturePolicy.captureClassIds.length) {
+    if (!this.inTransaction && hasClassroomLearningCapture(this.capturePolicy)) {
       return this.runAtomically((store) =>
         store.createCheck(studentId, courseRevisionId, payloadDigest, record, evidence),
       );
@@ -335,7 +336,7 @@ class PrismaPracticeCheckStore implements PracticeCheckStore {
     ) {
       return false;
     }
-    if (!this.inTransaction && this.capturePolicy.captureClassIds.length) {
+    if (!this.inTransaction && hasClassroomLearningCapture(this.capturePolicy)) {
       return this.runAtomically((store) => store.finishCheck(record));
     }
     const changed = await this.client.classroomPracticeCheck.updateMany({
@@ -428,7 +429,7 @@ class PrismaPracticeCheckStore implements PracticeCheckStore {
     check: PracticeRecord,
     now: Date,
   ): Promise<WorkSubmission> {
-    if (!this.inTransaction && this.capturePolicy.captureClassIds.length) {
+    if (!this.inTransaction && hasClassroomLearningCapture(this.capturePolicy)) {
       return this.runAtomically((store) =>
         store.createSubmission(studentId, requestId, payloadDigest, check, now),
       );

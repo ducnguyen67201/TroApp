@@ -23,13 +23,10 @@ async function backfillClassroomInsights() {
       return;
     }
     if (
-      !environment.CLASSROOM_INSIGHT_CLASS_IDS?.includes(classId) ||
       !environment.CLASSROOM_INSIGHT_COLLECTION_POLICY ||
       environment.CLASSROOM_INSIGHT_RETENTION_DAYS === undefined
     ) {
-      throw new Error(
-        'Apply requires an allowlisted class and explicit collection and retention policies.',
-      );
+      throw new Error('Apply requires collection and retention policies.');
     }
     const policyStore = createPrismaClassroomInsightStore(environment.DATABASE_URL, {
       captureClassIds: [classId],

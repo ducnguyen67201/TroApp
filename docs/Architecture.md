@@ -484,8 +484,9 @@ Student reads require current enrollment and return that student's progress and
 assigned plans. Help requests additionally require main's private joined-device
 binding, a current lease and the permitted live Practice activity.
 
-Capture defaults to disabled. [Backend configuration](../src/server/Env.ts) selects permitted classes,
-the reviewed collection-policy identifier and a rolling retention duration.
+Learning insights are always available for authorized classes. [Backend configuration](../src/server/Env.ts)
+provides the collection-policy identifier and a rolling retention duration, with a
+default classroom learning policy and 180-day retention. No class allowlist is required.
 `PrismaClassroomStore` and `PrismaPracticeCheckStore` append accepted progress,
 confirmed snapshot/link hand-ins, check admission and terminal results inside the
 source transaction. Rejected or stale writes cannot create a learning event.
@@ -540,12 +541,13 @@ Delayed checks retain their earlier episode reference and elapsed time even when
 the earlier observation lies outside the displayed window. These are task
 observations, not a calibrated mastery estimate or a causal teacher rating.
 
-`ClassroomInsightsPanel` composes real server data in the existing teacher/student
-panels. Account, class, student and reporting-window changes fence late replies.
+`ClassroomInsightsPage` is available from the Insights navbar entry for teachers
+and students, with an authorized class picker. `ClassroomInsightsPanel` composes
+real server data there across sessions. Account, class, student and reporting-window changes fence late replies.
 The work gallery fetches selected evidence through the private API when opened.
 Teachers approve the learning plan, add comparable variants, choose a next task,
 record checks and maintain explicit help/intervention records. An unavailable
-optional bridge or disabled collection policy produces a useful disabled state.
+optional bridge or an older backend with disabled collection produces a useful unavailable state.
 
 `BuildParentReport` freezes sourced facts, chart rows and calculation identity;
 facts name recorded learning tasks and targets, explicit support and the approved
@@ -568,12 +570,13 @@ assignment eligibility references so removed children do not vanish from histori
 denominators. The separately authorized enrollment roster remains.
 `ClassroomInsightRetentionRunner` applies the
 approved policy in bounded startup and periodic batches. The state store retains
-the policy identifier and duration, so disabling capture does not disable expiry
-for previously enabled classes. Expiry removes old
+the policy identifier and duration, so previously collected sources continue to expire. The always-on runtime
+walks all classes in bounded batches, including classes created after startup. Expiry removes old
 private source content, marks partial coverage and retains minimal source markers
 so backfill cannot restore expired or removed work. [Operator backfill](../scripts/BackfillClassroomInsights.ts)
-is read-only by default; explicit apply requires the class's approved collection
-policy. Keep capture disabled during mixed-version upgrades until sources reconcile.
+is read-only by default; explicit apply uses the configured collection
+policy. Backfill remains an explicit operator action; enabling insights does not
+automatically import historical work.
 Backfill is bounded and idempotent; it recovers retained checks and hand-ins without inventing
 overwritten progress, assignment eligibility or unrecorded support. Current attempt
 writes record their save time for expiry. Legacy standalone workspace values with
@@ -583,8 +586,7 @@ not invent their date or prove that every legacy value meets the retention perio
 The system remains a modular monolith with provider-free dashboard calculations
 and deterministic report wording. Stored projections, a separate analytics worker,
 private object storage, cross-center roles, AI wording and PDF generation remain
-future scopes that require measured demand and their own validation. Enabling a
-real center still requires its collection decision and a reconciled pilot.
+future scopes that require measured demand and their own validation. A real center still requires its collection decision and a reconciled pilot.
 
 ## Local presentation and app updates
 

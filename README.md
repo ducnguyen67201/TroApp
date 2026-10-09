@@ -119,6 +119,13 @@ teacher results show the exact saved evidence/version. A live class must end bef
 confirmed deletion. Class deletion preserves work/history; removing a material
 preserves originals referenced by approved revisions.
 
+Classroom learning insights are always on. Select **Insights** in the navbar
+(**Tiến độ học tập** in Vietnamese), then choose a class to view student journeys,
+class summaries and teacher reports. Access follows class ownership/enrollment.
+Collection records accepted classroom work; historical work is not imported
+implicitly. Backend collection and retention settings live in
+[Env.ts](src/server/Env.ts), with 180-day retention by default.
+
 ## Validation
 
 Finish all related edits, then run the required checks:

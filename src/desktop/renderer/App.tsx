@@ -22,6 +22,7 @@ import {
 import {
   IconArrowRight,
   IconSchool,
+  IconChartBar,
   IconMicrophone,
   IconLayoutSidebar,
   IconLogout,
@@ -222,6 +223,23 @@ export function App(): ReactElement {
                 <span>{classroomLabel}</span>
               </UnstyledButton>
             )}
+            {user && (
+              <UnstyledButton
+                className="sidebar-link"
+                disabled={accountTransition}
+                data-active={
+                  (!dialogs.state.settings && page === DesktopPage.INSIGHTS) || undefined
+                }
+                aria-current={page === DesktopPage.INSIGHTS ? 'page' : undefined}
+                onClick={() => {
+                  closeDialog(DesktopDialog.SETTINGS);
+                  navigation.openClassroom(true);
+                }}
+              >
+                <IconChartBar size={19} stroke={1.6} />
+                <span>{locale === 'vi' ? 'Tiến độ học tập' : 'Insights'}</span>
+              </UnstyledButton>
+            )}
           </nav>
           <div className="sidebar-bottom">
             <AppUpdateButton
@@ -368,7 +386,7 @@ export function App(): ReactElement {
                   {messages.microphoneVoiceError}
                 </Alert>
               )}
-              <div hidden={page === DesktopPage.CLASSROOM && Boolean(user)}>
+              <div hidden={page !== DesktopPage.WORKSPACE && Boolean(user)}>
                 {user && permissions.status?.kind !== 'ready' ? (
                   <PermissionsOnboardingPage controller={permissions} />
                 ) : (
@@ -392,7 +410,7 @@ export function App(): ReactElement {
                       navigation.openWorkspace();
                     }
                   }}
-                  active={page === DesktopPage.CLASSROOM}
+                  active={page !== DesktopPage.WORKSPACE}
                   onRoleChange={setAccountRole}
                 />
               )}

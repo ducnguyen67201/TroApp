@@ -272,7 +272,8 @@ it('captures admission and terminal result in their source transaction with stab
   const { PracticeRecordSchema, PracticeCheckStatus } = await import('#contracts/PracticeCheck.js');
   const { createHash } = await import('node:crypto');
   const practice = createPrismaPracticeCheckStore(environment.DATABASE_URL, {
-    captureClassIds: [data.classId],
+    captureClassIds: [],
+    captureAllClasses: true,
   });
   const evidenceId = randomUUID(),
     text = 'Hello';
@@ -1045,4 +1046,34 @@ it('atomically invalidates retained reports on course and roster changes while c
       expectedVersion: approved.report.version,
     }),
   ).rejects.toMatchObject({ code: 'stale' });
+});
+
+it('registers retention for all classes including classes created after startup', async () => {
+  const policyStore = createPrismaClassroomInsightStore(environment.DATABASE_URL, {
+    captureClassIds: [],
+    captureAllClasses: true,
+    collectionPolicy: 'always-on-test',
+    retentionDays: 180,
+  });
+
+  async function completeCycle(): Promise<void> {
+    let more: boolean;
+    do {
+      more = (await policyStore.purgeExpiredSources(new Date('2026-10-09'))).more;
+    } while (more);
+  }
+
+  try {
+    await completeCycle();
+    const data = await fixture();
+    await completeCycle();
+    expect(
+      await client.classroomInsightState.findUnique({ where: { classId: data.classId } }),
+    ).toMatchObject({
+      collectionPolicy: 'always-on-test',
+      retentionDays: 180,
+    });
+  } finally {
+    await policyStore.close();
+  }
 });

@@ -476,3 +476,25 @@ describe('ClassroomInsightService authorization and report integrity', () => {
     expect(store.appendRecord).not.toHaveBeenCalled();
   });
 });
+
+it('enables all classes without an allowlist while keeping access checks', async () => {
+  const { store, packet } = createStore();
+  const service = new ClassroomInsightService(store, {
+    captureClassIds: [],
+    captureAllClasses: true,
+  });
+  await expect(
+    service.execute('teacher', { kind: 'status', classId: packet.classId }),
+  ).resolves.toMatchObject({ enabled: true });
+  await expect(
+    service.execute('teacher', {
+      kind: 'read-class-insights',
+      classId: packet.classId,
+      window: packet.window,
+    }),
+  ).resolves.toMatchObject({ kind: 'class-insights' });
+  store.readAccess.mockResolvedValue(null);
+  await expect(
+    service.execute('outsider', { kind: 'status', classId: packet.classId }),
+  ).rejects.toThrow();
+});
