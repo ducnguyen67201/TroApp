@@ -1,3 +1,4 @@
+import type { PracticeGrounding } from '#contracts/PracticeAssessment.js';
 import { randomUUID } from 'node:crypto';
 import {
   PracticeCheckStatus,
@@ -70,6 +71,14 @@ export class MemoryPracticeStore implements PracticeCheckStore {
   checks = new Map<string, StoredPracticeCheck>();
   evidence = new Map<string, PracticeEvidence[]>();
   submissions = new Map<string, { submission: WorkSubmission; payloadDigest: string }>();
+  readGrounding(access: PracticeAccess, rubric: PracticeCheckpoint): Promise<PracticeGrounding> {
+    return Promise.resolve({
+      courseRevisionId: access.courseRevisionId,
+      teacherInstructions: '',
+      sources: [],
+      missingSourceIds: rubric.criteria.flatMap((item) => item.sourceIds),
+    });
+  }
   private queue: Promise<unknown> = Promise.resolve();
   runAtomically<T>(work: (store: PracticeCheckStore) => Promise<T>): Promise<T> {
     const result = this.queue.then(() => work(this));

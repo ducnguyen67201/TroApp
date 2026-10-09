@@ -1,3 +1,5 @@
+import { PracticeFeedbackReview } from './PracticeFeedbackReview.js';
+import { PracticeCaptureControls } from './PracticeCaptureControls.js';
 import type { PracticeShortcutEvent } from '#contracts/PracticeShortcut.js';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import {
@@ -15,6 +17,8 @@ import {
 } from '@mantine/core';
 import { ClassroomPhase, type TeachingContext } from '#contracts/Classroom.js';
 import {
+  PracticeEvidenceKind,
+  PracticeEvidenceSchema,
   PracticeCheckStatus,
   PracticeFinding,
   PracticeLimits,
@@ -39,7 +43,9 @@ export function formatPracticeFinding(
 }
 
 async function readPracticeFile(file: File): Promise<PracticeEvidence> {
-  if (file.type === 'image/png' || file.type === 'image/jpeg') {
+  const isPdf = /\.pdf$/i.test(file.name);
+  const isScratch = /\.sb3$/i.test(file.name);
+  if (file.type === 'image/png' || file.type === 'image/jpeg' || isPdf || isScratch) {
     if (file.size > PracticeLimits.IMAGE_BYTES) {
       throw new Error('Image too large.');
     }
@@ -61,22 +67,28 @@ async function readPracticeFile(file: File): Promise<PracticeEvidence> {
     if (!base64) {
       throw new Error('Unreadable image.');
     }
-    return {
+    return PracticeEvidenceSchema.parse({
       id: crypto.randomUUID(),
-      kind: 'image',
+      kind: isPdf || isScratch ? PracticeEvidenceKind.DOCUMENT : PracticeEvidenceKind.IMAGE,
       name: file.name,
-      mediaType: file.type,
+      mediaType: isPdf
+        ? 'application/pdf'
+        : isScratch
+          ? 'application/x.scratch.sb3'
+          : file.type === 'image/png'
+            ? 'image/png'
+            : 'image/jpeg',
       base64,
-    };
+    });
   }
-  if (!/\.(txt|md|py|js|ts|html|css)$/i.test(file.name) || file.size > 48000) {
+  if (!/\.(txt|md|py|js|ts|html|css|sql)$/i.test(file.name) || file.size > 48000) {
     throw new Error('Unsupported file.');
   }
   const text = await file.text();
   if (!text.trim() || text.length > PracticeLimits.TEXT_CHARACTERS) {
     throw new Error('Text too large.');
   }
-  return { id: crypto.randomUUID(), kind: 'text', name: file.name, text };
+  return { id: crypto.randomUUID(), kind: PracticeEvidenceKind.TEXT, name: file.name, text };
 }
 
 /** Explicit preview/check/hand-in. Historical findings never assert that later edits pass. */
@@ -93,7 +105,9 @@ export function PracticeCheckPanel({
 }): ReactElement | null {
   const { locale } = useLocale();
   const checkpoints = context.activity.practiceCheckpoints?.filter((item) => item.approved) ?? [];
-  const [checkpointId, setCheckpointId] = useState(checkpoints[0]?.id ?? null);
+  const [checkpointId, setCheckpointId] = useState(
+    checkpoints.length === 1 ? (checkpoints[0]?.id ?? null) : null,
+  );
   const [text, setText] = useState('');
   const [files, setFiles] = useState<PracticeEvidence[]>([]);
   const [check, setCheck] = useState<PracticeRecord | null>(null);
@@ -151,6 +165,10 @@ export function PracticeCheckPanel({
     generation.current += 1;
     setReview(false);
     setConfirm(false);
+    setFiles((current) =>
+      current.filter((item) => item.kind !== PracticeEvidenceKind.IMAGE || !item.capture),
+    );
+    setCheckpointId(checkpoints.length === 1 ? (checkpoints[0]?.id ?? null) : null);
     setCheck(null);
     setHistory([]);
     setSubmissions([]);
@@ -219,7 +237,7 @@ export function PracticeCheckPanel({
           ? [
               {
                 id: crypto.randomUUID(),
-                kind: 'text' as const,
+                kind: PracticeEvidenceKind.TEXT,
                 name: t('Pasted work', 'Bài đã nhập'),
                 text: text.trim(),
               },
@@ -306,7 +324,10 @@ export function PracticeCheckPanel({
       </Group>
       <Group justify="space-between">
         <Text size="xs" c="dimmed">
-          {t('Cmd/Ctrl + Shift + Enter · Review work', 'Cmd/Ctrl + Shift + Enter · Xem lại bài')}
+          {t(
+            '⌘ K (Mac) / Alt + K (Windows) · Review work',
+            '⌘ K (Mac) / Alt + K (Windows) · Xem lại bài',
+          )}
         </Text>
         <Button
           size="xs"
@@ -319,6 +340,25 @@ export function PracticeCheckPanel({
           {t('Review work', 'Xem lại bài')}
         </Button>
       </Group>
+      <PracticeCaptureControls
+        key={`${context.attempt.id}:${String(context.meeting.contextVersion)}:${String(context.attempt.progressVersion)}`}
+        enabled={
+          enabled &&
+          files.filter((item) => item.kind !== PracticeEvidenceKind.IMAGE || !item.capture).length <
+            3
+        }
+        busy={busy}
+        practiceReview={practiceReview}
+        t={t}
+        onCaptured={(evidence) => {
+          setFiles((current) => [
+            ...current.filter((item) => item.kind !== PracticeEvidenceKind.IMAGE || !item.capture),
+            evidence,
+          ]);
+          changeWork();
+          setReview(true);
+        }}
+      />
       <Select
         label={t('Practice task', 'Bài thực hành')}
         value={checkpointId}
@@ -374,10 +414,10 @@ export function PracticeCheckPanel({
       <FileInput
         label={t('Add evidence', 'Thêm bằng chứng')}
         description={t(
-          'PNG/JPEG up to 1 MB, or text/code. Up to 3 items.',
-          'PNG/JPEG tối đa 1 MB, hoặc văn bản/mã. Tối đa 3 mục.',
+          'PNG/JPEG, PDF or Scratch (.sb3) up to 1 MB, or text/code. Up to 3 items.',
+          'PNG/JPEG, PDF hoặc Scratch (.sb3) tối đa 1 MB, hoặc văn bản/mã. Tối đa 3 mục.',
         )}
-        accept="image/png,image/jpeg,.txt,.md,.py,.js,.ts,.html,.css"
+        accept="image/png,image/jpeg,.pdf,.sb3,.txt,.md,.py,.js,.ts,.html,.css,.sql"
         value={null}
         disabled={busy || files.length >= 3}
         onChange={(file) => {
@@ -395,8 +435,8 @@ export function PracticeCheckPanel({
                 if (version === generation.current) {
                   setError(
                     t(
-                      'Use PNG/JPEG under 1 MB or a text/code file under 12,000 characters.',
-                      'Dùng PNG/JPEG dưới 1 MB hoặc tệp văn bản/mã dưới 12.000 ký tự.',
+                      'Use PNG/JPEG, PDF or .sb3 under 1 MB, or text/code under 12,000 characters.',
+                      'Dùng PNG/JPEG, PDF hoặc .sb3 dưới 1 MB, hoặc văn bản/mã dưới 12.000 ký tự.',
                     ),
                   );
                 }
@@ -425,12 +465,19 @@ export function PracticeCheckPanel({
               {t('Remove', 'Xóa')}
             </Button>
           </Group>
-          {item.kind === 'image' ? (
+          {item.kind === PracticeEvidenceKind.IMAGE ? (
             <img
               className="practice-evidence-preview"
               src={`data:${item.mediaType};base64,${item.base64}`}
               alt={item.name}
             />
+          ) : item.kind === PracticeEvidenceKind.DOCUMENT ? (
+            <Text size="xs">
+              {t(
+                'Original document will be checked after submission for feedback.',
+                'Tài liệu gốc được kiểm tra khi gửi để nhận phản hồi.',
+              )}
+            </Text>
           ) : (
             <details>
               <summary>{t('Preview text', 'Xem văn bản')}</summary>
@@ -499,6 +546,33 @@ export function PracticeCheckPanel({
               <Badge size="lg" color={check.finding === PracticeFinding.MET ? 'green' : 'orange'}>
                 {formatPracticeFinding(check.finding, t)}
               </Badge>
+              {check.assessment?.warnings.map((warning) => (
+                <Text key={warning} size="xs" c="dimmed">
+                  {warning.startsWith('PDF')
+                    ? t(
+                        warning,
+                        'Văn bản trích từ PDF không xác minh bố cục, hình ảnh hoặc bản quét.',
+                      )
+                    : t(warning, 'Đã đọc cấu trúc Scratch mà không chạy dự án.')}
+                </Text>
+              ))}
+              {check.assessment && (
+                <details>
+                  <summary>
+                    {t('Checked evidence and sources', 'Bằng chứng và nguồn đã kiểm tra')}
+                  </summary>
+                  <Text size="xs">
+                    {t('Approved source references', 'Nguồn đã duyệt')}:{' '}
+                    {check.assessment.sourceIds.length}
+                  </Text>
+                  {check.assessment.units.map((unit, index) => (
+                    <Stack key={`${unit.evidenceId}:${String(index)}`} gap={2}>
+                      <Text size="xs">{unit.location}</Text>
+                      <pre className="practice-evidence-text">{unit.text}</pre>
+                    </Stack>
+                  ))}
+                </details>
+              )}
               {check.results.map((result) => (
                 <Stack key={result.criterionId} className="practice-criterion-result" gap={5}>
                   <Text fw={500} size="sm">
@@ -511,6 +585,13 @@ export function PracticeCheckPanel({
                     {formatPracticeFinding(result.finding, t)}
                   </Text>
                   <Text size="sm">{result.feedback}</Text>
+                  <PracticeFeedbackReview
+                    key={`${check.id}:${result.criterionId}`}
+                    context={context}
+                    checkId={check.id}
+                    criterionId={result.criterionId}
+                    t={t}
+                  />
                   {result.finding !== PracticeFinding.MET && onAskForHelp && (
                     <Button
                       size="xs"
@@ -590,6 +671,10 @@ export function PracticeCheckPanel({
       <Modal
         opened={review}
         onClose={() => {
+          setFiles((current) =>
+            current.filter((item) => item.kind !== PracticeEvidenceKind.IMAGE || !item.capture),
+          );
+          void window.tro.controlPracticeCapture?.({ kind: 'discard' });
           setReview(false);
         }}
         title={t('Review your practice', 'Xem lại bài thực hành')}
@@ -633,7 +718,7 @@ export function PracticeCheckPanel({
                     ? [
                         {
                           id: 'draft-text',
-                          kind: 'text' as const,
+                          kind: PracticeEvidenceKind.TEXT,
                           name: t('Pasted work', 'Bài đã nhập'),
                           text: text.trim(),
                         },
@@ -749,17 +834,24 @@ export function PracticeEvidencePreview({
 }: {
   evidence: PracticeEvidence[];
 }): ReactElement {
+  const { locale } = useLocale();
+  const t: ClassroomTranslate = (english, vietnamese) => (locale === 'vi' ? vietnamese : english);
   return (
     <Stack>
       {evidence.map((item) => (
         <Stack key={item.id}>
           <Text fw={500}>{item.name}</Text>
-          {item.kind === 'image' ? (
+          {item.kind === PracticeEvidenceKind.IMAGE ? (
             <img
               className="practice-evidence-preview"
               src={`data:${item.mediaType};base64,${item.base64}`}
               alt={item.name}
             />
+          ) : item.kind === PracticeEvidenceKind.DOCUMENT ? (
+            <a href={`data:${item.mediaType};base64,${item.base64}`} download={item.name}>
+              {t('Save original file', 'Lưu tệp gốc')} ·{' '}
+              {item.mediaType === 'application/pdf' ? 'PDF' : 'Scratch (.sb3)'}
+            </a>
           ) : (
             <pre className="practice-evidence-text">{item.text}</pre>
           )}

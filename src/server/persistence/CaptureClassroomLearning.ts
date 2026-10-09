@@ -140,7 +140,13 @@ export async function capturePracticeAssessment(
         })),
         results: record.results,
         status: record.status,
-        method: AssessmentMethod.MODEL,
+        method: record.assessment
+          ? record.assessment.evaluators.every((evaluator) => evaluator.id === 'llm')
+            ? AssessmentMethod.MODEL
+            : record.assessment.evaluators.some((evaluator) => evaluator.id === 'llm')
+              ? AssessmentMethod.MIXED
+              : AssessmentMethod.RULE
+          : AssessmentMethod.MODEL,
         evaluatorRevision: record.evaluator,
         purpose: AssessmentPurpose.PRACTICE,
         assistance: AssistanceContext.UNKNOWN,

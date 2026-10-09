@@ -535,6 +535,20 @@ export class ClassroomInsightService {
           ) {
             throw new ClassroomInsightError(InsightFailure.INVALID);
           }
+          const reviewedCheck = command.checkId
+            ? packet.assessments.find(
+                (assessment) =>
+                  assessment.checkId === command.checkId &&
+                  assessment.studentId === userId &&
+                  assessment.classSessionId === authority.meeting.id &&
+                  assessment.activityId === command.activityId &&
+                  (!command.criterionId ||
+                    assessment.criteria.some((criterion) => criterion.id === command.criterionId)),
+              )
+            : null;
+          if (command.checkId && !reviewedCheck) {
+            throw new ClassroomInsightError(InsightFailure.FORBIDDEN);
+          }
           if (packet.removedStudentIds.includes(userId)) {
             throw new ClassroomInsightError(InsightFailure.REMOVED);
           }
@@ -549,11 +563,12 @@ export class ClassroomInsightService {
               activityId: command.activityId,
               criterionId: command.criterionId,
               requestedAt: now,
+              ...(command.checkId ? { checkId: command.checkId } : {}),
               category: command.category,
               interventions: [],
               closedAt: null,
               reportedOutcome: null,
-              sourceIds: [command.id],
+              sourceIds: [command.id, ...(reviewedCheck ? [reviewedCheck.id] : [])],
             },
           };
         } else if (command.kind === 'record-support' || command.kind === 'close-help') {

@@ -12,6 +12,10 @@ import {
 import { randomUUID } from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Prisma, PrismaClient } from '../generated/prisma/client.js';
+import { readPublicationPassages } from '../features/materials/application/MaterialSourceSelection.js';
+import { MaterialPublicationSchema } from '#contracts/ClassroomMaterials.js';
+import { PracticeGroundingSchema, type PracticeGrounding } from '#contracts/PracticeAssessment.js';
+import { PracticeEvidenceKind, type PracticeCheckpoint } from '#contracts/PracticeCheck.js';
 import { CourseContentSchema } from '#contracts/Classroom.js';
 import {
   PracticeCheckStatus,
@@ -34,7 +38,7 @@ const checkInclude = {
   snapshot: {
     include: {
       evidence: {
-        select: { id: true, kind: true, name: true, byteCount: true, digest: true },
+        select: { id: true, kind: true, name: true, byteCount: true, digest: true, capture: true },
         orderBy: { id: 'asc' as const },
       },
     },
@@ -104,6 +108,7 @@ function projectCheck(row: CheckRow): StoredPracticeCheck {
       status: row.status,
       finding: row.finding,
       evaluator: row.evaluator,
+      ...(row.assessment ? { assessment: row.assessment } : {}),
       createdAt: row.createdAt.toISOString(),
       completedAt: row.completedAt?.toISOString() ?? null,
       results: row.results.map((result) => ({
@@ -112,7 +117,10 @@ function projectCheck(row: CheckRow): StoredPracticeCheck {
         feedback: result.feedback,
         evidenceIds: result.evidenceIds,
       })),
-      evidence: row.snapshot.evidence,
+      evidence: row.snapshot.evidence.map(({ capture, ...item }) => ({
+        ...item,
+        ...(capture ? { capture } : {}),
+      })),
     }),
   };
 }
@@ -137,6 +145,36 @@ class PrismaPracticeCheckStore implements PracticeCheckStore {
     private readonly capturePolicy: LearningCapturePolicy = DisabledLearningCapture,
     private readonly inTransaction = false,
   ) {}
+  async readGrounding(
+    access: PracticeAccess,
+    rubric: PracticeCheckpoint,
+  ): Promise<PracticeGrounding> {
+    const row = await this.client.classroomMaterialPublication.findUnique({
+      where: { courseId: access.courseRevisionId },
+    });
+    const publication = row ? MaterialPublicationSchema.parse(row.document) : null;
+    if (publication && publication.classId !== access.classId) {
+      throw new Error('Foreign publication.');
+    }
+    const passages = publication ? readPublicationPassages(publication) : [];
+    const required = [...new Set(rubric.criteria.flatMap((criterion) => criterion.sourceIds))];
+    const selected = passages.filter(
+      (passage) => required.includes(passage.id) || required.includes(passage.sourceUnitId),
+    );
+    return PracticeGroundingSchema.parse({
+      courseRevisionId: access.courseRevisionId,
+      teacherInstructions: publication?.teacherInstructions ?? '',
+      sources: selected.map((passage) => ({
+        id: passage.id,
+        location: passage.location,
+        text: passage.text,
+        teacherNote: passage.teacherNote,
+      })),
+      missingSourceIds: required.filter(
+        (id) => !passages.some((passage) => passage.id === id || passage.sourceUnitId === id),
+      ),
+    });
+  }
   runAtomically<T>(work: (store: PracticeCheckStore) => Promise<T>): Promise<T> {
     return this.transact(work);
   }
@@ -299,11 +337,14 @@ class PrismaPracticeCheckStore implements PracticeCheckStore {
               id: item.id,
               kind: item.kind,
               name: item.name,
-              mediaType: item.kind === 'text' ? 'text/plain' : item.mediaType,
+              ...(item.kind === PracticeEvidenceKind.IMAGE && item.capture
+                ? { capture: item.capture }
+                : {}),
+              mediaType: item.kind === PracticeEvidenceKind.TEXT ? 'text/plain' : item.mediaType,
               byteCount: metadata.byteCount,
               digest: metadata.digest,
               content:
-                item.kind === 'text'
+                item.kind === PracticeEvidenceKind.TEXT
                   ? Buffer.from(item.text, 'utf8')
                   : Buffer.from(item.base64, 'base64'),
             };
@@ -344,6 +385,7 @@ class PrismaPracticeCheckStore implements PracticeCheckStore {
       data: {
         status: record.status,
         finding: record.finding,
+        ...(record.assessment ? { assessment: record.assessment } : {}),
         completedAt: record.completedAt ? new Date(record.completedAt) : null,
       },
     });
@@ -375,17 +417,18 @@ class PrismaPracticeCheckStore implements PracticeCheckStore {
     });
     return rows.map((row) =>
       PracticeEvidenceSchema.parse(
-        row.kind === 'text'
+        row.kind === PracticeEvidenceKind.TEXT
           ? {
               id: row.id,
-              kind: 'text',
+              kind: PracticeEvidenceKind.TEXT,
               name: row.name,
               text: Buffer.from(row.content).toString('utf8'),
             }
           : {
               id: row.id,
-              kind: 'image',
+              kind: row.kind,
               name: row.name,
+              ...(row.capture ? { capture: row.capture } : {}),
               mediaType: row.mediaType,
               base64: Buffer.from(row.content).toString('base64'),
             },

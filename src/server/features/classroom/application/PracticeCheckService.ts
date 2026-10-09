@@ -231,8 +231,21 @@ export class PracticeCheckService {
     this.log({ checkId: record.id, stage: 'admitted' });
     try {
       const signal = AbortSignal.timeout(60000);
+      const access = await this.store.readAccess(command.participationId, command.activityId);
+      requireStudentAccess(access, userId);
+      requireCurrentPractice(access, command, this.now());
+      const grounding = await this.store.readGrounding(access, record.rubric);
+      if (
+        countPracticeInput({ rubric: record.rubric, grounding }, command.evidence) >
+        PracticeLimits.INPUT_TOKENS
+      ) {
+        throw new PracticeError(PracticeFailure.LIMIT);
+      }
       const evaluation = PracticeEvaluationSchema.parse(
-        await this.evaluator.evaluate(record.rubric, command.evidence, command.locale, signal),
+        await this.evaluator.evaluate(record.rubric, command.evidence, command.locale, signal, {
+          grounding,
+          units: [],
+        }),
       );
       signal.throwIfAborted();
       const finding = validatePracticeFindings(
@@ -250,6 +263,9 @@ export class PracticeCheckService {
         record.status = PracticeCheckStatus.COMPLETED;
         record.finding = finding;
         record.results = evaluation.results;
+        if (evaluation.assessment) {
+          record.assessment = evaluation.assessment;
+        }
         record.completedAt = this.now().toISOString();
         if (!(await store.finishCheck(record))) {
           throw new PracticeError(PracticeFailure.STALE);

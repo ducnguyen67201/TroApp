@@ -1,3 +1,4 @@
+import type { PracticeCaptureCommand, PracticeCaptureReply } from './PracticeCapture.js';
 import type { PetCommand, PetReply, PetSnapshot } from './Pet.js';
 import type { PracticeShortcutEvent } from './PracticeShortcut.js';
 import type { PracticeCommand, PracticeReply } from './PracticeCheck.js';
@@ -51,6 +52,7 @@ export interface DesktopBridge {
   cancelGuidance?: () => Promise<void>;
   readPracticeShortcutAvailable?: () => Promise<boolean>;
   subscribePracticeShortcut?: (listener: (event: PracticeShortcutEvent) => void) => () => void;
+  controlPracticeCapture?: (command: PracticeCaptureCommand) => Promise<PracticeCaptureReply>;
   controlPractice?: (command: PracticeCommand) => Promise<PracticeReply>;
   controlClassroomInsights?: (command: ClassroomInsightCommand) => Promise<ClassroomInsightReply>;
   exportParentReport?: (command: ParentReportExportCommand) => Promise<ParentReportExportReply>;

@@ -52,7 +52,12 @@ export const AssessmentPurpose = {
 
 export type AssessmentPurpose = (typeof AssessmentPurpose)[keyof typeof AssessmentPurpose];
 
-export const AssessmentMethod = { MODEL: 'model', TEACHER: 'teacher' } as const;
+export const AssessmentMethod = {
+  MODEL: 'model',
+  TEACHER: 'teacher',
+  RULE: 'rule',
+  MIXED: 'mixed',
+} as const;
 
 export const ReportStatus = {
   DRAFT: 'draft',
@@ -272,6 +277,7 @@ export const InsightSupportSchema = z.strictObject({
   activityId: z.uuid(),
   criterionId: z.uuid().nullable(),
   requestedAt: timestamp,
+  checkId: z.uuid().optional(),
   category: z.string().min(1).max(200),
   interventions: z
     .array(
@@ -661,6 +667,7 @@ export const ClassroomInsightCommandSchema = z
       ...binding,
       id: z.uuid(),
       criterionId: z.uuid().nullable(),
+      checkId: z.uuid().optional(),
       category: z.string().min(1).max(200),
     }),
     z.strictObject({

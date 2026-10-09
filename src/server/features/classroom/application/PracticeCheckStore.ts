@@ -1,3 +1,5 @@
+import type { PracticeGrounding } from '#contracts/PracticeAssessment.js';
+import type { PracticeCheckpoint } from '#contracts/PracticeCheck.js';
 import type { ClassroomActivity } from '#contracts/Classroom.js';
 import type {
   PracticeEvidence,
@@ -33,6 +35,7 @@ export interface StoredPracticeCheck {
 
 /** Persistence adapters own transactions, private evidence and authenticated relationship reads. */
 export interface PracticeCheckStore {
+  readGrounding(access: PracticeAccess, rubric: PracticeCheckpoint): Promise<PracticeGrounding>;
   runAtomically<T>(work: (store: PracticeCheckStore) => Promise<T>): Promise<T>;
   readAccess(participationId: string, activityId: string): Promise<PracticeAccess | null>;
   readEvidenceAccess(

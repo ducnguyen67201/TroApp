@@ -85,6 +85,7 @@ function TeacherHelpRequest({
         {name} · {request.category}
       </summary>
       <Stack gap="sm" mt="sm">
+        {request.checkId && <Text size="xs">Practice feedback review · {request.checkId}</Text>}
         <Text size="xs">Requested {new Date(request.requestedAt).toLocaleString()}</Text>
         {request.interventions.map((intervention) => (
           <Text key={intervention.id} size="sm">

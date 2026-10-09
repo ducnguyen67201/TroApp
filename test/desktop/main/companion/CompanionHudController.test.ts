@@ -670,3 +670,17 @@ it('bounds practice presentation and never reports a failed request as a saved h
   controller.receivePracticeReply(captureId, { kind: 'failed', code: 'unavailable' });
   expect(latest()?.phase).toBe('idle');
 });
+
+it.each(['en', 'vi'] as const)(
+  'keeps the %s HUD in checking while evaluation is pending',
+  (locale) => {
+    const { controller, latest } = createHarness();
+    expect(controller.startPractice(captureId, 'check', locale)).toBe(true);
+    vi.advanceTimersByTime(59000);
+    expect(latest()).toMatchObject({ phase: 'checking', locale });
+    controller.receivePracticeReply(sessionId, { kind: 'failed', code: 'unavailable' });
+    expect(latest()).toMatchObject({ phase: 'checking', locale });
+    controller.receivePracticeReply(captureId, { kind: 'failed', code: 'unavailable' });
+    expect(latest()).toMatchObject({ phase: 'error', locale });
+  },
+);
