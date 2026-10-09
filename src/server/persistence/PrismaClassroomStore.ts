@@ -1,3 +1,13 @@
+import { runClassroomTransactionWithRetries } from './RetryClassroomTransaction.js';
+import { InsightRecordKind } from '#contracts/ClassroomInsights.js';
+import {
+  captureClassroomSubmission,
+  captureClassroomProgress,
+} from './CaptureClassroomLearning.js';
+import {
+  DisabledLearningCapture,
+  type LearningCapturePolicy,
+} from './AppendClassroomLearningEvent.js';
 import { MaterialDerivationSchema, type MaterialDerivation } from '#contracts/MaterialContext.js';
 import {
   StoredMaterialCollectionSchema,
@@ -39,10 +49,45 @@ class PrismaClassroomStore implements ClassroomStore {
   constructor(
     private readonly client: Prisma.TransactionClient,
     private readonly transact?: <T>(operation: (store: ClassroomStore) => Promise<T>) => Promise<T>,
+    private readonly capturePolicy: LearningCapturePolicy = DisabledLearningCapture,
   ) {}
 
   runAtomically<T>(operation: (store: ClassroomStore) => Promise<T>): Promise<T> {
     return this.transact ? this.transact(operation) : operation(this);
+  }
+
+  private async invalidateClassroomInsights(classId: string) {
+    if (!this.capturePolicy.captureClassIds.includes(classId)) {
+      return;
+    }
+    await this.client.classroomInsightState.upsert({
+      where: { classId },
+      create: { classId, invalidationRevision: 1, revision: 1 },
+      update: { invalidationRevision: { increment: 1 }, revision: { increment: 1 } },
+    });
+  }
+
+  private async isClassroomSourceRemoved(attemptId: string, sourceId: string) {
+    const attempt = await this.client.classroomAttempt.findUnique({
+      where: { id: attemptId },
+      include: { participation: { include: { meeting: true } } },
+    });
+    if (!attempt) {
+      return true;
+    }
+    const classId = attempt.participation.meeting.classId;
+    return Boolean(
+      (await this.client.classroomInsightRecord.findFirst({
+        where: {
+          classId,
+          kind: InsightRecordKind.REMOVAL,
+          studentId: attempt.participation.studentId,
+        },
+      })) ||
+      (await this.client.classroomExpiredSource.findUnique({
+        where: { classId_sourceId: { classId, sourceId } },
+      })),
+    );
   }
 
   async readMaterialDerivation(classId: string, key: string) {
@@ -178,7 +223,11 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async updateClassCourse(classId: string, courseRevisionId: string) {
+    if (this.transact && this.capturePolicy.captureClassIds.length) {
+      return this.runAtomically((store) => store.updateClassCourse(classId, courseRevisionId));
+    }
     await this.client.classroomGroup.update({ where: { id: classId }, data: { courseRevisionId } });
+    await this.invalidateClassroomInsights(classId);
   }
 
   async readAccountRole(userId: string) {
@@ -292,6 +341,9 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async deleteClass(classId: string, deletedAt: Date): Promise<void> {
+    if (this.transact && this.capturePolicy.captureClassIds.length) {
+      return this.runAtomically((store) => store.deleteClass(classId, deletedAt));
+    }
     const updated = await this.client.classroomGroup.updateMany({
       where: { id: classId, deletedAt: null },
       data: { deletedAt },
@@ -299,6 +351,7 @@ class PrismaClassroomStore implements ClassroomStore {
     if (updated.count !== 1) {
       throw new ClassroomError(ClassroomFailure.STALE);
     }
+    await this.invalidateClassroomInsights(classId);
   }
 
   async readStudentByEmail(email: string) {
@@ -313,6 +366,9 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async enrollStudent(classId: string, studentId: string, active: boolean) {
+    if (this.transact && this.capturePolicy.captureClassIds.length) {
+      return this.runAtomically((store) => store.enrollStudent(classId, studentId, active));
+    }
     if (
       active &&
       (await this.client.classroomEnrollment.count({ where: { classId, active: true } })) >= 200 &&
@@ -325,6 +381,7 @@ class PrismaClassroomStore implements ClassroomStore {
       create: { classId, studentId, active },
       update: { active },
     });
+    await this.invalidateClassroomInsights(classId);
   }
 
   async isEnrolled(classId: string, studentId: string) {
@@ -431,13 +488,23 @@ class PrismaClassroomStore implements ClassroomStore {
       create: { id: randomUUID(), participationId, activityId, evidence: [] },
       update: {},
     });
-    return StudentAttemptSchema.parse(row);
+    return StudentAttemptSchema.parse({
+      id: row.id,
+      participationId: row.participationId,
+      activityId: row.activityId,
+      progressVersion: row.progressVersion,
+      workspaceUrl: row.workspaceUrl,
+      evidence: row.evidence,
+      declaredComplete: row.declaredComplete,
+      helpSummary: row.helpSummary,
+    });
   }
 
   async saveAttempt(attempt: StudentAttempt) {
     await this.client.classroomAttempt.update({
       where: { id: attempt.id },
       data: {
+        lastSavedAt: new Date(),
         progressVersion: attempt.progressVersion,
         workspaceUrl: attempt.workspaceUrl,
         evidence: attempt.evidence,
@@ -456,7 +523,11 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async saveProgressEvent(attemptId: string, eventId: string) {
+    if (this.transact && this.capturePolicy.captureClassIds.length) {
+      return this.runAtomically((store) => store.saveProgressEvent(attemptId, eventId));
+    }
     await this.client.classroomProgressEvent.create({ data: { attemptId, eventId } });
+    await captureClassroomProgress(this.client, this.capturePolicy, attemptId, eventId);
   }
 
   async savePreparation(preparation: SubmissionPreparation) {
@@ -476,7 +547,7 @@ class PrismaClassroomStore implements ClassroomStore {
     const row = await this.client.classroomSubmission.findUnique({
       where: { attemptId_idempotencyKey: { attemptId, idempotencyKey } },
     });
-    return row
+    return row && !(await this.isClassroomSourceRemoved(attemptId, row.id))
       ? SubmissionReceiptSchema.parse({
           id: row.id,
           attemptId,
@@ -491,7 +562,7 @@ class PrismaClassroomStore implements ClassroomStore {
       where: { attemptId },
       orderBy: [{ submittedAt: 'desc' }, { id: 'desc' }],
     });
-    return row
+    return row && !(await this.isClassroomSourceRemoved(attemptId, row.id))
       ? SubmissionReceiptSchema.parse({
           id: row.id,
           attemptId,
@@ -502,9 +573,22 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async saveSubmission(receipt: SubmissionReceipt, idempotencyKey: string) {
+    if (this.transact && this.capturePolicy.captureClassIds.length) {
+      return this.runAtomically((store) => store.saveSubmission(receipt, idempotencyKey));
+    }
     await this.client.classroomSubmission.create({
       data: { ...receipt, idempotencyKey, submittedAt: new Date(receipt.submittedAt) },
     });
+    await captureClassroomSubmission(
+      this.client,
+      this.capturePolicy,
+      receipt.id,
+      receipt.attemptId,
+      new Date(receipt.submittedAt),
+      null,
+      null,
+      null,
+    );
   }
 
   async readRoster(classSessionId: string, classId: string) {
@@ -574,28 +658,27 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 }
 
-export function createPrismaClassroomStore(connectionString: string): {
+export function createPrismaClassroomStore(
+  connectionString: string,
+  capturePolicy: LearningCapturePolicy = DisabledLearningCapture,
+): {
   store: ClassroomStore;
   close(): Promise<void>;
 } {
   const client = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
-  const transact = async <T>(operation: (store: ClassroomStore) => Promise<T>): Promise<T> => {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        return await client.$transaction(
-          (transaction) => operation(new PrismaClassroomStore(transaction)),
+  const transact = <T>(operation: (store: ClassroomStore) => Promise<T>): Promise<T> =>
+    runClassroomTransactionWithRetries(
+      () =>
+        client.$transaction(
+          (transaction) =>
+            operation(new PrismaClassroomStore(transaction, undefined, capturePolicy)),
           { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-        );
-      } catch (error: unknown) {
-        if (
-          !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-          !['P2034', 'P2002'].includes(error.code)
-        ) {
-          throw error;
-        }
-      }
-    }
-    throw new ClassroomError(ClassroomFailure.STALE);
+        ),
+      { operation: 'classroom-write' },
+      { createExhaustionError: () => new ClassroomError(ClassroomFailure.STALE) },
+    );
+  return {
+    store: new PrismaClassroomStore(client, transact, capturePolicy),
+    close: () => client.$disconnect(),
   };
-  return { store: new PrismaClassroomStore(client, transact), close: () => client.$disconnect() };
 }

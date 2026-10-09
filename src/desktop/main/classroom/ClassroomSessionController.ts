@@ -5,6 +5,11 @@ import {
 } from '#contracts/PracticeCheck.js';
 import { randomUUID } from 'node:crypto';
 import {
+  InsightFailure,
+  type ClassroomInsightCommand,
+  type ClassroomInsightReply,
+} from '#contracts/ClassroomInsights.js';
+import {
   ClassroomPhase,
   ClassroomStatus,
   ClassroomFailure,
@@ -180,6 +185,29 @@ export class ClassroomSessionController implements ClassroomTaskContext {
     return generation === this.generation
       ? result
       : { kind: 'failed', code: PracticeFailure.STALE };
+  }
+
+  /** Student help uses the current private participation binding, never a renderer device claim. */
+  async executeInsights(
+    command: ClassroomInsightCommand,
+    send: (command: ClassroomInsightCommand) => Promise<ClassroomInsightReply>,
+  ): Promise<ClassroomInsightReply> {
+    const generation = this.generation;
+    if (command.kind === 'request-help') {
+      if (
+        !this.binding ||
+        !this.context ||
+        this.binding.participationId !== command.participationId ||
+        this.binding.activityId !== command.activityId ||
+        this.context.meeting.classId !== command.classId ||
+        !this.isContextCurrent(this.context)
+      ) {
+        return { kind: 'failed', code: InsightFailure.FORBIDDEN };
+      }
+      command = { ...command, deviceId: this.deviceId };
+    }
+    const reply = await send(command);
+    return generation === this.generation ? reply : { kind: 'failed', code: InsightFailure.STALE };
   }
 
   /** Cached eligibility is checked again at keypress; the backend still authorizes mutations. */

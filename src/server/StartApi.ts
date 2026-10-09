@@ -1,3 +1,7 @@
+import { ClassroomInsightService } from './features/classroom/application/ClassroomInsightService.js';
+import { registerClassroomInsightRoutes } from './features/classroom/infrastructure/RegisterClassroomInsightRoutes.js';
+import { ClassroomInsightRetentionRunner } from './features/classroom/infrastructure/ClassroomInsightRetentionRunner.js';
+import { createPrismaClassroomInsightStore } from './persistence/PrismaClassroomInsightStore.js';
 import { MaterialProviderRequestState } from './features/materials/application/MaterialGeneration.js';
 import { PracticeCheckService } from './features/classroom/application/PracticeCheckService.js';
 import { OpenAiPracticeCheckEvaluator } from './features/classroom/infrastructure/OpenAiPracticeCheckEvaluator.js';
@@ -49,14 +53,35 @@ async function startApi(): Promise<void> {
       voiceIds: VoiceoverConfig.VOICE_IDS,
     }),
   );
-  const classroom = createPrismaClassroomStore(environment.DATABASE_URL);
+  const capturePolicy = {
+    captureClassIds: environment.CLASSROOM_INSIGHT_CLASS_IDS ?? [],
+    collectionPolicy: environment.CLASSROOM_INSIGHT_COLLECTION_POLICY,
+    retentionDays: environment.CLASSROOM_INSIGHT_RETENTION_DAYS,
+  };
+  const classroom = createPrismaClassroomStore(environment.DATABASE_URL, capturePolicy);
+  const insights = createPrismaClassroomInsightStore(environment.DATABASE_URL, capturePolicy, {
+    resumeStoredRetentionPolicies: true,
+  });
+  registerClassroomInsightRoutes(
+    api,
+    authentication.readSignedInUserId,
+    new ClassroomInsightService(insights.store, capturePolicy),
+    logger,
+  );
+  const retentionRunner = new ClassroomInsightRetentionRunner(
+    insights,
+    environment.CLASSROOM_INSIGHT_RETENTION_DAYS,
+    () => {
+      logger.warn({ operation: 'purge-expired-insights' }, 'classroom.insights.retention.failed');
+    },
+  );
   registerClassroomRoutes(
     api,
     authentication.readSignedInUserId,
     new ClassroomService(classroom.store),
     logger,
   );
-  const practice = createPrismaPracticeCheckStore(environment.DATABASE_URL);
+  const practice = createPrismaPracticeCheckStore(environment.DATABASE_URL, capturePolicy);
   registerPracticeCheckRoutes(
     api,
     authentication.readSignedInUserId,
@@ -149,6 +174,7 @@ async function startApi(): Promise<void> {
   registerModelGateway(api, authentication.readSignedInUserId, environment, logger);
 
   api.addHook('onClose', async () => {
+    await retentionRunner.close();
     await materialRunner.close();
     await database.close();
     await authentication.close();
@@ -156,9 +182,11 @@ async function startApi(): Promise<void> {
     await voiceoverAllowance.close();
     await classroom.close();
     await practice.close();
+    await insights.close();
   });
 
   try {
+    await retentionRunner.start();
     await api.listen({ host: environment.HOST, port: environment.PORT });
   } catch (error: unknown) {
     await api.close();

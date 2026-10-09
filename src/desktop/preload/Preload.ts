@@ -1,4 +1,11 @@
 import { petOverlayBridge } from './PetPreload.js';
+import {
+  ClassroomInsightCommandSchema,
+  ClassroomInsightReplySchema,
+  InsightFailure,
+  ParentReportExportCommandSchema,
+  ParentReportExportReplySchema,
+} from '#contracts/ClassroomInsights.js';
 import { PetCommandSchema, PetReplySchema, PetSnapshotSchema, PetFailure } from '#contracts/Pet.js';
 import { PracticeShortcutEventSchema } from '#contracts/PracticeShortcut.js';
 import {
@@ -74,6 +81,28 @@ import {
 /* Expose named session operations, not generic IPC or direct computer tools.
    Validate IPC data before it enters the renderer. */
 const bridge: DesktopBridge = {
+  async controlClassroomInsights(command) {
+    try {
+      const raw: unknown = await ipcRenderer.invoke(
+        'tro:classroom-insights',
+        ClassroomInsightCommandSchema.parse(command),
+      );
+      return ClassroomInsightReplySchema.parse(raw);
+    } catch {
+      return { kind: 'failed', code: InsightFailure.UNAVAILABLE };
+    }
+  },
+  async exportParentReport(command) {
+    try {
+      const raw: unknown = await ipcRenderer.invoke(
+        'tro:parent-report-export',
+        ParentReportExportCommandSchema.parse(command),
+      );
+      return ParentReportExportReplySchema.parse(raw);
+    } catch {
+      return { saved: false, code: InsightFailure.UNAVAILABLE };
+    }
+  },
   async readPets() {
     try {
       const value: unknown = await ipcRenderer.invoke('tro:pet-read');

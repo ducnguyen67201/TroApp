@@ -75,6 +75,11 @@ model ClassroomGroup {
   courseRevision ClassroomCourseRevision @relation(fields: [courseRevisionId], references: [id], onDelete: Restrict)
   createdAt DateTime @default(now())
   deletedAt DateTime?
+  insightState ClassroomInsightState?
+  learningEvents ClassroomLearningEvent[]
+  insightRecords ClassroomInsightRecord[]
+  insightReceipts ClassroomInsightReceipt[]
+  expiredSources ClassroomExpiredSource[]
   enrollments ClassroomEnrollment[]
   meetings ClassroomMeeting[]
   invitations ClassroomInvitation[]
@@ -121,6 +126,7 @@ model ClassroomParticipation {
 }
 
 model ClassroomAttempt {
+  lastSavedAt DateTime?
   id String @id @db.Uuid
   participationId String @db.Uuid
   participation ClassroomParticipation @relation(fields: [participationId], references: [id], onDelete: Restrict)
@@ -321,6 +327,7 @@ model ClassroomMaterialDerivation {
 }
 
 model ClassroomWorkSnapshot {
+ expiredAt DateTime?
  id String @id @db.Uuid
  studentId String
  student User @relation(fields:[studentId],references:[id],onDelete:Restrict)
@@ -400,4 +407,86 @@ model ClassroomWorkSubmission {
  @@unique([studentId,requestId])
  @@unique([attemptId,checkpointId,sequence])
  @@index([attemptId,submittedAt])
+}
+
+/** Atomic per-class source cutoff; all insight writers allocate a revision in their source transaction. */
+model ClassroomInsightState {
+  collectionPolicy String?
+  retentionDays Int?
+  classId String @id @db.Uuid
+  schoolClass ClassroomGroup @relation(fields: [classId], references: [id], onDelete: Restrict)
+  revision BigInt @default(0)
+  invalidationRevision BigInt @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+/** Immutable metadata ledger. Content lives in typed source records or existing private snapshots. */
+model ClassroomLearningEvent {
+  logicalId String
+  id String @id @db.Uuid
+  classId String @db.Uuid
+  schoolClass ClassroomGroup @relation(fields: [classId], references: [id], onDelete: Restrict)
+  revision BigInt
+  identity String
+  kind String
+  studentId String?
+  sessionId String? @db.Uuid
+  attemptId String? @db.Uuid
+  activityId String? @db.Uuid
+  sourceId String
+  actorId String
+  observedAt DateTime?
+  recordedAt DateTime
+  payloadDigest String @db.VarChar(64)
+  record Json
+  @@unique([classId, identity])
+  @@unique([classId, revision])
+  @@index([classId, studentId, revision])
+  @@index([classId, recordedAt, id])
+}
+
+/** Versioned strict-contract records: plans, eligibility, skills, observations, support, next tasks,
+ * report revisions/dependencies/exports, corrections, removals and import coverage. JSON is validated
+ * with the canonical discriminated schema before writing and after reading, never used as arbitrary data.
+ */
+model ClassroomInsightRecord {
+  episodeOrder Int?
+  id String @id @db.Uuid
+  classId String @db.Uuid
+  schoolClass ClassroomGroup @relation(fields: [classId], references: [id], onDelete: Restrict)
+  kind String
+  logicalId String
+  version Int
+  revision BigInt
+  studentId String?
+  sessionId String? @db.Uuid
+  sourceId String?
+  supersedesId String? @db.Uuid
+  removedAt DateTime?
+  recordedAt DateTime
+  record Json
+  @@unique([classId, logicalId, version])
+  @@index([classId, studentId, episodeOrder])
+  @@index([classId, kind, revision])
+  @@index([classId, studentId, revision])
+  @@index([classId, sourceId])
+}
+
+model ClassroomInsightReceipt {
+  schoolClass ClassroomGroup @relation(fields: [classId], references: [id], onDelete: Restrict)
+  userId String
+  requestId String @db.Uuid
+  classId String @db.Uuid
+  digest String @db.VarChar(64)
+  reply Json
+  @@id([userId, requestId])
+  @@index([classId])
+}
+
+model ClassroomExpiredSource {
+  schoolClass ClassroomGroup @relation(fields: [classId], references: [id], onDelete: Restrict)
+  classId String @db.Uuid
+  sourceId String
+  expiredAt DateTime
+  @@id([classId, sourceId])
 }

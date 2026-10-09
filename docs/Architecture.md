@@ -361,6 +361,112 @@ grade. Cmd/Ctrl + Shift + Enter opens practice review with an in-app fallback.
 The shortcut does not capture an open application. Native selected-window evidence,
 unlimited storage and automatic final grading are not implemented promises.
 
+### Learning history and parent reports
+
+[ClassroomInsights.ts](../src/contracts/ClassroomInsights.ts) owns strict source,
+command, read and report schemas. [ClassroomInsightService](../src/server/features/classroom/application/ClassroomInsightService.ts)
+authorizes the versioned insights endpoint. An owning teacher can read retained
+class history and approve plans, comparable tasks, observations and parent reports.
+Student reads require current enrollment and return that student's progress and
+assigned plans. Help requests additionally require main's private joined-device
+binding, a current lease and the permitted live Practice activity.
+
+Capture defaults to disabled. Backend configuration selects permitted classes,
+the reviewed collection-policy identifier and a rolling retention duration.
+`PrismaClassroomStore` and `PrismaPracticeCheckStore` append accepted progress,
+confirmed snapshot/link hand-ins, check admission and terminal results inside the
+source transaction. Rejected or stale writes cannot create a learning event.
+This captures explicit work and requests; it does not measure attention, keyboard
+activity, motivation or the delivery of native tutoring assistance.
+
+[AppendClassroomLearningEvent](../src/server/persistence/AppendClassroomLearningEvent.ts)
+allocates the class revision and saves an immutable event plus a versioned record.
+The additive Prisma tables index class, child, kind and revision; their JSON values
+must validate against the discriminated source schemas. Evidence bytes stay in
+the existing private snapshot store. Plans, skill standards and task variants are
+approved definitions. Historical mapping versions remain available, and an
+assessment pins the exact mapping, course and rubric it used.
+
+```mermaid
+flowchart LR
+  Accepted[Accepted work and teacher observations] --> Commit[Source transaction and class revision]
+  Definitions[Approved plans and comparable tasks] --> Commit
+  Commit --> History[Versioned source records]
+  History --> Replay[Authorized snapshot and pure calculations]
+  Replay --> Journey[Student journey and class review]
+  Replay --> Draft[Frozen single-child report facts]
+  Draft --> Review[Editable commentary and exact revision approval]
+  Review --> Export[Main-owned local HTML export]
+```
+
+[PrismaClassroomInsightStore](../src/server/persistence/PrismaClassroomInsightStore.ts)
+owns consistent complete metadata reads, scoped pagination, private evidence and
+compare-and-set writes. Serializable reads, source writes and retention use bounded
+conflict retries, including driver failures reported during commit. Read limits are
+declared by `InsightLimits`; exceeding a
+budget refuses the query instead of returning truncated totals. Cursor scope binds
+the class, student, reporting window, cutoff and current privacy revision.
+An exhausted retry emits `transaction-retry-exhausted` with the operation, optional
+class ID, conflict reason and attempt count; queries and learning content are excluded.
+`SelectLearningEvidence`, `CalculateStudentProgress` and `CalculateClassSummary`
+are pure replay functions. Observation order and committed revision are separate:
+late results cannot replace newer work, and historical unknown ordering stays
+explicit. Corrections supersede assertions while preserving the original work.
+
+Journey counts distinguish assigned activities handed in from criteria met.
+Assignments pin the eligible roster, including children who never joined; repeated
+session assignments are separate tasks. Unknown historical eligibility remains
+unknown. Lesson charts include missing, insufficient and conflicting results.
+Independent task counts require an individual, unaided teacher observation of a
+fresh or transfer task meeting every required criterion. Comparisons group only
+the approved skill standard, task family, scoring revision, support context and
+individual/group context.
+Delayed checks retain their earlier episode reference and elapsed time even when
+the earlier observation lies outside the displayed window. These are task
+observations, not a calibrated mastery estimate or a causal teacher rating.
+
+`ClassroomInsightsPanel` composes real server data in the existing teacher/student
+panels. Account, class, student and reporting-window changes fence late replies.
+The work gallery fetches selected evidence through the private API when opened.
+Teachers approve the learning plan, add comparable variants, choose a next task,
+record checks and maintain explicit help/intervention records. An unavailable
+optional bridge or disabled collection policy produces a useful disabled state.
+
+`BuildParentReport` freezes sourced facts, chart rows and calculation identity;
+facts name recorded learning tasks and targets, explicit support and the approved
+next activity title. Teacher commentary is separate. Editing creates a new
+unapproved revision.
+Approval and export recheck authorization, current source invalidation and exact
+version in a serializable transaction. Corrections, changed referenced definitions,
+removal and expiry invalidate affected snapshots; new ordinary work does not
+rewrite an approved report. `ParentReportExportController` accepts only the
+validated single-child approved revision after the native save dialog. Main
+escapes report text and atomically replaces the chosen HTML file under its account
+fence. The file has no scripts, remote assets or private evidence links and includes
+a printable table. Existing exported local copies remain outside backend control.
+
+Removal works for active and withdrawn class students. It scrubs private learning
+content and cached reports/receipts, retaining a minimal removal marker and approved
+assignment eligibility references so removed children do not vanish from historical
+denominators. The separately authorized enrollment roster remains.
+`ClassroomInsightRetentionRunner` applies the
+approved policy in bounded startup and periodic batches. The state store retains
+the policy identifier and duration, so disabling capture does not disable expiry
+for previously enabled classes. Expiry removes old
+private source content, marks partial coverage and retains minimal source markers
+so backfill cannot restore expired or removed work. Operator backfill is explicit,
+bounded and idempotent; it recovers retained checks and hand-ins without inventing
+overwritten progress, assignment eligibility or unrecorded support. Current attempt
+writes record their save time for expiry. Legacy standalone workspace values with
+no dated source have unknown age and require operator review; the new policy does
+not invent their date or prove that every legacy value meets the retention period.
+
+The system remains a modular monolith with provider-free dashboard calculations
+and deterministic report wording. Stored projections, a separate analytics worker,
+private object storage, cross-center roles, AI wording and PDF generation remain
+future scopes that require measured demand and their own validation. Enabling a
+real center still requires its collection decision and a reconciled pilot.
+
 ## Local presentation and app updates
 
 Mantine defaults and semantic styling belong in `Theme.ts` and
@@ -386,24 +492,25 @@ try-on generation remain future work; there is no implemented try-on job pipelin
 
 ## Code ownership
 
-| Responsibility                   | Start here                                                                                                                                                                                                                                                                                      |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Renderer and bridge              | [App.tsx](../src/desktop/renderer/App.tsx), [Preload.ts](../src/desktop/preload/Preload.ts), [Main.ts](../src/desktop/main/Main.ts)                                                                                                                                                             |
-| Public boundary schemas          | [contracts](../src/contracts/SystemStatus.ts); domain code consumes framework-free values, never persistence-generated types                                                                                                                                                                    |
-| Auth and saved accounts          | [AuthClient.ts](../src/desktop/main/AuthClient.ts), [AccountSessions.ts](../src/desktop/main/accounts/AccountSessions.ts), [EncryptedAccountVault.ts](../src/desktop/main/accounts/EncryptedAccountVault.ts)                                                                                    |
-| Native host and permissions      | [EmbeddedDesktopDriver.ts](../src/desktop/main/EmbeddedDesktopDriver.ts), [DesktopPermissions.ts](../src/desktop/main/DesktopPermissions.ts), [CursorCompanion.patch](../driver-patches/CursorCompanion.patch)                                                                                  |
-| Chat and worker composition      | [AgentChatController.ts](../src/desktop/main/AgentChatController.ts), [ComputerUseTaskRunner.ts](../src/desktop/worker/agent/ComputerUseTaskRunner.ts)                                                                                                                                          |
-| Execution and verification       | [TaskHarness.ts](../src/desktop/worker/execution/TaskHarness.ts), [TaskVerifier.ts](../src/desktop/worker/execution/TaskVerifier.ts), [CompletionGate.ts](../src/desktop/worker/execution/CompletionGate.ts)                                                                                    |
-| Teaching and native tool adapter | [TeachingTaskRunner.ts](../src/desktop/worker/teaching/TeachingTaskRunner.ts), [TeachingPresenter.ts](../src/desktop/worker/teaching/TeachingPresenter.ts), [LoggedCuaServer.ts](../src/desktop/worker/cua/LoggedCuaServer.ts)                                                                  |
-| Local observation                | [DesktopObservationClient.ts](../src/desktop/worker/observation/DesktopObservationClient.ts), [TeachingObservationPolicy.ts](../src/desktop/worker/observation/TeachingObservationPolicy.ts)                                                                                                    |
-| Companion presentation           | [DesktopCompanion.ts](../src/desktop/main/companion/DesktopCompanion.ts), [CompanionHudPublisher.ts](../src/desktop/worker/companion/CompanionHudPublisher.ts)                                                                                                                                  |
-| Voice and microphones            | [VoiceInputController.ts](../src/desktop/main/voice/VoiceInputController.ts), [VoiceoverController.ts](../src/desktop/main/voiceover/VoiceoverController.ts), [Microphones.ts](../src/desktop/renderer/voice/Microphones.ts)                                                                    |
-| Model gateway                    | [RegisterModelGateway.ts](../src/server/auth/RegisterModelGateway.ts), [ModelGatewayConfig.ts](../src/server/auth/ModelGatewayConfig.ts), [ForwardModelResponse.ts](../src/server/auth/ForwardModelResponse.ts)                                                                                 |
-| Classroom and practice           | [ClassroomService.ts](../src/server/features/classroom/application/ClassroomService.ts), [PracticeCheckService.ts](../src/server/features/classroom/application/PracticeCheckService.ts), [ClassroomSessionController.ts](../src/desktop/main/classroom/ClassroomSessionController.ts)          |
-| Materials and retrieval          | [MaterialService.ts](../src/server/features/materials/application/MaterialService.ts), [PrepareMaterialCollection.ts](../src/server/features/materials/application/PrepareMaterialCollection.ts), [ReadMaterialSources.ts](../src/server/features/materials/application/ReadMaterialSources.ts) |
-| Persistence                      | [PrismaClassroomStore.ts](../src/server/persistence/PrismaClassroomStore.ts), [schema.prisma](../prisma/schema.prisma), reviewed additive migrations                                                                                                                                            |
-| Updates and pets                 | [AppUpdateController.ts](../src/desktop/main/updates/AppUpdateController.ts), [PetController.ts](../src/desktop/main/pets/PetController.ts)                                                                                                                                                     |
-| Runtime configuration            | [backend Env.ts](../src/server/Env.ts), [main Env.ts](../src/desktop/main/Env.ts), [scripts Env.ts](../scripts/Env.ts)                                                                                                                                                                          |
+| Responsibility                   | Start here                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Renderer and bridge              | [App.tsx](../src/desktop/renderer/App.tsx), [Preload.ts](../src/desktop/preload/Preload.ts), [Main.ts](../src/desktop/main/Main.ts)                                                                                                                                                                                                                          |
+| Public boundary schemas          | [contracts](../src/contracts/SystemStatus.ts); domain code consumes framework-free values, never persistence-generated types                                                                                                                                                                                                                                 |
+| Auth and saved accounts          | [AuthClient.ts](../src/desktop/main/AuthClient.ts), [AccountSessions.ts](../src/desktop/main/accounts/AccountSessions.ts), [EncryptedAccountVault.ts](../src/desktop/main/accounts/EncryptedAccountVault.ts)                                                                                                                                                 |
+| Native host and permissions      | [EmbeddedDesktopDriver.ts](../src/desktop/main/EmbeddedDesktopDriver.ts), [DesktopPermissions.ts](../src/desktop/main/DesktopPermissions.ts), [CursorCompanion.patch](../driver-patches/CursorCompanion.patch)                                                                                                                                               |
+| Chat and worker composition      | [AgentChatController.ts](../src/desktop/main/AgentChatController.ts), [ComputerUseTaskRunner.ts](../src/desktop/worker/agent/ComputerUseTaskRunner.ts)                                                                                                                                                                                                       |
+| Execution and verification       | [TaskHarness.ts](../src/desktop/worker/execution/TaskHarness.ts), [TaskVerifier.ts](../src/desktop/worker/execution/TaskVerifier.ts), [CompletionGate.ts](../src/desktop/worker/execution/CompletionGate.ts)                                                                                                                                                 |
+| Teaching and native tool adapter | [TeachingTaskRunner.ts](../src/desktop/worker/teaching/TeachingTaskRunner.ts), [TeachingPresenter.ts](../src/desktop/worker/teaching/TeachingPresenter.ts), [LoggedCuaServer.ts](../src/desktop/worker/cua/LoggedCuaServer.ts)                                                                                                                               |
+| Local observation                | [DesktopObservationClient.ts](../src/desktop/worker/observation/DesktopObservationClient.ts), [TeachingObservationPolicy.ts](../src/desktop/worker/observation/TeachingObservationPolicy.ts)                                                                                                                                                                 |
+| Companion presentation           | [DesktopCompanion.ts](../src/desktop/main/companion/DesktopCompanion.ts), [CompanionHudPublisher.ts](../src/desktop/worker/companion/CompanionHudPublisher.ts)                                                                                                                                                                                               |
+| Voice and microphones            | [VoiceInputController.ts](../src/desktop/main/voice/VoiceInputController.ts), [VoiceoverController.ts](../src/desktop/main/voiceover/VoiceoverController.ts), [Microphones.ts](../src/desktop/renderer/voice/Microphones.ts)                                                                                                                                 |
+| Model gateway                    | [RegisterModelGateway.ts](../src/server/auth/RegisterModelGateway.ts), [ModelGatewayConfig.ts](../src/server/auth/ModelGatewayConfig.ts), [ForwardModelResponse.ts](../src/server/auth/ForwardModelResponse.ts)                                                                                                                                              |
+| Classroom and practice           | [ClassroomService.ts](../src/server/features/classroom/application/ClassroomService.ts), [PracticeCheckService.ts](../src/server/features/classroom/application/PracticeCheckService.ts), [ClassroomSessionController.ts](../src/desktop/main/classroom/ClassroomSessionController.ts)                                                                       |
+| Learning insights and reports    | [ClassroomInsightService.ts](../src/server/features/classroom/application/ClassroomInsightService.ts), [ClassroomInsights.ts](../src/contracts/ClassroomInsights.ts), [ClassroomInsightsPanel.tsx](../src/desktop/renderer/classroom/ClassroomInsightsPanel.tsx), [PrismaClassroomInsightStore.ts](../src/server/persistence/PrismaClassroomInsightStore.ts) |
+| Materials and retrieval          | [MaterialService.ts](../src/server/features/materials/application/MaterialService.ts), [PrepareMaterialCollection.ts](../src/server/features/materials/application/PrepareMaterialCollection.ts), [ReadMaterialSources.ts](../src/server/features/materials/application/ReadMaterialSources.ts)                                                              |
+| Persistence                      | [PrismaClassroomStore.ts](../src/server/persistence/PrismaClassroomStore.ts), [schema.prisma](../prisma/schema.prisma), reviewed additive migrations                                                                                                                                                                                                         |
+| Updates and pets                 | [AppUpdateController.ts](../src/desktop/main/updates/AppUpdateController.ts), [PetController.ts](../src/desktop/main/pets/PetController.ts)                                                                                                                                                                                                                  |
+| Runtime configuration            | [backend Env.ts](../src/server/Env.ts), [main Env.ts](../src/desktop/main/Env.ts), [scripts Env.ts](../scripts/Env.ts)                                                                                                                                                                                                                                       |
 
 Tests mirror `src` under `test`. Production code never imports tests or sibling
 repository source. Framework-free domain rules depend on explicit ports; public
