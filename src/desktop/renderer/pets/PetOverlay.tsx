@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type ReactElement, type PointerEvent } from 'react';
 import { PetMotion, PetOverlayAction, type PetSnapshot } from '#contracts/Pet.js';
 import { PetMascot } from './PetMascot.js';
-import { petRenderer } from './PetPresentation.js';
 import { petMessages } from './PetMessages.js';
 
 export function PetOverlay(): ReactElement | null {
@@ -52,14 +51,6 @@ export function PetOverlay(): ReactElement | null {
     capturedPointer.current = null;
     if (captured?.hasPointerCapture(event.pointerId)) {
       captured.releasePointerCapture(event.pointerId);
-    }
-    if (
-      snapshot &&
-      petRenderer.supportsControlledReactions(snapshot.preferences.activePetId) &&
-      !previous.moved &&
-      event.type === 'pointerup'
-    ) {
-      window.troPet.interactWithPet({ kind: PetOverlayAction.PET });
     }
   }
 
@@ -114,10 +105,6 @@ export function PetOverlay(): ReactElement | null {
         <PetMascot
           petId={snapshot.preferences.activePetId}
           label={`${messages.pet} ${snapshot.preferences.names[snapshot.preferences.activePetId]}`}
-          onSlap={() => {
-            window.troPet.interactWithPet({ kind: PetOverlayAction.SLAP });
-          }}
-          reaction={snapshot.reaction}
           reducedMotion={snapshot.preferences.motion === PetMotion.REDUCED}
         />
       </div>

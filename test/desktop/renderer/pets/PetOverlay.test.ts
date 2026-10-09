@@ -5,7 +5,6 @@ import { afterEach, expect, it, vi } from 'vitest';
 import {
   createPetPreferences,
   PetReaction,
-  PetId,
   PetOverlayAction,
   type PetOverlayBridge,
   type PetSnapshot,
@@ -17,12 +16,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('renders a localized pet and sends a bounded slap command without workspace capabilities', async () => {
+it('renders a localized pet and sends only bounded hover and drag commands', async () => {
   const snapshot: PetSnapshot = {
     revision: 1,
     preferences: {
       ...createPetPreferences(),
-      activePetId: PetId.SLIME,
       locale: 'en',
       enabled: true,
     },
@@ -38,7 +36,7 @@ it('renders a localized pet and sends a bounded slap command without workspace c
   } satisfies PetOverlayBridge;
   window.troPet = bridge;
   render(createElement(PetOverlay));
-  const pet = await screen.findByRole('button', { name: 'Pet Jelly' });
+  const pet = await screen.findByRole('button', { name: 'Pet Mochi' });
   expect(screen.getByRole('status').textContent).toBe('One small step at a time.');
   bridge.interactWithPet.mockClear();
   fireEvent.mouseMove(window);
@@ -61,10 +59,7 @@ it('renders a localized pet and sends a bounded slap command without workspace c
     pet,
     new MouseEvent('pointerup', { bubbles: true, button: 0, screenX: 72, screenY: 100 }),
   );
-  expect(bridge.interactWithPet.mock.calls).toEqual([
-    [{ kind: PetOverlayAction.END_DRAG }],
-    [{ kind: PetOverlayAction.PET }],
-  ]);
+  expect(bridge.interactWithPet.mock.calls).toEqual([[{ kind: PetOverlayAction.END_DRAG }]]);
 
   bridge.interactWithPet.mockClear();
   fireEvent(
@@ -83,7 +78,7 @@ it('renders a localized pet and sends a bounded slap command without workspace c
   ]);
 
   fireEvent.contextMenu(pet);
-  expect(bridge.interactWithPet).toHaveBeenCalledWith({ kind: PetOverlayAction.SLAP });
+  expect(bridge.interactWithPet).not.toHaveBeenCalledWith({ kind: PetOverlayAction.SLAP });
   cleanup();
   expect(bridge.interactWithPet).toHaveBeenLastCalledWith({ kind: PetOverlayAction.END_DRAG });
 });

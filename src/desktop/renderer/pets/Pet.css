@@ -1,6 +1,6 @@
 .pet-gallery {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 .pet-card {
@@ -25,29 +25,6 @@
 .pet-card-preview button:focus-visible {
   outline: 2px solid var(--mantine-color-text);
   outline-offset: 3px;
-}
-.pet-sprite {
-  image-rendering: pixelated;
-  pointer-events: none;
-  user-select: none;
-  object-fit: contain;
-  animation: pet-breathe 3s ease-in-out infinite;
-  transform-origin: 50% 85%;
-}
-.pet-sprite[data-reaction='happy'] {
-  animation: pet-bounce 0.8s ease-out;
-}
-.pet-sprite[data-reaction='startled'] {
-  animation: pet-squash 0.8s ease-out;
-}
-.pet-sprite[data-motion='reduced'] {
-  animation: none;
-}
-.pet-sprite[data-motion='reduced'][data-reaction='happy'] {
-  transform: rotate(-5deg);
-}
-.pet-sprite[data-motion='reduced'][data-reaction='startled'] {
-  transform: scale(1.06, 0.94);
 }
 .pet-overlay {
   width: 144px;
@@ -92,44 +69,6 @@ body.pet-document {
   overflow: hidden;
   background: transparent;
 }
-@keyframes pet-breathe {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-3px);
-  }
-}
-@keyframes pet-bounce {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  35% {
-    transform: translateY(-9px) rotate(-5deg);
-  }
-  65% {
-    transform: translateY(-4px) rotate(4deg);
-  }
-}
-@keyframes pet-squash {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  25% {
-    transform: scale(1.12, 0.82) rotate(5deg);
-  }
-  60% {
-    transform: scale(0.94, 1.06) rotate(-4deg);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .pet-sprite {
-    animation: none;
-  }
-}
 @media (max-width: 760px) {
   .pet-gallery {
     grid-template-columns: 1fr;
@@ -137,8 +76,7 @@ body.pet-document {
 }
 
 .pet-mascot,
-.pet-mascot-still,
-.pet-mascot-button {
+.pet-mascot-still {
   display: block;
   width: 96px;
   height: 96px;
@@ -147,12 +85,6 @@ body.pet-document {
   background-size: 300% 300%;
   background-position: 50% 50%;
   background-repeat: no-repeat;
-}
-.pet-mascot-button {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  cursor: pointer;
 }
 .pet-hit-region button {
   border-radius: 50%;
