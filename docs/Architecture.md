@@ -265,6 +265,16 @@ Keyboard, focused typing and loading actions require a null drawing and an expli
 text-only receipt. The final decision references the presentation rather than
 introducing another unacknowledged instruction.
 
+The drawing contract owns point limits, closure rules and host presentation policy.
+It rejects nonfinite, out-of-range and degenerate paths. Coordinates are normalized
+fractions of the bound screenshot, with a top-left origin, X increasing rightward
+and Y downward. Capture ownership, screenshot pixel dimensions, logical display
+dimensions, scale and capture options remain attached to that observation. The
+worker passes the validated points unchanged; the native compiler maps them to
+logical display points once, and the platform adapter owns compositor origin,
+Y-axis and backing-scale conversion. Attachment previews and guessed window sizes
+do not supply drawing geometry.
+
 `LoggedCuaServer` restricts model tools, binds the lesson and pins drawing version 3.
 Host-generated epochs and presentation IDs cannot be overridden by the model.
 The private native `present_teaching_guidance` tool compiles the bound capture's
@@ -278,13 +288,25 @@ are terminal and are not replayed.
 A paired receipt requires the current HUD message and actual drawing installation.
 An uninterrupted presentation must cover every requested stroke with full reveal
 and the required visible hold. An interrupted presentation reports only strokes
-that appeared, with their actual progress. Pointer-only and clear-only frames
-cannot count as spatial guidance. Fixed teaching gesture generation and V1/V2
-playback compatibility have been removed; incompatible drivers fail admission.
+that appeared, with their actual progress. The
+[receipt validators](../src/contracts/CursorCompanion.ts) bind the epoch,
+presentation, lesson and step, and check unique in-range stroke indices. An
+interrupted spatial receipt requires an installed nonempty stroke; interruption
+before visibility and interrupted text-only presentations cannot report success.
+Pointer-only and clear-only frames cannot count as spatial guidance. Teaching uses
+one scribble renderer and one supported presentation protocol; incompatible drivers
+fail admission.
 
 In the native companion, `ScribbleRenderer` owns curve compilation and bounded
-playback timing. `TeachingGuidanceAdapter` joins capture comparison and paired
-presentation; `CompanionSession` retains session ownership and cursor following.
+playback timing. A pair of points forms a straight segment; longer open paths and
+closed loops use midpoint-based quadratic smoothing. Open endpoints are retained,
+loops close continuously, and redundant neighboring points are removed without
+moving the target. The compiled path supplies rendering, stroke comparison coverage
+and diagnostic bounds. Reveal follows distance along that path; styling, round caps
+and joins, reveal and hold timing belong to the host. Reduced motion skips
+progressive reveal while retaining drawing installation and visible-hold evidence.
+`TeachingGuidanceAdapter` joins capture comparison and paired presentation;
+`CompanionSession` retains session ownership and cursor following.
 `TeachingPresenter` binds pending narration and input matching to the current
 segment. Closing a segment revokes its pending presentation, ends the native epoch
 and drains outstanding calls. A late response cannot commit or clear a newer step;
@@ -353,13 +375,10 @@ rejected images are released. The original one-second message deadline remains.
 Presented means CALayer accepted the current frame, not physical display scan-out.
 A message receipt alone does not satisfy a spatial teaching presentation.
 
-The stale-refresh regression previously separated message 2 from its receipt when
-an old snapshot carried message 1. Common admission, explicit refresh commands and
-the installation fence remove that split ownership. Native build provenance is
-owned by [CuaCompanionBuild.ts](../src/contracts/CuaCompanionBuild.ts). The cleaned
-`0.30.4-tro.19` build passed the permanent regression and real native two-message
-and paired-receipt checks. Temporary render stages and socket profiling were removed;
-concise genuine failures remain. Earlier TLS errors are a separate transport issue.
+Common admission, explicit refresh commands and the installation fence keep HUD
+messages and receipts under the same owner. Native build provenance and the required
+app/driver pairing are owned by
+[CuaCompanionBuild.ts](../src/contracts/CuaCompanionBuild.ts).
 
 A diagnosed gateway HTTP 502 with `provider_network_failed`, SDK connection or
 timeout errors, and validated temporary provider 500/502/503/504 responses pause
@@ -678,6 +697,9 @@ with a scripted local model peer. Its native mode also exercises the real macOS
 host, capture comparison, HUD installations, paired receipts and teardown. A
 validated completion marker prevents a normal app launch from counting as a pass.
 These checks require no paid inference.
+[BuildCuaCompanion.ts](../scripts/BuildCuaCompanion.ts) selects the native companion,
+MCP transport and core-session regressions before building and recording provenance
+for the local driver executable.
 
 Signed macOS/Windows hardware checks still cover global shortcuts, mic routing,
 background capture, transparent-window interactions, physical click/drag/Esc,
@@ -691,8 +713,7 @@ Operational logs record owned stage/reason, correlation IDs and bounded safe fie
 Successful routine polls are quiet. Development exchange tracing is explicitly
 content-bearing and excludes image pixels, secrets and hidden reasoning. Ordinary
 logs never contain screenshots, typed keys, raw configuration or credentials.
-Gateway failures retain safe provider/network/TLS evidence; temporary per-stage
-render and successful-connection profiling is absent. When cause is uncertain,
+Gateway failures retain safe provider/network/TLS evidence. When cause is uncertain,
 instrument the owning boundary before changing behavior.
 
 Teaching coordinate diagnostics emit one `agent.teaching.coordinates.requested`
@@ -711,10 +732,8 @@ means no drawable frame was recorded. A null trace means geometry diagnostics ar
 unavailable, including text-only guidance; it is not a conversion measurement.
 These events contain no instruction text, target labels, screenshots, pixel colors
 or typed content.
-[CuaCompanionBuild.ts](../src/contracts/CuaCompanionBuild.ts) owns the required
-scribble-enabled build. Rebuild and restart the desktop before comparing a new
-capture with its drawing. Painter geometry and CALayer
-acknowledgments do not measure physical display scan-out.
+Painter geometry and CALayer acknowledgments do not measure physical display
+scan-out.
 
 ### Teaching target admission
 
