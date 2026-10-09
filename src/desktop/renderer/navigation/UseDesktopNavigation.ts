@@ -9,7 +9,7 @@ import {
 export interface DesktopNavigation {
   route: DesktopRoute;
   openWorkspace: () => void;
-  openClassroom: () => void;
+  openClassroom: (insights?: boolean) => void;
   openClass: (classId: string, view: ClassView) => void;
 }
 
@@ -34,9 +34,12 @@ export function useDesktopNavigation(): DesktopNavigation {
     openWorkspace: useCallback(() => {
       navigate('#/workspace');
     }, [navigate]),
-    openClassroom: useCallback(() => {
-      navigate('#/classroom');
-    }, [navigate]),
+    openClassroom: useCallback(
+      (insights = false) => {
+        navigate(insights ? '#/insights' : '#/classroom');
+      },
+      [navigate],
+    ),
     openClass: useCallback(
       (classId: string, view: ClassView) => {
         navigate(formatClassRoute(classId, view));

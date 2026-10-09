@@ -24,9 +24,11 @@ import { buildParentReport } from '../domain/BuildParentReport.js';
 import { selectRecordVersions } from '../domain/SelectLearningEvidence.js';
 import type { ClassroomInsightStore, InsightAccess } from './ClassroomInsightStore.js';
 
-export interface ClassroomInsightPolicy {
-  captureClassIds: readonly string[];
-}
+import {
+  canCaptureClassroomLearning,
+  type ClassroomInsightPolicy,
+} from './ClassroomInsightPolicy.js';
+export type { ClassroomInsightPolicy } from './ClassroomInsightPolicy.js';
 
 /** Owns authorized commands and exact report revisions; calculations stay provider-free. */
 export class ClassroomInsightService {
@@ -43,7 +45,7 @@ export class ClassroomInsightService {
       if (!access || access.deleted || (!access.isTeacher && !access.studentIds.includes(userId))) {
         throw new ClassroomInsightError(InsightFailure.FORBIDDEN);
       }
-      const enabled = this.policy.captureClassIds.includes(command.classId);
+      const enabled = canCaptureClassroomLearning(this.policy, command.classId);
       if (command.kind === 'status') {
         const packet = await store.readPacket(command.classId, this.defaultWindow());
         const permitted = access.isTeacher ? packet : restrictPacketToStudent(packet, userId);

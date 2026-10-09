@@ -28,3 +28,15 @@ describe('desktop class routes', () => {
     });
   });
 });
+
+it('opens the insights page with or without an authorized class selection', () => {
+  expect(parseDesktopRoute('#/insights')).toMatchObject({
+    page: DesktopPage.INSIGHTS,
+    classId: null,
+  });
+  expect(parseDesktopRoute(`#/insights/${classId}`)).toMatchObject({
+    page: DesktopPage.INSIGHTS,
+    classId,
+  });
+  expect(parseDesktopRoute('#/insights/not-a-class').classId).toBeNull();
+});

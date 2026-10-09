@@ -1,7 +1,10 @@
 // @vitest-environment happy-dom
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
-import { ClassView } from '../../../../src/desktop/renderer/navigation/DesktopRoute.js';
+import {
+  ClassView,
+  DesktopPage,
+} from '../../../../src/desktop/renderer/navigation/DesktopRoute.js';
 import { useDesktopNavigation } from '../../../../src/desktop/renderer/navigation/UseDesktopNavigation.js';
 
 afterEach(cleanup);
@@ -26,4 +29,17 @@ it('restores a deep class page and follows history hash changes without losing t
     result.current.openClassroom();
   });
   expect(result.current.route.classId).toBeNull();
+});
+
+it('opens insights directly from navigation and returns to classes', () => {
+  const { result } = renderHook(useDesktopNavigation);
+  act(() => {
+    result.current.openClassroom(true);
+  });
+  expect(result.current.route.page).toBe(DesktopPage.INSIGHTS);
+  expect(window.location.hash).toBe('#/insights');
+  act(() => {
+    result.current.openClassroom();
+  });
+  expect(result.current.route.page).toBe(DesktopPage.CLASSROOM);
 });

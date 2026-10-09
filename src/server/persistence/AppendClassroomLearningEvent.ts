@@ -1,3 +1,4 @@
+import type { ClassroomInsightPolicy } from '../features/classroom/application/ClassroomInsightPolicy.js';
 import { validateClassroomInsightRecord } from './ValidateClassroomInsightRecord.js';
 import { ClassroomInsightError } from '../features/classroom/domain/ClassroomInsightError.js';
 import { createHash, randomUUID } from 'node:crypto';
@@ -136,8 +137,7 @@ export async function appendClassroomLearningEvent(
   return record;
 }
 
-export interface LearningCapturePolicy {
-  captureClassIds: readonly string[];
+export interface LearningCapturePolicy extends ClassroomInsightPolicy {
   collectionPolicy?: string | undefined;
   retentionDays?: number | undefined;
 }

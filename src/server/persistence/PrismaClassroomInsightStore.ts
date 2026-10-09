@@ -591,11 +591,34 @@ export function createPrismaClassroomInsightStore(
   };
   const purgeExpiredSources = async (now: Date, retentionDays?: number) => {
     await registerConfiguredPolicies(retentionDays);
-    const configuredClassId = capturePolicy.captureClassIds[retentionClassIndex];
+    const configuredClassId = capturePolicy.captureAllClasses
+      ? undefined
+      : capturePolicy.captureClassIds[retentionClassIndex];
     let classId = configuredClassId;
     let days = retentionDays ?? capturePolicy.retentionDays;
     let hasAnotherStoredClass = false;
-    if (!classId && lifecycle.resumeStoredRetentionPolicies) {
+    if (capturePolicy.captureAllClasses) {
+      const classes = await client.classroomGroup.findMany({
+        where: storedPolicyCursor ? { id: { gt: storedPolicyCursor } } : {},
+        orderBy: { id: 'asc' },
+        take: 2,
+        select: { id: true },
+      });
+      classId = classes[0]?.id;
+      hasAnotherStoredClass = classes.length > 1;
+      if (classId && capturePolicy.collectionPolicy && days !== undefined) {
+        await client.classroomInsightState.upsert({
+          where: { classId },
+          create: {
+            classId,
+            collectionPolicy: capturePolicy.collectionPolicy,
+            retentionDays: days,
+          },
+          update: { collectionPolicy: capturePolicy.collectionPolicy, retentionDays: days },
+        });
+      }
+    }
+    if (!capturePolicy.captureAllClasses && !classId && lifecycle.resumeStoredRetentionPolicies) {
       const policies = await client.classroomInsightState.findMany({
         where: {
           retentionDays: { not: null },
