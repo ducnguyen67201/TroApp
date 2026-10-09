@@ -143,6 +143,26 @@ export async function checkNativeHudRendering(server: MCPServerStdio): Promise<v
     sequence: 10,
     expectedToken: nextReceipt.renderToken,
   });
+  for (const [index, locale] of (['vi', 'en'] as const).entries()) {
+    await send({
+      kind: CompanionHudCommandKind.UPDATE_APPEARANCE,
+      group,
+      sequence: 11 + index,
+      phase: 'practice_ready',
+      locale,
+      level: 0,
+      speakingSequence: null,
+    });
+  }
+  await send({
+    kind: CompanionHudCommandKind.UPDATE_APPEARANCE,
+    group,
+    sequence: 13,
+    phase: 'idle',
+    locale: 'en',
+    level: 0,
+    speakingSequence: null,
+  });
   console.info(
     'PASS native HUD: two CALayer installations, stale snapshot, renewal, speaking/appearance, token readback and conditional clear.',
   );

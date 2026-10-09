@@ -1,5 +1,5 @@
 diff --git a/libs/cua-driver/rust/Cargo.lock b/libs/cua-driver/rust/Cargo.lock
-index 74051d8..f2f37ac 100644
+index 74051d8..32d1881 100644
 --- a/libs/cua-driver/rust/Cargo.lock
 +++ b/libs/cua-driver/rust/Cargo.lock
 @@ -1205,7 +1205,7 @@ dependencies = [
@@ -7,7 +7,7 @@ index 74051d8..f2f37ac 100644
  [[package]]
  name = "cua-driver"
 -version = "0.30.4"
-+version = "0.30.4-tro.21"
++version = "0.30.4-tro.22"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -16,7 +16,7 @@ index 74051d8..f2f37ac 100644
  [[package]]
  name = "cua-driver-bindgen"
 -version = "0.30.4"
-+version = "0.30.4-tro.21"
++version = "0.30.4-tro.22"
  dependencies = [
   "cbindgen",
   "uniffi",
@@ -25,7 +25,7 @@ index 74051d8..f2f37ac 100644
  [[package]]
  name = "cua-driver-contract"
 -version = "0.30.4"
-+version = "0.30.4-tro.21"
++version = "0.30.4-tro.22"
  dependencies = [
   "schemars",
   "serde",
@@ -34,7 +34,7 @@ index 74051d8..f2f37ac 100644
  [[package]]
  name = "cua-driver-core"
 -version = "0.30.4"
-+version = "0.30.4-tro.21"
++version = "0.30.4-tro.22"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -43,7 +43,7 @@ index 74051d8..f2f37ac 100644
  [[package]]
  name = "cua-driver-e2e"
 -version = "0.30.4"
-+version = "0.30.4-tro.21"
++version = "0.30.4-tro.22"
  dependencies = [
   "base64",
   "core-foundation",
@@ -52,7 +52,7 @@ index 74051d8..f2f37ac 100644
  [[package]]
  name = "cua-driver-sdk"
 -version = "0.30.4"
-+version = "0.30.4-tro.21"
++version = "0.30.4-tro.22"
  dependencies = [
   "async-trait",
   "core-foundation",
@@ -61,7 +61,7 @@ index 74051d8..f2f37ac 100644
  [[package]]
  name = "cua-driver-testkit"
 -version = "0.30.4"
-+version = "0.30.4-tro.21"
++version = "0.30.4-tro.22"
  dependencies = [
   "arbitrary",
   "async-trait",
@@ -70,7 +70,7 @@ index 74051d8..f2f37ac 100644
  [[package]]
  name = "cua-driver-uia"
 -version = "0.30.4"
-+version = "0.30.4-tro.21"
++version = "0.30.4-tro.22"
  dependencies = [
   "anyhow",
   "cua-driver-core",
@@ -79,7 +79,7 @@ index 74051d8..f2f37ac 100644
  [[package]]
  name = "cursor-overlay"
 -version = "0.30.4"
-+version = "0.30.4-tro.21"
++version = "0.30.4-tro.22"
  dependencies = [
   "anyhow",
   "cua-driver-contract",
@@ -88,7 +88,7 @@ index 74051d8..f2f37ac 100644
  [[package]]
  name = "cursor-theme-cli"
 -version = "0.30.4"
-+version = "0.30.4-tro.21"
++version = "0.30.4-tro.22"
  dependencies = [
   "anyhow",
   "cursor-overlay",
@@ -97,7 +97,7 @@ index 74051d8..f2f37ac 100644
  [[package]]
  name = "pip-preview"
 -version = "0.30.4"
-+version = "0.30.4-tro.21"
++version = "0.30.4-tro.22"
  dependencies = [
   "serde_json",
  ]
@@ -106,7 +106,7 @@ index 74051d8..f2f37ac 100644
  [[package]]
  name = "platform-linux"
 -version = "0.30.4"
-+version = "0.30.4-tro.21"
++version = "0.30.4-tro.22"
  dependencies = [
   "anyhow",
   "ashpd",
@@ -115,7 +115,7 @@ index 74051d8..f2f37ac 100644
  [[package]]
  name = "platform-macos"
 -version = "0.30.4"
-+version = "0.30.4-tro.21"
++version = "0.30.4-tro.22"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -124,12 +124,12 @@ index 74051d8..f2f37ac 100644
  [[package]]
  name = "platform-windows"
 -version = "0.30.4"
-+version = "0.30.4-tro.21"
++version = "0.30.4-tro.22"
  dependencies = [
   "anyhow",
   "async-trait",
 diff --git a/libs/cua-driver/rust/Cargo.toml b/libs/cua-driver/rust/Cargo.toml
-index 53edeb0..ef3c8cf 100644
+index 53edeb0..a2bd798 100644
 --- a/libs/cua-driver/rust/Cargo.toml
 +++ b/libs/cua-driver/rust/Cargo.toml
 @@ -19,7 +19,7 @@ members = [
@@ -137,7 +137,7 @@ index 53edeb0..ef3c8cf 100644
  
  [workspace.package]
 -version = "0.30.4"
-+version = "0.30.4-tro.21"
++version = "0.30.4-tro.22"
  edition = "2021"
  authors = ["trycua"]
  license = "MIT"
@@ -770,10 +770,10 @@ index 0000000..634cdd6
 +}
 diff --git a/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs
 new file mode 100644
-index 0000000..8b1cb82
+index 0000000..388a511
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs
-@@ -0,0 +1,351 @@
+@@ -0,0 +1,352 @@
 +//! Host-only content-free presentation vocabulary; no desktop action semantics.
 +use crate::{Platform, SchemaMode, ToolAnnotations, ToolContract, ToolInput, ToolOutput};
 +use schemars::JsonSchema;
@@ -784,6 +784,7 @@ index 0000000..8b1cb82
 +pub enum CompanionHudPhase {
 +    #[default]
 +    Idle,
++    PracticeReady,
 +    Preparing,
 +    Listening,
 +    Transcribing,
@@ -3315,10 +3316,10 @@ index 0000000..cceea34
 +}
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs
 new file mode 100644
-index 0000000..d28211e
+index 0000000..1d8163a
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs
-@@ -0,0 +1,484 @@
+@@ -0,0 +1,574 @@
 +//! Compact host HUD in logical points. Never posts input or performs submission.
 +use cua_driver_contract::{CompanionHudLocale as Locale, CompanionHudPhase as Phase};
 +use fontdue::layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle};
@@ -3387,7 +3388,13 @@ index 0000000..d28211e
 +        if self.alpha <= 0.002 && self.message.message.is_none() {
 +            return;
 +        }
-+        let width = if self.locale == Locale::Vietnamese {
++        let width = if self.phase == Phase::PracticeReady {
++            if self.locale == Locale::Vietnamese {
++                110.0
++            } else {
++                100.0
++            }
++        } else if self.locale == Locale::Vietnamese {
 +            98.0
 +        } else {
 +            HUD_WIDTH
@@ -3508,6 +3515,10 @@ index 0000000..d28211e
 +        alpha: f32,
 +        reduced: bool,
 +    ) {
++        if phase == Phase::PracticeReady {
++            paint_practice_shortcut(image, (x, y), width, scale, alpha, self.locale);
++            return;
++        }
 +        let transform = Transform::from_scale(scale, scale);
 +        let blue = paint([138, 200, 250], alpha);
 +        let icon_x = x + 7.0;
@@ -3628,11 +3639,12 @@ index 0000000..d28211e
 +    if locale == Locale::Vietnamese {
 +        return match phase {
 +            Phase::Idle => "",
++            Phase::PracticeReady => "Kiểm tra bài",
 +            Phase::Preparing => "Chuẩn bị…",
 +            Phase::Listening => "Đang nghe",
 +            Phase::Transcribing => "Chuyển lời…",
 +            Phase::Sending => "Đang gửi…",
-+            Phase::Checking => "Đang kiểm tra…",
++            Phase::Checking => "Kiểm tra…",
 +            Phase::Submitting => "Đang nộp…",
 +            Phase::Checked => "Có phản hồi",
 +            Phase::Submitted => "Đã nộp bài",
@@ -3649,11 +3661,12 @@ index 0000000..d28211e
 +    }
 +    match phase {
 +        Phase::Idle => "",
++        Phase::PracticeReady => "Check work",
 +        Phase::Preparing => "Preparing…",
 +        Phase::Listening => "Listening",
 +        Phase::Transcribing => "Transcribing…",
 +        Phase::Sending => "Sending…",
-+        Phase::Checking => "Checking work…",
++        Phase::Checking => "Checking…",
 +        Phase::Submitting => "Submitting…",
 +        Phase::Checked => "Feedback ready",
 +        Phase::Submitted => "Hand-in saved",
@@ -3668,6 +3681,52 @@ index 0000000..d28211e
 +        Phase::NeedsInput => "Needs input",
 +    }
 +}
++/// macOS-only native HUD: a vector Command glyph avoids missing font symbols.
++fn paint_practice_shortcut(
++    image: &mut Pixmap,
++    origin: (f32, f32),
++    width: f32,
++    scale: f32,
++    alpha: f32,
++    locale: Locale,
++) {
++    let (x, y) = origin;
++    let transform = Transform::from_scale(scale, scale);
++    let ink = paint([138, 200, 250], alpha);
++    let mut command = PathBuilder::new();
++    command.move_to(x + 12.0, y + 8.0);
++    command.line_to(x + 18.0, y + 8.0);
++    command.cubic_to(x + 22.0, y + 8.0, x + 22.0, y + 4.0, x + 18.0, y + 4.0);
++    command.line_to(x + 18.0, y + 14.0);
++    command.cubic_to(x + 18.0, y + 18.0, x + 22.0, y + 18.0, x + 22.0, y + 14.0);
++    command.line_to(x + 12.0, y + 14.0);
++    command.cubic_to(x + 8.0, y + 14.0, x + 8.0, y + 18.0, x + 12.0, y + 18.0);
++    command.line_to(x + 12.0, y + 8.0);
++    command.cubic_to(x + 12.0, y + 4.0, x + 8.0, y + 4.0, x + 8.0, y + 8.0);
++    command.close();
++    if let Some(path) = command.finish() {
++        image.stroke_path(
++            &path,
++            &ink,
++            &Stroke {
++                width: 0.9,
++                ..Default::default()
++            },
++            transform,
++            None,
++        );
++    }
++    paint_text(image, "K", (x + 25.0, y), 7.0, scale, alpha);
++    paint_text(
++        image,
++        label(Phase::PracticeReady, locale),
++        (x + 36.0, y),
++        width - 42.0,
++        scale,
++        alpha,
++    );
++}
++
 +fn paint_text(
 +    image: &mut Pixmap,
 +    text: &str,
@@ -3743,6 +3802,38 @@ index 0000000..d28211e
 +mod tests {
 +    use super::*;
 +    #[test]
++    fn companion_practice_shortcut_renders_glyph_and_localized_label() {
++        assert_eq!(label(Phase::PracticeReady, Locale::English), "Check work");
++        assert_eq!(
++            label(Phase::PracticeReady, Locale::Vietnamese),
++            "Kiểm tra bài"
++        );
++        for locale in [Locale::English, Locale::Vietnamese] {
++            for scale in [1.0, 2.0] {
++                let mut image = Pixmap::new((200.0 * scale) as u32, (80.0 * scale) as u32).unwrap();
++                let width = if locale == Locale::Vietnamese {
++                    110.0
++                } else {
++                    100.0
++                };
++                paint_practice_shortcut(&mut image, (8.0, 8.0), width, scale, 1.0, locale);
++                assert!(
++                    image
++                        .data()
++                        .chunks_exact(4)
++                        .filter(|pixel| pixel[3] > 0)
++                        .count()
++                        > 100
++                );
++                let shortcut_background = image
++                    .pixel((15.0 * scale) as u32, (13.0 * scale) as u32)
++                    .unwrap();
++                assert_eq!(shortcut_background.alpha(), 0);
++            }
++        }
++    }
++
++    #[test]
 +    fn companion_hud_renders_clamped_retina_and_fades() {
 +        for scale in [1.0, 2.0] {
 +            let mut pm = Pixmap::new((200.0 * scale) as u32, (100.0 * scale) as u32).unwrap();
@@ -3759,7 +3850,7 @@ index 0000000..d28211e
 +    }
 +    #[test]
 +    fn companion_hud_practice_labels_do_not_claim_a_passing_result() {
-+        assert_eq!(label(Phase::Checking, Locale::English), "Checking work…");
++        assert_eq!(label(Phase::Checking, Locale::English), "Checking…");
 +        assert_eq!(label(Phase::Submitting, Locale::Vietnamese), "Đang nộp…");
 +        assert_eq!(label(Phase::Checked, Locale::English), "Feedback ready");
 +        assert_eq!(label(Phase::Submitted, Locale::Vietnamese), "Đã nộp bài");

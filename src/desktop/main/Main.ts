@@ -438,6 +438,7 @@ async function startDesktop(): Promise<void> {
     const parsed = VoiceoverPreferenceSchema.safeParse(raw);
     if (isTrustedSender(event) && parsed.success) {
       narration.setLocale(parsed.data.locale);
+      desktopCompanion?.hud.setLocale(parsed.data.locale);
       narration.setEnabled(parsed.data.enabled);
     }
   });
@@ -497,15 +498,20 @@ async function startDesktop(): Promise<void> {
     (context) => {
       if (!context) {
         practiceShortcut.disable();
+        desktopCompanion?.hud.setPracticeShortcutAvailable(false);
         practiceCapture.dispose();
         return;
       }
-      if (practiceShortcut.isAvailable()) {
-        return;
+      if (!practiceShortcut.isAvailable()) {
+        practiceShortcut.enable(() => {
+          void openPracticeCapture();
+        });
       }
-      practiceShortcut.enable(() => {
-        void openPracticeCapture();
-      });
+      const shortcutAvailable = practiceShortcut.isAvailable();
+      desktopCompanion?.hud.setPracticeShortcutAvailable(shortcutAvailable);
+      if (shortcutAvailable) {
+        void desktopCompanion?.startPresentation();
+      }
     },
   );
   let openingPracticeCapture = false;

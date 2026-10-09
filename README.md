@@ -122,7 +122,9 @@ after changing that permission if necessary. Manual text/code, PNG/JPEG, PDF and
 uploads are also supported within the [evidence limits](src/contracts/PracticeCheck.ts).
 PDF checking reads text; Scratch checking reads structure without running the project.
 The HUD shows localized checking and feedback status when voice/teaching is idle;
-the practice panel always shows request progress. Inspect feedback,
+the practice panel always shows request progress. On macOS, an idle native HUD shows
+**⌘ K · Check work** (**Kiểm tra bài**) when an approved Practice task and the global
+shortcut are available. The hint opens capture/review; hand-in still needs confirmation. Inspect feedback,
 request a hint or targeted Show me, then independently confirm hand-in. Confirm
 teacher results show the exact saved evidence/version. A live class must end before
 confirmed deletion. Class deletion preserves work/history; removing a material

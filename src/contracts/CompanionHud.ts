@@ -4,6 +4,7 @@ import { TeachingMessageSchema } from './TeachingStep.js';
 
 export const CompanionHudPhase = {
   IDLE: 'idle',
+  PRACTICE_READY: 'practice_ready',
   PREPARING: 'preparing',
   LISTENING: 'listening',
   TRANSCRIBING: 'transcribing',

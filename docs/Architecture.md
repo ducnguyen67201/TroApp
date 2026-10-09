@@ -540,7 +540,15 @@ Manual text, supported images, PDF and sb3 uploads remain available. Capture pro
 time, dimensions and a digest, not proof of authorship or execution. Preload validates narrow
 capture commands/replies; main rejects changed or expired captured evidence.
 
-The HUD uses the request locale for Checking work / Đang kiểm tra, feedback ready,
+While idle, the macOS native HUD shows a compact vector Command symbol and K beside
+Check work / Kiểm tra bài when the joined Practice activity has an approved checkpoint
+and its global shortcut is registered. `CompanionHudController` owns the display-only
+practice-ready phase; active voice, teaching and evaluation take priority. The hint returns
+after transient status fades and clears on eligibility loss or presentation reset. The
+shortcut opens capture/review; it never confirms hand-in. Windows keeps its Alt + K
+workflow; native companion rendering remains macOS-only.
+
+The HUD uses the request locale for Checking… / Kiểm tra…, feedback ready,
 submission and failure phases. Request IDs, history matching and a bounded presentation timer
 fence late replies. Active voice or teaching guidance retains HUD priority; the practice panel
 still displays check progress. A successful check is formative feedback, never a grade.
