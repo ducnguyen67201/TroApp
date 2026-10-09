@@ -1,10 +1,14 @@
 // @vitest-environment happy-dom
-import { createElement } from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { type ReactNode, createElement } from 'react';
+import { cleanup, fireEvent, render as renderView, screen } from '@testing-library/react';
+import { LocaleProvider } from '../../../../src/desktop/renderer/localization/LocaleProvider.js';
 import { afterEach, expect, it, vi } from 'vitest';
 import { LearningProgressChart } from '../../../../src/desktop/renderer/classroom/LearningProgressChart.js';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.localStorage.clear();
+});
 
 it('shows criterion counts and accessible lesson selection without inventing an ability score', () => {
   const select = vi.fn<(sessionId: string) => void>();
@@ -45,3 +49,8 @@ it('shows criterion counts and accessible lesson selection without inventing an 
   );
   expect(screen.queryByText(/mastery|100%/i)).toBeNull();
 });
+
+function render(view: ReactNode): ReturnType<typeof renderView> {
+  window.localStorage.setItem('tro.desktop.locale', 'en');
+  return renderView(view, { wrapper: LocaleProvider });
+}

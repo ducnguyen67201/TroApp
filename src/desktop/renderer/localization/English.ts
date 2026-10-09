@@ -1,8 +1,10 @@
+import { readInsightMessages } from './InsightMessages.js';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
 import { readClassroomMessages } from '../../localization/ClassroomMessages.js';
 
 /** Canonical desktop copy. Other catalogs must implement every key and parameter. */
 export const english = {
+  ...readInsightMessages(DesktopLocale.ENGLISH),
   ...readClassroomMessages(DesktopLocale.ENGLISH),
   switchAccount: 'Switch account',
   savedAccounts: 'Accounts on this device',

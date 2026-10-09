@@ -1,3 +1,4 @@
+import { useLocale } from '../localization/UseLocale.js';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import { Button, Group, Select, Stack, Tabs, Text, TextInput } from '@mantine/core';
 import {
@@ -51,6 +52,8 @@ export function ClassroomInsightsPanel({
   classSessionId = null,
   context = null,
 }: ClassroomInsightsPanelProps): ReactElement {
+  const { locale, messages } = useLocale();
+  const t = messages.translateInsight;
   const [period, setPeriod] = useState(createDefaultWindow);
   const [from, setFrom] = useState(() => formatDateInput(new Date(period.from)));
   const [to, setTo] = useState(() => formatDateInput(new Date(period.to)));
@@ -176,33 +179,34 @@ export function ClassroomInsightsPanel({
     '';
   const hasControls = Boolean(readInsightBridge()?.controlClassroomInsights);
   return (
-    <section className="learning-insights" aria-label="Learning insights">
+    <section className="learning-insights" aria-label={t('Learning insights')}>
       <Group justify="space-between">
-        <h2>Learning insights</h2>
+        <h2>{t('Learning insights')}</h2>
         <Button variant="default" size="xs" disabled={busy || !hasControls} onClick={refresh}>
-          Refresh
+          {t('Refresh')}
         </Button>
       </Group>
       {!hasControls ? (
         <Text size="sm" c="dimmed">
-          Learning insights are unavailable in this app version.
+          {t('Learning insights are unavailable in this app version.')}
         </Text>
       ) : (
         <>
           {busy && (
             <Text size="sm" role="status">
-              Loading learning insights…
+              {t('Loading learning insights…')}
             </Text>
           )}
           {message && (
             <Text size="sm" role="alert">
-              {message}
+              {t(message)}
             </Text>
           )}
           {visibleStatus && !visibleStatus.enabled && (
             <Text size="sm" c="dimmed">
-              Learning insights are unavailable for this class. Collection permissions must be in
-              place before the feature is enabled.
+              {t(
+                'Learning insights are unavailable for this class. Collection permissions must be in place before the feature is enabled.',
+              )}
             </Text>
           )}
           {visibleStatus?.enabled && (
@@ -210,7 +214,8 @@ export function ClassroomInsightsPanel({
               <Group align="end">
                 <TextInput
                   type="date"
-                  label="From"
+                  lang={locale}
+                  label={t('From')}
                   value={from}
                   onChange={(event) => {
                     setFrom(event.currentTarget.value);
@@ -218,7 +223,8 @@ export function ClassroomInsightsPanel({
                 />
                 <TextInput
                   type="date"
-                  label="Through"
+                  lang={locale}
+                  label={t('Through')}
                   value={to}
                   onChange={(event) => {
                     setTo(event.currentTarget.value);
@@ -245,11 +251,11 @@ export function ClassroomInsightsPanel({
                     setPeriod(parsed.data);
                   }}
                 >
-                  Apply period
+                  {t('Apply period')}
                 </Button>
                 {isTeacher && (
                   <Select
-                    label="Student"
+                    label={t('Student')}
                     value={studentId}
                     data={visibleStatus.students.map((student) => ({
                       value: student.id,
@@ -263,10 +269,10 @@ export function ClassroomInsightsPanel({
               {isTeacher ? (
                 <Tabs defaultValue="journey" keepMounted>
                   <Tabs.List>
-                    <Tabs.Tab value="journey">Student journey</Tabs.Tab>
-                    <Tabs.Tab value="class">Class insights</Tabs.Tab>
-                    <Tabs.Tab value="parent">Parent report</Tabs.Tab>
-                    <Tabs.Tab value="definitions">Learning definitions</Tabs.Tab>
+                    <Tabs.Tab value="journey">{t('Student journey')}</Tabs.Tab>
+                    <Tabs.Tab value="class">{t('Class insights')}</Tabs.Tab>
+                    <Tabs.Tab value="parent">{t('Parent report')}</Tabs.Tab>
+                    <Tabs.Tab value="definitions">{t('Learning definitions')}</Tabs.Tab>
                   </Tabs.List>
                   <Tabs.Panel value="journey" pt="lg">
                     {visibleProgress ? (
@@ -281,7 +287,7 @@ export function ClassroomInsightsPanel({
                         onSaved={refresh}
                       />
                     ) : (
-                      <Text size="sm">Choose a student to see saved work.</Text>
+                      <Text size="sm">{t('Choose a student to see saved work.')}</Text>
                     )}
                   </Tabs.Panel>
                   <Tabs.Panel value="class" pt="lg">
@@ -290,36 +296,39 @@ export function ClassroomInsightsPanel({
                         <>
                           <div className="learning-stat-grid">
                             <div className="learning-stat">
-                              <span>Assigned students</span>
+                              <span>{t('Assigned students')}</span>
                               <strong>{summary.eligible ?? '—'}</strong>
-                              <small>From this lesson’s approved assignment</small>
+                              <small>{t('From this lesson’s approved assignment')}</small>
                             </div>
                             <div className="learning-stat">
-                              <span>Students with checked work</span>
+                              <span>{t('Students with checked work')}</span>
                               <strong>{summary.checked}</strong>
-                              <small>Results within the selected period</small>
+                              <small>{t('Results within the selected period')}</small>
                             </div>
                             <div className="learning-stat">
-                              <span>No checked result shown</span>
+                              <span>{t('No checked result shown')}</span>
                               <strong>{summary.unknown ?? '—'}</strong>
-                              <small>Unknown when assignment coverage is missing</small>
+                              <small>{t('Unknown when assignment coverage is missing')}</small>
                             </div>
                           </div>
                           {summary.criteria.map((criterion) => (
                             <article key={criterion.criterionId} className="learning-work-card">
                               <h3>{criterion.description}</h3>
                               <p>
-                                {criterion.counts.needsChanges} need practice ·{' '}
-                                {criterion.counts.met} met ·{' '}
-                                {criterion.counts.insufficient + criterion.counts.notChecked} no
-                                result shown ·{' '}
-                                {criterion.counts.conflict + criterion.counts.removed} need review
+                                {criterion.counts.needsChanges} {t('need practice')} ·{' '}
+                                {criterion.counts.met} {t('met')} ·{' '}
+                                {criterion.counts.insufficient + criterion.counts.notChecked}{' '}
+                                {t('no result shown')} ·{' '}
+                                {criterion.counts.conflict + criterion.counts.removed}{' '}
+                                {t('need review')}
                               </p>
                             </article>
                           ))}
                           <Text size="xs" c="dimmed">
-                            Latest saved findings through revision {summary.identity.sourceRevision}
-                            . A past result does not show who needs help right now.
+                            {t(
+                              'Latest saved findings through revision {revision}. A past result does not show who needs help right now.',
+                              { revision: summary.identity.sourceRevision },
+                            )}
                           </Text>
                           <TeacherHelpQueue
                             classId={classId}

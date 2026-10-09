@@ -1,13 +1,17 @@
 // @vitest-environment happy-dom
 import { randomUUID } from 'node:crypto';
-import { createElement, type ComponentProps } from 'react';
+import { type ReactNode, createElement, type ComponentProps } from 'react';
 import { MantineProvider } from '@mantine/core';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render as renderView, screen } from '@testing-library/react';
+import { LocaleProvider } from '../../../../src/desktop/renderer/localization/LocaleProvider.js';
 import { afterEach, expect, it, vi } from 'vitest';
 import { NextLearningTaskPicker } from '../../../../src/desktop/renderer/classroom/NextLearningTaskPicker.js';
 import { createStudentProgress } from '../../ClassroomInsightDesktopFixtures.js';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.localStorage.clear();
+});
 
 it.each([true, false])(
   'shows the captured next-task title when current activity metadata is missing: %s',
@@ -83,3 +87,8 @@ it('keeps a legacy next-task selection visible when its title and current activi
   expect(screen.getByText('Teacher-selected activity')).toBeTruthy();
   expect(screen.getByText('Task details are unavailable.')).toBeTruthy();
 });
+
+function render(view: ReactNode): ReturnType<typeof renderView> {
+  window.localStorage.setItem('tro.desktop.locale', 'en');
+  return renderView(view, { wrapper: LocaleProvider });
+}

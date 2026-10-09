@@ -1,3 +1,4 @@
+import { useLocale } from '../localization/UseLocale.js';
 import { useState, type ReactElement } from 'react';
 import { Button, Select, Stack, Text, TextInput } from '@mantine/core';
 import type { TeachingContext } from '#contracts/Classroom.js';
@@ -18,6 +19,8 @@ export function StudentHelpRequest({
   send,
   onSaved,
 }: StudentHelpRequestProps): ReactElement {
+  const { messages } = useLocale();
+  const t = messages.translateInsight;
   const [id, setId] = useState(() => crypto.randomUUID());
   const [category, setCategory] = useState('');
   const [criterionId, setCriterionId] = useState<string | null>(null);
@@ -25,11 +28,11 @@ export function StudentHelpRequest({
   const [message, setMessage] = useState<string | null>(null);
   return (
     <details>
-      <summary>Ask your teacher for help</summary>
+      <summary>{t('Ask your teacher for help')}</summary>
       <Stack mt="sm" gap="sm">
-        <Text size="sm">Tell your teacher which part you want to work through.</Text>
+        <Text size="sm">{t('Tell your teacher which part you want to work through.')}</Text>
         <TextInput
-          label="What would you like help with?"
+          label={t('What would you like help with?')}
           value={category}
           maxLength={200}
           onChange={(event) => {
@@ -39,7 +42,7 @@ export function StudentHelpRequest({
         />
         <Select
           clearable
-          label="Part of the task"
+          label={t('Part of the task')}
           value={criterionId}
           data={context.activity.criteria.map((criterion) => ({
             value: criterion.id,
@@ -79,11 +82,11 @@ export function StudentHelpRequest({
             });
           }}
         >
-          Send help request
+          {t('Send help request')}
         </Button>
         {message && (
           <Text size="sm" role="status">
-            {message}
+            {t(message)}
           </Text>
         )}
       </Stack>
