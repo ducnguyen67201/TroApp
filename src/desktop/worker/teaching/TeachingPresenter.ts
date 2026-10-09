@@ -2,7 +2,10 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
 import type { DesktopLocale } from '#contracts/DesktopLocale.js';
-import { CursorGuidanceResultSchema } from '#contracts/CursorCompanion.js';
+import {
+  CursorGuidanceResultSchema,
+  GuidanceCoordinateTraceSchema,
+} from '#contracts/CursorCompanion.js';
 import {
   TeachingPresentationReceiptSchema,
   type PresentTeachingStep,
@@ -65,6 +68,17 @@ export class TeachingPresenter {
     // this action; history records approximate attempts, not proof of visibility.
     this.tracker.registerStep(message.stepId, geometry.interaction);
     this.prepareMessage(message);
+    this.log.info(
+      {
+        lessonId: this.lesson.id,
+        stepId: message.stepId,
+        presentationId,
+        captureId: proposal.captureId,
+        actionKind: proposal.action.kind,
+        targetsNormalized: geometry.targets,
+      },
+      'agent.teaching.coordinates.requested',
+    );
     let published = false;
     try {
       const native = await this.server.showTeachingCue(
@@ -98,6 +112,20 @@ export class TeachingPresenter {
           refusal.success ? refusal.data.code : 'paired_presentation_missing',
         );
       }
+      const coordinateTrace = GuidanceCoordinateTraceSchema.safeParse(parsed.data.coordinate_trace);
+      this.log.info(
+        {
+          lessonId: this.lesson.id,
+          stepId: message.stepId,
+          presentationId,
+          captureId: proposal.captureId,
+          coordinateTrace: coordinateTrace.success ? coordinateTrace.data : null,
+          coordinateTraceAvailable: coordinateTrace.success,
+          drawingPresented: parsed.data.receipt.drawing_presented,
+          interrupted: parsed.data.receipt.interrupted,
+        },
+        'agent.teaching.coordinates.converted',
+      );
       const interrupted = parsed.data.receipt.interrupted;
       const receipt = TeachingPresentationReceiptSchema.parse({
         lessonId: this.lesson.id,

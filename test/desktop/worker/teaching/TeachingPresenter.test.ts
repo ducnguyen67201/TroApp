@@ -11,7 +11,7 @@ import { DesktopLocale } from '#contracts/DesktopLocale.js';
 import type { TeachingMessage } from '#contracts/TeachingStep.js';
 
 function setup() {
-  const { lesson, proposal } = createLesson();
+  const { lesson, proposal, capture } = createLesson();
   const log = pino({ level: 'silent' });
   const server = new LoggedCuaServer(
     { name: 'Unused presentation transport', command: 'unused' },
@@ -32,7 +32,7 @@ function setup() {
     prepare,
     revoke,
   );
-  return { lesson, proposal, server, tracker, publish, prepare, revoke, presenter };
+  return { lesson, proposal, capture, server, tracker, publish, prepare, revoke, presenter, log };
 }
 
 it.each([false, true])(
@@ -215,3 +215,206 @@ it('revokes pending narration when the native presentation throws', async () => 
   expect(prepare).toHaveBeenCalledOnce();
   expect(revoke.mock.calls).toEqual(prepare.mock.calls);
 });
+
+it('logs correlated native coordinates without instruction text and preserves interrupted geometry', async () => {
+  const { proposal, server, presenter, log } = setup();
+  const info = vi.spyOn(log, 'info');
+  const coordinateTrace = {
+    capture_id: 'fresh-capture',
+    screen_size_points: [1000, 500],
+    capture_size_px: [2000, 1000],
+    display_scale: 2,
+    targets_normalized: [bounds],
+    planned_steps: [{ step_index: 0, cue_bounds_points: [100, 100, 300, 150] }],
+    painted_steps: [
+      {
+        step_index: 0,
+        trace_progress: 0.5,
+        geometry: {
+          origin_points: [0, 0],
+          backing_scale: 2,
+          raster_size_px: [2000, 1000],
+          cue_bounds_px: [200, 200, 600, 300],
+          stroke_width_px: 6,
+        },
+      },
+    ],
+  };
+  vi.spyOn(server, 'showTeachingCue').mockImplementation((args, message) =>
+    Promise.resolve({
+      content: [],
+      structuredContent: {
+        status: 'presented',
+        following: true,
+        active: false,
+        coordinate_trace: coordinateTrace,
+        receipt: {
+          presentation_version: 2,
+          task_epoch: randomUUID(),
+          sequence_id: randomUUID(),
+          presentation_id: args['presentation_id'],
+          lesson_id: message?.lessonId,
+          step_id: message?.stepId,
+          message_presented: true,
+          drawing_presented: true,
+          text_only: false,
+          interrupted: true,
+        },
+      },
+    }),
+  );
+  const result = await presenter.presentStep(proposal, DesktopLocale.ENGLISH);
+  expect(result['admitted']).toBe(true);
+  expect(info).toHaveBeenCalledWith(
+    expect.objectContaining({
+      presentationId: result['presentationId'],
+      targetsNormalized: [bounds],
+    }),
+    'agent.teaching.coordinates.requested',
+  );
+  expect(info).toHaveBeenCalledWith(
+    expect.objectContaining({
+      presentationId: result['presentationId'],
+      coordinateTrace,
+      interrupted: true,
+    }),
+    'agent.teaching.coordinates.converted',
+  );
+  expect(JSON.stringify(info.mock.calls)).not.toContain(proposal.instruction);
+  expect(JSON.stringify(info.mock.calls)).not.toContain(
+    proposal.action.kind === 'click' ? proposal.action.target.label : 'never-log-this-label',
+  );
+});
+
+it('ignores untrusted diagnostic fields without rejecting a valid drawing receipt', async () => {
+  const { proposal, server, presenter, log } = setup();
+  const info = vi.spyOn(log, 'info');
+  vi.spyOn(server, 'showTeachingCue').mockImplementation((args, message) =>
+    Promise.resolve({
+      content: [],
+      structuredContent: {
+        status: 'presented',
+        following: true,
+        active: false,
+        coordinate_trace: { screenshot: 'private-pixels', instruction: 'private-text' },
+        receipt: {
+          presentation_version: 2,
+          task_epoch: randomUUID(),
+          sequence_id: randomUUID(),
+          presentation_id: args['presentation_id'],
+          lesson_id: message?.lessonId,
+          step_id: message?.stepId,
+          message_presented: true,
+          drawing_presented: true,
+          text_only: false,
+          interrupted: false,
+        },
+      },
+    }),
+  );
+  expect(await presenter.presentStep(proposal, DesktopLocale.ENGLISH)).toMatchObject({
+    admitted: true,
+  });
+  expect(info).toHaveBeenCalledWith(
+    expect.objectContaining({
+      coordinateTrace: null,
+      coordinateTraceAvailable: false,
+    }),
+    'agent.teaching.coordinates.converted',
+  );
+  expect(JSON.stringify(info.mock.calls)).not.toContain('private-');
+});
+
+it('presents a highlight directly from its observed bounds and a paired native receipt', async () => {
+  const { lesson, proposal, server, presenter, tracker, publish } = setup();
+  const highlight = {
+    ...proposal,
+    action: { kind: 'highlight' as const, target: { label: 'Requested area', bounds } },
+  };
+  const drawing = vi.spyOn(server, 'showTeachingCue').mockImplementation((args, message) =>
+    Promise.resolve({
+      content: [],
+      structuredContent: {
+        status: 'presented',
+        following: true,
+        active: false,
+        receipt: {
+          presentation_version: 2,
+          task_epoch: randomUUID(),
+          sequence_id: randomUUID(),
+          presentation_id: args['presentation_id'],
+          lesson_id: message?.lessonId,
+          step_id: message?.stepId,
+          message_presented: true,
+          drawing_presented: true,
+          text_only: false,
+          interrupted: false,
+        },
+      },
+    }),
+  );
+
+  expect(await presenter.presentStep(highlight, DesktopLocale.ENGLISH)).toMatchObject({
+    admitted: true,
+    drawingPresented: true,
+    textOnly: false,
+  });
+  expect(drawing).toHaveBeenCalledOnce();
+  expect(drawing.mock.calls[0]?.[0]).toMatchObject({
+    capture_id: proposal.captureId,
+    targets: [bounds],
+    text_only: false,
+  });
+  expect(drawing.mock.calls[0]?.[0]['steps']).toHaveLength(1);
+  expect(tracker.readEvidence().expected).toBeNull();
+  expect(lesson.readCurrentStep()?.proposal.action).toEqual(highlight.action);
+  expect(publish).toHaveBeenCalledOnce();
+});
+
+it.each(['stale_capture', 'missing_drawing'])(
+  'refuses a highlight with %s without committing or publishing it',
+  async (variant) => {
+    const { lesson, proposal, capture, server, presenter, prepare, revoke, publish } = setup();
+    const highlight = {
+      ...proposal,
+      action: { kind: 'highlight' as const, target: { label: 'Requested area', bounds } },
+    };
+    const drawing = vi.spyOn(server, 'showTeachingCue').mockImplementation((args, message) =>
+      Promise.resolve({
+        content: [],
+        structuredContent: {
+          status: 'presented',
+          following: true,
+          active: false,
+          receipt: {
+            presentation_version: 2,
+            task_epoch: randomUUID(),
+            sequence_id: randomUUID(),
+            presentation_id: args['presentation_id'],
+            lesson_id: message?.lessonId,
+            step_id: message?.stepId,
+            message_presented: true,
+            drawing_presented: false,
+            text_only: false,
+            interrupted: false,
+          },
+        },
+      }),
+    );
+    if (variant === 'stale_capture') {
+      lesson.recordObservation(capture('new-capture'));
+    }
+
+    expect(await presenter.presentStep(highlight, DesktopLocale.ENGLISH)).toMatchObject({
+      admitted: false,
+      reason:
+        variant === 'stale_capture' ? 'fresh_observation_required' : 'paired_presentation_missing',
+    });
+    expect(drawing).toHaveBeenCalledTimes(variant === 'stale_capture' ? 0 : 1);
+    expect(prepare).toHaveBeenCalledTimes(variant === 'stale_capture' ? 0 : 1);
+    expect(revoke.mock.calls).toEqual(prepare.mock.calls);
+    expect(lesson.readCurrentStep()).toBeNull();
+    expect(presenter.readReceipt()).toBeNull();
+    expect(publish).not.toHaveBeenCalled();
+  },
+);

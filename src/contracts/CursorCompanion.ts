@@ -55,9 +55,53 @@ export const CursorGuidanceReceiptSchema = z.strictObject({
   completed_steps: z.number().int().min(1).max(8),
 });
 
+const CoordinateBoundsSchema = z.tuple([z.number(), z.number(), z.number(), z.number()]);
+
+/** Bounded native geometry only. Bounds describe stroke centerlines, not screen pixels. */
+export const GuidanceCoordinateTraceSchema = z.strictObject({
+  capture_id: z.string().min(1).max(200),
+  screen_size_points: z.tuple([z.number().positive(), z.number().positive()]),
+  capture_size_px: z.tuple([z.number().int().positive(), z.number().int().positive()]),
+  display_scale: z.number().positive(),
+  targets_normalized: z
+    .array(
+      z.strictObject({
+        x: z.number().min(0).max(1),
+        y: z.number().min(0).max(1),
+        width: z.number().positive().max(1),
+        height: z.number().positive().max(1),
+      }),
+    )
+    .max(8),
+  planned_steps: z
+    .array(
+      z.strictObject({
+        step_index: z.number().int().min(0).max(7),
+        cue_bounds_points: CoordinateBoundsSchema.nullable(),
+      }),
+    )
+    .max(8),
+  painted_steps: z
+    .array(
+      z.strictObject({
+        step_index: z.number().int().min(0).max(7),
+        trace_progress: z.number().min(0).max(1),
+        geometry: z.strictObject({
+          origin_points: z.tuple([z.number(), z.number()]),
+          backing_scale: z.number().positive(),
+          raster_size_px: z.tuple([z.number().int().positive(), z.number().int().positive()]),
+          cue_bounds_px: CoordinateBoundsSchema,
+          stroke_width_px: z.number().positive(),
+        }),
+      }),
+    )
+    .max(8),
+});
+
 export const CursorGuidanceResultSchema = z.discriminatedUnion('status', [
   z.strictObject({
     status: z.literal('presented'),
+    coordinate_trace: z.unknown().optional(),
     following: z.boolean(),
     active: z.literal(false),
     receipt: z

@@ -5,6 +5,8 @@ import { readTlsErrorNumbers, TlsErrorNumbersSchema } from './TlsErrorDiagnostic
 /* These additional codes describe the native socket error only. They must not change
  * the fetch failure classification used by the gateway's existing retry policy. */
 const SocketErrorCode = {
+  NETWORK_UNREACHABLE: 'ENETUNREACH',
+  HOST_UNREACHABLE: 'EHOSTUNREACH',
   CLIENT_INFORMATION: 'UND_ERR_INFO',
   CLIENT_ABORTED: 'UND_ERR_ABORTED',
   CLIENT_DESTROYED: 'UND_ERR_DESTROYED',
@@ -139,7 +141,7 @@ const SocketErrorDetailsSchema = z.object({
   ...TlsErrorNumbersSchema.shape,
 });
 
-const SocketCloseDiagnosticsSchema = SocketErrorDetailsSchema.extend({
+export const SocketCloseDiagnosticsSchema = SocketErrorDetailsSchema.extend({
   socketErrorCauses: z
     .array(
       SocketErrorDetailsSchema.extend({
@@ -181,7 +183,9 @@ function readSocketErrorFamily(code: unknown): SocketCloseDiagnostics['socketErr
   if (code.startsWith('ERR_STREAM_') || code.startsWith('ERR_SOCKET_')) {
     return SocketErrorFamily.STREAM;
   }
-  return NetworkErrorCodeSchema.safeParse(code).success
+  return NetworkErrorCodeSchema.safeParse(code).success ||
+    code === SocketErrorCode.NETWORK_UNREACHABLE ||
+    code === SocketErrorCode.HOST_UNREACHABLE
     ? SocketErrorFamily.SYSTEM
     : SocketErrorFamily.UNKNOWN;
 }

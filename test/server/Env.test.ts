@@ -66,13 +66,13 @@ describe('backend application environment', () => {
 
 it('validates backend speech configuration without requiring it for ordinary startup', () => {
   const base = { DATABASE_URL: databaseUrl, AUTH_SECRET: authSecret };
-  expect(readServerEnv(base).ELEVENLABS_API_KEY).toBeUndefined();
+  expect(readServerEnv(base).OPENAI_API_KEY).toBeUndefined();
   expect(
     readServerEnv({
       ...base,
-      ELEVENLABS_API_KEY: 'synthetic-key',
-    }).ELEVENLABS_MODEL_ID,
-  ).toBe('eleven_flash_v2_5');
+      OPENAI_API_KEY: 'synthetic-openai-key-for-tests',
+    }).OPENAI_API_KEY,
+  ).toBe('synthetic-openai-key-for-tests');
 });
 
 it('uses separate brief and composition budgets and allows configured larger compositions', () => {

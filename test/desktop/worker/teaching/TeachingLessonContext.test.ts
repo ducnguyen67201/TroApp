@@ -180,3 +180,17 @@ it('evicts oversized material exchanges as intact groups', () => {
   expect(retained).not.toContain('oversized');
   expect(retained).toContain('Help me print');
 });
+
+it('accepts one follow-up during local activity waiting and refuses it while processing', () => {
+  const lesson = new TeachingLessonContext('Open the requested page');
+  expect(lesson.submitAnswer(lesson.id, 'Explain this')).toBe(false);
+  lesson.setWaitingForStudent(true);
+  expect(lesson.canAnswer()).toBe(false);
+  expect(lesson.submitAnswer(randomUUID(), 'Explain this')).toBe(false);
+  expect(lesson.submitAnswer(lesson.id, 'Explain this')).toBe(true);
+  expect(lesson.submitAnswer(lesson.id, 'Duplicate')).toBe(false);
+  expect(JSON.stringify(lesson.buildInput('follow-up', null))).toContain('Explain this');
+  lesson.setWaitingForStudent(false);
+  lesson.recordReply([], 0);
+  expect(lesson.submitAnswer(lesson.id, 'New message while processing')).toBe(false);
+});

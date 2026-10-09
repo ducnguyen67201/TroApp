@@ -1,5 +1,5 @@
 diff --git a/libs/cua-driver/rust/Cargo.lock b/libs/cua-driver/rust/Cargo.lock
-index 74051d8..3ac2ee9 100644
+index 74051d8..952fd9f 100644
 --- a/libs/cua-driver/rust/Cargo.lock
 +++ b/libs/cua-driver/rust/Cargo.lock
 @@ -1205,7 +1205,7 @@ dependencies = [
@@ -7,7 +7,7 @@ index 74051d8..3ac2ee9 100644
  [[package]]
  name = "cua-driver"
 -version = "0.30.4"
-+version = "0.30.4-tro.19"
++version = "0.30.4-tro.20"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -16,7 +16,7 @@ index 74051d8..3ac2ee9 100644
  [[package]]
  name = "cua-driver-bindgen"
 -version = "0.30.4"
-+version = "0.30.4-tro.19"
++version = "0.30.4-tro.20"
  dependencies = [
   "cbindgen",
   "uniffi",
@@ -25,7 +25,7 @@ index 74051d8..3ac2ee9 100644
  [[package]]
  name = "cua-driver-contract"
 -version = "0.30.4"
-+version = "0.30.4-tro.19"
++version = "0.30.4-tro.20"
  dependencies = [
   "schemars",
   "serde",
@@ -34,7 +34,7 @@ index 74051d8..3ac2ee9 100644
  [[package]]
  name = "cua-driver-core"
 -version = "0.30.4"
-+version = "0.30.4-tro.19"
++version = "0.30.4-tro.20"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -43,7 +43,7 @@ index 74051d8..3ac2ee9 100644
  [[package]]
  name = "cua-driver-e2e"
 -version = "0.30.4"
-+version = "0.30.4-tro.19"
++version = "0.30.4-tro.20"
  dependencies = [
   "base64",
   "core-foundation",
@@ -52,7 +52,7 @@ index 74051d8..3ac2ee9 100644
  [[package]]
  name = "cua-driver-sdk"
 -version = "0.30.4"
-+version = "0.30.4-tro.19"
++version = "0.30.4-tro.20"
  dependencies = [
   "async-trait",
   "core-foundation",
@@ -61,7 +61,7 @@ index 74051d8..3ac2ee9 100644
  [[package]]
  name = "cua-driver-testkit"
 -version = "0.30.4"
-+version = "0.30.4-tro.19"
++version = "0.30.4-tro.20"
  dependencies = [
   "arbitrary",
   "async-trait",
@@ -70,7 +70,7 @@ index 74051d8..3ac2ee9 100644
  [[package]]
  name = "cua-driver-uia"
 -version = "0.30.4"
-+version = "0.30.4-tro.19"
++version = "0.30.4-tro.20"
  dependencies = [
   "anyhow",
   "cua-driver-core",
@@ -79,7 +79,7 @@ index 74051d8..3ac2ee9 100644
  [[package]]
  name = "cursor-overlay"
 -version = "0.30.4"
-+version = "0.30.4-tro.19"
++version = "0.30.4-tro.20"
  dependencies = [
   "anyhow",
   "cua-driver-contract",
@@ -88,7 +88,7 @@ index 74051d8..3ac2ee9 100644
  [[package]]
  name = "cursor-theme-cli"
 -version = "0.30.4"
-+version = "0.30.4-tro.19"
++version = "0.30.4-tro.20"
  dependencies = [
   "anyhow",
   "cursor-overlay",
@@ -97,7 +97,7 @@ index 74051d8..3ac2ee9 100644
  [[package]]
  name = "pip-preview"
 -version = "0.30.4"
-+version = "0.30.4-tro.19"
++version = "0.30.4-tro.20"
  dependencies = [
   "serde_json",
  ]
@@ -106,7 +106,7 @@ index 74051d8..3ac2ee9 100644
  [[package]]
  name = "platform-linux"
 -version = "0.30.4"
-+version = "0.30.4-tro.19"
++version = "0.30.4-tro.20"
  dependencies = [
   "anyhow",
   "ashpd",
@@ -115,7 +115,7 @@ index 74051d8..3ac2ee9 100644
  [[package]]
  name = "platform-macos"
 -version = "0.30.4"
-+version = "0.30.4-tro.19"
++version = "0.30.4-tro.20"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -124,12 +124,12 @@ index 74051d8..3ac2ee9 100644
  [[package]]
  name = "platform-windows"
 -version = "0.30.4"
-+version = "0.30.4-tro.19"
++version = "0.30.4-tro.20"
  dependencies = [
   "anyhow",
   "async-trait",
 diff --git a/libs/cua-driver/rust/Cargo.toml b/libs/cua-driver/rust/Cargo.toml
-index 53edeb0..0b32e40 100644
+index 53edeb0..a9127c7 100644
 --- a/libs/cua-driver/rust/Cargo.toml
 +++ b/libs/cua-driver/rust/Cargo.toml
 @@ -19,7 +19,7 @@ members = [
@@ -137,16 +137,16 @@ index 53edeb0..0b32e40 100644
  
  [workspace.package]
 -version = "0.30.4"
-+version = "0.30.4-tro.19"
++version = "0.30.4-tro.20"
  edition = "2021"
  authors = ["trycua"]
  license = "MIT"
 diff --git a/libs/cua-driver/rust/crates/cua-driver-contract/src/companion.rs b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion.rs
 new file mode 100644
-index 0000000..0df370c
+index 0000000..b8dbc51
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion.rs
-@@ -0,0 +1,607 @@
+@@ -0,0 +1,644 @@
 +//! Bounded presentation-only teaching protocol. Coordinates are fractions of
 +//! a fresh primary-desktop capture, never OS input coordinates.
 +use crate::{Platform, SchemaMode, ToolAnnotations, ToolContract, ToolInput, ToolOutput};
@@ -573,6 +573,41 @@ index 0000000..0df370c
 +    #[serde(default, skip_serializing_if = "Option::is_none")]
 +    pub interrupted: Option<bool>,
 +}
++/// Bounded numeric metadata; no screenshot pixels, labels or teaching text.
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct GuidancePaintGeometry {
++    pub origin_points: [f64; 2],
++    pub backing_scale: f64,
++    pub raster_size_px: [u32; 2],
++    pub cue_bounds_px: [f32; 4],
++    pub stroke_width_px: f32,
++}
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct PlannedCoordinateStep {
++    pub step_index: usize,
++    pub cue_bounds_points: Option<[f64; 4]>,
++}
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct PaintedCoordinateStep {
++    pub step_index: usize,
++    pub trace_progress: f64,
++    pub geometry: GuidancePaintGeometry,
++}
++#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
++#[serde(deny_unknown_fields)]
++pub struct GuidanceCoordinateTrace {
++    pub capture_id: String,
++    pub screen_size_points: [f64; 2],
++    pub capture_size_px: [u32; 2],
++    pub display_scale: f64,
++    pub targets_normalized: Vec<TeachingTarget>,
++    pub planned_steps: Vec<PlannedCoordinateStep>,
++    pub painted_steps: Vec<PaintedCoordinateStep>,
++}
++
 +#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 +#[serde(untagged)]
 +pub enum CursorSequenceOutput {
@@ -581,6 +616,8 @@ index 0000000..0df370c
 +        following: bool,
 +        active: bool,
 +        receipt: CursorGuidanceReceipt,
++        #[serde(default, skip_serializing_if = "Option::is_none")]
++        coordinate_trace: Option<GuidanceCoordinateTrace>,
 +    },
 +    Legacy(CursorCompanionOutput),
 +}
@@ -2639,10 +2676,10 @@ index 0000000..fca1462
 +}
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/guidance.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/guidance.rs
 new file mode 100644
-index 0000000..1442925
+index 0000000..5d8e7df
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cursor-overlay/src/guidance.rs
-@@ -0,0 +1,253 @@
+@@ -0,0 +1,256 @@
 +//! Bounded, pure guidance planning and compositor evidence. Never posts input.
 +use crate::companion::{plan_mark, plan_path};
 +use cua_driver_contract::CompanionStep;
@@ -2661,12 +2698,15 @@ index 0000000..1442925
 +
 +/// One indivisible pointer/cue scene. The platform stamps only after installing
 +/// the CGImage in CALayer on the main queue. Cancel invalidates queued images.
++pub use cua_driver_contract::GuidancePaintGeometry;
++
 +#[derive(Debug, Clone)]
 +pub struct GuidanceFrame {
 +    pub generation: u64,
 +    pub revision: u64,
 +    pub fence: Arc<Mutex<FrameFence>>,
 +    pub receipt: Arc<Mutex<Option<Instant>>>,
++    pub paint_geometry: Arc<Mutex<Option<GuidancePaintGeometry>>>,
 +    pub pointer: (f64, f64),
 +    pub cue: Vec<(f64, f64)>,
 +    pub cue_alpha: f32,
@@ -2942,7 +2982,7 @@ index 36f3717..76cce23 100644
      SetPressed(bool),
      /// Show or hide the overlay.
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs
-index 264c427..58e3a34 100644
+index 264c427..d233be1 100644
 --- a/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs
 +++ b/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs
 @@ -48,6 +48,14 @@ pub const SESSION_BADGE_FADE_SECS: f64 = 0.4;
@@ -3091,12 +3131,22 @@ index 264c427..58e3a34 100644
      let s = backing_scale.max(1.0) as f64; // logical-pt → pixmap-pixel scale
      let sf = s as f32;
  
-@@ -959,7 +1045,41 @@ pub fn paint_cursor(
+@@ -959,7 +1045,51 @@ pub fn paint_cursor(
          }
      }
  
 -    if let Some(theme) = core.theme.as_deref() {
 +    if let Some(path) = build_companion_mark_path(&core.companion_mark, origin_x, origin_y, s) {
++        if let Some(frame) = &core.guidance_frame {
++            let bounds = path.bounds();
++            *frame.paint_geometry.lock().unwrap() = Some(crate::guidance::GuidancePaintGeometry {
++                origin_points: [origin_x, origin_y],
++                backing_scale: s,
++                raster_size_px: [pm.width(), pm.height()],
++                cue_bounds_px: [bounds.left(), bounds.top(), bounds.right(), bounds.bottom()],
++                stroke_width_px: 3.0 * sf,
++            });
++        }
 +        let mut paint = tiny_skia::Paint::default();
 +        let [red, green, blue, _] = crate::companion_appearance::COMPANION_BLUE;
 +        paint.set_color_rgba8(
@@ -3134,7 +3184,7 @@ index 264c427..58e3a34 100644
          let tint = (theme.id == crate::DEFAULT_THEME_ID)
              .then(|| crate::session_fill_rgba(&core.cfg.cursor_id));
          crate::paint_compiled_theme_with_tint(
-@@ -989,6 +1109,9 @@ pub fn paint_cursor(
+@@ -989,6 +1119,9 @@ pub fn paint_cursor(
          );
      }
  
@@ -3144,7 +3194,7 @@ index 264c427..58e3a34 100644
      let (delivery, target) = core.badge_modifiers.unwrap_or((None, None));
      if let Some(layout) = crate::session_badge_layout(crate::SessionBadgeInput {
          label: core.session_label.as_deref(),
-@@ -1003,12 +1126,56 @@ pub fn paint_cursor(
+@@ -1003,12 +1136,56 @@ pub fn paint_cursor(
          crate::paint_session_badge(
              pm,
              &layout,
@@ -3202,7 +3252,7 @@ index 264c427..58e3a34 100644
  #[cfg(test)]
  mod glide_duration_tests {
      use super::*;
-@@ -1043,6 +1210,164 @@ mod glide_duration_tests {
+@@ -1043,6 +1220,211 @@ mod glide_duration_tests {
          t
      }
  
@@ -3218,6 +3268,7 @@ index 264c427..58e3a34 100644
 +            revision: 1,
 +            fence: fence.clone(),
 +            receipt: Arc::new(std::sync::Mutex::new(None)),
++            paint_geometry: Arc::new(std::sync::Mutex::new(None)),
 +            pointer: (100.0, 100.0),
 +            cue: vec![(10.0, 10.0), (20.0, 20.0)],
 +            cue_alpha: 1.0,
@@ -3247,6 +3298,52 @@ index 264c427..58e3a34 100644
 +            frame.receipt.lock().unwrap().is_none(),
 +            "applying a command is not render evidence"
 +        );
++    }
++
++    #[test]
++    fn companion_coordinates_record_actual_painter_origin_and_scale() {
++        use crate::guidance::{FrameFence, GuidanceFrame};
++        let frame = GuidanceFrame {
++            generation: 1,
++            revision: 1,
++            fence: Arc::new(std::sync::Mutex::new(FrameFence {
++                generation: 1,
++                rendered_revision: 0,
++            })),
++            receipt: Arc::new(std::sync::Mutex::new(None)),
++            paint_geometry: Arc::new(std::sync::Mutex::new(None)),
++            pointer: (50.0, 50.0),
++            cue: vec![
++                (30.0, 40.0),
++                (60.0, 40.0),
++                (60.0, 80.0),
++                (30.0, 80.0),
++                (30.0, 40.0),
++            ],
++            cue_alpha: 1.0,
++            teaching: true,
++            visible: true,
++            pressed: false,
++        };
++        let mut core = RenderStateCore::new(CursorConfig::default());
++        core.apply_command_base(OverlayCommand::GuidanceFrame(frame.clone()), true, true);
++        for scale in [1.0, 2.0] {
++            let mut image = tiny_skia::Pixmap::new(200, 200).unwrap();
++            paint_cursor(&mut image, &core, 10.0, 20.0, None, scale);
++            let geometry = frame.paint_geometry.lock().unwrap().clone().unwrap();
++            assert_eq!(geometry.origin_points, [10.0, 20.0]);
++            assert_eq!(geometry.backing_scale, scale as f64);
++            assert_eq!(geometry.raster_size_px, [200, 200]);
++            assert_eq!(
++                geometry.cue_bounds_px,
++                [20.0 * scale, 20.0 * scale, 50.0 * scale, 60.0 * scale]
++            );
++            assert_eq!(geometry.stroke_width_px, 3.0 * scale);
++            assert!(
++                frame.receipt.lock().unwrap().is_none(),
++                "paint diagnostics do not acknowledge installation"
++            );
++        }
 +    }
 +
 +    #[test]
@@ -4408,7 +4505,7 @@ index cb5012c..37247b6 100644
  /// System cursor shape reporting (what the OS draws, not what Cua draws).
  pub mod shape;
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs b/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
-index 8a4c547..ce69806 100644
+index 8a4c547..d4f6cb0 100644
 --- a/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
 +++ b/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
 @@ -40,6 +40,143 @@ use cursor_overlay::{
@@ -4994,7 +5091,7 @@ index 8a4c547..ce69806 100644
  /// Raise the normal-level overlay without activating the driver application.
  ///
  /// This is used only for an externally visible cursor with no target window.
-@@ -1362,3 +1764,93 @@ mod tests {
+@@ -1362,3 +1764,94 @@ mod tests {
          ));
      }
  }
@@ -5048,6 +5145,7 @@ index 8a4c547..ce69806 100644
 +            revision: 1,
 +            fence: fence.clone(),
 +            receipt: std::sync::Arc::new(Mutex::new(None)),
++            paint_geometry: std::sync::Arc::new(Mutex::new(None)),
 +            pointer: (1.0, 1.0),
 +            cue: vec![],
 +            cue_alpha: 1.0,
@@ -5550,19 +5648,31 @@ index 280f81c..50d0291 100644
  
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_guidance.rs b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_guidance.rs
 new file mode 100644
-index 0000000..fb49a1a
+index 0000000..de7ced5
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_guidance.rs
-@@ -0,0 +1,694 @@
+@@ -0,0 +1,746 @@
 +//! Host-bound V2 teaching. No desktop input executor dependency.
 +use super::*;
 +use cua_driver_contract::{
 +    BeginCursorGuidanceTaskInput, EndCursorGuidanceTaskInput, GetCursorCompanionCapabilitiesInput,
 +};
 +use cursor_overlay::guidance::{
-+    compile_guidance, point_on_path, reveal_path, GuidanceFrame, GuidancePlan, GuidanceStep,
-+    StepEvidence, FADE_MS, MAX_FRAME_GAP, RETURN_MS,
++    compile_guidance, point_on_path, reveal_path, GuidanceFrame, GuidancePaintGeometry,
++    GuidancePlan, GuidanceStep, StepEvidence, FADE_MS, MAX_FRAME_GAP, RETURN_MS,
 +};
++
++fn read_coordinate_bounds(points: &[(f64, f64)]) -> Option<[f64; 4]> {
++    let &(x, y) = points.first()?;
++    Some(points.iter().fold([x, y, x, y], |bounds, &(x, y)| {
++        [
++            bounds[0].min(x),
++            bounds[1].min(y),
++            bounds[2].max(x),
++            bounds[3].max(y),
++        ]
++    }))
++}
 +
 +impl CompanionState {
 +    pub(super) fn create_frame(
@@ -5581,6 +5691,7 @@ index 0000000..fb49a1a
 +            revision: self.revision,
 +            fence: self.fence.clone(),
 +            receipt: Arc::new(Mutex::new(None)),
++            paint_geometry: Arc::new(Mutex::new(None)),
 +            pointer,
 +            cue,
 +            cue_alpha,
@@ -5690,7 +5801,7 @@ index 0000000..fb49a1a
 +    alpha: f32,
 +    pressed: bool,
 +    check: &(impl Fn() -> Result<(), &'static str> + Sync),
-+) -> Result<Instant, &'static str> {
++) -> Result<(Instant, Option<GuidancePaintGeometry>), &'static str> {
 +    check()?;
 +    let frame = {
 +        let mut state = state().lock().unwrap();
@@ -5703,7 +5814,9 @@ index 0000000..fb49a1a
 +        }
 +        frame
 +    };
-+    await_receipt(&frame, MAX_FRAME_GAP, check).await
++    let rendered_at = await_receipt(&frame, MAX_FRAME_GAP, check).await?;
++    let geometry = frame.paint_geometry.lock().unwrap().clone();
++    Ok((rendered_at, geometry))
 +}
 +
 +/// Only a non-degenerate installed stroke acknowledges a drawing. An approach
@@ -5739,7 +5852,8 @@ index 0000000..fb49a1a
 +    duration_ms: u64,
 +    check: &(impl Fn() -> Result<(), &'static str> + Sync),
 +    mut scene: impl FnMut(f64) -> ((f64, f64), Vec<(f64, f64)>, f32, bool) + Send,
-+    mut rendered: impl FnMut(f64, Instant) -> Result<(), &'static str> + Send,
++    mut rendered: impl FnMut(f64, Instant, Option<GuidancePaintGeometry>) -> Result<(), &'static str>
++        + Send,
 +) -> Result<(), &'static str> {
 +    let started = Instant::now();
 +    loop {
@@ -5751,7 +5865,7 @@ index 0000000..fb49a1a
 +        let (pointer, cue, alpha, pressed) = scene(progress);
 +        let receipt =
 +            present_frame(session, generation, pointer, cue, alpha, pressed, check).await?;
-+        rendered(progress, receipt)?;
++        rendered(progress, receipt.0, receipt.1)?;
 +        if progress >= 1.0 {
 +            return Ok(());
 +        }
@@ -5905,6 +6019,7 @@ index 0000000..fb49a1a
 +        let message_shown = AtomicBool::new(false);
 +        let drawing_shown = AtomicBool::new(false);
 +        let mut render_token = None;
++        let mut coordinate_trace = None;
 +        let result = self
 +            .admit_and_play_guidance(
 +                session,
@@ -5913,6 +6028,7 @@ index 0000000..fb49a1a
 +                &message_shown,
 +                &drawing_shown,
 +                &mut render_token,
++                &mut coordinate_trace,
 +            )
 +            .await;
 +        let interrupted = result == Err("user_takeover");
@@ -5939,6 +6055,7 @@ index 0000000..fb49a1a
 +                let state = state().lock().unwrap();
 +                return ToolResult::text("presentation_acknowledged").with_structured(json!({
 +                    "status":"presented", "following":state.following, "active":false,
++                    "coordinate_trace":coordinate_trace,
 +                    "receipt": {"presentation_version":2,"task_epoch":epoch,"sequence_id":sequence_id,
 +                        "presentation_id":presentation_id,"lesson_id":message.lesson_id,"step_id":message.step_id,
 +                        "message_presented":true,"drawing_presented":drawing_shown.load(Ordering::Acquire),"text_only":input.text_only,"interrupted":interrupted}
@@ -5978,6 +6095,7 @@ index 0000000..fb49a1a
 +        message_shown: &AtomicBool,
 +        drawing_shown: &AtomicBool,
 +        render_token: &mut Option<cua_driver_contract::CompanionRenderToken>,
++        coordinate_trace: &mut Option<Value>,
 +    ) -> Result<(), &'static str> {
 +        let captures = &self.state.companion_captures;
 +        let binding = captures
@@ -6055,6 +6173,17 @@ index 0000000..fb49a1a
 +            }
 +            state.begin_sequence(session).map_err(|_| "busy")?
 +        };
++        *coordinate_trace = Some(json!({
++            "capture_id":input.capture_id,
++            "screen_size_points":[width,height],
++            "capture_size_px":[encoded.width(),encoded.height()],
++            "display_scale":scale,
++            "targets_normalized":input.targets,
++            "planned_steps":plan.steps.iter().enumerate().map(|(index, step)| json!({
++                "step_index":index, "cue_bounds_points":read_coordinate_bounds(&step.mark),
++            })).collect::<Vec<_>>(),
++            "painted_steps":[],
++        }));
 +        let deadline = Instant::now() + Duration::from_millis(plan.duration_ms + 2000);
 +        let check = || {
 +            check_guidance(session, generation, deadline, &|| {
@@ -6077,8 +6206,16 @@ index 0000000..fb49a1a
 +            );
 +            message_shown.store(true, Ordering::Release);
 +        }
-+        self.play_guidance(session, generation, start, &plan, &check, drawing_shown)
-+            .await?;
++        self.play_guidance(
++            session,
++            generation,
++            start,
++            &plan,
++            &check,
++            drawing_shown,
++            coordinate_trace,
++        )
++        .await?;
 +        check()?;
 +        // Terminal scene is already clear and acknowledged before releasing the
 +        // active writer. The following loop can now resume with the same fence.
@@ -6100,10 +6237,11 @@ index 0000000..fb49a1a
 +        plan: &GuidancePlan,
 +        check: &(impl Fn() -> Result<(), &'static str> + Sync),
 +        drawing_shown: &AtomicBool,
++        coordinate_trace: &mut Option<Value>,
 +    ) -> Result<(), &'static str> {
 +        let reduced = crate::cursor::overlay::companion_reduced_motion();
 +        let mut previous = start;
-+        for step in &plan.steps {
++        for (step_index, step) in plan.steps.iter().enumerate() {
 +            let first = step.path[0];
 +            if step.approach_ms > 0 {
 +                animate_phase(
@@ -6112,7 +6250,7 @@ index 0000000..fb49a1a
 +                    if reduced { 0 } else { step.approach_ms },
 +                    check,
 +                    |p| (point_on_path(&[previous, first], p), vec![], 0.0, false),
-+                    |_, _| Ok(()),
++                    |_, _, _| Ok(()),
 +                )
 +                .await?;
 +            }
@@ -6128,7 +6266,19 @@ index 0000000..fb49a1a
 +                    let cue = read_visible_cue(step, p);
 +                    (pointer, cue, 1.0, step.pressed)
 +                },
-+                |p, at| {
++                |p, at, geometry| {
++                    if let Some(geometry) = geometry {
++                        if let Some(trace) = coordinate_trace.as_mut() {
++                            let painted = trace["painted_steps"].as_array_mut().unwrap();
++                            let entry = json!({"step_index":step_index,
++                                "trace_progress":p,"geometry":geometry});
++                            if painted.len() == step_index + 1 {
++                                painted[step_index] = entry;
++                            } else {
++                                painted.push(entry);
++                            }
++                        }
++                    }
 +                    if has_visible_stroke(&read_visible_cue(step, p)) {
 +                        drawing_shown.store(true, Ordering::Release);
 +                    }
@@ -6153,14 +6303,14 @@ index 0000000..fb49a1a
 +                check,
 +            )
 +            .await?;
-+            evidence.finish_hold(rendered, step.hold_ms, reduced)?;
++            evidence.finish_hold(rendered.0, step.hold_ms, reduced)?;
 +            animate_phase(
 +                session,
 +                generation,
 +                if reduced { 0 } else { FADE_MS },
 +                check,
 +                |p| (last, step.mark.clone(), (1.0 - p) as f32, false),
-+                |_, _| Ok(()),
++                |_, _, _| Ok(()),
 +            )
 +            .await?;
 +            present_frame(session, generation, last, vec![], 0.0, false, check).await?;
@@ -6177,7 +6327,7 @@ index 0000000..fb49a1a
 +                    .unwrap_or(previous);
 +                (point_on_path(&[previous, target], p), vec![], 0.0, false)
 +            },
-+            |_, _| Ok(()),
++            |_, _, _| Ok(()),
 +        )
 +        .await?;
 +        // Restore the idle badge only with an acknowledged cue-free scene.

@@ -8,6 +8,17 @@ import type {
 } from '../../../src/desktop/main/AgentChatPorts.js';
 import { DesktopPermissionState, PermissionGrant } from '#contracts/DesktopPermissions.js';
 import type { ModelCredential } from '#contracts/AuthSession.js';
+import type { AgentResult } from '#contracts/AgentSession.js';
+import {
+  AgentProgressPhase,
+  CompanionHudPhase,
+  type CompanionHudSnapshot,
+  type AgentProgress,
+} from '#contracts/CompanionHud.js';
+import { AgentTaskMode, GuidanceReason, TeachingOutcome } from '#contracts/CursorCompanion.js';
+import { TeachingMessageKind } from '#contracts/TeachingStep.js';
+import { TranscriptionEventKind, type TranscriptionEvent } from '#contracts/Transcription.js';
+import { VoiceShortcut, VoiceState, type VoiceEvent } from '#contracts/VoiceInput.js';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
 import {
   VoiceoverController,
@@ -16,6 +27,12 @@ import {
 
 import type { ClassroomTaskContext } from '../../../src/desktop/main/classroom/ClassroomSessionController.js';
 import { createTeachingContext } from '../../server/features/classroom/ClassroomFixtures.js';
+import { CompanionHudController } from '../../../src/desktop/main/companion/CompanionHudController.js';
+import {
+  VoiceInputController,
+  type VoiceDependencies,
+} from '../../../src/desktop/main/voice/VoiceInputController.js';
+import type { TranscriptionConnection } from '../../../src/desktop/main/voice/TranscriptionClient.js';
 
 function createController(
   cancelShortcut?: AgentCancelShortcut,
@@ -270,55 +287,306 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-it('routes typed and voice answers into the active lesson and fences foreign questions', async () => {
-  const { auth, worker, controller } = createController();
+it.each(['needs_input', 'waiting'] as const)(
+  'routes answers during %s into the same lesson and fences foreign questions',
+  async (phase) => {
+    const { auth, worker, controller } = createController();
+    auth.fetchModelCredential.mockResolvedValue({
+      token: 'test-token',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    });
+    let finish: ((result: Awaited<ReturnType<AgentChatWorker['sendMessage']>>) => void) | undefined;
+    worker.sendMessage.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const running = controller.sendMessage(
+      'teacher',
+      'Design an ERD',
+      DesktopLocale.ENGLISH,
+      'teach',
+    );
+    await vi.waitFor(() => {
+      expect(worker.sendMessage).toHaveBeenCalledOnce();
+    });
+    const lessonId = '22222222-2222-4222-8222-222222222222';
+    controller.receiveProgress({
+      kind: 'progress',
+      requestId: lessonId,
+      sessionId: 'teacher',
+      lessonId,
+      phase,
+      canAcceptAnswer: true,
+      teachingStep: 'Which database?',
+    });
+    expect(controller.isBusy()).toBe(false);
+    expect(await controller.startTaskSession()).toEqual({ kind: 'started', sessionId: 'teacher' });
+    expect(
+      await controller.answerLesson('other', lessonId, 'Sales', DesktopLocale.ENGLISH),
+    ).toMatchObject({ kind: 'failed' });
+    expect(
+      await controller.sendMessage('teacher', 'Sales', DesktopLocale.ENGLISH, 'teach'),
+    ).toMatchObject({ kind: 'accepted' });
+    expect(worker.answerLesson).toHaveBeenCalledWith(
+      'teacher',
+      lessonId,
+      'Sales',
+      DesktopLocale.ENGLISH,
+    );
+    expect(worker.sendMessage).toHaveBeenCalledOnce();
+    finish?.({ kind: 'teaching', result: { outcome: 'goal_reached', answer: 'ERD finished.' } });
+    expect(await running).toMatchObject({ kind: 'teaching', result: { outcome: 'goal_reached' } });
+    controller.dispose();
+  },
+);
+
+it('routes a transcribed follow-up after a model pause, then Esc releases the lesson and HUD', async () => {
+  const shortcut = {
+    enable: vi.fn<AgentCancelShortcut['enable']>().mockReturnValue(true),
+    disable: vi.fn<AgentCancelShortcut['disable']>(),
+  };
+  const { auth, worker, controller } = createController(shortcut);
   auth.fetchModelCredential.mockResolvedValue({
-    token: 'test-token',
+    token: 'fixture-model-credential',
     expiresAt: '2099-01-01T00:00:00.000Z',
   });
-  let finish: ((result: Awaited<ReturnType<AgentChatWorker['sendMessage']>>) => void) | undefined;
+  worker.start.mockImplementation((sessionId) => {
+    worker.isRunning.mockReturnValue(true);
+    return Promise.resolve({ kind: 'started', sessionId });
+  });
+  let finishLesson: ((result: AgentResult) => void) | undefined;
   worker.sendMessage.mockImplementation(
     () =>
       new Promise((resolve) => {
-        finish = resolve;
+        finishLesson = resolve;
       }),
   );
-  const running = controller.sendMessage(
-    'teacher',
-    'Design an ERD',
-    DesktopLocale.ENGLISH,
-    'teach',
+  worker.stop.mockImplementation(() => {
+    worker.isRunning.mockReturnValue(false);
+    finishLesson?.({
+      kind: 'teaching',
+      result: { outcome: TeachingOutcome.CANCELED, reason: GuidanceReason.EXPLICIT_STOP },
+    });
+    return Promise.resolve({ kind: 'stopped' });
+  });
+  const snapshots: CompanionHudSnapshot[] = [];
+  const hud = new CompanionHudController(
+    { showSnapshot: (snapshot) => snapshots.push(snapshot) },
+    {
+      now: () => Date.now(),
+      schedule: (callback, delayMs) => {
+        const timer = setTimeout(callback, delayMs);
+        timer.unref();
+        return () => {
+          clearTimeout(timer);
+        };
+      },
+    },
   );
-  await vi.waitFor(() => {
+  const voiceEvents: VoiceEvent[] = [];
+  let receiveTranscript: ((event: TranscriptionEvent) => void) | undefined;
+  const connection: TranscriptionConnection = {
+    sendCommand: vi.fn<TranscriptionConnection['sendCommand']>(),
+    close: vi.fn<TranscriptionConnection['close']>(),
+  };
+  const voice = new VoiceInputController(
+    {
+      readSession: () => controller.readAuthSession(),
+      releaseUnusedCredential: () => Promise.resolve(),
+      fetchCredential: () =>
+        Promise.resolve({
+          token: 'fixture-transcription-credential',
+          expiresAt: '2099-01-01T00:00:00.000Z',
+        }),
+      connect: (_token, emit) => {
+        receiveTranscript = emit;
+        return connection;
+      },
+      isAgentBusy: () => controller.isBusy(),
+      areTriggerKeysReleased: () => true,
+      startAgentSession: () => controller.startTaskSession(),
+      sendAgentMessage: (sessionId, message, locale, mode) =>
+        controller.sendMessage(sessionId, message, locale, mode),
+      emit: (event) => {
+        voiceEvents.push(event);
+        hud.receiveVoiceEvent(event);
+      },
+    } satisfies VoiceDependencies,
+    VoiceShortcut.COMMAND_CONTROL,
+  );
+  voice.enableVoiceInput(VoiceShortcut.COMMAND_CONTROL, true);
+  const sendVoiceInstruction = async (text: string): Promise<void> => {
+    expect(voice.startVoiceCapture().kind).toBe('ok');
+    const capture = [...voiceEvents].reverse().find((event) => event.kind === 'prepare');
+    if (!capture) {
+      throw new Error('No capture was prepared.');
+    }
+    await voice.prepareVoiceCapture(capture.captureId, DesktopLocale.ENGLISH, AgentTaskMode.TEACH);
+    if (!receiveTranscript) {
+      throw new Error('No transcription connection was established.');
+    }
+    receiveTranscript({ kind: TranscriptionEventKind.READY });
+    voice.releaseVoiceCapture();
+    voice.finishVoiceAudio(capture.captureId, -1);
+    receiveTranscript({ kind: TranscriptionEventKind.FINAL, text });
+  };
+  const receiveProgress = (progress: AgentProgress): void => {
+    controller.receiveProgress(progress);
+    voice.setLessonAnswerAllowed(!controller.isBusy());
+    hud.receiveProgress(progress);
+  };
+  try {
+    await sendVoiceInstruction('Explain this screen');
+    await vi.waitFor(() => {
+      expect(worker.sendMessage).toHaveBeenCalledOnce();
+    });
+    const submitted = voiceEvents.find((event) => event.kind === 'submitted');
+    if (!submitted) {
+      throw new Error('The original voice task was not submitted.');
+    }
+    const lessonId = '22222222-2222-4222-8222-222222222222';
+    const pause: AgentProgress = {
+      kind: 'progress',
+      requestId: submitted.captureId,
+      sessionId: submitted.sessionId,
+      lessonId,
+      phase: AgentProgressPhase.PAUSED,
+      canAcceptAnswer: true,
+      teachingMessage: {
+        lessonId,
+        stepId: '33333333-3333-4333-8333-333333333333',
+        sequence: 1,
+        kind: TeachingMessageKind.QUESTION,
+        text: 'The model connection was interrupted. Reply to retry, or press Esc to stop.',
+      },
+    };
+    receiveProgress(pause);
+    expect(controller.isBusy()).toBe(false);
+    expect(voice.readStatus().state).toBe(VoiceState.IDLE);
+    expect(snapshots.at(-1)?.phase).toBe(CompanionHudPhase.NEEDS_INPUT);
+    expect(voice.startVoiceCapture().kind).toBe('ok');
+    const failedCapture = [...voiceEvents].reverse().find((event) => event.kind === 'prepare');
+    if (!failedCapture) {
+      throw new Error('No follow-up capture was prepared.');
+    }
+    await voice.prepareVoiceCapture(
+      failedCapture.captureId,
+      DesktopLocale.ENGLISH,
+      AgentTaskMode.TEACH,
+    );
+    if (!receiveTranscript) {
+      throw new Error('No follow-up transcription connection was established.');
+    }
+    receiveTranscript({ kind: TranscriptionEventKind.READY });
+    receiveTranscript({ kind: TranscriptionEventKind.FAILED });
+    expect(voice.readStatus().state).toBe(VoiceState.IDLE);
+    expect(snapshots.at(-1)?.phase).toBe(CompanionHudPhase.ERROR);
+    expect(snapshots.at(-1)?.message).toEqual(pause.teachingMessage);
+    await sendVoiceInstruction('Try again');
+    await vi.waitFor(() => {
+      expect(worker.answerLesson).toHaveBeenCalledOnce();
+    });
+    expect(worker.answerLesson).toHaveBeenCalledWith(
+      submitted.sessionId,
+      lessonId,
+      'Try again',
+      DesktopLocale.ENGLISH,
+    );
     expect(worker.sendMessage).toHaveBeenCalledOnce();
+    expect(worker.start).toHaveBeenCalledOnce();
+    await vi.waitFor(() => {
+      expect(
+        voiceEvents.some((event) => event.kind === 'result' && event.result.kind === 'accepted'),
+      ).toBe(true);
+    });
+    receiveProgress({ ...pause, phase: AgentProgressPhase.THINKING });
+    expect(voice.startVoiceCapture()).toEqual({ kind: 'failed' });
+    expect(shortcut.enable).toHaveBeenCalledOnce();
+    shortcut.enable.mock.calls[0]?.[0]();
+    await vi.waitFor(() => {
+      expect(
+        voiceEvents.some(
+          (event) =>
+            event.kind === 'result' &&
+            event.result.kind === 'teaching' &&
+            event.result.result.outcome === TeachingOutcome.CANCELED,
+        ),
+      ).toBe(true);
+    });
+    expect(worker.stop).toHaveBeenCalledWith(submitted.sessionId);
+    expect(controller.isBusy()).toBe(false);
+    expect(voice.readStatus().state).toBe(VoiceState.IDLE);
+    expect(snapshots.at(-1)?.phase).toBe(CompanionHudPhase.CANCELED);
+    expect(shortcut.disable).toHaveBeenCalled();
+    receiveProgress(pause);
+    expect(snapshots.at(-1)?.phase).toBe(CompanionHudPhase.CANCELED);
+    expect(voice.startVoiceCapture().kind).toBe('ok');
+  } finally {
+    voice.disableVoiceInput();
+    controller.dispose();
+    hud.reset();
+  }
+});
+
+it('releases busy and answer ownership after a fatal model result without requiring Esc', async () => {
+  const shortcut = {
+    enable: vi.fn<AgentCancelShortcut['enable']>().mockReturnValue(true),
+    disable: vi.fn<AgentCancelShortcut['disable']>(),
+  };
+  const { auth, worker, controller } = createController(shortcut);
+  auth.fetchModelCredential.mockResolvedValue({
+    token: 'fixture',
+    expiresAt: '2099-01-01T00:00:00.000Z',
   });
-  const lessonId = '22222222-2222-4222-8222-222222222222';
-  controller.receiveProgress({
-    kind: 'progress',
-    requestId: lessonId,
-    sessionId: 'teacher',
-    lessonId,
-    phase: 'needs_input',
-    teachingStep: 'Which database?',
+  worker.sendMessage.mockResolvedValueOnce({
+    kind: 'teaching',
+    result: { outcome: TeachingOutcome.FAILED, reason: GuidanceReason.TRANSPORT_FAILED },
   });
-  expect(controller.isBusy()).toBe(false);
-  expect(await controller.startTaskSession()).toEqual({ kind: 'started', sessionId: 'teacher' });
-  expect(
-    await controller.answerLesson('other', lessonId, 'Sales', DesktopLocale.ENGLISH),
-  ).toMatchObject({ kind: 'failed' });
-  expect(
-    await controller.sendMessage('teacher', 'Sales', DesktopLocale.ENGLISH, 'teach'),
-  ).toMatchObject({ kind: 'accepted' });
-  expect(worker.answerLesson).toHaveBeenCalledWith(
-    'teacher',
-    lessonId,
-    'Sales',
-    DesktopLocale.ENGLISH,
-  );
-  expect(worker.sendMessage).toHaveBeenCalledOnce();
-  finish?.({ kind: 'teaching', result: { outcome: 'goal_reached', answer: 'ERD finished.' } });
-  expect(await running).toMatchObject({ kind: 'teaching', result: { outcome: 'goal_reached' } });
-  controller.dispose();
+  try {
+    expect(
+      await controller.sendMessage(
+        'teacher',
+        'Explain this screen',
+        DesktopLocale.ENGLISH,
+        AgentTaskMode.TEACH,
+      ),
+    ).toMatchObject({
+      kind: 'teaching',
+      result: { outcome: TeachingOutcome.FAILED },
+    });
+    expect(controller.isBusy()).toBe(false);
+    expect(shortcut.disable).toHaveBeenCalled();
+    controller.receiveProgress({
+      kind: 'progress',
+      requestId: '11111111-1111-4111-8111-111111111111',
+      sessionId: 'teacher',
+      lessonId: '22222222-2222-4222-8222-222222222222',
+      phase: AgentProgressPhase.PAUSED,
+      canAcceptAnswer: true,
+    });
+    expect(
+      await controller.answerLesson(
+        'teacher',
+        '22222222-2222-4222-8222-222222222222',
+        'Try again',
+        DesktopLocale.ENGLISH,
+      ),
+    ).toMatchObject({ kind: 'failed' });
+    expect(
+      await controller.sendMessage(
+        'new-session',
+        'Explain again',
+        DesktopLocale.ENGLISH,
+        AgentTaskMode.TEACH,
+      ),
+    ).toMatchObject({ kind: 'completed' });
+    expect(worker.sendMessage).toHaveBeenCalledTimes(2);
+    expect(worker.answerLesson).not.toHaveBeenCalled();
+  } finally {
+    controller.dispose();
+  }
 });
 
 it('renews expiring model access during a long lesson without replacing its worker or goal', async () => {

@@ -1,4 +1,9 @@
-import { readModelGatewayDiagnostics } from '#contracts/ModelGatewayError.js';
+import {
+  ModelRequestTraceHeader,
+  ModelRequestTraceSchema,
+  readModelGatewayDiagnostics,
+} from '#contracts/ModelGatewayError.js';
+import { randomUUID } from 'node:crypto';
 import { enableAgentExchangeLog, logAgentExchange } from './AgentExchangeLog.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { TaskContext } from '../execution/TaskContext.js';
@@ -192,7 +197,12 @@ export function createLoggedModelFetch(
   let nextModelCall = 0;
   let previousToolCatalog = '';
   return async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-    const metadata = { ...readAgentLogContext(), modelCallId: 'model-' + String(++nextModelCall) };
+    const modelRequestId = randomUUID();
+    const metadata = {
+      ...readAgentLogContext(),
+      modelCallId: 'model-' + String(++nextModelCall),
+      modelRequestId,
+    };
     let requestBytes = 0;
     /* Always enforce the serialized request size, independent of debug logging.
        The SDK client has retries disabled so a rejected body never reaches a provider. */
@@ -255,7 +265,14 @@ export function createLoggedModelFetch(
       : null;
 
     try {
-      const response = await fetch(input, init);
+      const headers = new Headers(
+        init?.headers ?? (input instanceof Request ? input.headers : undefined),
+      );
+      headers.set(ModelRequestTraceHeader, modelRequestId);
+      const response = await fetch(input, { ...init, headers });
+      const returnedTrace = ModelRequestTraceSchema.safeParse(
+        response.headers.get(ModelRequestTraceHeader),
+      );
       const contentType = response.headers.get('content-type') ?? '';
       let responseBody: unknown = null;
       if (contentType.includes('application/json')) {
@@ -270,6 +287,7 @@ export function createLoggedModelFetch(
         {
           ...metadata,
           ...(gatewayFailure ? { gatewayFailure } : {}),
+          traceMatched: returnedTrace.success ? returnedTrace.data === modelRequestId : null,
           gatewayRequestId: /^req-[a-z0-9]+$/.test(response.headers.get('x-tro-request-id') ?? '')
             ? response.headers.get('x-tro-request-id')
             : null,

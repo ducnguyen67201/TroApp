@@ -1,8 +1,11 @@
 import {
+  ModelAbortSource,
+  ModelFailureStage,
   readModelGatewayDiagnostics,
   type ModelGatewayDiagnostics,
 } from '#contracts/ModelGatewayError.js';
 import { z } from 'zod';
+import OpenAI from 'openai';
 import { GuidanceReason, type CursorCompanionTool } from '#contracts/CursorCompanion.js';
 import type { DesktopObservation, DesktopObservationTool } from '#contracts/DesktopObservation.js';
 import { GuidanceTaskError } from './GuidanceTaskError.js';
@@ -24,6 +27,25 @@ export const TeachingFailureCode = {
 } as const;
 
 type FailureCode = (typeof TeachingFailureCode)[keyof typeof TeachingFailureCode];
+
+const TeachingModelErrorCode = {
+  HTTP: 'model_http_error',
+  CONNECTION: 'model_connection_error',
+  TIMEOUT: 'model_connection_timeout',
+  CANCELED: 'model_request_canceled',
+  UNEXPECTED: 'unexpected_error',
+} as const;
+
+export const TeachingModelRetryReason = {
+  ACCESS_UNAVAILABLE: 'access_unavailable',
+  CONNECTION_INTERRUPTED: 'connection_interrupted',
+  SERVICE_UNAVAILABLE: 'service_unavailable',
+} as const;
+
+export type TeachingModelRetryReason =
+  (typeof TeachingModelRetryReason)[keyof typeof TeachingModelRetryReason];
+
+const temporaryProviderStatuses = new Set([500, 502, 503, 504]);
 
 const FailureMessages = {
   [TeachingFailureCode.PRESENTATION_INCOMPLETE]:
@@ -137,6 +159,7 @@ export function describeTeachingFailure(error: unknown): TeachingFailureDiagnost
   let current: unknown = error;
   const chain: Array<{
     errorType: string;
+    errorCode?: (typeof TeachingModelErrorCode)[keyof typeof TeachingModelErrorCode];
     httpStatus?: number;
     gatewayFailure?: ModelGatewayDiagnostics;
     sdkRequestId?: string;
@@ -144,9 +167,35 @@ export function describeTeachingFailure(error: unknown): TeachingFailureDiagnost
     causeDepth: number;
   }> = [];
   for (let depth = 0; depth < 6; depth += 1) {
+    if (current instanceof GuidanceTaskError) {
+      return { ...describeTeachingFailure(current), causeDepth: depth };
+    }
+    if (current instanceof OpenAI.APIUserAbortError) {
+      chain.push({
+        errorType: 'APIUserAbortError',
+        errorCode: TeachingModelErrorCode.CANCELED,
+        causeDepth: depth,
+      });
+      break;
+    }
+    if (current instanceof OpenAI.APIConnectionError) {
+      chain.push({
+        errorType:
+          current instanceof OpenAI.APIConnectionTimeoutError
+            ? 'APIConnectionTimeoutError'
+            : 'APIConnectionError',
+        errorCode:
+          current instanceof OpenAI.APIConnectionTimeoutError
+            ? TeachingModelErrorCode.TIMEOUT
+            : TeachingModelErrorCode.CONNECTION,
+        causeDepth: depth,
+      });
+      break;
+    }
     const parsed = z
       .object({
         status: z.number().int().min(100).max(599).optional(),
+        requestID: z.unknown().optional(),
         request_id: z.unknown().optional(),
         code: z.unknown().optional(),
         cause: z.unknown().optional(),
@@ -156,7 +205,8 @@ export function describeTeachingFailure(error: unknown): TeachingFailureDiagnost
     if (!parsed.success) {
       break;
     }
-    const { status, request_id, code } = parsed.data;
+    const { status, code } = parsed.data;
+    const requestId = parsed.data.requestID ?? parsed.data.request_id;
     if (status !== undefined) {
       const gatewayFailure =
         readModelGatewayDiagnostics(parsed.data.error) ?? readModelGatewayDiagnostics(current);
@@ -164,8 +214,8 @@ export function describeTeachingFailure(error: unknown): TeachingFailureDiagnost
         ...(gatewayFailure ? { gatewayFailure } : {}),
         errorType: current instanceof Error ? current.constructor.name : 'SdkResponseError',
         httpStatus: status,
-        ...(typeof request_id === 'string' && /^req[_-][A-Za-z0-9_-]{1,128}$/.test(request_id)
-          ? { sdkRequestId: request_id }
+        ...(typeof requestId === 'string' && /^req[_-][A-Za-z0-9_-]{1,128}$/.test(requestId)
+          ? { sdkRequestId: requestId }
           : {}),
         ...(typeof code === 'string' &&
         ['server_error', 'rate_limit_exceeded', 'invalid_api_key', 'insufficient_quota'].includes(
@@ -181,8 +231,47 @@ export function describeTeachingFailure(error: unknown): TeachingFailureDiagnost
   }
   return {
     errorType: error instanceof Error ? error.constructor.name : typeof error,
-    errorCode: chain.length ? 'model_http_error' : 'unexpected_error',
+    errorCode: chain.length ? TeachingModelErrorCode.HTTP : TeachingModelErrorCode.UNEXPECTED,
     errorMessageAvailable: false,
     ...chain[0],
   };
+}
+
+/** Preserve the lesson for an explicit student retry, never replaying a stream or tool.
+ * SDK connection types establish desktop transport failure. Provider status is trusted
+ * only inside the validated Tro gateway diagnostics; arbitrary 502s remain unexplained. */
+export function readTeachingModelRetryReason(error: unknown): TeachingModelRetryReason | null {
+  const failure = describeTeachingFailure(error);
+  if (
+    failure.errorCode === TeachingModelErrorCode.CONNECTION ||
+    failure.errorCode === TeachingModelErrorCode.TIMEOUT
+  ) {
+    return TeachingModelRetryReason.CONNECTION_INTERRUPTED;
+  }
+  if (failure.httpStatus === 401 || failure.httpStatus === 429) {
+    return TeachingModelRetryReason.ACCESS_UNAVAILABLE;
+  }
+  const gatewayFailure = failure.gatewayFailure;
+  if (failure.httpStatus !== 502 || !gatewayFailure) {
+    return null;
+  }
+  if (
+    gatewayFailure.reason === 'provider_network_failed' &&
+    gatewayFailure.abortSource !== ModelAbortSource.CLIENT &&
+    gatewayFailure.failureStage !== ModelFailureStage.CLIENT_DISCONNECTED
+  ) {
+    return TeachingModelRetryReason.CONNECTION_INTERRUPTED;
+  }
+  if (
+    gatewayFailure.reason === 'provider_rejected' &&
+    gatewayFailure.providerStatus !== undefined &&
+    temporaryProviderStatuses.has(gatewayFailure.providerStatus)
+  ) {
+    return TeachingModelRetryReason.SERVICE_UNAVAILABLE;
+  }
+  return null;
+}
+
+export function canRetryTeachingModelRequest(error: unknown): boolean {
+  return readTeachingModelRetryReason(error) !== null;
 }

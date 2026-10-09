@@ -1,5 +1,7 @@
 import { enableAgentExchangeLog } from '../../../../src/desktop/worker/agent/AgentExchangeLog.js';
 import OpenAI from 'openai';
+import { z } from 'zod';
+import { ModelRequestTraceHeader, ModelRequestTraceSchema } from '#contracts/ModelGatewayError.js';
 import {
   isTaskContextBudgetError,
   TaskContextBudgetError,
@@ -21,6 +23,32 @@ import {
   describeCuaResult,
 } from '../../../../src/desktop/worker/cua/LoggedCuaServer.js';
 import { describeTeachingFailure } from '../../../../src/desktop/worker/teaching/TeachingFailure.js';
+
+const ModelLogEventSchema = z.object({
+  msg: z.string(),
+  modelRequestId: ModelRequestTraceSchema,
+  traceMatched: z.boolean().nullable().optional(),
+  gatewayRequestId: z.string().nullable().optional(),
+});
+
+function createCapturedModelLog() {
+  const output = new PassThrough();
+  const chunks: string[] = [];
+  output.on('data', (chunk: Buffer) => chunks.push(chunk.toString('utf8')));
+  return {
+    log: pino({ level: 'debug' }, output),
+    readRawLog: () => chunks.join(''),
+    readEvents: () =>
+      chunks
+        .join('')
+        .trim()
+        .split('\n')
+        .map((line) => {
+          const value: unknown = JSON.parse(line);
+          return ModelLogEventSchema.parse(value);
+        }),
+  };
+}
 
 describe('local agent debug summaries', () => {
   it('keeps operational errors enabled when verbose desktop debugging is disabled', () => {
@@ -585,4 +613,165 @@ it('preserves gateway diagnostics through the real SDK and JSON logs without raw
   } finally {
     provider.mockRestore();
   }
+});
+
+describe('model request trace correlation', () => {
+  it('sends a distinct trace per call, preserves supplied headers and correlates each echoed response', async () => {
+    const capture = createCapturedModelLog();
+    const suppliedHeaders = new Headers({
+      authorization: 'Bearer private-token',
+      'content-type': 'application/json',
+      'x-client-metadata': 'private-header',
+      [ModelRequestTraceHeader]: '11111111-1111-4111-8111-111111111111',
+    });
+    const receivedIds: string[] = [];
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+      const headers = new Headers(init?.headers);
+      const modelRequestId = ModelRequestTraceSchema.parse(headers.get(ModelRequestTraceHeader));
+      receivedIds.push(modelRequestId);
+      expect(headers.get('authorization')).toBe('Bearer private-token');
+      expect(headers.get('content-type')).toBe('application/json');
+      expect(headers.get('x-client-metadata')).toBe('private-header');
+      return Promise.resolve(
+        new Response('{}', {
+          headers: {
+            'content-type': 'application/json',
+            [ModelRequestTraceHeader]: modelRequestId,
+            'x-tro-request-id': 'req-synthetic',
+          },
+        }),
+      );
+    });
+
+    try {
+      const guardedFetch = createLoggedModelFetch(capture.log);
+      for (let index = 0; index < 2; index += 1) {
+        await guardedFetch(new URL('https://api.example.test/private-resource'), {
+          method: 'POST',
+          headers: suppliedHeaders,
+          body: JSON.stringify({ model: 'gpt-5.4', input: 'private prompt' }),
+        });
+      }
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(new Set(receivedIds).size).toBe(2);
+      expect(suppliedHeaders.get(ModelRequestTraceHeader)).toBe(
+        '11111111-1111-4111-8111-111111111111',
+      );
+      const events = capture.readEvents();
+      for (const modelRequestId of receivedIds) {
+        expect(events.filter((event) => event.modelRequestId === modelRequestId)).toEqual([
+          { msg: 'openai.request', modelRequestId },
+          {
+            msg: 'openai.response',
+            modelRequestId,
+            traceMatched: true,
+            gatewayRequestId: 'req-synthetic',
+          },
+        ]);
+      }
+      expect(capture.readRawLog()).not.toContain('private');
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('retains Request headers, body and explicit cancellation while adding the trace to a copy', async () => {
+    const capture = createCapturedModelLog();
+    const abort = new AbortController();
+    const request = new Request('https://api.example.test/private-resource', {
+      method: 'POST',
+      headers: { authorization: 'Bearer private-token', 'content-type': 'application/json' },
+      body: 'private prompt',
+    });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+      expect(input).toBe(request);
+      expect(init?.signal).toBe(abort.signal);
+      const headers = new Headers(init?.headers);
+      expect(headers.get('authorization')).toBe('Bearer private-token');
+      expect(headers.get('content-type')).toBe('application/json');
+      const modelRequestId = ModelRequestTraceSchema.parse(headers.get(ModelRequestTraceHeader));
+      return Promise.resolve(
+        new Response('{}', {
+          headers: {
+            'content-type': 'application/json',
+            [ModelRequestTraceHeader]: modelRequestId,
+          },
+        }),
+      );
+    });
+
+    try {
+      await createLoggedModelFetch(capture.log)(request, { signal: abort.signal });
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(request.headers.has(ModelRequestTraceHeader)).toBe(false);
+      expect(request.bodyUsed).toBe(false);
+      expect(await request.text()).toBe('private prompt');
+      expect(capture.readEvents().find((event) => event.msg === 'openai.response')).toMatchObject({
+        traceMatched: true,
+      });
+      expect(capture.readRawLog()).not.toContain('private');
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  it.each([
+    { responseTrace: '22222222-2222-4222-8222-222222222222', traceMatched: false },
+    { responseTrace: 'private-returned-header', traceMatched: null },
+  ])(
+    'reports an untrusted response trace as $traceMatched without logging it',
+    async ({ responseTrace, traceMatched }) => {
+      const capture = createCapturedModelLog();
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response('{}', {
+          headers: { 'content-type': 'application/json', [ModelRequestTraceHeader]: responseTrace },
+        }),
+      );
+
+      try {
+        await createLoggedModelFetch(capture.log)('https://api.example.test/private-resource');
+        expect(capture.readEvents().find((event) => event.msg === 'openai.response')).toMatchObject(
+          {
+            traceMatched,
+          },
+        );
+        expect(capture.readRawLog()).not.toContain(responseTrace);
+        expect(capture.readRawLog()).not.toContain('private');
+      } finally {
+        fetchMock.mockRestore();
+      }
+    },
+  );
+
+  it('keeps the dispatched trace when local fetch fails before returning gateway headers', async () => {
+    const capture = createCapturedModelLog();
+    const originalError = new TypeError('private transport failure', {
+      cause: { request: 'private input', token: 'private token' },
+    });
+    let dispatchedTrace: string | null = null;
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+      dispatchedTrace = ModelRequestTraceSchema.parse(
+        new Headers(init?.headers).get(ModelRequestTraceHeader),
+      );
+      return Promise.reject<Response>(originalError);
+    });
+
+    try {
+      await expect(
+        createLoggedModelFetch(capture.log)('https://api.example.test/private-resource', {
+          method: 'POST',
+          headers: { authorization: 'Bearer private-token' },
+          body: JSON.stringify({ model: 'gpt-5.4', input: 'private prompt' }),
+        }),
+      ).rejects.toBe(originalError);
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(capture.readEvents()).toEqual([
+        { msg: 'openai.request', modelRequestId: dispatchedTrace },
+        { msg: 'openai.failed', modelRequestId: dispatchedTrace },
+      ]);
+      expect(capture.readRawLog()).not.toContain('private');
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
 });

@@ -40,6 +40,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
     "test": "vitest run",
     "test:worker": "tsx scripts/CheckWorkerBundle.ts",
+    "test:model-gateway": "tsx scripts/CheckModelGatewayDiagnostics.ts",
+    "check:model-connection": "tsx scripts/CheckModelConnection.ts",
     "inspect:cua:mcp": "tsx scripts/InspectCuaMcpSchema.ts",
     "test:integration": "tsx scripts/RunIntegration.ts",
     "build:cua": "tsx scripts/BuildCuaCompanion.ts",

@@ -24,8 +24,6 @@ export interface ServerEnv {
   MATERIAL_COMPOSITION_OUTPUT_TOKENS: number;
   MATERIAL_COMPOSITION_TIMEOUT_MS: number;
   MATERIAL_JOB_DEADLINE_MS: number;
-  ELEVENLABS_API_KEY?: string | undefined;
-  ELEVENLABS_MODEL_ID: string;
   VOICEOVER_DAILY_CHARACTERS: number;
   VOICEOVER_GLOBAL_DAILY_CHARACTERS: number;
   VOICEOVER_GLOBAL_STREAMS: number;
@@ -80,8 +78,6 @@ export function readServerEnv(environment: NodeJS.ProcessEnv): ServerEnv {
         .max(540000)
         .default(defaultMaterialGenerationPolicy.compositionTimeoutMs),
       MATERIAL_JOB_DEADLINE_MS: z.coerce.number().int().positive().max(540000).default(540000),
-      ELEVENLABS_API_KEY: z.string().min(1).optional(),
-      ELEVENLABS_MODEL_ID: z.enum(['eleven_flash_v2_5', 'eleven_v3']).default('eleven_flash_v2_5'),
       VOICEOVER_DAILY_CHARACTERS: z.coerce.number().int().positive().max(1000000).default(30000),
       VOICEOVER_GLOBAL_DAILY_CHARACTERS: z.coerce
         .number()

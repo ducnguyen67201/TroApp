@@ -51,7 +51,7 @@ container, not the development database.
 | Backend                                     | `DATABASE_URL` and unique `AUTH_SECRET` are required. `APP_ENV=dev                                                                                                                                             | stage | prod`, `HOST`, `PORT`and`AUTH_BASE_URL` select the API environment/address. |
 | Google sign-in                              | Backend-only `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Register the web OAuth redirect as `AUTH_BASE_URL + /api/auth/callback/google`; local default is `http://127.0.0.1:3000/api/auth/callback/google`. |
 | Chat, transcription, materials and practice | Backend-only `OPENAI_API_KEY`. Feature budgets and settings are validated in [server Env.ts](src/server/Env.ts) and owning config modules. The API can start with provider features unavailable.               |
-| HUD narration                               | Backend-only `ELEVENLABS_API_KEY`; locale/voice mapping belongs in [VoiceoverConfig.ts](src/server/features/voiceover/VoiceoverConfig.ts).                                                                     |
+| HUD narration                               | Backend-only `OPENAI_API_KEY` (shared with other OpenAI features); speech model, instructions and locale/voice mapping belongs in [VoiceoverConfig.ts](src/server/features/voiceover/VoiceoverConfig.ts).      |
 | Desktop                                     | Public `MAIN_VITE_API_BASE_URL` and `MAIN_VITE_APP_ENV`. Local defaults work without overrides; `.env.local` may override these public values. `ELECTRON_RENDERER_URL` is supplied by electron-vite.           |
 | Installed updates                           | Public build-time `MAIN_VITE_UPDATE_FEED_URL`, an HTTPS release directory. Unset disables updates.                                                                                                             |
 
@@ -143,6 +143,46 @@ For worker, SDK, preload, teaching or gateway wiring:
 ```sh
 pnpm test:teaching
 ```
+
+For model gateway diagnostics, run the real-socket failure lab:
+
+```sh
+pnpm test:model-gateway
+```
+
+It uses synthetic requests and loopback servers, with no credentials or paid model
+call. Safe event logs and the case report are written to
+`.tro-development/model-gateway-diagnostics/GatewayEvents.jsonl` and
+`GatewayReport.json`. During `pnpm dev`, match `modelRequestId` between the worker's
+`openai.request`/`openai.response` and API `model.gateway.*` events. Use
+`gatewayRequestId` for the API request, `attemptNumber` for retries, and
+`taskId`/`lessonId` to reach teaching and HUD events. See
+[Architecture.md](docs/Architecture.md#agent-requests-and-model-gateway) for what
+each failure stage establishes.
+
+For current provider connectivity, run credentialless DNS/TLS/HTTP probes in the
+same environment as the API:
+
+```sh
+pnpm check:model-connection
+doppler run -- pnpm check:model-connection
+```
+
+The report is `.tro-development/model-connection/ConnectionReport.json` (each run
+replaces it). Probes send only GET requests without credentials or inference.
+They compare repeated native fetch with fresh IPv4/IPv6 HTTPS sockets and record
+proxy/CA presence, safe TLS state, timing and IDs. A 401 is the expected reachable
+response. Small GET success does not prove screenshot uploads are stable. Forced
+IPv6 failure alone does not explain a successful default IPv4 connection. The
+fresh HTTPS and fetch paths can use different proxy routes.
+
+Each gateway attempt also sends a unique `providerClientRequestId` as
+`X-Client-Request-Id`. Match that ID across attempt events and the final error
+envelope; provider support can use it when a disconnect leaves no response ID.
+Inspect `socketFailure` in a failed attempt or final `model.gateway.failed` event
+alongside `networkCode`: it preserves an observed TLS/socket cause even when fetch
+reports only a later generic disconnect. Console logs from the running API are
+separate from the synthetic failure lab's saved `GatewayEvents.jsonl`.
 
 For native watch, capture, input or rendering changes, rebuild first, then run on
 an authorized macOS desktop:

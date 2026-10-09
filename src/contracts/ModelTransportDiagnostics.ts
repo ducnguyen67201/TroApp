@@ -94,10 +94,21 @@ export const ModelTransportSnapshotSchema = z
     providerHeadersReceived: z.boolean(),
     providerResponseCompleted: z.boolean().optional(),
     socketHadPriorTraffic: z.boolean().nullable(),
+    socketAddressFamily: z.enum(['IPv4', 'IPv6']).nullable().optional(),
     socketBytesWrittenSinceAssignment: socketByteCount,
     socketBytesReadSinceAssignment: socketByteCount,
     tlsAuthorized: z.boolean().nullable(),
     tlsProtocol: z.enum(['TLSv1.2', 'TLSv1.3']).nullable(),
+    events: z
+      .array(
+        z.strictObject({
+          stage: z.enum(ModelTransportStage),
+          afterStartMs: z.number().int().nonnegative(),
+        }),
+      )
+      .max(16)
+      .optional(),
+    eventsTruncated: z.boolean().optional(),
     connectionSetupDurationMs: socketByteCount.optional(),
     requestBodyBytesSubmitted: socketByteCount.optional(),
     requestBodyChunksSubmitted: socketByteCount.optional(),

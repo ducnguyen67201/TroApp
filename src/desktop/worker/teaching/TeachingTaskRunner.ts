@@ -2,6 +2,7 @@ import { StudentInteractionTracker } from '../observation/StudentInteractionTrac
 import type { ClassroomTeachingSession } from './ClassroomTeachingTools.js';
 import type { StudentActivity } from '#contracts/StudentActivity.js';
 import { logAgentExchange } from '../agent/AgentExchangeLog.js';
+import { AgentLogRole, withAgentLogContext } from '../agent/AgentDebugLog.js';
 import type { Logger } from 'pino';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
 import { TeachingLessonPhase, type DesktopObservation } from '#contracts/DesktopObservation.js';
@@ -26,7 +27,6 @@ import {
   TeachingObservationLimits,
   TeachingObservationPolicy,
 } from '../observation/TeachingObservationPolicy.js';
-import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { TeachingMessageKind, type TeachingMessage } from '#contracts/TeachingStep.js';
 import { describeTeachingMessage } from './TeachingStepDiagnostics.js';
@@ -36,6 +36,8 @@ import {
   TeachingFailureCode,
   TeachingFailureStage,
   describeTeachingFailure,
+  readTeachingModelRetryReason,
+  TeachingModelRetryReason,
   describeTeachingObservation,
 } from './TeachingFailure.js';
 
@@ -47,6 +49,7 @@ export type ReceiveTeachingStep = (
   locale?: DesktopLocale,
   presentationPending?: boolean,
   presentationRevoked?: boolean,
+  canAcceptAnswer?: boolean,
 ) => void;
 
 /** Local waits have no SDK request. Abort always removes their pending timer. */
@@ -106,7 +109,9 @@ export class TeachingTaskRunner {
   }
 
   submitAnswer(lessonId: string, answer: string): boolean {
-    return this.lesson?.submitAnswer(lessonId, answer) ?? false;
+    const accepted = this.lesson?.submitAnswer(lessonId, answer) ?? false;
+    this.log.debug({ lessonId, accepted }, 'agent.teaching.student_input.admission');
+    return accepted;
   }
 
   async run(
@@ -195,7 +200,10 @@ export class TeachingTaskRunner {
         stage = TeachingFailureStage.RUN_MODEL;
         let result: { reply: ComputerUseAnswer; inputCount: number };
         try {
-          result = await this.runSegment(lesson, trigger, presenter, budget, signal);
+          result = await withAgentLogContext(
+            { taskId: lesson.id, agentRole: AgentLogRole.MAIN, attemptNumber: segmentNumber },
+            () => this.runSegment(lesson, trigger, presenter, budget, signal),
+          );
         } catch (error) {
           signal.throwIfAborted();
           if (this.locale !== this.requestedLocale) {
@@ -207,9 +215,25 @@ export class TeachingTaskRunner {
             trigger = 'Locale changed; assess the original request again';
             continue;
           }
-          if (this.isModelAccessUnavailable(error)) {
+          const retryReason = readTeachingModelRetryReason(error);
+          if (retryReason) {
+            const failure = describeTeachingFailure(error);
+            this.log.warn(
+              { ...failure, retryReason, lessonId: lesson.id, segmentNumber, stage },
+              'agent.teaching.model_retry.paused',
+            );
             stage = TeachingFailureStage.PAUSE_LESSON;
-            await this.pauseLesson(lesson, this.locale, signal, receiveStep, false);
+            const retryMessage =
+              retryReason === TeachingModelRetryReason.CONNECTION_INTERRUPTED
+                ? this.locale === DesktopLocale.VIETNAMESE
+                  ? 'Kết nối đến mô hình bị gián đoạn. Mình đã giữ lại yêu cầu của bạn. Hãy trả lời để thử lại, hoặc nhấn Esc để dừng.'
+                  : 'The model connection was interrupted. Your request is saved. Reply to retry, or press Esc to stop.'
+                : retryReason === TeachingModelRetryReason.SERVICE_UNAVAILABLE
+                  ? this.locale === DesktopLocale.VIETNAMESE
+                    ? 'Dịch vụ mô hình hiện chưa phản hồi. Mình đã giữ lại yêu cầu của bạn. Hãy trả lời để thử lại, hoặc nhấn Esc để dừng.'
+                    : 'The model service is temporarily unavailable. Your request is saved. Reply to retry, or press Esc to stop.'
+                  : undefined;
+            await this.pauseLesson(lesson, this.locale, signal, receiveStep, false, retryMessage);
             trigger = 'Student answered model-access retry question';
             continue;
           }
@@ -346,6 +370,7 @@ export class TeachingTaskRunner {
           }
           policy.recordAssessment(decision.disposition !== TeachingDisposition.OBSERVE_AGAIN);
         }
+        lesson.setWaitingForStudent(true);
         if (decision.disposition !== TeachingDisposition.ASK) {
           receiveStep?.(
             lesson.readInstruction(),
@@ -353,11 +378,18 @@ export class TeachingTaskRunner {
             lesson.id,
             lesson.readMessage() ?? undefined,
             this.locale,
+            false,
+            false,
+            true,
           );
         }
         stage = TeachingFailureStage.WAIT_FOR_STUDENT;
-        this.log.debug({ segmentNumber }, 'agent.teaching.waiting.locally');
-        trigger = await this.waitForResume(lesson, baseline, policy, signal);
+        this.log.debug({ segmentNumber, canAcceptAnswer: true }, 'agent.teaching.waiting.locally');
+        try {
+          trigger = await this.waitForResume(lesson, baseline, policy, signal);
+        } finally {
+          lesson.setWaitingForStudent(false);
+        }
         receiveStep?.(
           lesson.readInstruction(),
           TeachingLessonPhase.OBSERVING,
@@ -587,7 +619,7 @@ export class TeachingTaskRunner {
       this.companion.assertFollowingAvailable();
       await this.refreshLocale(lesson, signal);
       if (lesson.hasAnswer()) {
-        return 'The student answered the previous question';
+        return 'The student supplied a question answer or follow-up instruction';
       }
       const current = await this.observation.read();
       if (policy.canObserve(baseline, current) && !lesson.canAnswer()) {
@@ -667,21 +699,6 @@ export class TeachingTaskRunner {
         );
       }
     }
-  }
-
-  private isModelAccessUnavailable(error: unknown): boolean {
-    let current: unknown = error;
-    for (let depth = 0; depth < 5; depth += 1) {
-      const parsed = z.object({ status: z.number() }).safeParse(current);
-      if (parsed.success && (parsed.data.status === 401 || parsed.data.status === 429)) {
-        return true;
-      }
-      if (!(current instanceof Error)) {
-        return false;
-      }
-      current = current.cause;
-    }
-    return false;
   }
 
   private async pauseLesson(

@@ -34,7 +34,7 @@ export const vietnamese = {
     'Có thể lưu tối đa 10 tài khoản. Đăng xuất một tài khoản trước khi thêm tài khoản khác.',
   errorAccountBusy: 'Hoàn tất tác vụ, tải tài liệu hoặc kiểm tra micrô trước khi chuyển tài khoản.',
   voiceover: 'Đọc hướng dẫn thành tiếng',
-  voiceoverDescription: 'Đọc hướng dẫn HUD bằng ngôn ngữ đã chọn qua dịch vụ giọng nói trực tuyến.',
+  voiceoverDescription: 'Đọc hướng dẫn HUD bằng ngôn ngữ đã chọn với giọng nói do AI tạo.',
   voiceoverUnavailable: 'Giọng nói không khả dụng. Hướng dẫn trực quan vẫn tiếp tục.',
   voiceoverStop: 'Dừng đọc',
   updateTro: 'Cập nhật Tro',

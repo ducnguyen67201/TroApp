@@ -34,7 +34,7 @@ export const english = {
   errorAccountBusy:
     'Finish the current task, upload, or microphone test before switching accounts.',
   voiceover: 'Read guidance aloud',
-  voiceoverDescription: 'Read HUD guidance in your selected language using cloud speech.',
+  voiceoverDescription: 'Read HUD guidance in your selected language using an AI-generated voice.',
   voiceoverUnavailable: 'Speech is unavailable. Visual guidance will continue.',
   voiceoverStop: 'Stop speaking',
   updateTro: 'Update Tro',

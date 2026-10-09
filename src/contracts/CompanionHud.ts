@@ -72,6 +72,7 @@ export const AgentProgressSchema = z.strictObject({
   teachingMessage: TeachingMessageSchema.optional(),
   presentationPending: z.boolean().optional(),
   presentationRevoked: z.boolean().optional(),
+  canAcceptAnswer: z.boolean().optional(),
   locale: DesktopLocaleSchema.optional(),
 });
 

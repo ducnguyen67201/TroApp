@@ -1,6 +1,34 @@
 import { z } from 'zod';
 import { ModelTransportSnapshotSchema } from './ModelTransportDiagnostics.js';
 
+export const ModelRequestTraceHeader = 'x-tro-model-request-id';
+
+export const ProviderClientRequestHeader = 'x-client-request-id';
+
+export const ModelRequestTraceSchema = z.uuid();
+
+export const ModelFailureStage = {
+  UNOBSERVED: 'unobserved',
+  CLIENT_DISCONNECTED: 'client_disconnected',
+  DEADLINE: 'deadline',
+  BEFORE_CONNECTION: 'before_connection',
+  UPLOAD: 'upload',
+  WAITING_FOR_HEADERS: 'waiting_for_headers',
+  PROVIDER_RESPONSE: 'provider_response',
+  RESPONSE_STREAM: 'response_stream',
+} as const;
+
+export const ModelConnectionUse = { UNKNOWN: 'unknown', NEW: 'new', REUSED: 'reused' } as const;
+
+export const ModelAbortSource = { CLIENT: 'client', DEADLINE: 'deadline' } as const;
+
+export const ModelFailureEvidenceSchema = z.strictObject({
+  failureStage: z.enum(ModelFailureStage),
+  connectionUse: z.enum(ModelConnectionUse),
+});
+
+export type ModelFailureEvidence = z.infer<typeof ModelFailureEvidenceSchema>;
+
 /** Allowlisted diagnostics only. Raw provider messages, bodies and credentials never cross here. */
 export const ProviderErrorCodeSchema = z.enum([
   'invalid_api_key',
@@ -49,6 +77,11 @@ export const NetworkErrorCodeSchema = z.enum([
 
 export const ModelGatewayDiagnosticsSchema = z.object({
   gatewayRequestId: z.string().regex(/^req[-_][A-Za-z0-9_-]{1,128}$/),
+  modelRequestId: ModelRequestTraceSchema.optional(),
+  providerClientRequestId: ModelRequestTraceSchema.optional(),
+  failureStage: z.enum(ModelFailureStage).optional(),
+  connectionUse: z.enum(ModelConnectionUse).optional(),
+  abortSource: z.enum(ModelAbortSource).nullable().optional(),
   reason: z.enum([
     'provider_network_failed',
     'provider_rejected',

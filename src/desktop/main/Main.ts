@@ -674,6 +674,11 @@ async function startDesktop(): Promise<void> {
         };
       },
     },
+    environment.APP_ENV === AppEnvironment.DEV
+      ? (transition) => {
+          console.debug('companion.hud.transition', transition);
+        }
+      : undefined,
   );
   desktopCompanion = companion;
 

@@ -19,6 +19,13 @@ export const ModelGatewayFailure = {
 
 export const ModelGatewayEvent = {
   REQUEST: 'model.gateway.request',
+  ADMITTED: 'model.gateway.admitted',
+  DISPATCH: 'model.gateway.dispatch',
+  PROVIDER_HEADERS: 'model.gateway.provider_headers',
+  FIRST_CHUNK: 'model.gateway.first_chunk',
+  ABORTED: 'model.gateway.aborted',
+  DELIVERED: 'model.gateway.delivered',
+  ATTEMPT: 'model.gateway.attempt',
   REJECTED: 'model.gateway.rejected',
   RETRY: 'model.gateway.retry',
   FAILED: 'model.gateway.failed',

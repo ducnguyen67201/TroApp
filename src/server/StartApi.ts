@@ -9,7 +9,7 @@ import { MaterialPreparationRunner } from './features/materials/application/Mate
 import { MaterialExtractorWorker } from './features/materials/infrastructure/MaterialExtractorWorker.js';
 import { OpenAiMaterialPreparation } from './features/materials/infrastructure/OpenAiMaterialPreparation.js';
 import { registerMaterialRoutes } from './features/materials/infrastructure/RegisterMaterialRoutes.js';
-import { ElevenLabsSpeechProvider } from './features/voiceover/ElevenLabsSpeechProvider.js';
+import { OpenAiSpeechProvider } from './features/voiceover/OpenAiSpeechProvider.js';
 import { VoiceoverConfig } from './features/voiceover/VoiceoverConfig.js';
 import { registerVoiceoverRoutes } from './features/voiceover/RegisterVoiceoverRoutes.js';
 import { createPrismaVoiceoverAllowance } from './persistence/PrismaVoiceoverAllowance.js';
@@ -43,10 +43,11 @@ async function startApi(): Promise<void> {
     api,
     authentication.readSignedInUserId,
     voiceoverAllowance,
-    new ElevenLabsSpeechProvider({
-      apiKey: environment.ELEVENLABS_API_KEY,
-      modelId: environment.ELEVENLABS_MODEL_ID,
-      voiceIds: VoiceoverConfig.VOICE_IDS,
+    new OpenAiSpeechProvider({
+      apiKey: environment.OPENAI_API_KEY,
+      modelId: VoiceoverConfig.MODEL_ID,
+      voices: VoiceoverConfig.VOICES,
+      instructions: VoiceoverConfig.INSTRUCTIONS,
     }),
   );
   const classroom = createPrismaClassroomStore(environment.DATABASE_URL);

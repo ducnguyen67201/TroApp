@@ -1,12 +1,33 @@
-import { readModelGatewayDiagnostics } from '#contracts/ModelGatewayError.js';
+import {
+  ModelAbortSource,
+  ModelFailureStage,
+  ModelRequestTraceHeader,
+  readModelGatewayDiagnostics,
+} from '#contracts/ModelGatewayError.js';
+import { randomUUID } from 'node:crypto';
+import { channel } from 'node:diagnostics_channel';
+import { Socket } from 'node:net';
 import type { IncomingHttpHeaders } from 'node:http';
 import Fastify from 'fastify';
 import { PassThrough } from 'node:stream';
 import pino from 'pino';
+import { z } from 'zod';
 import { describe, expect, it, vi } from 'vitest';
 import { ModelCredentialSchema } from '#contracts/AuthSession.js';
 import { readServerEnv } from '../../../src/server/Env.js';
 import { registerModelGateway } from '../../../src/server/auth/RegisterModelGateway.js';
+import { ModelGatewayEvent } from '../../../src/server/auth/ModelGatewayDiagnostics.js';
+import { ModelGatewayConfig } from '../../../src/server/auth/ModelGatewayConfig.js';
+
+function readLogEvents(logs: string): Record<string, unknown>[] {
+  return logs
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .map((line) => {
+      const event: unknown = JSON.parse(line);
+      return z.record(z.string(), z.unknown()).parse(event);
+    });
+}
 
 async function createLoggingFixture() {
   const environment = readServerEnv({
@@ -35,11 +56,12 @@ async function createLoggingFixture() {
     api,
     token,
     readLogs: () => lines.join(''),
-    sendRequest: (fields: Record<string, unknown> = {}) =>
+    readEvents: () => readLogEvents(lines.join('')),
+    sendRequest: (fields: Record<string, unknown> = {}, headers: Record<string, string> = {}) =>
       api.inject({
         method: 'POST',
         url: '/api/v1/model/responses',
-        headers: { authorization: 'Bearer ' + token },
+        headers: { authorization: 'Bearer ' + token, ...headers },
         payload: {
           model: 'gpt-5.4',
           input: 'private prompt and screenshot',
@@ -51,6 +73,277 @@ async function createLoggingFixture() {
 }
 
 describe('model gateway', () => {
+  it('traces admission, provider response and HTTP delivery for a valid request identity', async () => {
+    const fixture = await createLoggingFixture();
+    const modelRequestId = randomUUID();
+    const chunks = ['data: private model answer\n\n', 'data: [DONE]\n\n'];
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of chunks) {
+          controller.enqueue(new TextEncoder().encode(chunk));
+        }
+        controller.close();
+      },
+    });
+    const provider = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(stream, {
+        headers: {
+          'content-type': 'text/event-stream',
+          'x-request-id': 'req_synthetic-lifecycle',
+          'x-private-provider-detail': 'private response header',
+        },
+      }),
+    );
+    try {
+      const reply = await fixture.sendRequest(
+        { stream: true },
+        { [ModelRequestTraceHeader]: modelRequestId },
+      );
+      expect(reply.statusCode).toBe(200);
+      expect(reply.headers[ModelRequestTraceHeader]).toBe(modelRequestId);
+      expect(reply.body).toBe(chunks.join(''));
+      const events = fixture.readEvents();
+      const lifecycleEvents = new Set<string>([
+        ModelGatewayEvent.REQUEST,
+        ModelGatewayEvent.ADMITTED,
+        ModelGatewayEvent.DISPATCH,
+        ModelGatewayEvent.PROVIDER_HEADERS,
+        ModelGatewayEvent.FIRST_CHUNK,
+        ModelGatewayEvent.COMPLETED,
+        ModelGatewayEvent.DELIVERED,
+      ]);
+      expect(
+        events
+          .filter((entry) => typeof entry.event === 'string' && lifecycleEvents.has(entry.event))
+          .map((entry) => entry.event),
+      ).toEqual([
+        ModelGatewayEvent.REQUEST,
+        ModelGatewayEvent.ADMITTED,
+        ModelGatewayEvent.DISPATCH,
+        ModelGatewayEvent.PROVIDER_HEADERS,
+        ModelGatewayEvent.FIRST_CHUNK,
+        ModelGatewayEvent.COMPLETED,
+        ModelGatewayEvent.DELIVERED,
+      ]);
+      for (const event of events) {
+        expect(event).toMatchObject({
+          modelRequestId,
+          gatewayRequestId: reply.headers['x-tro-request-id'],
+        });
+      }
+      const forwardedBody = provider.mock.calls[0]?.[1]?.body;
+      if (typeof forwardedBody !== 'string') {
+        throw new Error('The provider fixture did not receive a serialized body.');
+      }
+      expect(events.find((entry) => entry.event === ModelGatewayEvent.DISPATCH)).toMatchObject({
+        requestBytes: Buffer.byteLength(forwardedBody),
+        model: 'gpt-5.4',
+        stream: true,
+      });
+      expect(
+        events.find((entry) => entry.event === ModelGatewayEvent.PROVIDER_HEADERS),
+      ).toMatchObject({
+        providerStatus: 200,
+        providerRequestId: 'req_synthetic-lifecycle',
+      });
+      const completion = events.find((entry) => entry.event === ModelGatewayEvent.COMPLETED);
+      expect(completion).toMatchObject({
+        responseBytes: Buffer.byteLength(chunks.join('')),
+        responseChunks: chunks.length,
+        backpressureWaits: 0,
+        backpressureDurationMs: 0,
+      });
+      const firstChunkMs = completion?.firstChunkAfterDispatchMs;
+      const lastChunkMs = completion?.lastChunkAfterDispatchMs;
+      if (typeof firstChunkMs !== 'number' || typeof lastChunkMs !== 'number') {
+        throw new Error('The completed stream did not retain chunk timing.');
+      }
+      expect(firstChunkMs).toBeGreaterThanOrEqual(0);
+      expect(lastChunkMs).toBeGreaterThanOrEqual(firstChunkMs);
+      const delivery = events.find((entry) => entry.event === ModelGatewayEvent.DELIVERED);
+      expect(delivery).toMatchObject({ status: 200 });
+      /* Fastify's in-memory injector does not model native writable finish state. */
+      expect(typeof delivery?.responseFinished).toBe('boolean');
+      expect(fixture.readLogs()).not.toContain('private');
+      expect(fixture.readLogs()).not.toContain(fixture.token);
+      expect(fixture.readLogs()).not.toContain('x-private-provider-detail');
+    } finally {
+      provider.mockRestore();
+      await fixture.api.close();
+    }
+  });
+
+  it('retains a valid request identity in both a gateway failure and its delivery event', async () => {
+    const fixture = await createLoggingFixture();
+    const modelRequestId = randomUUID();
+    const provider = vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+      new TypeError('private network detail', {
+        cause: { code: 'ENOTFOUND', syscall: 'getaddrinfo' },
+      }),
+    );
+    try {
+      const reply = await fixture.sendRequest({}, { [ModelRequestTraceHeader]: modelRequestId });
+      expect(reply.statusCode).toBe(502);
+      expect(reply.headers[ModelRequestTraceHeader]).toBe(modelRequestId);
+      const body: unknown = reply.json();
+      expect(readModelGatewayDiagnostics(body)).toMatchObject({
+        modelRequestId,
+        gatewayRequestId: reply.headers['x-tro-request-id'],
+        networkCode: 'ENOTFOUND',
+      });
+      const events = fixture.readEvents();
+      expect(events.find((entry) => entry.event === ModelGatewayEvent.FAILED)).toMatchObject({
+        modelRequestId,
+      });
+      expect(events.find((entry) => entry.event === ModelGatewayEvent.DELIVERED)).toMatchObject({
+        modelRequestId,
+        status: 502,
+      });
+      expect(fixture.readLogs()).not.toContain('private');
+      expect(reply.body).not.toContain('private');
+    } finally {
+      provider.mockRestore();
+      await fixture.api.close();
+    }
+  });
+
+  it('ignores an invalid request identity instead of logging or echoing its value', async () => {
+    const fixture = await createLoggingFixture();
+    const invalidTrace = 'private unvalidated trace value';
+    const provider = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+    try {
+      const reply = await fixture.sendRequest({}, { [ModelRequestTraceHeader]: invalidTrace });
+      expect(reply.statusCode).toBe(200);
+      expect(reply.headers[ModelRequestTraceHeader]).toBeUndefined();
+      for (const event of fixture.readEvents()) {
+        expect(event).not.toHaveProperty('modelRequestId');
+      }
+      expect(fixture.readLogs()).not.toContain(invalidTrace);
+      expect(reply.body).not.toContain(invalidTrace);
+    } finally {
+      provider.mockRestore();
+      await fixture.api.close();
+    }
+  });
+
+  it('logs arrival before schema rejection without admitting or dispatching the request', async () => {
+    const fixture = await createLoggingFixture();
+    const provider = vi.spyOn(globalThis, 'fetch');
+    try {
+      const reply = await fixture.sendRequest({ model: 'private unsupported model' });
+      expect(reply.statusCode).toBe(400);
+      expect(provider).not.toHaveBeenCalled();
+      expect(fixture.readEvents().map((entry) => entry.event)).toEqual([
+        ModelGatewayEvent.REQUEST,
+        ModelGatewayEvent.REJECTED,
+        ModelGatewayEvent.DELIVERED,
+      ]);
+      expect(
+        fixture.readEvents().find((entry) => entry.event === ModelGatewayEvent.REJECTED),
+      ).toMatchObject({
+        reason: 'request_invalid',
+        status: 400,
+      });
+      expect(fixture.readLogs()).not.toContain('private');
+    } finally {
+      provider.mockRestore();
+      await fixture.api.close();
+    }
+  });
+
+  it('logs malformed JSON at the body stage after arrival without copying its content', async () => {
+    const fixture = await createLoggingFixture();
+    const provider = vi.spyOn(globalThis, 'fetch');
+    try {
+      await fixture.api.inject({
+        method: 'POST',
+        url: '/api/v1/model/responses',
+        headers: {
+          authorization: 'Bearer ' + fixture.token,
+          'content-type': 'application/json',
+        },
+        payload: '{ private malformed body',
+      });
+      expect(provider).not.toHaveBeenCalled();
+      expect(fixture.readEvents().map((entry) => entry.event)).toEqual([
+        ModelGatewayEvent.REQUEST,
+        ModelGatewayEvent.REJECTED,
+        ModelGatewayEvent.DELIVERED,
+      ]);
+      expect(
+        fixture.readEvents().find((entry) => entry.event === ModelGatewayEvent.REJECTED),
+      ).toMatchObject({
+        stage: 'request_body',
+        errorCode: 'FST_ERR_CTP_INVALID_JSON_BODY',
+        status: 400,
+      });
+      expect(fixture.readLogs()).not.toContain('private');
+      expect(fixture.readLogs()).not.toContain(fixture.token);
+    } finally {
+      provider.mockRestore();
+      await fixture.api.close();
+    }
+  });
+
+  it('records the deadline as the first abort source and stops without retrying', async () => {
+    const fixture = await createLoggingFixture();
+    const deadline = new AbortController();
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(deadline.signal);
+    const provider = vi.spyOn(globalThis, 'fetch').mockImplementation((_url, options) => {
+      const signal = options?.signal;
+      if (signal === undefined || signal === null) {
+        throw new Error('The provider fixture did not receive cancellation.');
+      }
+      return new Promise<Response>((_resolve, reject) => {
+        signal.addEventListener(
+          'abort',
+          () => {
+            reject(new DOMException('private deadline detail', 'TimeoutError'));
+          },
+          { once: true },
+        );
+        deadline.abort(new DOMException('private cancellation detail', 'TimeoutError'));
+      });
+    });
+    try {
+      const reply = await fixture.sendRequest();
+      expect(reply.statusCode).toBe(502);
+      expect(timeout).toHaveBeenCalledWith(ModelGatewayConfig.requestTimeoutMs);
+      expect(provider).toHaveBeenCalledOnce();
+      const events = fixture.readEvents();
+      expect(events.filter((entry) => entry.event === ModelGatewayEvent.ABORTED)).toEqual([
+        expect.objectContaining({ abortSource: ModelAbortSource.DEADLINE }),
+      ]);
+      expect(events.find((entry) => entry.event === ModelGatewayEvent.FAILED)).toMatchObject({
+        abortSource: ModelAbortSource.DEADLINE,
+        timedOut: true,
+        failureStage: ModelFailureStage.DEADLINE,
+      });
+      expect(events.some((entry) => entry.event === ModelGatewayEvent.RETRY)).toBe(false);
+      expect(
+        events
+          .filter((entry) => entry.event === ModelGatewayEvent.ATTEMPT)
+          .map((entry) => [entry.attemptNumber, entry.phase]),
+      ).toEqual([
+        [1, 'started'],
+        [1, 'failed'],
+      ]);
+      const body: unknown = reply.json();
+      expect(readModelGatewayDiagnostics(body)).toMatchObject({
+        abortSource: ModelAbortSource.DEADLINE,
+        timedOut: true,
+        failureStage: ModelFailureStage.DEADLINE,
+        attemptNumber: 1,
+      });
+      expect(fixture.readLogs()).not.toContain('private');
+      expect(reply.body).not.toContain('private');
+    } finally {
+      provider.mockRestore();
+      timeout.mockRestore();
+      await fixture.api.close();
+    }
+  });
+
   it('forwards visual requests directly without a token-count preflight', async () => {
     const fixture = await createLoggingFixture();
     const input = [
@@ -201,6 +494,13 @@ describe('model gateway', () => {
         attemptNumber: 2,
         timedOut: false,
       });
+      const finalRequestId = new Headers(provider.mock.calls[1]?.[1]?.headers).get(
+        'x-client-request-id',
+      );
+      expect(readModelGatewayDiagnostics(responseBody)?.providerClientRequestId).toBe(
+        finalRequestId,
+      );
+      expect(z.uuid().safeParse(finalRequestId).success).toBe(true);
       expect(reply.body).not.toContain('private');
       expect(provider).toHaveBeenCalledTimes(2);
       const logs = fixture.readLogs();
@@ -208,7 +508,21 @@ describe('model gateway', () => {
       expect(logs).toContain('"networkCode":"ECONNRESET"');
       expect(logs).toContain('"reason":"provider_network_failed"');
       expect(logs).toContain('"event":"model.gateway.retry"');
-      expect(logs).not.toContain('model.gateway.attempt');
+      expect(logs.match(/"phase":"failed"/g)).toHaveLength(2);
+      expect(logs).toContain('"requestBytes":');
+      expect(logs).toContain('"transportObserved":false');
+      expect(logs).toContain('model.gateway.attempt');
+      expect(
+        fixture
+          .readEvents()
+          .filter((entry) => entry.event === ModelGatewayEvent.ATTEMPT)
+          .map((entry) => [entry.attemptNumber, entry.phase]),
+      ).toEqual([
+        [1, 'started'],
+        [1, 'failed'],
+        [2, 'started'],
+        [2, 'failed'],
+      ]);
       expect(logs).not.toContain('private');
     } finally {
       provider.mockRestore();
@@ -280,7 +594,7 @@ describe('model gateway', () => {
       expect(logs).toContain('model.gateway.failed');
       expect(logs).toContain('"networkCode":"ENOTFOUND"');
       expect(logs).not.toContain('model.gateway.connection.');
-      expect(logs).not.toContain('model.gateway.attempt');
+      expect(logs).toContain('model.gateway.attempt');
       expect(logs).not.toContain('private');
     } finally {
       provider.mockRestore();
@@ -307,9 +621,60 @@ describe('model gateway', () => {
       expect(logs).toContain('"socketTlsAlertNumber":20');
       expect(logs).toContain('"socketTlsErrorNumber":"0A0003FC"');
       expect(logs).not.toContain('model.gateway.connection.');
-      expect(logs).not.toContain('model.gateway.attempt');
+      expect(logs).toContain('model.gateway.attempt');
       expect(logs).not.toContain('private');
       expect(reply.body).not.toContain('socketTls');
+    } finally {
+      provider.mockRestore();
+      await fixture.api.close();
+    }
+  });
+
+  it('retains the observed TLS alert when fetch replaces it with a generic disconnect', async () => {
+    const fixture = await createLoggingFixture();
+    const provider = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+      const request = {};
+      const socket = new Socket();
+      channel('undici:request:create').publish({ request });
+      channel('undici:client:sendHeaders').publish({ request, socket });
+      socket.emit(
+        'error',
+        Object.assign(new Error('private peer:error:0A0003FC:SSL routines:private'), {
+          code: 'ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC',
+          library: 'SSL routines',
+        }),
+      );
+      socket.destroy();
+      return Promise.reject(
+        new TypeError('private request', { cause: { code: 'UND_ERR_SOCKET' } }),
+      );
+    });
+    try {
+      const reply = await fixture.sendRequest();
+      expect(reply.statusCode).toBe(502);
+      expect(provider).toHaveBeenCalledTimes(2);
+      const failures = fixture
+        .readEvents()
+        .filter((event) => event.event === ModelGatewayEvent.FAILED);
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toMatchObject({
+        networkCode: 'UND_ERR_SOCKET',
+        socketFailure: {
+          socketErrorCode: 'ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC',
+          socketErrorReason: 'tls_bad_record_mac',
+          socketTlsAlertNumber: 20,
+          socketTlsErrorNumber: '0A0003FC',
+        },
+      });
+      const attempts = fixture
+        .readEvents()
+        .filter((event) => event.event === ModelGatewayEvent.ATTEMPT && event.phase === 'failed');
+      expect(attempts).toHaveLength(2);
+      for (const attempt of attempts) {
+        expect(attempt).toMatchObject({ socketFailure: { socketTlsAlertNumber: 20 } });
+      }
+      expect(fixture.readLogs()).not.toContain('private');
+      expect(reply.body).not.toContain('socketFailure');
     } finally {
       provider.mockRestore();
       await fixture.api.close();
@@ -354,9 +719,9 @@ describe('model gateway', () => {
       );
       expect(fixture.readLogs()).toContain('"responseBytes":' + String(Buffer.byteLength(body)));
       expect(fixture.readLogs()).not.toContain('model.gateway.first_byte');
-      expect(fixture.readLogs()).not.toContain('model.gateway.attempt');
+      expect(fixture.readLogs()).toContain('model.gateway.attempt');
       expect(fixture.readLogs()).not.toContain('model.gateway.connection.');
-      expect(fixture.readLogs()).not.toContain('transportObserved');
+      expect(fixture.readLogs()).toContain('"transportObserved":false');
       expect(fixture.readLogs()).not.toContain('private');
     } finally {
       provider.mockRestore();
@@ -375,6 +740,16 @@ describe('model gateway', () => {
     try {
       await fixture.sendRequest();
       expect(fixture.readLogs()).toContain('"reason":"provider_stream_failed"');
+      expect(
+        fixture.readEvents().find((entry) => entry.event === ModelGatewayEvent.FAILED),
+      ).toMatchObject({
+        responseBytes: 0,
+        responseChunks: 0,
+        firstChunkAfterDispatchMs: null,
+        lastChunkAfterDispatchMs: null,
+        backpressureWaits: 0,
+        backpressureDurationMs: 0,
+      });
       expect(fixture.readLogs()).not.toContain('model.gateway.completed');
       expect(fixture.readLogs()).not.toContain('private');
     } finally {

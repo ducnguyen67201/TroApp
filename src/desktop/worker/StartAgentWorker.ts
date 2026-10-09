@@ -189,6 +189,7 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
           locale,
           presentationPending,
           presentationRevoked,
+          canAcceptAnswer,
         ) => {
           parentPort.postMessage(
             AgentProgressSchema.parse({
@@ -210,6 +211,7 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
               ...(teachingMessage ? { teachingMessage } : {}),
               ...(presentationPending ? { presentationPending } : {}),
               ...(presentationRevoked ? { presentationRevoked } : {}),
+              ...(canAcceptAnswer ? { canAcceptAnswer } : {}),
               ...(locale ? { locale } : {}),
             }),
           );

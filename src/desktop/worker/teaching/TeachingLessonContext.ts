@@ -38,6 +38,7 @@ export class TeachingLessonContext {
   private readonly presentedHighlights: TeachingPresentationReceipt[] = [];
   private question: string | null = null;
   private answer: string | null = null;
+  private waitingForStudent = false;
 
   constructor(
     readonly originalRequest: string,
@@ -203,12 +204,20 @@ export class TeachingLessonContext {
     return this.question !== null && this.answer === null;
   }
 
+  setWaitingForStudent(waiting: boolean): void {
+    this.waitingForStudent = waiting;
+  }
+
   hasAnswer(): boolean {
     return this.answer !== null;
   }
 
   submitAnswer(lessonId: string, answer: string): boolean {
-    if (lessonId !== this.id || !this.canAnswer()) {
+    if (
+      lessonId !== this.id ||
+      this.answer !== null ||
+      (!this.canAnswer() && !this.waitingForStudent)
+    ) {
       return false;
     }
     this.answer = answer.slice(0, 4000);

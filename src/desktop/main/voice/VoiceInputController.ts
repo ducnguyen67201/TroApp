@@ -61,8 +61,8 @@ export class VoiceInputController {
 
   setLessonAnswerAllowed(allowed: boolean): void {
     this.lessonAnswerAllowed = allowed;
-    if (this.running > 0 && !this.capture && this.status.state === VoiceState.RUNNING && allowed) {
-      this.setState(VoiceState.IDLE);
+    if (this.running > 0 && !this.capture && this.status.state !== VoiceState.DISABLED) {
+      this.setState(allowed ? VoiceState.IDLE : VoiceState.RUNNING);
     }
   }
 
@@ -282,7 +282,9 @@ export class VoiceInputController {
 
   cancelVoiceCapture(): VoiceReply {
     const capture = this.capture;
-    if (capture) {
+    /* A follow-up capture has its own identity. Canceling it must preserve the
+       original lesson's pending result, including its later Esc settlement. */
+    if (capture && this.running === 0) {
       this.generation += 1;
     }
     this.capture = null;
@@ -292,8 +294,10 @@ export class VoiceInputController {
       this.dependencies.emit({ kind: 'cancel', captureId: capture.id });
       void this.dependencies.releaseUnusedCredential(capture.id).catch(() => {});
     }
-    if (this.status.state !== VoiceState.DISABLED && !this.running) {
-      this.setState(VoiceState.IDLE);
+    if (this.status.state !== VoiceState.DISABLED) {
+      this.setState(
+        this.running > 0 && !this.lessonAnswerAllowed ? VoiceState.RUNNING : VoiceState.IDLE,
+      );
     }
     return this.reply();
   }

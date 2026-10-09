@@ -1,6 +1,6 @@
-import { AgentTaskMode } from '#contracts/CursorCompanion.js';
+import { AgentTaskMode, GuidanceReason, TeachingOutcome } from '#contracts/CursorCompanion.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { VoiceShortcut, type VoiceEvent } from '#contracts/VoiceInput.js';
+import { VoiceShortcut, VoiceState, type VoiceEvent } from '#contracts/VoiceInput.js';
 import { TranscriptionEventKind, type TranscriptionEvent } from '#contracts/Transcription.js';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
 import {
@@ -303,6 +303,10 @@ it('accepts a spoken question answer while the original teaching turn is still p
   });
   harness.controller.setLessonAnswerAllowed(true);
   expect(harness.controller.readStatus().state).toBe('idle');
+  harness.controller.setLessonAnswerAllowed(false);
+  expect(harness.controller.readStatus().state).toBe('running');
+  expect(harness.controller.startVoiceCapture()).toEqual({ kind: 'failed' });
+  harness.controller.setLessonAnswerAllowed(true);
   const answer = await harness.startCapture(DesktopLocale.ENGLISH, AgentTaskMode.TEACH);
   harness.controller.releaseVoiceCapture();
   harness.controller.finishVoiceAudio(answer, -1);
@@ -318,4 +322,128 @@ it('accepts a spoken question answer while the original teaching turn is still p
     expect(harness.events.filter((event) => event.kind === 'result')).toHaveLength(2);
   });
   expect(harness.controller.readStatus().state).toBe('idle');
+});
+
+it.each(['terminal result', 'rejected request'] as const)(
+  'allows another voice hold after a failed model %s without Escape',
+  async (failureKind) => {
+    const harness = createHarness();
+    if (failureKind === 'terminal result') {
+      harness.dependencies.sendAgentMessage.mockResolvedValueOnce({
+        kind: 'teaching',
+        result: { outcome: TeachingOutcome.FAILED, reason: GuidanceReason.TRANSPORT_FAILED },
+      });
+    } else {
+      harness.dependencies.sendAgentMessage.mockRejectedValueOnce(
+        new Error('Fixture SDK connection failed.'),
+      );
+    }
+    const captureId = await harness.startCapture(DesktopLocale.ENGLISH, AgentTaskMode.TEACH);
+    harness.controller.releaseVoiceCapture();
+    harness.controller.finishVoiceAudio(captureId, -1);
+    harness.emit({ kind: TranscriptionEventKind.FINAL, text: 'Explain this screen' });
+    await vi.waitFor(() => {
+      expect(harness.dependencies.sendAgentMessage).toHaveBeenCalledOnce();
+      expect(harness.controller.readStatus().state).toBe(VoiceState.IDLE);
+    });
+    const nextCaptureId = await harness.startCapture(DesktopLocale.ENGLISH, AgentTaskMode.TEACH);
+    expect(nextCaptureId).not.toBe(captureId);
+    expect(harness.controller.readStatus().state).toBe(VoiceState.RECORDING);
+    expect(harness.connection.close).toHaveBeenCalledOnce();
+  },
+);
+
+it.each([
+  { captureEnd: 'failed', modelResumed: false },
+  { captureEnd: 'canceled', modelResumed: false },
+  { captureEnd: 'canceled', modelResumed: true },
+] as const)(
+  'releases a $captureEnd follow-up capture without suppressing original lesson settlement (modelResumed=$modelResumed)',
+  async ({ captureEnd, modelResumed }) => {
+    const harness = createHarness();
+    let finishLesson:
+      ((result: Awaited<ReturnType<VoiceDependencies['sendAgentMessage']>>) => void) | undefined;
+    harness.dependencies.sendAgentMessage.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishLesson = resolve;
+        }),
+    );
+    const originalCaptureId = await harness.startCapture(
+      DesktopLocale.ENGLISH,
+      AgentTaskMode.TEACH,
+    );
+    harness.controller.releaseVoiceCapture();
+    harness.controller.finishVoiceAudio(originalCaptureId, -1);
+    harness.emit({ kind: TranscriptionEventKind.FINAL, text: 'Explain this screen' });
+    await vi.waitFor(() => {
+      expect(harness.dependencies.sendAgentMessage).toHaveBeenCalledOnce();
+    });
+    harness.controller.setLessonAnswerAllowed(true);
+    const followUpId = await harness.startCapture(DesktopLocale.ENGLISH, AgentTaskMode.TEACH);
+    const staleTranscript = harness.dependencies.connect.mock.calls.at(-1)?.[1];
+    if (modelResumed) {
+      harness.controller.setLessonAnswerAllowed(false);
+    }
+    if (captureEnd === 'failed') {
+      harness.emit({ kind: TranscriptionEventKind.FAILED });
+    } else {
+      harness.controller.cancelVoiceCapture();
+    }
+    expect(harness.controller.isCapturing()).toBe(false);
+    expect(harness.controller.readStatus().state).toBe(
+      modelResumed ? VoiceState.RUNNING : VoiceState.IDLE,
+    );
+    staleTranscript?.({ kind: TranscriptionEventKind.FINAL, text: 'Late canceled follow-up' });
+    expect(harness.dependencies.sendAgentMessage).toHaveBeenCalledOnce();
+    if (modelResumed) {
+      expect(harness.controller.startVoiceCapture()).toEqual({ kind: 'failed' });
+    } else {
+      const newCaptureId = await harness.startCapture(DesktopLocale.ENGLISH, AgentTaskMode.TEACH);
+      expect(newCaptureId).not.toBe(followUpId);
+      harness.controller.cancelVoiceCapture();
+    }
+    finishLesson?.({
+      kind: 'teaching',
+      result: { outcome: TeachingOutcome.CANCELED, reason: GuidanceReason.EXPLICIT_STOP },
+    });
+    await vi.waitFor(() => {
+      expect(harness.events.filter((event) => event.kind === 'result')).toHaveLength(1);
+    });
+    expect(harness.events.find((event) => event.kind === 'result')).toMatchObject({
+      captureId: originalCaptureId,
+      result: { kind: 'teaching', result: { outcome: TeachingOutcome.CANCELED } },
+    });
+    expect(harness.controller.readStatus().state).toBe(VoiceState.IDLE);
+  },
+);
+
+it('still suppresses original lesson replies after account invalidation during a follow-up capture', async () => {
+  const harness = createHarness();
+  let finishLesson:
+    ((result: Awaited<ReturnType<VoiceDependencies['sendAgentMessage']>>) => void) | undefined;
+  harness.dependencies.sendAgentMessage.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishLesson = resolve;
+      }),
+  );
+  const originalCaptureId = await harness.startCapture(DesktopLocale.ENGLISH, AgentTaskMode.TEACH);
+  harness.controller.releaseVoiceCapture();
+  harness.controller.finishVoiceAudio(originalCaptureId, -1);
+  harness.emit({ kind: TranscriptionEventKind.FINAL, text: 'Explain this screen' });
+  await vi.waitFor(() => {
+    expect(harness.dependencies.sendAgentMessage).toHaveBeenCalledOnce();
+  });
+  harness.controller.setLessonAnswerAllowed(true);
+  await harness.startCapture(DesktopLocale.ENGLISH, AgentTaskMode.TEACH);
+  harness.controller.invalidateVoiceInput();
+  finishLesson?.({
+    kind: 'teaching',
+    result: { outcome: TeachingOutcome.CANCELED, reason: GuidanceReason.EXPLICIT_STOP },
+  });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  expect(harness.controller.readStatus().state).toBe(VoiceState.DISABLED);
+  expect(harness.events.some((event) => event.kind === 'result')).toBe(false);
+  expect(harness.controller.startVoiceCapture()).toEqual({ kind: 'failed' });
 });

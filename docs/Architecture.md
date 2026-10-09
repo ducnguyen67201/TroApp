@@ -54,7 +54,7 @@ flowchart TB
   end
   Main <-->|Authenticated HTTP and audio streams| Routes
   Task <-->|Scoped Responses HTTP stream| Routes
-  Adapters <-->|Backend-only credentials| Providers[OpenAI and ElevenLabs]
+  Adapters <-->|Backend-only credentials| Providers[OpenAI]
 ```
 
 | Boundary                  | Contract and responsibility                                                                                                                                      |
@@ -142,6 +142,86 @@ codes, under the same cancellation/deadline. HTTP errors, other network errors a
 post-header failures are not retried. SDK automatic retries are disabled. Desktop
 tools are never replayed by transport recovery. A pre-header retry can still incur
 another inference charge because provider execution may be uncertain.
+
+The worker's logged fetch gives each model request a random UUID, sent in the
+validated `x-tro-model-request-id` header. The gateway echoes that ID on successful
+streams and failures, including pre-admission errors. Worker events retain task,
+role and attempt context; teaching segments use their lesson ID as the task ID.
+Gateway events share that model ID and the local gateway request ID. Untrusted
+trace headers are discarded, and the header is not forwarded to the provider.
+Each upstream attempt independently generates a UUID `providerClientRequestId`
+and sends it as `X-Client-Request-Id`. Started and settled attempt events share
+that ID; retries receive a new one. Final error diagnostics and stream events
+retain the relevant attempt ID. It permits provider-side receipt lookup when a
+disconnect prevents receipt of the provider's response ID, without exposing input.
+
+`ModelTransportObserver` observes each fetch attempt through Node's Undici
+diagnostic channels. Request identity scopes events after dispatch; sockets have
+opaque local connection IDs and observed use counts. It records assignment,
+local byte-counter changes, body-write completion, response-header arrival,
+socket closure and allowlisted public TLS state, with at most 16 stage timestamps.
+The connected socket's address family is retained without its address; a proxy
+socket's family does not establish the provider's address family.
+Snapshots freeze when fetch resolves or
+rejects; temporary socket listeners are removed then. It changes no dispatcher,
+pooling, retry, TLS or timeout behavior and reads no headers, request bodies,
+addresses or secrets. A body-sent event establishes local queuing/writing, not
+provider receipt or execution. Missing observations remain explicit.
+The observer also retains the first allowlisted socket error independently of
+the fetch rejection. A TLS alert can otherwise be replaced by a later
+`UND_ERR_SOCKET` or `EPIPE`. Failed attempt events and the final gateway failure
+include that bounded `socketFailure` summary, including safe TLS alert numbers.
+It remains API-log-only, contains no native error object or message, and does not
+change retry eligibility. Listeners and observations stop when the attempt settles.
+
+The route logs `model.gateway.request` before body parsing, then admission or a
+rejection. Forwarding logs dispatch, each attempt, provider headers and the first
+response chunk. Completion or failure includes aggregate bytes, chunks, first/last
+chunk latency and backpressure waits. `model.gateway.aborted` records the first
+local cancellation source, client or deadline. `model.gateway.delivered` records
+the local HTTP response finish; it does not prove the desktop received all bytes.
+These events contain no HTTP bodies, screenshot pixels, credentials or headers.
+
+Bounded `model.gateway.attempt` events include gateway request ID, attempt number,
+phase, request byte count, timing, cancellation status, retry decision and the
+transport snapshot. Failure summaries and the HTTP error envelope retain the
+final attempt snapshot and a conservative failure stage. A recorded second use
+establishes reuse; a connection established during this attempt establishes new
+use. Otherwise connection use remains unknown. Compare connection IDs across failed
+attempts; lifetime
+socket totals alone cannot identify the failing request's upload. These diagnostics
+do not establish why a remote peer closed. Local loopback checks exercise real
+fetch peer-close recovery without credentials, a model call or user screenshots.
+The failure lab compares local transport observations with independent peer byte
+counts for interrupted uploads, closure before headers, malformed HTTP, provider
+rejection, truncated streaming, client cancellation, deadline expiry, TLS setup
+failure and successful fresh/reused connections.
+
+`CheckModelConnection` separately probes current DNS/TLS/HTTP reachability with
+credentialless GETs to the fixed provider models endpoint. It compares repeated
+native fetch and fresh IPv4/IPv6 HTTPS connections under bounded deadlines and
+response sizes. The script's validated environment reader records only proxy,
+CA and TLS-override flags; macOS system proxy values and DNS addresses are
+discarded. Safe socket/TLS failures remain allowlisted. These small requests do
+not establish large authenticated upload stability or the earlier disconnect's
+cause. Different fetch/HTTPS proxy routes and unavailable IPv6 remain explicit
+limitations. Commands and report paths belong in README.md.
+
+| Failure stage                      | Evidence established by the log                                                                                                                        |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `before_connection`                | No provider socket was assigned; the safe cause may identify TLS or connection setup failure.                                                          |
+| `upload`                           | A socket was assigned, but body writing did not complete before the observed socket closure. A later body-sent callback does not change that evidence. |
+| `waiting_for_headers`              | Local body writing completed, but no valid HTTP response headers arrived. This does not prove provider receipt.                                        |
+| `provider_response`                | Valid provider HTTP headers arrived; status and allowlisted rejection fields identify its response.                                                    |
+| `response_stream`                  | Response headers arrived, then reading or forwarding the body failed.                                                                                  |
+| `client_disconnected` / `deadline` | The first local abort source identifies desktop disconnection or the gateway deadline.                                                                 |
+| `unobserved`                       | Transport observations were unavailable; the log does not invent a stage.                                                                              |
+
+Development-only `companion.hud.transition` events identify the previous and next
+phase, event source/cause and available task/capture/lesson IDs. Only phase changes
+are logged, and no message or transcript enters the event. A failed diagnostic
+callback cannot prevent the HUD from rendering. These logs locate the event that
+displayed an error; they do not determine the network peer's reason for closing.
 
 Execution tasks use `TaskHarness`, `MainAgentRunner`, `TaskVerifier` and
 `CompletionGate`. The harness owns immutable request/goal state, budgets and final
@@ -250,7 +330,37 @@ owned by [CuaCompanionBuild.ts](../src/contracts/CuaCompanionBuild.ts). The clea
 and paired-receipt checks. Temporary render stages and socket profiling were removed;
 concise genuine failures remain. Earlier TLS errors are a separate transport issue.
 
+A diagnosed gateway HTTP 502 with `provider_network_failed`, SDK connection or
+timeout errors, and validated temporary provider 500/502/503/504 responses pause
+the teaching lesson for an explicit student retry, as do model-access errors.
+The original goal and session stay in memory and the hold shortcut remains
+available. The HUD shows input readiness; `agent.teaching.model_retry.paused`
+retains safe gateway correlation and the retry reason. No automatic model loop
+is added. Cancellation, unclassified HTTP 502, permanent provider rejections
+and native failures retain terminal behavior.
+
 ## Voice input and narration
+
+During local teaching waits, the worker explicitly advertises `canAcceptAnswer`
+with WAITING progress. Main allows the hold-to-speak shortcut and routes the
+follow-up into the same lesson, just as for a question; it does not cancel or
+replace the original goal. Presentation acknowledgements alone do not advertise
+this readiness while the model is still deciding. The lesson accepts one pending
+follow-up and closes admission before the next observation/model segment. Voice
+returns to RUNNING when input readiness closes and IDLE when it opens, without
+requiring Escape.
+
+A failed follow-up voice capture releases its capture identity and returns to
+IDLE while the active lesson admits answers; it returns to RUNNING when the
+lesson is busy. Canceling that capture does not invalidate the original lesson's
+eventual outcome. Account invalidation still fences all pending submissions.
+The HUD preserves the active lesson on follow-up voice failure, briefly shows
+ERROR, then returns to NEEDS_INPUT. Its timer is canceled by newer input/progress
+or Escape so a late reset cannot overwrite the current state. Fatal task errors
+still settle the task and release controls.
+
+`agent.teaching.student_input.admission` records lesson identity and acceptance,
+without speech content; local waiting events include input readiness.
 
 The held shortcut is Command + Control on macOS and Control + Left Alt on Windows.
 The native key listener owns press/release/rearming. `VoiceInputController` owns
@@ -276,9 +386,12 @@ uploaded nor saved. Transcription usage reservations and active captures are
 persisted through the backend allowance adapter.
 
 HUD narration is a separate flow: installed native message readback →
-`VoiceoverController` → authenticated backend ElevenLabs stream → bounded renderer
+`VoiceoverController` → authenticated backend OpenAI PCM speech stream → bounded renderer
 playback → speaking acknowledgments back to main/HUD. The backend owns voices,
-model settings, credentials and paid allowance. Speech stops before microphone
+model settings, credentials and paid allowance. The speech adapter uses the same
+backend-only `OPENAI_API_KEY` as the other OpenAI features;
+`VoiceoverConfig` owns the model, voices and locale-specific reading instructions.
+Raw 24 kHz mono PCM preserves the existing playback contract. Speech stops before microphone
 capture and on context/account/window changes. Failure leaves visual guidance
 usable. Playback and speech are not completion evidence. English/Vietnamese locale
 is snapshotted for the operation. Live provider pronunciation and signed hardware
@@ -435,3 +548,35 @@ logs never contain screenshots, typed keys, raw configuration or credentials.
 Gateway failures retain safe provider/network/TLS evidence; temporary per-stage
 render and successful-connection profiling is absent. When cause is uncertain,
 instrument the owning boundary before changing behavior.
+
+Teaching coordinate diagnostics emit one `agent.teaching.coordinates.requested`
+event and, after a valid paired receipt, one
+`agent.teaching.coordinates.converted` event per presentation. Join them by
+`presentationId`. The requested event contains normalized target boxes; the native
+trace contains the refreshed capture ID, capture pixels, logical screen points,
+display scale, planned cue bounds and the last acknowledged painted bounds for
+each reached step. The painter records its actual origin, backing scale, raster
+size and stroke width. Bounds describe path centerlines, so the visible stroke
+extends by half its width. `trace_progress` below one identifies a partial cue.
+Interrupted presentations keep their reached geometry; an empty painted list
+means no drawable frame was recorded. A null trace means text-only guidance or an
+older driver, not a successful conversion measurement. These events contain no
+instruction text, target labels, screenshots, pixel colors or typed content.
+The instrumented native build is `0.30.4-tro.20`; rebuild and restart the desktop
+before comparing a new capture with its drawing. Painter geometry and CALayer
+acknowledgments do not measure physical display scan-out.
+
+### Teaching target admission
+
+The teaching model selects normalized target bounds from the current captured
+screen. `TeachingPresenter` validates the lesson, goal revision and capture before
+sending the same typed action to the native host for its drawing and input matcher.
+The native refresh compares the proposed cue regions with the live screen and
+refuses stale input, changed regions or invalid geometry. Drawing admission requires
+the paired native presentation receipt.
+
+These checks validate geometry, freshness and presentation; they do not establish
+that the model selected the correct control or content. Target selection remains
+the model's responsibility. The existing repair budget permits a fresh observation
+and corrected action after a refusal. Target checks add no separate model request
+or local text recognition step.

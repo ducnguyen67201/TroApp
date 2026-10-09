@@ -4,37 +4,369 @@ import { createPracticeCheckpoint } from '../../../server/features/classroom/Pra
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import {
   CompanionHudController,
+  CompanionHudTransitionSource,
   type CompanionHudPort,
+  type CompanionHudTransition,
 } from '../../../../src/desktop/main/companion/CompanionHudController.js';
-import { CompanionHudPhase, type CompanionHudSnapshot } from '#contracts/CompanionHud.js';
+import {
+  AgentProgressPhase,
+  CompanionHudPhase,
+  type CompanionHudSnapshot,
+} from '#contracts/CompanionHud.js';
+import { GuidanceReason, TeachingOutcome } from '#contracts/CursorCompanion.js';
+import { TeachingMessageKind } from '#contracts/TeachingStep.js';
 import { VoiceState, VoiceShortcut } from '#contracts/VoiceInput.js';
 import { AgentFailureCode } from '#contracts/AgentSession.js';
 const captureId = '11111111-1111-4111-8111-111111111111';
 const sessionId = '22222222-2222-4222-8222-222222222222';
 
-function createHarness() {
+function createHarness(reportTransition?: (transition: CompanionHudTransition) => void) {
   vi.useFakeTimers();
   const snapshots: CompanionHudSnapshot[] = [];
+  const transitions: CompanionHudTransition[] = [];
   const port: CompanionHudPort = {
     showSnapshot: (snapshot) => {
       snapshots.push(snapshot);
     },
   };
-  const controller = new CompanionHudController(port, {
-    now: () => Date.now(),
-    schedule: (callback, delayMs) => {
-      const timer = setTimeout(callback, delayMs);
-      return () => {
-        clearTimeout(timer);
-      };
+  const controller = new CompanionHudController(
+    port,
+    {
+      now: () => Date.now(),
+      schedule: (callback, delayMs) => {
+        const timer = setTimeout(callback, delayMs);
+        return () => {
+          clearTimeout(timer);
+        };
+      },
     },
-  });
-  return { controller, snapshots, latest: () => snapshots.at(-1) };
+    (transition) => {
+      transitions.push(transition);
+      reportTransition?.(transition);
+    },
+  );
+  return { controller, snapshots, transitions, latest: () => snapshots.at(-1) };
 }
 
 afterEach(() => {
   vi.useRealTimers();
 });
+
+it('distinguishes voice failure from task failure without recording speech or task content', () => {
+  const { controller, latest, transitions } = createHarness();
+  controller.startTask(sessionId, 'en');
+  controller.receiveVoiceEvent({ kind: 'failed' });
+  expect(latest()?.phase).toBe(CompanionHudPhase.ERROR);
+  expect(transitions.at(-1)).toEqual({
+    previousPhase: CompanionHudPhase.SENDING,
+    nextPhase: CompanionHudPhase.ERROR,
+    source: CompanionHudTransitionSource.VOICE_EVENT,
+    voiceEventKind: 'failed',
+    sessionId,
+    captureId: null,
+    lessonId: null,
+  });
+
+  controller.receiveVoiceEvent({ kind: 'prepare', captureId });
+  controller.receiveVoiceEvent({
+    kind: 'submitted',
+    captureId,
+    sessionId,
+    text: 'private spoken transcript',
+  });
+  controller.receiveVoiceEvent({
+    kind: 'result',
+    captureId,
+    sessionId,
+    result: { kind: 'failed', message: 'private task failure message' },
+  });
+  expect(transitions.at(-1)).toEqual({
+    previousPhase: CompanionHudPhase.SENDING,
+    nextPhase: CompanionHudPhase.ERROR,
+    source: CompanionHudTransitionSource.VOICE_EVENT,
+    voiceEventKind: 'result',
+    resultKind: 'failed',
+    sessionId,
+    captureId,
+    lessonId: null,
+  });
+  expect(JSON.stringify(transitions)).not.toContain('private');
+});
+
+it('records waiting, pause and teaching failure causes while keeping meters and repeated phases quiet', () => {
+  const { controller, transitions } = createHarness();
+  controller.receiveVoiceEvent({ kind: 'prepare', captureId });
+  controller.updateMeter({ captureId, sequence: 0, level: 0.2 });
+  vi.advanceTimersByTime(50);
+  controller.updateMeter({ captureId, sequence: 1, level: 0.8 });
+  vi.advanceTimersByTime(50);
+  controller.updateMeter({ captureId, sequence: 2, level: 0.4 });
+  expect(
+    transitions.filter(
+      (transition) => transition.source === CompanionHudTransitionSource.VOICE_METER,
+    ),
+  ).toHaveLength(1);
+
+  controller.receiveVoiceEvent({
+    kind: 'submitted',
+    captureId,
+    sessionId,
+    text: 'private voice request',
+  });
+  const progress = {
+    kind: 'progress' as const,
+    requestId: captureId,
+    sessionId,
+    phase: 'waiting' as const,
+    lessonId: captureId,
+    teachingMessage: {
+      lessonId: captureId,
+      stepId: sessionId,
+      sequence: 1,
+      kind: 'instruction' as const,
+      text: 'private teaching instruction',
+    },
+  };
+  controller.receiveProgress(progress);
+  const waiting = transitions.at(-1);
+  expect(waiting).toMatchObject({
+    previousPhase: CompanionHudPhase.SENDING,
+    nextPhase: CompanionHudPhase.WAITING,
+    source: CompanionHudTransitionSource.AGENT_PROGRESS,
+    progressPhase: 'waiting',
+    sessionId,
+    captureId,
+    lessonId: captureId,
+  });
+  controller.receiveProgress(progress);
+  expect(transitions.at(-1)).toBe(waiting);
+  controller.receiveProgress({ ...progress, phase: 'paused' });
+  expect(transitions.at(-1)).toMatchObject({
+    previousPhase: CompanionHudPhase.WAITING,
+    nextPhase: CompanionHudPhase.NEEDS_INPUT,
+    source: CompanionHudTransitionSource.AGENT_PROGRESS,
+    progressPhase: 'paused',
+  });
+  controller.finishTask(
+    { kind: 'teaching', result: { outcome: 'failed', reason: 'render_timeout' } },
+    sessionId,
+  );
+  expect(transitions.at(-1)).toMatchObject({
+    previousPhase: CompanionHudPhase.NEEDS_INPUT,
+    nextPhase: CompanionHudPhase.ERROR,
+    source: CompanionHudTransitionSource.AGENT_RESULT,
+    resultKind: 'teaching',
+    teachingOutcome: 'failed',
+    teachingReason: 'render_timeout',
+    sessionId,
+    captureId,
+    lessonId: captureId,
+  });
+  expect(JSON.stringify(transitions)).not.toContain('private');
+});
+
+it('keeps rendering and terminal cleanup when transition reporting fails', () => {
+  const { controller, latest, transitions } = createHarness(() => {
+    throw new Error('diagnostic sink unavailable');
+  });
+  expect(() => {
+    controller.receiveVoiceEvent({ kind: 'prepare', captureId });
+    controller.receiveVoiceEvent({ kind: 'failed' });
+    vi.advanceTimersByTime(1800);
+  }).not.toThrow();
+  expect(latest()?.phase).toBe(CompanionHudPhase.IDLE);
+  expect(transitions.at(-1)).toMatchObject({
+    previousPhase: CompanionHudPhase.ERROR,
+    nextPhase: CompanionHudPhase.IDLE,
+    source: CompanionHudTransitionSource.HIDE_TIMER,
+  });
+});
+
+it('keeps a recoverable model pause visible through a spoken retry and accepts later Esc', () => {
+  const { controller, latest } = createHarness();
+  const answerCaptureId = '33333333-3333-4333-8333-333333333333';
+  controller.startTask(sessionId, 'en');
+  controller.receiveProgress({
+    kind: 'progress',
+    requestId: captureId,
+    sessionId,
+    lessonId: captureId,
+    phase: AgentProgressPhase.PAUSED,
+    teachingMessage: {
+      lessonId: captureId,
+      stepId: sessionId,
+      sequence: 1,
+      kind: TeachingMessageKind.QUESTION,
+      text: 'Reply to retry, or press Esc to stop.',
+    },
+  });
+  expect(latest()?.phase).toBe(CompanionHudPhase.NEEDS_INPUT);
+  vi.advanceTimersByTime(3000);
+  expect(latest()?.phase).toBe(CompanionHudPhase.NEEDS_INPUT);
+  controller.receiveVoiceEvent({ kind: 'prepare', captureId: answerCaptureId });
+  expect(latest()?.message?.kind).toBe(TeachingMessageKind.QUESTION);
+  controller.receiveVoiceEvent({
+    kind: 'submitted',
+    captureId: answerCaptureId,
+    sessionId,
+    text: 'Try again',
+  });
+  controller.receiveVoiceEvent({
+    kind: 'result',
+    captureId: answerCaptureId,
+    sessionId,
+    result: { kind: 'accepted', lessonId: captureId },
+  });
+  controller.receiveProgress({
+    kind: 'progress',
+    requestId: captureId,
+    sessionId,
+    phase: AgentProgressPhase.THINKING,
+  });
+  expect(latest()?.phase).toBe(CompanionHudPhase.THINKING);
+  controller.finishTask(
+    {
+      kind: 'teaching',
+      result: { outcome: TeachingOutcome.CANCELED, reason: GuidanceReason.EXPLICIT_STOP },
+    },
+    sessionId,
+  );
+  expect(latest()?.phase).toBe(CompanionHudPhase.CANCELED);
+  controller.receiveProgress({
+    kind: 'progress',
+    requestId: captureId,
+    sessionId,
+    phase: AgentProgressPhase.PAUSED,
+  });
+  expect(latest()?.phase).toBe(CompanionHudPhase.CANCELED);
+});
+
+it('releases a fatal model error presentation when the next voice hold begins', () => {
+  const { controller, latest } = createHarness();
+  controller.startTask(sessionId, 'en');
+  controller.finishTask(
+    {
+      kind: 'teaching',
+      result: { outcome: TeachingOutcome.FAILED, reason: GuidanceReason.TRANSPORT_FAILED },
+    },
+    sessionId,
+  );
+  expect(latest()?.phase).toBe(CompanionHudPhase.ERROR);
+  controller.receiveProgress({
+    kind: 'progress',
+    requestId: captureId,
+    sessionId,
+    phase: AgentProgressPhase.PAUSED,
+  });
+  expect(latest()?.phase).toBe(CompanionHudPhase.ERROR);
+  controller.receiveVoiceEvent({ kind: 'prepare', captureId });
+  vi.advanceTimersByTime(1800);
+  expect(latest()?.phase).toBe(CompanionHudPhase.PREPARING);
+});
+
+it('preserves a paused lesson after follow-up voice failure and restores its retry prompt', () => {
+  const { controller, latest, transitions } = createHarness();
+  const question = {
+    lessonId: captureId,
+    stepId: sessionId,
+    sequence: 1,
+    kind: TeachingMessageKind.QUESTION,
+    text: 'Private retry question.',
+  };
+  controller.startTask(sessionId, 'en');
+  controller.receiveProgress({
+    kind: 'progress',
+    requestId: captureId,
+    sessionId,
+    lessonId: captureId,
+    phase: AgentProgressPhase.PAUSED,
+    teachingMessage: question,
+  });
+  controller.receiveVoiceEvent({ kind: 'prepare', captureId });
+  controller.updateMeter({ captureId, sequence: 0, level: 0.7 });
+  controller.receiveVoiceEvent({ kind: 'failed' });
+  expect(latest()).toMatchObject({ phase: CompanionHudPhase.ERROR, message: question, level: 0 });
+  expect(transitions.at(-1)).toMatchObject({
+    previousPhase: CompanionHudPhase.LISTENING,
+    nextPhase: CompanionHudPhase.ERROR,
+    source: CompanionHudTransitionSource.VOICE_EVENT,
+    voiceEventKind: 'failed',
+    sessionId,
+    captureId,
+    lessonId: captureId,
+  });
+  vi.advanceTimersByTime(50);
+  controller.updateMeter({ captureId, sequence: 1, level: 1 });
+  expect(latest()?.phase).toBe(CompanionHudPhase.ERROR);
+  vi.advanceTimersByTime(1750);
+  expect(latest()).toMatchObject({ phase: CompanionHudPhase.NEEDS_INPUT, message: question });
+  expect(transitions.at(-1)).toMatchObject({
+    previousPhase: CompanionHudPhase.ERROR,
+    nextPhase: CompanionHudPhase.NEEDS_INPUT,
+    source: CompanionHudTransitionSource.HIDE_TIMER,
+    sessionId,
+    captureId: null,
+    lessonId: captureId,
+  });
+  controller.receiveProgress({
+    kind: 'progress',
+    requestId: captureId,
+    sessionId,
+    phase: AgentProgressPhase.THINKING,
+  });
+  expect(latest()?.phase).toBe(CompanionHudPhase.THINKING);
+  controller.receiveVoiceEvent({
+    kind: 'prepare',
+    captureId: '33333333-3333-4333-8333-333333333333',
+  });
+  expect(latest()?.phase).toBe(CompanionHudPhase.PREPARING);
+  expect(JSON.stringify(transitions)).not.toContain(question.text);
+});
+
+it.each(['voice hold', 'lesson progress'] as const)(
+  'does not let an earlier follow-up error timer overwrite newer %s',
+  (nextActivity) => {
+    const { controller, latest } = createHarness();
+    controller.startTask(sessionId, 'en');
+    controller.receiveProgress({
+      kind: 'progress',
+      requestId: captureId,
+      sessionId,
+      lessonId: captureId,
+      phase: AgentProgressPhase.PAUSED,
+      teachingMessage: {
+        lessonId: captureId,
+        stepId: sessionId,
+        sequence: 1,
+        kind: TeachingMessageKind.QUESTION,
+        text: 'Reply to retry.',
+      },
+    });
+    controller.receiveVoiceEvent({ kind: 'prepare', captureId });
+    controller.receiveVoiceEvent({ kind: 'cancel', captureId });
+    controller.receiveVoiceEvent({ kind: 'failed' });
+    expect(latest()?.phase).toBe(CompanionHudPhase.ERROR);
+    vi.advanceTimersByTime(500);
+    if (nextActivity === 'voice hold') {
+      controller.receiveVoiceEvent({
+        kind: 'prepare',
+        captureId: '33333333-3333-4333-8333-333333333333',
+      });
+    } else {
+      controller.receiveProgress({
+        kind: 'progress',
+        requestId: captureId,
+        sessionId,
+        phase: AgentProgressPhase.THINKING,
+      });
+    }
+    const phase = latest()?.phase;
+    expect(vi.getTimerCount()).toBe(0);
+    vi.advanceTimersByTime(1300);
+    expect(latest()?.phase).toBe(phase);
+    expect(latest()?.phase).not.toBe(CompanionHudPhase.IDLE);
+  },
+);
 describe('companion voice lifecycle', () => {
   it('uses microphone frames, fences release and stale meters, and keeps the bar through admission', () => {
     const { controller, latest } = createHarness();

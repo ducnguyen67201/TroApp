@@ -13,6 +13,8 @@ describe('safe original socket error evidence', () => {
     { code: 'ERR_STREAM_WRITE_AFTER_END', family: 'stream', reason: 'unclassified' },
     { code: 'HPE_INVALID_HEADER_TOKEN', family: 'http_parser', reason: 'unclassified' },
     { code: 'EPIPE', family: 'system', reason: 'unclassified' },
+    { code: 'ENETUNREACH', family: 'system', reason: 'unclassified' },
+    { code: 'EHOSTUNREACH', family: 'system', reason: 'unclassified' },
   ])('retains native $code without raw error messages', ({ code, family, reason }) => {
     const error = Object.assign(new Error('private certificate and address'), { code });
     expect(describeSocketClose(error)).toEqual({

@@ -11,7 +11,10 @@ import { AgentWorkerClient } from '../../../../../src/desktop/main/AgentWorkerCl
 import { executeAgentCommand } from '../../../../../src/desktop/main/ExecuteAgentCommand.js';
 import type { AgentChatAuth } from '../../../../../src/desktop/main/AgentChatPorts.js';
 import { CompanionHudController } from '../../../../../src/desktop/main/companion/CompanionHudController.js';
-import type { CompanionHudSnapshot } from '../../../../../src/contracts/CompanionHud.js';
+import {
+  CompanionHudPhase,
+  type CompanionHudSnapshot,
+} from '../../../../../src/contracts/CompanionHud.js';
 import type { AgentProgress } from '../../../../../src/contracts/CompanionHud.js';
 import { FlowScenario, TeachingFlowFixture } from './TeachingFlowFixture.js';
 import { checkNativeTeachingBoundary } from './CheckNativeTeachingBoundary.js';
@@ -226,6 +229,51 @@ async function checkQuestion(): Promise<void> {
   );
   await assertCleanup();
   console.info('PASS question: scoped answer resumes the same goal; stale answer rejected.');
+}
+
+async function checkModelRecovery(): Promise<void> {
+  for (const scenario of [
+    FlowScenario.MODEL_NETWORK_FAILURE,
+    FlowScenario.SDK_CONNECTION_FAILURE,
+    FlowScenario.MODEL_SERVICE_FAILURE,
+  ]) {
+    await beginLesson(scenario);
+    await waitForState('model failure pause', (state) => state.phase === 'paused');
+    assert.ok(chat);
+    assert.equal(chat.isBusy(), false, 'Paused lesson must permit spoken retry.');
+    assert.equal((await readState()).sending, 'true', 'Model failure must retain the lesson.');
+    assert.equal((await readState()).outcome, '', 'Recoverable failure cannot finish the lesson.');
+    assert.equal(hudSnapshots.at(-1)?.phase, CompanionHudPhase.NEEDS_INPUT);
+    assert.match(
+      (await readState()).step,
+      scenario === FlowScenario.MODEL_SERVICE_FAILURE ? /Dịch vụ mô hình/ : /Kết nối/,
+    );
+    const paused = progress.find((item) => item.phase === 'paused');
+    assert.ok(paused?.lessonId);
+    const requests = fixture.requests;
+    await delay(700);
+    assert.equal(fixture.requests, requests, 'Pause must not automatically request the model.');
+    await clickControl('contract-answer');
+    await waitForWaiting(2);
+    const resumed = progress.find((item) => item.phase === 'waiting');
+    assert.equal(resumed?.lessonId, paused.lessonId, 'Retry must preserve the lesson identity.');
+    assert.equal(resumed.sessionId, paused.sessionId, 'Retry must preserve the task session.');
+    fixture.changeScreen('youtube');
+    await waitForState(
+      'retried model lesson completes',
+      (state) => state.outcome === 'goal_reached',
+    );
+    await assertCleanup();
+
+    await beginLesson(scenario);
+    await waitForState('model pause before Escape', (state) => state.phase === 'paused');
+    await pressEscapeAndCheckCleanup();
+    assert.equal(hudSnapshots.at(-1)?.phase, CompanionHudPhase.IDLE);
+    assert.equal(chat.isBusy(), false, 'Escape must release the failed lesson session.');
+  }
+  console.info(
+    'PASS model recovery: gateway socket failure, SDK connection failure and provider503 keep the same lesson and paused HUD; retry and Escape remain available.',
+  );
 }
 
 async function pressEscapeAndCheckCleanup(): Promise<void> {
@@ -456,6 +504,7 @@ async function runContract(): Promise<void> {
   await checkJourney();
   await checkPresentationContract();
   await checkQuestion();
+  await checkModelRecovery();
   await checkStaleCompletion();
   await checkBackgroundAnimation();
   await checkTargetRecovery();

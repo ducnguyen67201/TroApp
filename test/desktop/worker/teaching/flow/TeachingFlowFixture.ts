@@ -40,6 +40,9 @@ export const FlowScenario = {
   WATCH_FAILURE: 'watch_failure',
   STALE_COMPLETION: 'stale_completion',
   MODEL_PENDING: 'model_pending',
+  MODEL_NETWORK_FAILURE: 'model_network_failure',
+  SDK_CONNECTION_FAILURE: 'sdk_connection_failure',
+  MODEL_SERVICE_FAILURE: 'model_service_failure',
   STALE_PREVIEW: 'stale_preview',
   INPUT_DURING_PROPOSAL: 'input_during_proposal',
   BACKGROUND_ANIMATION: 'background_animation',
@@ -47,6 +50,12 @@ export const FlowScenario = {
 } as const;
 
 export type FlowScenario = (typeof FlowScenario)[keyof typeof FlowScenario];
+
+const modelFailureScenarios = new Set<FlowScenario>([
+  FlowScenario.MODEL_NETWORK_FAILURE,
+  FlowScenario.SDK_CONNECTION_FAILURE,
+  FlowScenario.MODEL_SERVICE_FAILURE,
+]);
 
 const toolProperties: Record<string, Record<string, unknown>> = {
   get_desktop_state: { max_image_dimension: { type: 'integer' } },
@@ -101,6 +110,7 @@ export class TeachingFlowFixture {
   private buttonsDown = false;
   private screen = 'desktop';
   private modelPhase = 0;
+  private modelFailureSent = false;
   private observationCaptureId = '';
   private lastPresentationId: string | null = null;
   failure: Error | null = null;
@@ -123,6 +133,7 @@ export class TeachingFlowFixture {
     this.buttonsDown = false;
     this.screen = 'desktop';
     this.modelPhase = 0;
+    this.modelFailureSent = false;
     this.lastPresentationId = null;
     this.observationCaptureId = '';
     this.failure = null;
@@ -208,6 +219,39 @@ export class TeachingFlowFixture {
       chunks.push(value);
     }
     const body: unknown = JSON.parse(Buffer.concat(chunks).toString());
+    if (
+      request.url === '/v1/responses' &&
+      modelFailureScenarios.has(this.scenario) &&
+      !this.modelFailureSent
+    ) {
+      RequestSchema.parse(body);
+      this.modelFailureSent = true;
+      if (this.scenario === FlowScenario.SDK_CONNECTION_FAILURE) {
+        request.socket.destroy();
+        return;
+      }
+      response.writeHead(502, { 'content-type': 'application/json' }).end(
+        JSON.stringify({
+          error: {
+            type: 'api_error',
+            code: 'tro_model_gateway_failed',
+            diagnostics: {
+              gatewayRequestId: 'req-contract',
+              attemptNumber: 2,
+              durationMs: 560,
+              ...(this.scenario === FlowScenario.MODEL_SERVICE_FAILURE
+                ? {
+                    reason: 'provider_rejected',
+                    providerStatus: 503,
+                    providerErrorCode: 'server_error',
+                  }
+                : { reason: 'provider_network_failed', networkCode: 'EPIPE' }),
+            },
+          },
+        }),
+      );
+      return;
+    }
     const result =
       request.url === '/tools'
         ? this.callTool(ToolRequestSchema.parse(body))

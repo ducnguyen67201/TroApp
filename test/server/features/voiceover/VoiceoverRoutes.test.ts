@@ -2,13 +2,14 @@ import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import { expect, it, vi } from 'vitest';
 import { registerVoiceoverRoutes } from '../../../../src/server/features/voiceover/RegisterVoiceoverRoutes.js';
-import { ElevenLabsSpeechProvider } from '../../../../src/server/features/voiceover/ElevenLabsSpeechProvider.js';
+import { OpenAiSpeechProvider } from '../../../../src/server/features/voiceover/OpenAiSpeechProvider.js';
 import type {
   SpeechProvider,
   VoiceoverAllowance,
 } from '../../../../src/server/features/voiceover/VoiceoverPorts.js';
 import { TeachingMessageKind } from '#contracts/TeachingStep.js';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
+import { VoiceoverConfig } from '../../../../src/server/features/voiceover/VoiceoverConfig.js';
 import type { VoiceoverRequest } from '#contracts/Voiceover.js';
 
 function createRequest(): VoiceoverRequest {
@@ -90,13 +91,14 @@ it('keeps provider settings on the backend and sends the displayed text/locale w
   const request = vi
     .fn<typeof fetch>()
     .mockImplementation(() => Promise.resolve(new Response(new Uint8Array([0, 0]))));
-  const provider = new ElevenLabsSpeechProvider(
+  const provider = new OpenAiSpeechProvider(
     {
       apiKey: 'synthetic-provider-key',
-      modelId: 'eleven_flash_v2_5',
-      voiceIds: {
-        [DesktopLocale.VIETNAMESE]: 'vietnamese-voice',
-        [DesktopLocale.ENGLISH]: 'english-voice',
+      modelId: VoiceoverConfig.MODEL_ID,
+      instructions: VoiceoverConfig.INSTRUCTIONS,
+      voices: {
+        [DesktopLocale.VIETNAMESE]: 'marin',
+        [DesktopLocale.ENGLISH]: 'cedar',
       },
     },
     request,
@@ -104,12 +106,13 @@ it('keeps provider settings on the backend and sends the displayed text/locale w
   const controller = new AbortController();
   expect(provider.isAvailable()).toBe(true);
   expect(
-    new ElevenLabsSpeechProvider({
+    new OpenAiSpeechProvider({
       apiKey: undefined,
-      modelId: 'eleven_flash_v2_5',
-      voiceIds: {
-        [DesktopLocale.VIETNAMESE]: 'vietnamese-voice',
-        [DesktopLocale.ENGLISH]: 'english-voice',
+      modelId: VoiceoverConfig.MODEL_ID,
+      instructions: VoiceoverConfig.INSTRUCTIONS,
+      voices: {
+        [DesktopLocale.VIETNAMESE]: 'marin',
+        [DesktopLocale.ENGLISH]: 'cedar',
       },
     }).isAvailable(),
   ).toBe(false);
@@ -122,15 +125,21 @@ it('keeps provider settings on the backend and sends the displayed text/locale w
     };
     const stream = await provider.streamSpeech(localizedSpeech, controller.signal);
     expect(request).toHaveBeenLastCalledWith(
-      locale === DesktopLocale.VIETNAMESE
-        ? 'https://api.elevenlabs.io/v1/text-to-speech/vietnamese-voice/stream?output_format=pcm_24000'
-        : 'https://api.elevenlabs.io/v1/text-to-speech/english-voice/stream?output_format=pcm_24000',
+      'https://api.openai.com/v1/audio/speech',
       expect.objectContaining({
         signal: controller.signal,
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer synthetic-provider-key',
+          'content-type': 'application/json',
+        },
         body: JSON.stringify({
-          text: localizedSpeech.message.text,
-          model_id: 'eleven_flash_v2_5',
-          language_code: locale,
+          input: localizedSpeech.message.text,
+          model: VoiceoverConfig.MODEL_ID,
+          voice: locale === DesktopLocale.VIETNAMESE ? 'marin' : 'cedar',
+          instructions: VoiceoverConfig.INSTRUCTIONS[locale],
+          response_format: 'pcm',
+          stream_format: 'audio',
         }),
       }),
     );
@@ -141,4 +150,54 @@ it('keeps provider settings on the backend and sends the displayed text/locale w
     'Speech generation failed.',
   );
   expect(request).toHaveBeenCalledTimes(3);
+});
+
+it('does not dispatch speech without a backend key', async () => {
+  const request = vi.fn<typeof fetch>();
+  const provider = new OpenAiSpeechProvider(
+    {
+      apiKey: undefined,
+      modelId: VoiceoverConfig.MODEL_ID,
+      voices: VoiceoverConfig.VOICES,
+      instructions: VoiceoverConfig.INSTRUCTIONS,
+    },
+    request,
+  );
+  await expect(
+    provider.streamSpeech(createRequest(), new AbortController().signal),
+  ).rejects.toThrow('Speech is unavailable.');
+  expect(request).not.toHaveBeenCalled();
+});
+
+it('preserves cancellation without retrying the paid speech request', async () => {
+  const controller = new AbortController();
+  const cancellationError = new Error('Speech cancelled.');
+  const request = vi.fn<typeof fetch>().mockImplementation(
+    (_url, options) =>
+      new Promise<Response>((_resolve, reject) => {
+        options?.signal?.addEventListener(
+          'abort',
+          () => {
+            reject(cancellationError);
+          },
+          {
+            once: true,
+          },
+        );
+      }),
+  );
+  const provider = new OpenAiSpeechProvider(
+    {
+      apiKey: 'synthetic-provider-key',
+      modelId: VoiceoverConfig.MODEL_ID,
+      voices: VoiceoverConfig.VOICES,
+      instructions: VoiceoverConfig.INSTRUCTIONS,
+    },
+    request,
+  );
+  const speech = provider.streamSpeech(createRequest(), controller.signal);
+  const rejection = expect(speech).rejects.toThrow('Speech cancelled.');
+  controller.abort(cancellationError);
+  await rejection;
+  expect(request).toHaveBeenCalledOnce();
 });

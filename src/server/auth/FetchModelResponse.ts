@@ -1,6 +1,11 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { randomUUID } from 'node:crypto';
+import { ProviderClientRequestHeader } from '#contracts/ModelGatewayError.js';
 import { ModelGatewayConfig } from './ModelGatewayConfig.js';
 import { describeNetworkFailure } from './ModelGatewayDiagnostics.js';
+import { ModelTransportObserver } from './ModelTransportObserver.js';
+import type { ModelTransportSnapshot } from '#contracts/ModelTransportDiagnostics.js';
+import type { SocketCloseDiagnostics } from './SocketCloseDiagnostics.js';
 
 export const ModelAttemptPhase = {
   STARTED: 'started',
@@ -10,6 +15,7 @@ export const ModelAttemptPhase = {
 
 export interface ModelAttemptDiagnostics {
   attemptNumber: number;
+  providerClientRequestId: string;
   phase: (typeof ModelAttemptPhase)[keyof typeof ModelAttemptPhase];
   durationMs: number;
   aborted: boolean;
@@ -17,6 +23,8 @@ export interface ModelAttemptDiagnostics {
   retryEligible?: boolean;
   retryDelayMs?: number;
   retryStopReason?: (typeof ModelRetryStopReason)[keyof typeof ModelRetryStopReason];
+  transport?: ModelTransportSnapshot;
+  socketFailure?: SocketCloseDiagnostics;
 }
 
 const ModelRetryStopReason = {
@@ -58,28 +66,40 @@ export async function fetchModelResponse(
   for (;;) {
     signal.throwIfAborted();
     const startedAt = performance.now();
+    const providerClientRequestId = randomUUID();
+    const transport = new ModelTransportObserver();
     reportAttempt?.({
       attemptNumber,
+      providerClientRequestId,
       phase: ModelAttemptPhase.STARTED,
       durationMs: 0,
       aborted: signal.aborted,
     });
     try {
-      const response = await fetch(ModelGatewayConfig.providerResponsesUrl, {
-        method: 'POST',
-        headers: { authorization: 'Bearer ' + providerKey, 'content-type': 'application/json' },
-        body,
-        signal,
-      });
+      const response = await transport.observe(() =>
+        fetch(ModelGatewayConfig.providerResponsesUrl, {
+          method: 'POST',
+          headers: {
+            authorization: 'Bearer ' + providerKey,
+            'content-type': 'application/json',
+            [ProviderClientRequestHeader]: providerClientRequestId,
+          },
+          body,
+          signal,
+        }),
+      );
       reportAttempt?.({
         attemptNumber,
+        providerClientRequestId,
         phase: ModelAttemptPhase.HEADERS_RECEIVED,
         durationMs: Math.round(performance.now() - startedAt),
         aborted: signal.aborted,
+        transport: transport.readSnapshot(),
       });
       return response;
     } catch (error) {
       const failure = describeNetworkFailure(error);
+      const socketFailure = transport.readSocketFailure();
       const retryStopReason = readModelRetryStopReason(
         signal.aborted,
         attemptNumber,
@@ -87,10 +107,13 @@ export async function fetchModelResponse(
       );
       reportAttempt?.({
         attemptNumber,
+        providerClientRequestId,
         phase: ModelAttemptPhase.FAILED,
         durationMs: Math.round(performance.now() - startedAt),
         aborted: signal.aborted,
         failure,
+        ...(socketFailure ? { socketFailure } : {}),
+        transport: transport.readSnapshot(),
         retryEligible: retryStopReason === undefined,
         retryDelayMs: retryStopReason === undefined ? ModelGatewayConfig.retry.delayMs : 0,
         ...(retryStopReason ? { retryStopReason } : {}),

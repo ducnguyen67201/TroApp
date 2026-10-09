@@ -7,6 +7,7 @@ import { ModelGatewayConfig } from './ModelGatewayConfig.js';
 import { ModelRequestSchema, limitModelOutputTokens } from './ModelRequest.js';
 import { forwardModelResponse } from './ForwardModelResponse.js';
 import { ModelGatewayEvent, ModelGatewayFailure } from './ModelGatewayDiagnostics.js';
+import { ModelRequestTraceHeader, ModelRequestTraceSchema } from '#contracts/ModelGatewayError.js';
 
 type ReadSignedInUserId = ReturnType<typeof createAuthDatabase>['readSignedInUserId'];
 
@@ -18,6 +19,15 @@ export function registerModelGateway(
   logger: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'> = api.log,
 ): void {
   const credentials = createModelCredentials(environment.AUTH_SECRET);
+  const receivedAt = new WeakMap<object, number>();
+
+  const readRequestContext = (request: { id: string; headers: { [name: string]: unknown } }) => {
+    const trace = ModelRequestTraceSchema.safeParse(request.headers[ModelRequestTraceHeader]);
+    return {
+      gatewayRequestId: request.id,
+      ...(trace.success ? { modelRequestId: trace.data } : {}),
+    };
+  };
 
   api.get('/api/v1/model/credential', async (request, reply) => {
     if (!environment.OPENAI_API_KEY) {
@@ -33,15 +43,58 @@ export function registerModelGateway(
 
   api.post(
     '/api/v1/model/responses',
-    { bodyLimit: ModelGatewayConfig.bodyLimitBytes },
+    {
+      bodyLimit: ModelGatewayConfig.bodyLimitBytes,
+      onRequest: async (request, reply) => {
+        receivedAt.set(request, performance.now());
+        const context = readRequestContext(request);
+        reply.header('x-tro-request-id', request.id);
+        if (context.modelRequestId) {
+          reply.header(ModelRequestTraceHeader, context.modelRequestId);
+        }
+        logger.debug(
+          { ...context, event: ModelGatewayEvent.REQUEST },
+          'Received an assistant model request.',
+        );
+      },
+      onError: async (request, _reply, error) => {
+        const knownCodes = [
+          'FST_ERR_CTP_BODY_TOO_LARGE',
+          'FST_ERR_CTP_INVALID_JSON_BODY',
+          'FST_ERR_CTP_EMPTY_JSON_BODY',
+          'FST_ERR_CTP_INVALID_MEDIA_TYPE',
+          'FST_ERR_CTP_INVALID_CONTENT_LENGTH',
+        ];
+        logger.warn(
+          {
+            ...readRequestContext(request),
+            event: ModelGatewayEvent.REJECTED,
+            stage: knownCodes.includes(error.code) ? 'request_body' : 'unclassified',
+            errorCode: knownCodes.includes(error.code) ? error.code : 'unclassified',
+            status: error.statusCode ?? 500,
+          },
+          'Model gateway request failed before delivery.',
+        );
+      },
+      onResponse: async (request, reply) => {
+        logger.debug(
+          {
+            ...readRequestContext(request),
+            event: ModelGatewayEvent.DELIVERED,
+            status: reply.statusCode,
+            durationMs: Math.round(
+              performance.now() - (receivedAt.get(request) ?? performance.now()),
+            ),
+            responseDestroyed: reply.raw.destroyed,
+            responseFinished: reply.raw.writableFinished,
+          },
+          'Model gateway HTTP response finished.',
+        );
+      },
+    },
     async (request, reply) => {
-      const startedAt = performance.now();
-      const context = { gatewayRequestId: request.id };
-      reply.header('x-tro-request-id', request.id);
-      logger.debug(
-        { ...context, event: ModelGatewayEvent.REQUEST },
-        'Received an assistant model request.',
-      );
+      const startedAt = receivedAt.get(request) ?? performance.now();
+      const context = readRequestContext(request);
       const rejectRequest = (
         status: number,
         reason: (typeof ModelGatewayFailure)[keyof typeof ModelGatewayFailure],
@@ -90,6 +143,15 @@ export function registerModelGateway(
           'The model request is invalid.',
         );
       }
+      logger.debug(
+        {
+          ...context,
+          event: ModelGatewayEvent.ADMITTED,
+          model: parsed.data.model,
+          stream: parsed.data.stream,
+        },
+        'Model gateway admitted the request.',
+      );
       await forwardModelResponse(
         reply,
         limitModelOutputTokens(parsed.data),
@@ -97,6 +159,7 @@ export function registerModelGateway(
         request.id,
         startedAt,
         logger,
+        context.modelRequestId,
       );
       return reply;
     },

@@ -15,6 +15,7 @@ import {
   CursorGuidanceResultSchema,
   CursorCompanionStateSchema,
   GuidanceCaptureRefreshSchema,
+  GuidanceCoordinateTraceSchema,
 } from '../../../../../src/contracts/CursorCompanion.js';
 import { describeCuaResult } from '../../../../../src/desktop/worker/cua/LoggedCuaServer.js';
 import { z } from 'zod';
@@ -228,6 +229,26 @@ export async function checkNativeTeachingBoundary(): Promise<void> {
       assert.equal(playback.receipt.message_presented, true);
       assert.equal(playback.receipt.drawing_presented, true);
       assert.equal(playback.receipt.lesson_id, watchId);
+      const coordinates = GuidanceCoordinateTraceSchema.parse(playback.coordinate_trace);
+      assert.equal(coordinates.capture_id, metadata.data.capture_id);
+      const planned = coordinates.planned_steps[0];
+      const painted = coordinates.painted_steps[0];
+      assert.ok(
+        planned?.cue_bounds_points && painted,
+        'Native playback must report painter geometry.',
+      );
+      assert.equal(painted.trace_progress, 1, 'Completed playback must include the complete cue.');
+      for (const [index, coordinate] of planned.cue_bounds_points.entries()) {
+        const origin = painted.geometry.origin_points[index % 2];
+        const actual = painted.geometry.cue_bounds_px[index];
+        assert.ok(origin !== undefined && actual !== undefined);
+        const expected = (coordinate - origin) * painted.geometry.backing_scale;
+        assert.ok(
+          Math.abs(actual - expected) < 0.1,
+          'Painter bounds must match the converted native plan.',
+        );
+      }
+      console.info(`PASS native coordinate trace: ${JSON.stringify(coordinates)}`);
       console.info(
         'PASS native message/cue: compositor accepted the message before V2 playback and returned a current receipt.',
       );

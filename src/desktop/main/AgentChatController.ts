@@ -34,6 +34,7 @@ export class AgentChatController {
       return;
     }
     this.waitingLessonId =
+      (progress.phase === AgentProgressPhase.WAITING && progress.canAcceptAnswer) ||
       progress.phase === AgentProgressPhase.NEEDS_INPUT ||
       progress.phase === AgentProgressPhase.PAUSED
         ? (progress.lessonId ?? null)

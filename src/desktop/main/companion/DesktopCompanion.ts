@@ -3,6 +3,7 @@ import {
   CompanionHudController,
   type CompanionHudClock,
   type CompanionHudPort,
+  type CompanionHudTransition,
 } from './CompanionHudController.js';
 
 /** Cursor operations delegate to the authenticated chat controller. Its worker
@@ -34,8 +35,9 @@ export class DesktopCompanion {
     private readonly access: CompanionAccessPort,
     private readonly presentation: CompanionPresentationPort,
     clock: CompanionHudClock,
+    reportTransition?: (transition: CompanionHudTransition) => void,
   ) {
-    this.hud = new CompanionHudController(presentation, clock);
+    this.hud = new CompanionHudController(presentation, clock, reportTransition);
   }
 
   /** Register presentation before the task worker binds its native cursor.
