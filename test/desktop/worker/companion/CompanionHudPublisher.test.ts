@@ -178,3 +178,20 @@ describe('serialized native HUD commands', () => {
     expect(sendCommand).toHaveBeenCalledTimes(1);
   });
 });
+
+it('publishes the practice shortcut as appearance only, without action or teaching content', async () => {
+  const { publisher, sendCommand } = fixture();
+  publisher.updateSnapshot({ phase: CompanionHudPhase.PRACTICE_READY, locale: 'vi', level: 0 });
+  await publisher.flush();
+  expect(sendCommand.mock.calls.map(([command]) => command)).toEqual([
+    {
+      kind: CompanionHudCommandKind.UPDATE_APPEARANCE,
+      group,
+      sequence: 1,
+      phase: 'practice_ready',
+      locale: 'vi',
+      level: 0,
+      speakingSequence: null,
+    },
+  ]);
+});

@@ -684,3 +684,40 @@ it.each(['en', 'vi'] as const)(
     expect(latest()).toMatchObject({ phase: 'error', locale });
   },
 );
+
+it('shows the localized practice shortcut when eligible and restores it after evaluation', () => {
+  const { controller, latest } = createHarness();
+  controller.setLocale('vi');
+  controller.setPracticeShortcutAvailable(true);
+  expect(latest()).toMatchObject({ phase: 'practice_ready', locale: 'vi' });
+  controller.startPractice(captureId, 'check');
+  expect(latest()?.phase).toBe('checking');
+  controller.setPracticeShortcutAvailable(true);
+  expect(latest()?.phase).toBe('checking');
+  controller.receivePracticeReply(captureId, { kind: 'failed', code: 'unavailable' });
+  expect(latest()?.phase).toBe('error');
+  vi.advanceTimersByTime(2200);
+  expect(latest()).toMatchObject({ phase: 'practice_ready', locale: 'vi' });
+  controller.setLocale('en');
+  expect(latest()).toMatchObject({ phase: 'practice_ready', locale: 'en' });
+  controller.setPracticeShortcutAvailable(false);
+  expect(latest()?.phase).toBe('idle');
+});
+
+it('keeps voice and teaching above the shortcut, and removes eligibility on reset', () => {
+  const { controller, latest } = createHarness();
+  controller.setPracticeShortcutAvailable(true);
+  controller.receiveVoiceEvent({ kind: 'prepare', captureId });
+  controller.setPracticeShortcutAvailable(true);
+  expect(latest()?.phase).toBe('preparing');
+  controller.receiveVoiceEvent({ kind: 'cancel', captureId });
+  vi.advanceTimersByTime(500);
+  expect(latest()?.phase).toBe('practice_ready');
+  controller.startTask(sessionId, 'en');
+  controller.setPracticeShortcutAvailable(false);
+  expect(latest()?.phase).toBe('sending');
+  controller.reset();
+  expect(latest()?.phase).toBe('idle');
+  vi.advanceTimersByTime(5000);
+  expect(latest()?.phase).toBe('idle');
+});

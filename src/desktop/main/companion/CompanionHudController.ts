@@ -38,6 +38,7 @@ export const CompanionHudTransitionSource = {
   AGENT_RESULT: 'agent_result',
   TASK_START: 'task_start',
   PRACTICE_START: 'practice_start',
+  PRACTICE_AVAILABILITY: 'practice_availability',
   PRACTICE_REPLY: 'practice_reply',
   HIDE_TIMER: 'hide_timer',
   RESET: 'reset',
@@ -76,6 +77,7 @@ interface CompanionHudTransitionContext extends CompanionHudTransitionCause {
 /** Reduces existing lifecycle events into an optional native presentation.
  * It cannot capture audio or submit a task. Capture/task identities fence late events. */
 export class CompanionHudController {
+  private practiceShortcutAvailable = false;
   private practiceRequestId: string | null = null;
   private practiceCheckId: string | null = null;
   private captureId: string | null = null;
@@ -96,6 +98,19 @@ export class CompanionHudController {
     private readonly clock: CompanionHudClock,
     private readonly reportTransition?: (transition: CompanionHudTransition) => void,
   ) {}
+
+  /** A display-only hint; availability never starts a check or confirms a hand-in. */
+  setPracticeShortcutAvailable(available: boolean): void {
+    this.practiceShortcutAvailable = available;
+    if (
+      this.snapshot.phase === CompanionHudPhase.IDLE ||
+      this.snapshot.phase === CompanionHudPhase.PRACTICE_READY
+    ) {
+      this.showPhase(available ? CompanionHudPhase.PRACTICE_READY : CompanionHudPhase.IDLE, {
+        source: CompanionHudTransitionSource.PRACTICE_AVAILABILITY,
+      });
+    }
+  }
 
   /** Practice owns the HUD only while voice/teaching is idle. No evidence enters presentation. */
   startPractice(
@@ -185,6 +200,9 @@ export class CompanionHudController {
 
   setLocale(locale: Locale): void {
     this.snapshot = { ...this.snapshot, locale };
+    if (this.snapshot.phase === CompanionHudPhase.PRACTICE_READY) {
+      this.publish();
+    }
   }
 
   setCaptureLocale(captureId: string, locale: Locale): void {
@@ -255,7 +273,10 @@ export class CompanionHudController {
         }
         break;
       case 'failed':
-        if (this.snapshot.phase !== CompanionHudPhase.IDLE) {
+        if (
+          this.snapshot.phase !== CompanionHudPhase.IDLE &&
+          this.snapshot.phase !== CompanionHudPhase.PRACTICE_READY
+        ) {
           if (this.sessionId && this.snapshot.message?.lessonId) {
             this.showLessonVoiceFailure(cause, this.sessionId, this.snapshot.message.lessonId);
           } else {
@@ -438,6 +459,7 @@ export class CompanionHudController {
   }
 
   reset(): void {
+    this.practiceShortcutAvailable = false;
     this.resetPresentation({ source: CompanionHudTransitionSource.RESET });
   }
 
@@ -457,7 +479,10 @@ export class CompanionHudController {
     this.sequence = -1;
     this.lastMeterAt = -Infinity;
     this.snapshot = { phase: CompanionHudPhase.IDLE, locale: this.snapshot.locale, level: 0 };
-    this.showPhase(CompanionHudPhase.IDLE, { ...identity, ...cause });
+    this.showPhase(
+      this.practiceShortcutAvailable ? CompanionHudPhase.PRACTICE_READY : CompanionHudPhase.IDLE,
+      { ...identity, ...cause },
+    );
   }
 
   private finishPresentation(
