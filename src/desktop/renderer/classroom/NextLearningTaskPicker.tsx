@@ -1,3 +1,4 @@
+import { useLocale } from '../localization/UseLocale.js';
 import { useState, type ReactElement } from 'react';
 import { Button, Select, Text } from '@mantine/core';
 import type {
@@ -22,6 +23,8 @@ export function NextLearningTaskPicker({
   send,
   onSaved,
 }: NextLearningTaskPickerProps): ReactElement {
+  const { messages } = useLocale();
+  const t = messages.translateInsight;
   const [activityId, setActivityId] = useState<string | null>(
     progress.nextTask?.activityId ?? null,
   );
@@ -31,20 +34,20 @@ export function NextLearningTaskPicker({
   const taskTitle = progress.nextTask?.title ?? task?.title;
   return (
     <aside className="learning-next">
-      <h3>Next learning task</h3>
+      <h3>{t('Next learning task')}</h3>
       {progress.nextTask ? (
         <>
-          <Text fw={600}>{taskTitle ?? 'Teacher-selected activity'}</Text>
-          <p>Selected by your teacher based on the learning plan and saved work.</p>
-          {!taskTitle && <p>Task details are unavailable.</p>}
+          <Text fw={600}>{taskTitle ?? t('Teacher-selected activity')}</Text>
+          <p>{t('Selected by your teacher based on the learning plan and saved work.')}</p>
+          {!taskTitle && <p>{t('Task details are unavailable.')}</p>}
         </>
       ) : (
-        <p>Your teacher can choose the next activity after reviewing your work.</p>
+        <p>{t('Your teacher can choose the next activity after reviewing your work.')}</p>
       )}
       {teacher && (
         <>
           <Select
-            label="Teacher-selected task"
+            label={t('Teacher-selected task')}
             value={activityId}
             data={activities.map((activity) => ({ value: activity.id, label: activity.title }))}
             onChange={setActivityId}
@@ -80,13 +83,13 @@ export function NextLearningTaskPicker({
               });
             }}
           >
-            Select next task
+            {t('Select next task')}
           </Button>
         </>
       )}
       {message && (
         <Text size="sm" role="status">
-          {message}
+          {t(message)}
         </Text>
       )}
     </aside>

@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
-import { createElement } from 'react';
+import { type ReactNode, createElement } from 'react';
 import { MantineProvider } from '@mantine/core';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render as renderView, screen, waitFor } from '@testing-library/react';
+import { LocaleProvider } from '../../../../src/desktop/renderer/localization/LocaleProvider.js';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
 import { StudentWorkGallery } from '../../../../src/desktop/renderer/classroom/StudentWorkGallery.js';
@@ -14,6 +15,7 @@ import {
 
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
   vi.unstubAllGlobals();
 });
 
@@ -71,3 +73,8 @@ it('groups observations of one task and fetches actual saved evidence only on re
     assessmentId: assessment.id,
   });
 });
+
+function render(view: ReactNode): ReturnType<typeof renderView> {
+  window.localStorage.setItem('tro.desktop.locale', 'en');
+  return renderView(view, { wrapper: LocaleProvider });
+}

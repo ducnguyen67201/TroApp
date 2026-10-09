@@ -1,3 +1,4 @@
+import { useLocale } from '../localization/UseLocale.js';
 import type { ReactElement } from 'react';
 
 export interface LearningProgressPoint {
@@ -23,36 +24,40 @@ export function LearningProgressChart({
   selectedSessionId,
   onSelect,
 }: LearningProgressChartProps): ReactElement {
+  const { messages } = useLocale();
+  const t = messages.translateInsight;
   const maximum = Math.max(1, ...lessons.map((lesson) => lesson.denominator));
   return (
-    <section className="learning-chart" aria-label="Skills shown by lesson">
+    <section className="learning-chart" aria-label={t('Skills shown by lesson')}>
       <div className="learning-chart-heading">
         <div>
-          <h3>Skills shown by lesson</h3>
-          <p>Checked criteria from your teacher’s lesson plan.</p>
+          <h3>{t('Skills shown by lesson')}</h3>
+          <p>{t('Checked criteria from your teacher’s lesson plan.')}</p>
         </div>
-        <span className="learning-chart-axis-label">Criteria · 0–{maximum}</span>
+        <span className="learning-chart-axis-label">
+          {t('Criteria')} · 0–{maximum}
+        </span>
       </div>
       <div className="learning-chart-legend">
         <span>
           <i className="learning-met" />
-          Met
+          {t('Met')}
         </span>
         <span>
           <i className="learning-practice" />
-          Needs practice
+          {t('Needs practice')}
         </span>
         <span>
           <i className="learning-unknown" />
-          No result shown
+          {t('No result shown')}
         </span>
         <span>
           <i className="learning-conflict" />
-          Review needed
+          {t('Review needed')}
         </span>
       </div>
       {lessons.length === 0 ? (
-        <p>No lesson results to show yet.</p>
+        <p>{t('No lesson results to show yet.')}</p>
       ) : (
         <div className="learning-chart-plot">
           {lessons.map((lesson) => (
@@ -61,14 +66,14 @@ export function LearningProgressChart({
               className="learning-chart-column"
               key={lesson.sessionId}
               aria-pressed={lesson.sessionId === selectedSessionId}
-              aria-label={`${lesson.title}: ${String(lesson.met)} met, ${String(lesson.needsPractice)} need practice, ${String(lesson.unknown)} no result shown, ${String(lesson.conflicting)} need review; ${String(lesson.denominator)} criteria${lesson.comparable ? '' : ', comparison across lessons not established'}`}
+              aria-label={`${lesson.title}: ${String(lesson.met)} ${t('met')}, ${String(lesson.needsPractice)} ${t('need practice')}, ${String(lesson.unknown)} ${t('no result shown')}, ${String(lesson.conflicting)} ${t('need review')}; ${String(lesson.denominator)} ${t('criteria')}${lesson.comparable ? '' : t(', comparison across lessons not established')}`}
               onClick={() => {
                 onSelect(lesson.sessionId);
               }}
             >
               <span className="learning-chart-total">
                 {lesson.denominator ? `${String(lesson.met)}/${String(lesson.denominator)}` : '—'}
-                <small>met</small>
+                <small>{t('met')}</small>
               </span>
               <span
                 className="learning-chart-bar"
@@ -100,17 +105,17 @@ export function LearningProgressChart({
                 )}
               </span>
               <span className="learning-chart-title">{lesson.title}</span>
-              {!lesson.comparable && <small>Lesson criteria</small>}
+              {!lesson.comparable && <small>{t('Lesson criteria')}</small>}
             </button>
           ))}
         </div>
       )}
       <details>
-        <summary>How this is counted</summary>
+        <summary>{t('How this is counted')}</summary>
         <p>
-          Each bar uses the approved criteria for that lesson. A result counts once per criterion,
-          using the latest comparable finding. Met criteria may include support. Missing or
-          conflicting results remain separate. These counts do not measure general ability.
+          {t(
+            'Each bar uses the approved criteria for that lesson. A result counts once per criterion, using the latest comparable finding. Met criteria may include support. Missing or conflicting results remain separate. These counts do not measure general ability.',
+          )}
         </p>
       </details>
     </section>

@@ -1,15 +1,30 @@
 // @vitest-environment happy-dom
-import { createElement, type ReactElement } from 'react';
+import { type ReactNode, createElement, type ReactElement } from 'react';
 import { MantineProvider } from '@mantine/core';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render as renderView,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { useLocale } from '../../../../src/desktop/renderer/localization/UseLocale.js';
+import { LocaleProvider } from '../../../../src/desktop/renderer/localization/LocaleProvider.js';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { ClassroomInsightReply } from '#contracts/ClassroomInsights.js';
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
 import { ClassroomInsightsPanel } from '../../../../src/desktop/renderer/classroom/ClassroomInsightsPanel.js';
-import { createStudentProgress, insightClassId } from '../../ClassroomInsightDesktopFixtures.js';
+import {
+  createInsightAssessment,
+  createStudentProgress,
+  insightClassId,
+} from '../../ClassroomInsightDesktopFixtures.js';
 
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
   vi.unstubAllGlobals();
 });
 
@@ -107,4 +122,100 @@ it('keeps the insight panel unavailable when no preload bridge is installed', ()
   vi.stubGlobal('tro', undefined);
   render(panel());
   expect(screen.getByText('Learning insights are unavailable in this app version.')).toBeTruthy();
+});
+
+function render(view: ReactNode): ReturnType<typeof renderView> {
+  window.localStorage.setItem('tro.desktop.locale', 'en');
+  return renderView(view, { wrapper: LocaleProvider });
+}
+
+function LocaleSwitch(): ReactElement {
+  const { changeLocale } = useLocale();
+  return createElement(
+    'button',
+    {
+      onClick: () => {
+        changeLocale('en');
+      },
+    },
+    'English',
+  );
+}
+
+it('uses Vietnamese for student insights and switches to English without reloading learning records', async () => {
+  window.localStorage.setItem('tro.desktop.locale', 'vi');
+  const assessment = createInsightAssessment();
+  const progress = {
+    ...createStudentProgress(),
+    coverageReason: 'Historical assignment and support coverage is unknown.',
+    assessments: [assessment],
+  };
+  const send = vi
+    .fn<NonNullable<DesktopBridge['controlClassroomInsights']>>()
+    .mockImplementation((command) => {
+      if (command.kind === 'status') {
+        return Promise.resolve({
+          kind: 'status',
+          enabled: true,
+          teacher: false,
+          students: [{ id: 'minh', name: 'Minh' }],
+          activities: [],
+          plans: [],
+          mappings: [],
+        });
+      }
+      if (command.kind === 'read-student-progress') {
+        return Promise.resolve({ kind: 'student-progress', progress });
+      }
+      return Promise.resolve({ kind: 'failed', code: 'forbidden' });
+    });
+  vi.stubGlobal('tro', { controlClassroomInsights: send });
+  renderView(
+    createElement(MantineProvider, {
+      env: 'test',
+      children: createElement(LocaleProvider, {
+        children: [
+          createElement(LocaleSwitch, { key: 'locale' }),
+          createElement(ClassroomInsightsPanel, {
+            key: 'panel',
+            userId: 'minh',
+            classId: insightClassId,
+            teacher: false,
+          }),
+        ],
+      }),
+    }),
+  );
+  await waitFor(() => {
+    expect(screen.getByRole('heading', { name: 'Hành trình học tập của Minh' })).toBeTruthy();
+  });
+  expect(screen.getByLabelText('Từ ngày').getAttribute('lang')).toBe('vi');
+  expect(screen.getByText('Bài đã nộp')).toBeTruthy();
+  expect(
+    screen.getByText(
+      'Lịch sử chưa đầy đủ: Chưa rõ mức độ đầy đủ của dữ liệu giao bài và hỗ trợ trước đây.',
+    ),
+  ).toBeTruthy();
+  expect(screen.getByRole('region', { name: 'Kỹ năng thể hiện theo buổi học' })).toBeTruthy();
+  expect(
+    screen.getByRole('button', {
+      name: new RegExp(
+        new Date(progress.sessions[0]?.observedAt ?? '').toLocaleDateString('vi') + ': 2 đạt',
+      ),
+    }),
+  ).toBeTruthy();
+  expect(screen.getByText('Bài tập tiếp theo')).toBeTruthy();
+  expect(screen.getByText('Countdown challenge')).toBeTruthy();
+  expect(
+    within(screen.getByRole('region', { name: 'Bài làm gần đây' })).getAllByText(/: Đạt$/),
+  ).toHaveLength(2);
+  expect(screen.getByText(/Giáo viên xác nhận không có hỗ trợ/)).toBeTruthy();
+  const requestCount = send.mock.calls.length;
+  fireEvent.click(screen.getByRole('button', { name: 'English' }));
+  await waitFor(() => {
+    expect(screen.getByRole('heading', { name: 'Minh’s learning journey' })).toBeTruthy();
+  });
+  expect(screen.getByText('Tasks handed in')).toBeTruthy();
+  expect(screen.getByLabelText('From').getAttribute('lang')).toBe('en');
+  expect(send).toHaveBeenCalledTimes(requestCount);
 });

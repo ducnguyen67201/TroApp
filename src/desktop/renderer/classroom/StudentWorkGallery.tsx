@@ -1,7 +1,8 @@
+import { useLocale } from '../localization/UseLocale.js';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { Button, Modal, Stack, Text } from '@mantine/core';
 import { AssessmentMethod, type InsightStudentProgress } from '#contracts/ClassroomInsights.js';
-import type { PracticeEvidence } from '#contracts/PracticeCheck.js';
+import { PracticeFinding, type PracticeEvidence } from '#contracts/PracticeCheck.js';
 import { formatAssistance, formatInsightFailure } from './InsightLabels.js';
 import { useInsightRequest } from './UseInsightRequest.js';
 
@@ -17,6 +18,8 @@ export function StudentWorkGallery({
   progress,
   selectedSessionId,
 }: StudentWorkGalleryProps): ReactElement {
+  const { locale, messages } = useLocale();
+  const t = messages.translateInsight;
   const scope = `${userId}:${progress.identity.classId}:${progress.studentId}:${progress.identity.window.from}:${progress.identity.window.to}:${selectedSessionId ?? ''}`;
   const request = useInsightRequest(scope);
   const currentScope = useRef({ scope, sequence: 0 });
@@ -27,7 +30,7 @@ export function StudentWorkGallery({
   const [evidence, setEvidence] = useState<PracticeEvidence[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [title, setTitle] = useState('Saved work');
+  const [title, setTitle] = useState<string | null>(null);
   useEffect(() => {
     setOpened(false);
     setEvidence([]);
@@ -60,10 +63,10 @@ export function StudentWorkGallery({
     (right[1][0]?.observedAt ?? '').localeCompare(left[1][0]?.observedAt ?? ''),
   );
   return (
-    <section aria-label="Recent work">
+    <section aria-label={t('Recent work')}>
       <div className="learning-work-heading">
-        <h3>Recent work</h3>
-        <p>Tasks and submitted work from the selected lesson.</p>
+        <h3>{t('Recent work')}</h3>
+        <p>{t('Tasks and submitted work from the selected lesson.')}</p>
       </div>
       <div className="learning-work-grid">
         {work.map(([episodeId, checks]) => (
@@ -72,17 +75,19 @@ export function StudentWorkGallery({
             <p>{checks[0]?.task}</p>
             {checks.length > 1 && (
               <p>
-                {checks.length} observations of this task. Review their results and support
-                separately.
+                {t(
+                  '{count} observations of this task. Review their results and support separately.',
+                  { count: checks.length },
+                )}
               </p>
             )}
             {checks.map((assessment) => (
               <div key={assessment.id}>
                 <Text size="xs">
-                  {formatAssistance(assessment.assistance, assessment.unaidedConfirmed)} ·{' '}
+                  {t(formatAssistance(assessment.assistance, assessment.unaidedConfirmed))} ·{' '}
                   {assessment.method === AssessmentMethod.TEACHER
-                    ? 'Teacher observation'
-                    : 'Practice check'}
+                    ? t('Teacher observation')
+                    : t('Practice check')}
                 </Text>
                 <ul>
                   {assessment.results.map((result) => (
@@ -92,11 +97,11 @@ export function StudentWorkGallery({
                           ?.description
                       }
                       :{' '}
-                      {result.finding === 'met'
-                        ? 'Met'
-                        : result.finding === 'needs_changes'
-                          ? 'Needs practice'
-                          : 'More evidence needed'}
+                      {result.finding === PracticeFinding.MET
+                        ? t('Met')
+                        : result.finding === PracticeFinding.NEEDS_CHANGES
+                          ? t('Needs practice')
+                          : t('More evidence needed')}
                       <p>{result.feedback}</p>
                     </li>
                   ))}
@@ -138,25 +143,27 @@ export function StudentWorkGallery({
                     });
                   }}
                 >
-                  View saved work
+                  {t('View saved work')}
                 </Button>
                 {!assessment.snapshotId && !assessment.checkId && (
-                  <p>Teacher observation; no saved artifact attached.</p>
+                  <p>{t('Teacher observation; no saved artifact attached.')}</p>
                 )}
                 <details>
-                  <summary>Check details</summary>
+                  <summary>{t('Check details')}</summary>
                   <Text size="xs">
-                    Observed {new Date(assessment.observedAt).toLocaleString()} · saved{' '}
-                    {new Date(assessment.recordedAt).toLocaleString()}
+                    {t('Observed')} {new Date(assessment.observedAt).toLocaleString(locale)} ·{' '}
+                    {t('saved')} {new Date(assessment.recordedAt).toLocaleString(locale)}
                     <br />
-                    {assessment.purpose} · {assessment.status}
+                    {t(assessment.purpose)} · {t(assessment.status)}
                     <br />
-                    Source {assessment.id} · version {assessment.version} · cutoff{' '}
-                    {assessment.sourceRevision}
+                    {t('Source')} {assessment.id} · {t('version')} {assessment.version} ·{' '}
+                    {t('cutoff')} {assessment.sourceRevision}
                     <br />
                     {assessment.mappingId
-                      ? `Approved skill definition version ${String(assessment.mappingVersion ?? 'unknown')}`
-                      : 'No approved comparable skill mapping attached'}
+                      ? t('Approved skill definition version {version}', {
+                          version: assessment.mappingVersion ?? t('unknown'),
+                        })
+                      : t('No approved comparable skill mapping attached')}
                   </Text>
                 </details>
               </div>
@@ -171,26 +178,26 @@ export function StudentWorkGallery({
           )
           .map((submission) => (
             <article key={submission.id} className="learning-work-card">
-              <h3>Submitted link</h3>
-              <p>{new Date(submission.submittedAt).toLocaleString()}</p>
-              <p>A link was handed in. Its contents were not captured as checked work.</p>
+              <h3>{t('Submitted link')}</h3>
+              <p>{new Date(submission.submittedAt).toLocaleString(locale)}</p>
+              <p>{t('A link was handed in. Its contents were not captured as checked work.')}</p>
             </article>
           ))}
       </div>
-      {work.length === 0 && <p>No checked tasks shown for this lesson.</p>}
+      {work.length === 0 && <p>{t('No checked tasks shown for this lesson.')}</p>}
       <Modal
         opened={opened}
-        title={title}
+        title={title ?? t('Saved work')}
         onClose={() => {
           setOpened(false);
         }}
         size="lg"
       >
         <Stack>
-          {busy && <Text>Loading saved work…</Text>}
-          {message && <Text role="alert">{message}</Text>}
+          {busy && <Text>{t('Loading saved work…')}</Text>}
+          {message && <Text role="alert">{t(message)}</Text>}
           {!busy && !message && evidence.length === 0 && (
-            <Text>No saved artifact is available for this observation.</Text>
+            <Text>{t('No saved artifact is available for this observation.')}</Text>
           )}
           {evidence.map((item) => (
             <div key={item.id}>
