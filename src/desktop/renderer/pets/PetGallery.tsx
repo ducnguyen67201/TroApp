@@ -13,7 +13,8 @@ import {
 } from '@mantine/core';
 import { PetAction, PetId, PetMotion, PetReaction, type PetPreferences } from '#contracts/Pet.js';
 import { useLocale } from '../localization/UseLocale.js';
-import { PetSprite } from './PetSprite.js';
+import { PetMascot } from './PetMascot.js';
+import { petRenderer } from './PetPresentation.js';
 import { petMessages } from './PetMessages.js';
 import { usePets, type PetView } from './UsePets.js';
 
@@ -46,20 +47,16 @@ function PetCard({ petId, preferences, view }: PetCardProps): ReactElement {
   const label = isSelected ? (preferences.enabled ? messages.save : messages.show) : messages.adopt;
   return (
     <section className="pet-card" aria-label={messages[petId]}>
-      <button
-        type="button"
-        className="pet-card-preview"
-        aria-label={`${messages.pet} ${preferences.names[petId]}`}
-        onClick={() => {
-          setPreviewReaction(PetReaction.HAPPY);
-        }}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          setPreviewReaction(PetReaction.STARTLED);
-        }}
-      >
-        <PetSprite
+      <div className="pet-card-preview">
+        <PetMascot
           petId={petId}
+          label={`${messages.pet} ${preferences.names[petId]}`}
+          onPet={() => {
+            setPreviewReaction(PetReaction.HAPPY);
+          }}
+          onSlap={() => {
+            setPreviewReaction(PetReaction.STARTLED);
+          }}
           reaction={
             previewReaction !== PetReaction.IDLE
               ? previewReaction
@@ -69,7 +66,7 @@ function PetCard({ petId, preferences, view }: PetCardProps): ReactElement {
           }
           reducedMotion={preferences.motion === PetMotion.REDUCED}
         />
-      </button>
+      </div>
       <Group justify="space-between">
         <Text fw={600}>{messages[petId]}</Text>
         {isSelected && (
@@ -137,24 +134,31 @@ export function PetGallery({ accountId }: PetGalleryProps): ReactElement {
             {messages.hint}
           </Text>
           <Group>
-            <Button
-              variant="default"
-              disabled={view.isSaving || !view.snapshot?.isVisible}
-              onClick={() => {
-                void view.sendCommand({ kind: PetAction.REACT, reaction: PetReaction.HAPPY });
-              }}
-            >
-              {messages.pet}
-            </Button>
-            <Button
-              variant="default"
-              disabled={view.isSaving || !view.snapshot?.isVisible}
-              onClick={() => {
-                void view.sendCommand({ kind: PetAction.REACT, reaction: PetReaction.STARTLED });
-              }}
-            >
-              {messages.slap}
-            </Button>
+            {petRenderer.supportsControlledReactions(preferences.activePetId) && (
+              <>
+                <Button
+                  variant="default"
+                  disabled={view.isSaving || !view.snapshot?.isVisible}
+                  onClick={() => {
+                    void view.sendCommand({ kind: PetAction.REACT, reaction: PetReaction.HAPPY });
+                  }}
+                >
+                  {messages.pet}
+                </Button>
+                <Button
+                  variant="default"
+                  disabled={view.isSaving || !view.snapshot?.isVisible}
+                  onClick={() => {
+                    void view.sendCommand({
+                      kind: PetAction.REACT,
+                      reaction: PetReaction.STARTLED,
+                    });
+                  }}
+                >
+                  {messages.slap}
+                </Button>
+              </>
+            )}
             <Button
               variant="subtle"
               disabled={view.isSaving || !preferences.enabled}

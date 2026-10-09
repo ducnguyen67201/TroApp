@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState, type ReactElement, type PointerEvent } from 'react';
 import { PetMotion, PetOverlayAction, type PetSnapshot } from '#contracts/Pet.js';
-import { PetSprite } from './PetSprite.js';
+import { PetMascot } from './PetMascot.js';
+import { petRenderer } from './PetPresentation.js';
 import { petMessages } from './PetMessages.js';
 
 export function PetOverlay(): ReactElement | null {
   const [snapshot, setSnapshot] = useState<PetSnapshot | null>(null);
   const revision = useRef(-1);
+  const suppressClick = useRef(false);
+  const capturedPointer = useRef<Element | null>(null);
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   useEffect(() => {
     let active = true;
@@ -37,14 +40,25 @@ export function PetOverlay(): ReactElement | null {
     };
   }, []);
 
-  function finishDrag(event: PointerEvent<HTMLButtonElement>): void {
+  function finishDrag(event: PointerEvent<HTMLDivElement>): void {
     const previous = drag.current;
     drag.current = null;
     window.troPet.interactWithPet({ kind: PetOverlayAction.END_DRAG });
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+    if (!previous) {
+      return;
     }
-    if (previous && !previous.moved && event.type === 'pointerup') {
+    suppressClick.current = previous.moved || event.type !== 'pointerup';
+    const captured = capturedPointer.current;
+    capturedPointer.current = null;
+    if (captured?.hasPointerCapture(event.pointerId)) {
+      captured.releasePointerCapture(event.pointerId);
+    }
+    if (
+      snapshot &&
+      petRenderer.supportsControlledReactions(snapshot.preferences.activePetId) &&
+      !previous.moved &&
+      event.type === 'pointerup'
+    ) {
       window.troPet.interactWithPet({ kind: PetOverlayAction.PET });
     }
   }
@@ -60,19 +74,22 @@ export function PetOverlay(): ReactElement | null {
           {messages.encouragement}
         </div>
       )}
-      <button
-        type="button"
+      <div
         className="pet-hit-region"
-        aria-label={`${messages.pet} ${snapshot.preferences.names[snapshot.preferences.activePetId]}`}
-        onPointerDown={(event) => {
+        onPointerDownCapture={(event) => {
           if (event.button !== 0) {
             return;
           }
           event.preventDefault();
+          suppressClick.current = false;
           drag.current = { x: event.screenX, y: event.screenY, moved: false };
-          event.currentTarget.setPointerCapture(event.pointerId);
+          const target = event.target;
+          if (target instanceof Element) {
+            capturedPointer.current = target.closest('button') ?? event.currentTarget;
+            capturedPointer.current.setPointerCapture(event.pointerId);
+          }
         }}
-        onPointerMove={(event) => {
+        onPointerMoveCapture={(event) => {
           const previous = drag.current;
           if (
             previous &&
@@ -83,20 +100,27 @@ export function PetOverlay(): ReactElement | null {
             window.troPet.interactWithPet({ kind: PetOverlayAction.START_DRAG });
           }
         }}
-        onPointerUp={finishDrag}
-        onPointerCancel={finishDrag}
+        onPointerUpCapture={finishDrag}
+        onPointerCancelCapture={finishDrag}
         onLostPointerCapture={finishDrag}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          window.troPet.interactWithPet({ kind: PetOverlayAction.SLAP });
+        onClickCapture={(event) => {
+          if (suppressClick.current && event.detail > 0) {
+            suppressClick.current = false;
+            event.preventDefault();
+            event.stopPropagation();
+          }
         }}
       >
-        <PetSprite
+        <PetMascot
           petId={snapshot.preferences.activePetId}
+          label={`${messages.pet} ${snapshot.preferences.names[snapshot.preferences.activePetId]}`}
+          onSlap={() => {
+            window.troPet.interactWithPet({ kind: PetOverlayAction.SLAP });
+          }}
           reaction={snapshot.reaction}
           reducedMotion={snapshot.preferences.motion === PetMotion.REDUCED}
         />
-      </button>
+      </div>
     </main>
   );
 }

@@ -19,6 +19,7 @@ const packageMetadata = z
   .parse(metadata);
 
 await cp('scripts/DesktopEntitlements.plist', 'out/DesktopEntitlements.plist');
+await cp('src/desktop/assets/pets/PageMascotLicense.txt', 'out/renderer/PageMascotLicense.txt');
 await cp('src/desktop/assets', 'out/branding', { recursive: true });
 const require = createRequire(import.meta.url);
 const nativeLoaderDirectory = dirname(
