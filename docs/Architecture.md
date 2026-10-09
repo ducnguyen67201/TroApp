@@ -519,7 +519,8 @@ checker implement it. Missing required class sources, unsupported evidence capab
 There is no implicit fallback from an approved deterministic rule to an LLM.
 
 `PrismaPracticeCheckStore.readGrounding` resolves the pinned course publication and rubric
-source IDs into passages and teacher corrections. `ExtractPracticeArtifact` reuses the
+source IDs into passages and teacher corrections. Each grounding source retains both its
+passage ID and source-unit/page ID so criterion references remain traceable. `ExtractPracticeArtifact` reuses the
 bounded material parser worker for PDF text and static sb3 target graphs. Pasted code is
 text evidence; it is never executed. PDF layout/scans and Scratch runtime behavior require
 additional evidence or teacher review. Extraction is separate from judgment. Saved checks
@@ -545,7 +546,8 @@ fence late replies. Active voice or teaching guidance retains HUD priority; the 
 still displays check progress. A successful check is formative feedback, never a grade.
 Students can request teacher review tied to an authorized saved check and criterion through
 the existing insights help queue. Teacher results retain the original evidence and hand-in
-receipts; hand-in remains a separate confirmation of the exact checked version.
+receipts; hand-in remains a separate confirmation of the exact checked version. Both practice
+review and the Insights work gallery offer original-file downloads for PDF and sb3 evidence.
 
 ### Learning history and parent reports
 

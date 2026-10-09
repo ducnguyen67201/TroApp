@@ -52,6 +52,7 @@ it('batches legacy LLM criteria with approved grounding and preserves extracted 
   const f = fixture();
   f.grounding.sources.push({
     id: randomUUID(),
+    sourceUnitId: randomUUID(),
     location: 'Page 2',
     text: 'A greeting may be any language.',
     teacherNote: 'Do not demand the example verbatim.',

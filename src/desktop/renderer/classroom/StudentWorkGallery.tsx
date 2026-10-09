@@ -208,6 +208,10 @@ export function StudentWorkGallery({
               <Text fw={600}>{item.name}</Text>
               {item.kind === PracticeEvidenceKind.TEXT ? (
                 <pre className="learning-evidence-text">{item.text}</pre>
+              ) : item.kind === PracticeEvidenceKind.DOCUMENT ? (
+                <a href={`data:${item.mediaType};base64,${item.base64}`} download={item.name}>
+                  {t('Save original file')}
+                </a>
               ) : (
                 <img
                   className="learning-evidence-image"

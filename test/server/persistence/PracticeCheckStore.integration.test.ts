@@ -270,3 +270,56 @@ it('persists assessment provenance and capture metadata with private evidence re
     service.execute(f.other, { kind: 'read-evidence', checkId: result.check.id }),
   ).rejects.toThrow('forbidden');
 });
+
+it('retains each criterion’s source-page binding across multiple grounding passages', async () => {
+  const f = await fixture();
+  const access = await practice.store.readAccess(f.command.participationId, f.command.activityId);
+  if (!access) {
+    throw new Error('Missing access');
+  }
+  const rubric = createPracticeCheckpoint();
+  const materialId = randomUUID();
+  const pages = rubric.criteria.map((criterion, index) => {
+    const id = randomUUID();
+    criterion.sourceIds = [id];
+    return {
+      id,
+      materialId,
+      location: `Page ${String(index + 1)}`,
+      extractedText: `Approved requirement ${String(index + 1)}.\n`.repeat(400),
+      preparedNote: '',
+      teacherNote: `Teacher correction ${String(index + 1)}`,
+      warnings: [],
+    };
+  });
+  await classrooms.store.saveMaterialPublication({
+    courseId: access.courseRevisionId,
+    classId: access.classId,
+    teacherInstructions: 'Use the requirement from the cited page.',
+    sources: [{ id: materialId, name: 'Exercise.pdf', bytes: 1, digest: '', url: null }],
+    draft: {
+      summary: 'Two separate requirements',
+      questions: [],
+      pages,
+      sections: [
+        {
+          id: access.activity.id,
+          title: 'Practice',
+          instruction: 'Follow both pages.',
+          sourcePageIds: pages.map((page) => page.id),
+        },
+      ],
+    },
+  });
+  const grounding = await practice.store.readGrounding(access, rubric);
+  expect(grounding.missingSourceIds).toEqual([]);
+  for (const page of pages) {
+    const sources = grounding.sources.filter((source) => source.sourceUnitId === page.id);
+    expect(sources.length).toBeGreaterThan(1);
+    expect(sources.map((source) => source.text).join('')).toBe(page.extractedText);
+    expect(sources[0]?.teacherNote).toBe(page.teacherNote);
+    expect(
+      sources.every((source) => source.id !== page.id && source.location === page.location),
+    ).toBe(true);
+  }
+});

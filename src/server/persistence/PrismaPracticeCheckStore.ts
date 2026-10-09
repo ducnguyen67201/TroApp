@@ -166,6 +166,7 @@ class PrismaPracticeCheckStore implements PracticeCheckStore {
       teacherInstructions: publication?.teacherInstructions ?? '',
       sources: selected.map((passage) => ({
         id: passage.id,
+        sourceUnitId: passage.sourceUnitId,
         location: passage.location,
         text: passage.text,
         teacherNote: passage.teacherNote,

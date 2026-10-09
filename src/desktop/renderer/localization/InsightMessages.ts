@@ -1,6 +1,7 @@
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
 
 const vietnamese: Readonly<Record<string, string>> = {
+  'Save original file': 'Lưu tệp gốc',
   'Learning insights': 'Tiến độ học tập',
   Refresh: 'Cập nhật',
   From: 'Từ ngày',

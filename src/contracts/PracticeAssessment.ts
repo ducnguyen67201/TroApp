@@ -42,6 +42,7 @@ export const PracticeVerificationSchema = z.discriminatedUnion('kind', [
 
 export const PracticeSourceSchema = z.strictObject({
   id: z.uuid(),
+  sourceUnitId: z.uuid(),
   location: z.string().max(200),
   text: z.string().max(12000),
   teacherNote: z.string().max(10000).nullable(),
