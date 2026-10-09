@@ -1,6 +1,7 @@
 import {
-  CursorCompanionTool,
   CursorGuidanceResultSchema,
+  GuidancePresentationRefusalSchema,
+  hasValidPresentedStrokes,
   GuidanceReason,
   TeachingOutcome,
   type TeachingResult,
@@ -20,6 +21,7 @@ import {
 } from './CuaObservation.js';
 import { TaskCompletionConfig, type TaskBudgetConfig } from '../execution/TaskCompletionConfig.js';
 import { TaskContextBudgetError } from '../execution/TaskContextBudget.js';
+import { TeachingDrawingLimits } from '#contracts/TeachingDrawing.js';
 
 export const TaskIssue = {
   GUIDANCE_FAILED: 'guidance_failed',
@@ -27,9 +29,15 @@ export const TaskIssue = {
 
 export type TaskIssue = (typeof TaskIssue)[keyof typeof TaskIssue];
 
-export interface GuidanceRequest {
+export interface GuidancePresentationIdentity {
+  presentationId: string;
+  lessonId: string;
+  stepId: string;
+}
+
+export interface GuidanceRequest extends GuidancePresentationIdentity {
   taskEpoch: string;
-  expectedSteps: number;
+  expectedStrokes: number;
   callNumber: number;
 }
 
@@ -167,11 +175,25 @@ export class CuaTaskEvidence {
     return this.pendingGuidance.size > 0;
   }
 
-  beginGuidanceRequest(expectedSteps: number): GuidanceRequest | null {
-    if (!this.taskEpoch || this.terminalGuidance) {
+  beginGuidanceRequest(
+    expectedStrokes: number,
+    identity: GuidancePresentationIdentity,
+  ): GuidanceRequest | null {
+    if (
+      !this.taskEpoch ||
+      this.terminalGuidance ||
+      !Number.isInteger(expectedStrokes) ||
+      expectedStrokes < 0 ||
+      expectedStrokes > TeachingDrawingLimits.MAX_STROKES
+    ) {
       return null;
     }
-    const request = { taskEpoch: this.taskEpoch, expectedSteps, callNumber: ++this.callNumber };
+    const request = {
+      ...identity,
+      taskEpoch: this.taskEpoch,
+      expectedStrokes,
+      callNumber: ++this.callNumber,
+    };
     this.pendingGuidance.add(request.callNumber);
     return request;
   }
@@ -184,6 +206,11 @@ export class CuaTaskEvidence {
     if (this.terminalGuidance) {
       return false;
     }
+    const refusal = GuidancePresentationRefusalSchema.safeParse(result.structuredContent);
+    if (result.isError && refusal.success) {
+      // A changed screen is repairable feedback, not a broken presentation transport.
+      return false;
+    }
     const parsed = CursorGuidanceResultSchema.safeParse(result.structuredContent);
     if (!parsed.success) {
       this.failGuidance(GuidanceReason.TRANSPORT_FAILED);
@@ -194,26 +221,16 @@ export class CuaTaskEvidence {
       if (
         result.isError ||
         native.receipt.task_epoch !== request.taskEpoch ||
+        native.receipt.presentation_id !== request.presentationId ||
+        native.receipt.lesson_id !== request.lessonId ||
+        native.receipt.step_id !== request.stepId ||
+        !hasValidPresentedStrokes(native.receipt, request.expectedStrokes) ||
         this.completedSequences.has(native.receipt.sequence_id)
       ) {
         this.failGuidance(GuidanceReason.TRANSPORT_FAILED);
         return false;
       }
       this.completedSequences.add(native.receipt.sequence_id);
-      return true;
-    }
-    if (native.status === 'completed') {
-      const receipt = native.receipt;
-      if (
-        result.isError ||
-        receipt.task_epoch !== request.taskEpoch ||
-        receipt.completed_steps !== request.expectedSteps ||
-        this.completedSequences.has(receipt.sequence_id)
-      ) {
-        this.failGuidance(GuidanceReason.TRANSPORT_FAILED);
-        return false;
-      }
-      this.completedSequences.add(receipt.sequence_id);
       return true;
     }
     if (!result.isError || native.task_epoch !== request.taskEpoch) {
@@ -275,8 +292,6 @@ export class CuaTaskEvidence {
     if (isCursorPresentationTool(toolName)) {
       if (result.isError === true) {
         this.guidanceIssue ??= TaskIssue.GUIDANCE_FAILED;
-      } else if (toolName === CursorCompanionTool.SHOW_SEQUENCE && this.taskEpoch === null) {
-        this.guidanceIssue = null;
       }
     }
   }

@@ -33,7 +33,17 @@ it('shows readable requests, parsed tool arguments and native refusals without m
   const result = describeDebugExchange({
     input: 'Làm sao mở YouTube?',
     arguments: JSON.stringify({
-      steps: [{ kind: 'circle', center: { x: 0.5, y: 0.98 } }],
+      drawing: {
+        strokes: [
+          {
+            points: [
+              { x: 0.5, y: 0.9 },
+              { x: 0.6, y: 0.98 },
+            ],
+            closed: false,
+          },
+        ],
+      },
       token: 'synthetic-token',
     }),
     output: [
@@ -77,7 +87,7 @@ it('emits paired input/output/error only with development debug enabled', () => 
   });
   const exchange = {
     operation: 'native.tool',
-    input: { steps: [] },
+    input: { drawing: null },
     output: { isError: true },
     error: 'invalid_request',
   };

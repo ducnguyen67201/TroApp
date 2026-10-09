@@ -23,12 +23,28 @@ const WatchArgsSchema = z.strictObject({
 });
 const EpochArgsSchema = z.strictObject({
   task_epoch: z.uuid(),
-  presentation_version: z.literal(2).optional(),
+  presentation_version: z.literal(3).optional(),
 });
 const PreviewArgsSchema = z.object({
-  presentation_version: z.literal(2),
+  presentation_version: z.literal(3),
   capture_id: z.string(),
-  steps: z.array(z.unknown()).max(8),
+  drawing: z
+    .object({
+      strokes: z
+        .array(
+          z.object({
+            points: z
+              .array(z.object({ x: z.number(), y: z.number() }))
+              .min(2)
+              .max(32),
+            closed: z.boolean(),
+          }),
+        )
+        .min(1)
+        .max(3),
+    })
+    .nullable(),
+  text_only: z.boolean(),
 });
 
 export const FlowScenario = {
@@ -59,15 +75,10 @@ const modelFailureScenarios = new Set<FlowScenario>([
 
 const toolProperties: Record<string, Record<string, unknown>> = {
   get_desktop_state: { max_image_dimension: { type: 'integer' } },
-  refresh_cursor_guidance_capture: {
-    capture_id: { type: 'string' },
-    steps: { type: 'array', items: { type: 'object', additionalProperties: true } },
-    max_image_dimension: { type: 'integer' },
-  },
-  show_cursor_sequence: {
+  present_teaching_guidance: {
     presentation_version: { type: 'integer' },
     capture_id: { type: 'string' },
-    steps: { type: 'array', items: { type: 'object', additionalProperties: true } },
+    drawing: { type: ['object', 'null'], additionalProperties: true },
   },
   set_cursor_companion_mode: { mode: { type: 'string' }, label: { type: 'string' } },
   cancel_cursor_sequence: {},
@@ -334,18 +345,19 @@ export class TeachingFlowFixture {
         break;
       case 'get_cursor_companion_capabilities':
         structuredContent = {
-          presentation_versions: [2],
+          presentation_versions: [3],
           task_lifecycle: true,
           paired_presentation: true,
           display_scope: 'primary',
-          gestures: ['circle'],
-          max_steps: 8,
+          gestures: ['scribble'],
+          max_strokes: 3,
+          max_points_per_stroke: 32,
           max_duration_ms: 15000,
         };
         break;
       case 'begin_cursor_guidance_task': {
         const epoch = EpochArgsSchema.parse(args);
-        assert.equal(epoch.presentation_version, 2);
+        assert.equal(epoch.presentation_version, 3);
         assert.equal(this.epoch, null);
         this.epoch = epoch.task_epoch;
         this.epochStarts += 1;
@@ -397,51 +409,59 @@ export class TeachingFlowFixture {
             observation: this.readObservation(),
           },
         };
-      case 'refresh_cursor_guidance_capture': {
+      case 'present_teaching_guidance': {
+        const preview = PreviewArgsSchema.parse(args);
+        assert.ok(this.epoch);
+        assert.equal(preview.capture_id, this.captureId);
+        assert.equal(preview.text_only, preview.drawing === null);
+        assert.equal(args['hud_group'], '33333333-3333-4333-8333-333333333333');
         if (this.scenario === FlowScenario.REFRESH_FAILURE) {
           return {
             isError: true,
             content: [{ type: 'text', text: 'Synthetic capture transport error' }],
           };
         }
-        assert.equal(args['capture_id'], this.captureId);
-        assert.ok(this.epoch);
-        const matched = this.scenario !== FlowScenario.STALE_PREVIEW || this.modelPhase > 2;
+        if (this.scenario === FlowScenario.STALE_PREVIEW && this.modelPhase <= 2) {
+          this.captureId = randomUUID();
+          return {
+            isError: true,
+            content: [],
+            structuredContent: {
+              status: 'refused',
+              code: 'fresh_observation_required',
+              reason: 'target_changed',
+            },
+          };
+        }
         this.captureId = randomUUID();
-        structuredContent = {
-          matched,
-          capture_id: matched ? this.captureId : null,
-          reason: matched ? 'target_unchanged' : 'target_changed',
-        };
-        break;
-      }
-      case 'show_cursor_sequence': {
-        const preview = PreviewArgsSchema.parse(args);
-        assert.ok(this.epoch);
-        assert.equal(preview.capture_id, this.captureId);
-        assert.equal(args['hud_group'], '33333333-3333-4333-8333-333333333333');
         const message = z
           .object({ text: z.string(), lessonId: z.uuid(), stepId: z.uuid() })
           .parse(args['teaching_message']);
         assert.ok(message.text.length > 0, 'The native cue must carry the admitted instruction.');
         assert.ok(args['teaching_locale'] === 'en' || args['teaching_locale'] === 'vi');
-        this.previews += preview.steps.length > 0 ? 1 : 0;
+        this.previews += preview.drawing === null ? 0 : 1;
         this.lastPresentationId = z.uuid().parse(args['presentation_id']);
         structuredContent = {
           status: 'presented',
           following: true,
           active: false,
           receipt: {
-            presentation_version: 2,
+            presentation_version: 3,
             task_epoch: this.scenario === FlowScenario.BAD_RECEIPT ? randomUUID() : this.epoch,
             sequence_id: randomUUID(),
             presentation_id: args['presentation_id'],
             lesson_id: message.lessonId,
             step_id: message.stepId,
             message_presented: true,
-            drawing_presented: preview.steps.length > 0,
+            drawing_presented: preview.drawing !== null,
             text_only: args['text_only'] === true,
             interrupted: false,
+            strokes_presented:
+              preview.drawing?.strokes.map((_, stroke_index) => ({
+                stroke_index,
+                trace_progress: 1,
+                hold_ms_observed: 1100,
+              })) ?? [],
           },
         };
         break;
@@ -495,8 +515,8 @@ export class TeachingFlowFixture {
       'Host watches must never be exposed to the model.',
     );
     assert.ok(
-      !request.tools.some((tool) => tool.name === 'refresh_cursor_guidance_capture'),
-      'Cue comparison is a host-only local operation.',
+      !request.tools.some((tool) => tool.name === 'present_teaching_guidance'),
+      'Native refresh and drawing are one host-only local operation.',
     );
     const goalSchema = z.object({
       id: z.uuid(),
@@ -589,6 +609,19 @@ export class TeachingFlowFixture {
         instruction,
         expectedResult: 'Next requested checkpoint is visible',
         action,
+        drawing: ['focused', 'partial', 'loading'].includes(this.screen)
+          ? null
+          : {
+              strokes: [
+                {
+                  points: [
+                    { x: 0.4, y: 0.4 },
+                    { x: 0.5, y: 0.4 },
+                  ],
+                  closed: false,
+                },
+              ],
+            },
       });
       if (this.scenario === FlowScenario.INPUT_DURING_PROPOSAL && this.segments <= 3) {
         this.changeScreen('changed_target');

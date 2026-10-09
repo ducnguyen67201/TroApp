@@ -69,9 +69,10 @@ pnpm dev:desktop
 ```
 
 `build:cua` fetches the pinned Cua source, applies `CursorCompanion.patch`, runs
-selected native tests, builds/signs the local executable and records checksums in
-`~/.cache/tro/cua-companion`. Restart the desktop after rebuilding so its daemon
-loads that executable. [CuaCompanionBuild.ts](src/contracts/CuaCompanionBuild.ts)
+companion, MCP transport and session tests, builds/signs the local executable and
+records checksums in `~/.cache/tro/cua-companion`. Restart the desktop after
+rebuilding so its daemon loads that executable.
+[CuaCompanionBuild.ts](src/contracts/CuaCompanionBuild.ts)
 owns the required version/source commit. Packaged driver resources take precedence
 over development caches.
 
@@ -83,7 +84,9 @@ OS grants. Keep the same app instance open throughout browser OAuth. If a differ
 checkout owns the callback, restart the intended launcher before signing in.
 
 Choose **Show me** for student-controlled guidance and **Do it for me** for general
-execution. Joined classroom tasks admit Show me only. Voice holds Command + Control
+execution. Show me uses model-supplied scribble strokes and requires the matching
+native build; old teaching drawing protocols are not supported. Joined classroom
+tasks admit Show me only. Voice holds Command + Control
 on Mac or Control + Left Alt on Windows; release submits one final transcript.
 Microphone selection/ranking/comparison is in Settings. Narration and bundled pets
 are optional. Model requests, transcription and provider narration may incur charges.
