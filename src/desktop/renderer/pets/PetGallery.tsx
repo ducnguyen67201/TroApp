@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import {
   Alert,
   Badge,
@@ -11,10 +11,9 @@ import {
   TextInput,
   Title,
 } from '@mantine/core';
-import { PetAction, PetId, PetMotion, PetReaction, type PetPreferences } from '#contracts/Pet.js';
+import { PetAction, PetId, PetMotion, type PetPreferences } from '#contracts/Pet.js';
 import { useLocale } from '../localization/UseLocale.js';
 import { PetMascot } from './PetMascot.js';
-import { petRenderer } from './PetPresentation.js';
 import { petMessages } from './PetMessages.js';
 import { usePets, type PetView } from './UsePets.js';
 
@@ -31,18 +30,6 @@ function PetCard({ petId, preferences, view }: PetCardProps): ReactElement {
   const { locale } = useLocale();
   const messages = petMessages[locale];
   const [name, setName] = useState(preferences.names[petId]);
-  const [previewReaction, setPreviewReaction] = useState<PetReaction>(PetReaction.IDLE);
-  useEffect(() => {
-    if (previewReaction === PetReaction.IDLE) {
-      return;
-    }
-    const timeout = window.setTimeout(() => {
-      setPreviewReaction(PetReaction.IDLE);
-    }, 800);
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [previewReaction]);
   const isSelected = preferences.activePetId === petId;
   const label = isSelected ? (preferences.enabled ? messages.save : messages.show) : messages.adopt;
   return (
@@ -51,19 +38,6 @@ function PetCard({ petId, preferences, view }: PetCardProps): ReactElement {
         <PetMascot
           petId={petId}
           label={`${messages.pet} ${preferences.names[petId]}`}
-          onPet={() => {
-            setPreviewReaction(PetReaction.HAPPY);
-          }}
-          onSlap={() => {
-            setPreviewReaction(PetReaction.STARTLED);
-          }}
-          reaction={
-            previewReaction !== PetReaction.IDLE
-              ? previewReaction
-              : isSelected
-                ? (view.snapshot?.reaction ?? PetReaction.IDLE)
-                : PetReaction.IDLE
-          }
           reducedMotion={preferences.motion === PetMotion.REDUCED}
         />
       </div>
@@ -134,31 +108,6 @@ export function PetGallery({ accountId }: PetGalleryProps): ReactElement {
             {messages.hint}
           </Text>
           <Group>
-            {petRenderer.supportsControlledReactions(preferences.activePetId) && (
-              <>
-                <Button
-                  variant="default"
-                  disabled={view.isSaving || !view.snapshot?.isVisible}
-                  onClick={() => {
-                    void view.sendCommand({ kind: PetAction.REACT, reaction: PetReaction.HAPPY });
-                  }}
-                >
-                  {messages.pet}
-                </Button>
-                <Button
-                  variant="default"
-                  disabled={view.isSaving || !view.snapshot?.isVisible}
-                  onClick={() => {
-                    void view.sendCommand({
-                      kind: PetAction.REACT,
-                      reaction: PetReaction.STARTLED,
-                    });
-                  }}
-                >
-                  {messages.slap}
-                </Button>
-              </>
-            )}
             <Button
               variant="subtle"
               disabled={view.isSaving || !preferences.enabled}

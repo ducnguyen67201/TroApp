@@ -1,12 +1,40 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { z } from 'zod';
 import {
   createPetPreferences,
+  PetId,
   PetPreferencesSchema,
   type PetPreferences as SavedPetPreferences,
 } from '#contracts/Pet.js';
 import type { PetStore } from './PetController.js';
+
+const LegacyPetId = { ...PetId, SLIME: 'slime' } as const;
+const LegacyPetPreferencesSchema = PetPreferencesSchema.extend({
+  version: z.literal(1),
+  activePetId: z.enum(LegacyPetId),
+  names: PetPreferencesSchema.shape.names.extend({
+    slime: PetPreferencesSchema.shape.names.shape.cat,
+  }),
+});
+
+/** Upgrade only validated version-one files; reading never rewrites the original. */
+function parseSavedPreferences(value: unknown): SavedPetPreferences {
+  const current = PetPreferencesSchema.safeParse(value);
+  if (current.success) {
+    return current.data;
+  }
+  const legacy = LegacyPetPreferencesSchema.parse(value);
+  const hasRemovedPet = legacy.activePetId === LegacyPetId.SLIME;
+  return {
+    ...legacy,
+    version: 2,
+    activePetId: legacy.activePetId === LegacyPetId.SLIME ? PetId.CAT : legacy.activePetId,
+    enabled: legacy.enabled && !hasRemovedPet,
+    names: { cat: legacy.names.cat, fox: legacy.names.fox },
+  };
+}
 
 /** Account identifiers never become paths. Failed reads leave existing files intact. */
 export class PetPreferences implements PetStore {
@@ -16,7 +44,7 @@ export class PetPreferences implements PetStore {
     try {
       const contents = await readFile(this.resolveFile(accountId), 'utf8');
       const value: unknown = JSON.parse(contents);
-      return PetPreferencesSchema.parse(value);
+      return parseSavedPreferences(value);
     } catch (error: unknown) {
       if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
         console.warn('pet.preferences.failed', { stage: 'read' });

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { DesktopLocale, DesktopLocaleSchema } from './DesktopLocale.js';
 
-export const PetId = { CAT: 'cat', FOX: 'fox', SLIME: 'slime' } as const;
+export const PetId = { CAT: 'cat', FOX: 'fox' } as const;
 
 export type PetId = (typeof PetId)[keyof typeof PetId];
 
@@ -50,10 +50,10 @@ export type PetPlacement = z.infer<typeof PetPlacementSchema>;
 
 const PetNameSchema = z.string().trim().min(1).max(40);
 export const PetPreferencesSchema = z.strictObject({
-  version: z.literal(1),
+  version: z.literal(2),
   enabled: z.boolean(),
   activePetId: z.enum(PetId),
-  names: z.strictObject({ cat: PetNameSchema, fox: PetNameSchema, slime: PetNameSchema }),
+  names: z.strictObject({ cat: PetNameSchema, fox: PetNameSchema }),
   quiet: z.boolean(),
   locale: DesktopLocaleSchema,
   motion: z.enum(PetMotion),
@@ -64,10 +64,10 @@ export type PetPreferences = z.infer<typeof PetPreferencesSchema>;
 
 export function createPetPreferences(): PetPreferences {
   return {
-    version: 1,
+    version: 2,
     enabled: false,
     activePetId: PetId.CAT,
-    names: { cat: 'Mochi', fox: 'Maple', slime: 'Jelly' },
+    names: { cat: 'Mochi', fox: 'Maple' },
     quiet: false,
     locale: DesktopLocale.VIETNAMESE,
     motion: PetMotion.SYSTEM,

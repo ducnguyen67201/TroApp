@@ -649,16 +649,20 @@ capture, captures no screen and makes no model request. Generated pets and cloud
 collections are not implemented. `PetPresentation.ts` selects one shared
 `PetRenderer` implementation for the gallery and overlay. The stateless
 `PageMascotRenderer` class adapts the pinned, unmodified `page-mascot` dependency
-for bundled cat/fox direction and reaction sheets; slime retains `PetSprite`.
+for bundled cat/fox direction and reaction sheets. The legacy slime asset and
+renderer have been removed.
 `PetMascot` applies app/OS motion preferences through the renderer contract.
-Provider rendering and supported reaction controls belong to the adapter, so
+Provider rendering belongs to the adapter, so
 switching the implementation in `PetPresentation.ts` requires no gallery or
 overlay provider branches. The package owns click expressions, while Tro owns drag
 suppression, localized accessible names and a static center pose when app or OS
 reduced motion is enabled. Cat/fox reactions are local to the clicked surface;
-remote Pet/Slap controls and right-click reactions remain slime-only. Pointer
+remote Pet/Slap controls and right-click reactions are not exposed. Pointer
 tracking is renderer-local, not desktop-wide. Existing pet IDs, names and saved
-preferences remain compatible. Asset provenance and the MIT notice live in
+preferences are upgraded at the persistence boundary. Version-one files retain
+cat/fox names, placement and settings when loaded as version two; a removed slime
+selection becomes a hidden cat until the user chooses a pet. Reads preserve the
+original file, and the next normal save writes version two. Asset provenance and the MIT notice live in
 `src/desktop/assets/pets/PageMascotLicense.txt`; packaging includes that notice in
 the renderer resources.
 

@@ -1,12 +1,11 @@
 import { useLayoutEffect, useRef, type ReactElement } from 'react';
 import { Mascot } from 'page-mascot';
-import { PetId, PetReaction } from '#contracts/Pet.js';
+import type { PetId } from '#contracts/Pet.js';
 import { petCatalog } from './PetAssets.js';
-import { PetSprite } from './PetSprite.js';
 import type { PetRenderOptions, PetRenderer } from './PetRenderer.js';
 
 interface PageMascotViewProps {
-  petId: Exclude<PetId, typeof PetId.SLIME>;
+  petId: PetId;
   label: string;
   reducedMotion: boolean;
 }
@@ -46,30 +45,11 @@ function PageMascotView({ petId, label, reducedMotion }: PageMascotViewProps): R
   );
 }
 
-/** Stateless adapter for page-mascot and the bundled slime fallback.
+/** Stateless adapter for the bundled page-mascot catalog.
  * Owns provider APIs, assets and accessibility compatibility; never owns IPC or preferences.
  */
 export class PageMascotRenderer implements PetRenderer {
   renderPet(options: PetRenderOptions): ReactElement {
-    if (options.petId === PetId.SLIME) {
-      return (
-        <button
-          type="button"
-          className="pet-mascot-button"
-          aria-label={options.label}
-          onClick={options.onPet}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            options.onSlap?.();
-          }}
-        >
-          <PetSprite
-            reaction={options.reaction ?? PetReaction.IDLE}
-            reducedMotion={options.reducedMotion}
-          />
-        </button>
-      );
-    }
     return (
       <PageMascotView
         petId={options.petId}
@@ -77,9 +57,5 @@ export class PageMascotRenderer implements PetRenderer {
         reducedMotion={options.reducedMotion}
       />
     );
-  }
-
-  supportsControlledReactions(petId: PetId): boolean {
-    return petId === PetId.SLIME;
   }
 }

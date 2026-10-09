@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { createElement, type ReactElement } from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { PetId, PetReaction } from '#contracts/Pet.js';
+import { PetId } from '#contracts/Pet.js';
 import type {
   PetRenderOptions,
   PetRenderer,
@@ -50,38 +50,14 @@ it('follows live system reduced-motion changes and removes its listener', () => 
   expect(removeListener).toHaveBeenCalledWith('change', expect.any(Function));
 });
 
-it('retains slime click and context-menu callbacks', () => {
-  const onPet = vi.fn<() => void>();
-  const onSlap = vi.fn<() => void>();
-  render(
-    createElement(PetMascot, {
-      petId: PetId.SLIME,
-      label: 'Pet Jelly',
-      reducedMotion: false,
-      onPet,
-      onSlap,
-    }),
-  );
-  const button = screen.getByRole('button', { name: 'Pet Jelly' });
-  fireEvent.click(button);
-  fireEvent.contextMenu(button);
-  expect(onPet).toHaveBeenCalledOnce();
-  expect(onSlap).toHaveBeenCalledOnce();
-});
-
 it('switches renderer classes without losing presentation inputs or motion preferences', () => {
   class StillPetRenderer implements PetRenderer {
     renderPet(options: PetRenderOptions): ReactElement {
       return createElement('img', {
         alt: options.label,
         'data-pet-id': options.petId,
-        'data-reaction': options.reaction,
         'data-motion': options.reducedMotion ? 'reduced' : 'system',
       });
-    }
-
-    supportsControlledReactions(): boolean {
-      return false;
     }
   }
 
@@ -91,7 +67,6 @@ it('switches renderer classes without losing presentation inputs or motion prefe
     createElement(PetMascot, {
       petId: PetId.FOX,
       label: 'Pet Maple',
-      reaction: PetReaction.HAPPY,
       reducedMotion: false,
     }),
   );
@@ -101,13 +76,11 @@ it('switches renderer classes without losing presentation inputs or motion prefe
       renderer: new StillPetRenderer(),
       petId: PetId.FOX,
       label: 'Pet Maple',
-      reaction: PetReaction.HAPPY,
       reducedMotion: false,
     }),
   );
   const image = screen.getByRole('img', { name: 'Pet Maple' });
   expect(image.dataset.petId).toBe(PetId.FOX);
-  expect(image.dataset.reaction).toBe(PetReaction.HAPPY);
   expect(image.dataset.motion).toBe('system');
   expect(screen.queryByRole('button')).toBeNull();
   Object.defineProperty(preference, 'matches', { configurable: true, value: true });
