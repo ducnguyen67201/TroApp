@@ -8,6 +8,7 @@ import type {
   LessonRenderer,
   LessonSpeech,
 } from '../../../../src/server/features/guidedLessons/application/LessonPorts.js';
+import { LessonProviderNotDispatchedError } from '../../../../src/server/features/guidedLessons/application/LessonPorts.js';
 import {
   admitLessonRun,
   reserveLessonAttempt,
@@ -703,6 +704,137 @@ describe('guided lesson authorization, learning gates and paid attempt lifecycle
         }),
       ),
     ).rejects.toMatchObject({ code: 'budgetBlocked' });
+  });
+
+  it('measures token usage above the old quotas without interrupting the next attempt', async () => {
+    const store = new MemoryGuidedLessonStore();
+    const record = createStoredLesson();
+    record.run = {
+      id: 'measured-run',
+      day: '2026-10-09',
+      stage: 'rendering',
+      claimId: null,
+      leaseUntil: null,
+      dispatched: false,
+      contentRepairs: 0,
+      visualRepairs: 0,
+      physicalAttempts: 0,
+      inputTokens: 400000,
+      outputTokens: 150000,
+      speechAttempts: 0,
+      speechCharacters: 0,
+      renderRetries: 0,
+    };
+    store.budgets.set('teacher:2026-10-09', {
+      ...createLessonBudget('teacher:2026-10-09'),
+      version: 1,
+      reservations: [
+        {
+          id: 'measured',
+          runId: 'measured-run',
+          lessonId: record.id,
+          stage: 'codingVisuals',
+          input: 0,
+          output: 0,
+          speechCharacters: 0,
+          state: 'settled',
+          actualInput: 400000,
+          actualOutput: 150000,
+        },
+      ],
+    });
+    await store.runAtomically((transaction) =>
+      reserveLessonAttempt(transaction, record, {
+        id: 'next-measured',
+        runId: 'measured-run',
+        lessonId: record.id,
+        stage: 'codingVisuals',
+        input: 0,
+        output: 0,
+        speechCharacters: 0,
+        state: 'dispatched',
+        actualInput: null,
+        actualOutput: null,
+      }),
+    );
+    expect(store.budgets.get('teacher:2026-10-09')?.reservations).toHaveLength(2);
+  });
+
+  it('rejects an unavailable render sandbox before any paid content or speech call', async () => {
+    const fixture = setup();
+    const synthesize = vi.spyOn(fixture.speech, 'synthesize');
+    fixture.renderer.checkReady = vi
+      .fn<NonNullable<LessonRenderer['checkReady']>>()
+      .mockRejectedValue(new LessonProviderNotDispatchedError('Sandbox unavailable.'));
+    const day = await fixture.store.runAtomically((transaction) =>
+      admitLessonRun(transaction, 'teacher', now()),
+    );
+    fixture.record.status = LessonStatus.ADMITTED;
+    fixture.record.run = {
+      id: 'unavailable-render-run',
+      day,
+      stage: LessonStatus.ADMITTED,
+      claimId: null,
+      leaseUntil: null,
+      dispatched: false,
+      contentRepairs: 0,
+      visualRepairs: 0,
+      physicalAttempts: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      speechAttempts: 0,
+      speechCharacters: 0,
+      renderRetries: 0,
+    };
+    await fixture.service.prepareNextLesson();
+    expect(fixture.generate).not.toHaveBeenCalled();
+    expect(synthesize).not.toHaveBeenCalled();
+    expect(fixture.store.lessons.get(fixture.record.id)?.status).toBe(LessonStatus.FAILED);
+    expect(fixture.store.budgets.get(`teacher:${day}`)?.reservations).toEqual([]);
+  });
+
+  it('settles coding-agent usage durably even when rendering fails afterwards', async () => {
+    const fixture = setup();
+    const render = vi.spyOn(fixture.renderer, 'render');
+    render.mockImplementation(async (_request, _signal, lifecycle) => {
+      if (!lifecycle) {
+        throw new Error('No coding-agent accounting lifecycle.');
+      }
+      await lifecycle.beforeModelCall('coding-request');
+      await lifecycle.afterModelCall('coding-request', { inputTokens: 15000, outputTokens: 2000 });
+      throw new Error('Synthetic encoding failure after provider response.');
+    });
+    const day = await fixture.store.runAtomically((transaction) =>
+      admitLessonRun(transaction, 'teacher', now()),
+    );
+    fixture.record.status = LessonStatus.RENDERING;
+    fixture.record.speech = [];
+    fixture.record.run = {
+      id: 'render-run',
+      day,
+      stage: LessonStatus.RENDERING,
+      claimId: null,
+      leaseUntil: null,
+      dispatched: false,
+      contentRepairs: 0,
+      visualRepairs: 0,
+      physicalAttempts: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      speechAttempts: 0,
+      speechCharacters: 0,
+      renderRetries: 0,
+    };
+    await fixture.service.prepareNextLesson();
+    expect(fixture.store.lessons.get(fixture.record.id)).toMatchObject({
+      status: LessonStatus.FAILED,
+      run: { inputTokens: 15000, outputTokens: 2000, graphicsAttempts: 1, dispatched: false },
+    });
+    expect(fixture.store.budgets.get(`teacher:${day}`)?.reservations[0]).toMatchObject({
+      state: 'settled',
+      actualInput: 15000,
+      actualOutput: 2000,
+    });
   });
 
   it('hashes bounded JSON independently of object insertion order', () => {

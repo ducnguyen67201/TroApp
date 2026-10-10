@@ -483,8 +483,19 @@ export function buildLessonProjection(input: BuildLessonProjectionInput): Learne
   );
   const figureId =
     presentation.kind === LessonTemplateKind.CODE_TRACE ? null : presentation.figure?.assetId;
+  const video = manifest.evidence.filter(
+    (item) => item.kind === 'clip' && item.sceneId === scene.sceneId && item.phase === phase,
+  );
+  if (video.length > 1) {
+    throw new Error('A lesson phase must have one exact approved video.');
+  }
+  const videoArtifactId = video[0]?.artifactId;
   const allowedArtifactIds = [
-    ...new Set([...narrationCues.map((cue) => cue.artifactId), ...(figureId ? [figureId] : [])]),
+    ...new Set([
+      ...narrationCues.map((cue) => cue.artifactId),
+      ...(figureId ? [figureId] : []),
+      ...(videoArtifactId ? [videoArtifactId] : []),
+    ]),
   ];
   const checkpointState =
     checkpoint && progress.independent.includes(checkpoint.checkpointId)
@@ -523,6 +534,7 @@ export function buildLessonProjection(input: BuildLessonProjectionInput): Learne
     phase,
     visibleTraceStates: states,
     narrationCues,
+    ...(videoArtifactId ? { videoArtifactId } : {}),
     allowedArtifactIds,
     checkpoint: checkpoint
       ? {

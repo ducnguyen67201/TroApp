@@ -229,15 +229,27 @@ export class LessonGeneration {
       controller: signalController,
       runId: record.run?.id ?? null,
     });
-    const deadline = setTimeout(() => {
-      signalController.abort();
-    }, LessonPolicy.DEADLINE_MS);
+    const deadline = setTimeout(
+      () => {
+        signalController.abort();
+      },
+      stage === LessonStatus.RENDERING
+        ? LessonPolicy.GRAPHICS_DEADLINE_MS
+        : LessonPolicy.DEADLINE_MS,
+    );
     deadline.unref();
     let claimed: LessonRecord | null = null;
     let attemptId: string | null = null;
     let paid = false;
     let heartbeat: ReturnType<typeof setInterval> | null = null;
     try {
+      if (
+        record.status === LessonStatus.ADMITTED ||
+        record.status === LessonStatus.SYNTHESIZING ||
+        record.status === LessonStatus.RENDERING
+      ) {
+        await this.renderer.checkReady?.(signalController.signal);
+      }
       const request = isModelStage(stage) ? await this.buildModelRequest(record, stage) : null;
       const inputTokens = request
         ? await this.model.countInput(request, signalController.signal)
@@ -375,6 +387,87 @@ export class LessonGeneration {
             adjustments: claimed.adjustments,
           },
           signalController.signal,
+          {
+            beforeModelCall: async (codingAttemptId) => {
+              await this.store.runAtomically(async (store) => {
+                const current = await store.readLesson(record.id);
+                if (
+                  !current?.run ||
+                  current.run.claimId !== claimed?.run?.claimId ||
+                  !current.run.leaseUntil ||
+                  new Date(current.run.leaseUntil) <= this.now() ||
+                  current.status !== LessonStatus.RENDERING ||
+                  signalController.signal.aborted
+                ) {
+                  throw new LessonError(LessonFailure.STALE);
+                }
+                const access = await store.readAccess(current.teacherId, current.classId);
+                if (!access?.isTeacher) {
+                  throw new LessonError(LessonFailure.FORBIDDEN);
+                }
+                if ((current.run.graphicsAttempts ?? 0) >= 256) {
+                  throw new LessonError(LessonFailure.BUDGET);
+                }
+                await reserveLessonAttempt(store, current, {
+                  id: codingAttemptId,
+                  runId: current.run.id,
+                  lessonId: current.id,
+                  stage: 'codingVisuals',
+                  input: 0,
+                  output: 0,
+                  speechCharacters: 0,
+                  state: LessonReservationState.DISPATCHED,
+                  actualInput: null,
+                  actualOutput: null,
+                });
+                await store.saveLesson(
+                  {
+                    ...current,
+                    version: current.version + 1,
+                    run: {
+                      ...current.run,
+                      dispatched: true,
+                      graphicsAttempts: (current.run.graphicsAttempts ?? 0) + 1,
+                    },
+                  },
+                  current.version,
+                );
+              });
+              attemptId = codingAttemptId;
+              paid = true;
+            },
+            afterModelCall: async (codingAttemptId, reportedUsage) => {
+              const usage = LessonProviderUsageSchema.safeParse(reportedUsage);
+              await this.store.runAtomically((store) =>
+                settleLessonAttempt(
+                  store,
+                  record.teacherId,
+                  claimed?.run?.day ?? '',
+                  codingAttemptId,
+                  usage.success ? usage.data : null,
+                ),
+              );
+              paid = false;
+              if (!usage.success) {
+                throw new LessonError(LessonFailure.UNCERTAIN);
+              }
+              await this.recordUsage(claimed ?? record, usage.data);
+              await this.store.runAtomically(async (store) => {
+                const current = await store.readLesson(record.id);
+                if (!current?.run || current.run.claimId !== claimed?.run?.claimId) {
+                  return;
+                }
+                await store.saveLesson(
+                  {
+                    ...current,
+                    version: current.version + 1,
+                    run: { ...current.run, dispatched: false },
+                  },
+                  current.version,
+                );
+              });
+            },
+          },
         );
         const manifest = RenderManifestSchema.parse(rendered.manifest);
         if (

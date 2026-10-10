@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { LessonPlanSchema } from '#contracts/GuidedLessons.js';
+import { LessonPlanSchema, TraceOperation } from '#contracts/GuidedLessons.js';
 import {
   readCheckpointAnswer,
   validateLessonInput,
@@ -28,6 +28,32 @@ it('blocks stale source identity and fabricated event IDs', () => {
   const issues = validateLessonPlan(input, plan);
   expect(issues.some((issue) => issue.criterion === 'sourceSupport')).toBe(true);
   expect(issues.some((issue) => issue.criterion === 'traceCorrectness')).toBe(true);
+});
+
+it('requires an exact narration cue for a displayed intermediate binding event', () => {
+  const { input, plan } = createLessonFixture();
+  const scene = plan.scenes.find((candidate) => candidate.sceneId === 'continue');
+  const bindingEvent = input.traces[0]?.events.find(
+    (event) =>
+      event.operation === TraceOperation.BIND_ITEM &&
+      scene?.narration.some((beat) => beat.traceEventId === event.eventId),
+  );
+  if (!scene || scene.kind !== 'codeTrace' || !bindingEvent) {
+    throw new Error('Fixture continuation binding absent.');
+  }
+  scene.narration = scene.narration.filter((beat) => beat.traceEventId !== bindingEvent.eventId);
+  expect(validateLessonPlan(input, plan)).toMatchObject([
+    {
+      criterion: 'timeline',
+      sceneId: scene.sceneId,
+      observed: 'A visible trace event has no approved narration cue.',
+    },
+  ]);
+
+  scene.params.traceEventIds = scene.params.traceEventIds.filter(
+    (eventId) => eventId !== bindingEvent.eventId,
+  );
+  expect(validateLessonPlan(input, plan)).toEqual([]);
 });
 
 it('rejects out-of-range approval citations before model admission', () => {

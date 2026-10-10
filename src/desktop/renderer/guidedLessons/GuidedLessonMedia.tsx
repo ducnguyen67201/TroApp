@@ -46,7 +46,7 @@ export function readNeededLessonArtifacts(projection: LearnerProjection, frame: 
     : [currentCue?.artifactId, nextCue?.artifactId];
   return [
     ...new Set(
-      wanted.filter(
+      [...wanted, projection.videoArtifactId].filter(
         (artifactId): artifactId is string =>
           artifactId !== undefined && projection.allowedArtifactIds.includes(artifactId),
       ),
@@ -246,7 +246,9 @@ export function GuidedLessonMedia({
   );
   const sourceAssets = Object.fromEntries(
     currentArtifacts
-      .filter((artifact) => artifact.mimeType.startsWith('image/'))
+      .filter(
+        (artifact) => artifact.mimeType.startsWith('image/') || artifact.mimeType === 'video/mp4',
+      )
       .map((artifact) => [artifact.artifactId, artifact.url]),
   );
   const renderPlayer = (): ReactElement => (

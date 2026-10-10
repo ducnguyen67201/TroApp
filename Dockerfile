@@ -10,10 +10,15 @@ COPY prisma.config.ts tsconfig.json tsconfig.server.json ./
 RUN ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install --frozen-lockfile
 COPY src/server ./src/server
 COPY src/contracts ./src/contracts
+COPY src/transport ./src/transport
 COPY src/lessonMedia ./src/lessonMedia
 COPY scripts/BuildLessonBundle.ts scripts/LessonPresentationIdentity.ts ./scripts/
 COPY .prettierrc.json ./
 RUN pnpm db:generate && pnpm build:api && pnpm prune --prod
+
+FROM build AS lesson-renderer
+USER node
+ENTRYPOINT ["node", "dist/server/features/guidedLessons/infrastructure/RenderGeneratedLessonWorker.js"]
 
 FROM base AS runtime
 WORKDIR /app

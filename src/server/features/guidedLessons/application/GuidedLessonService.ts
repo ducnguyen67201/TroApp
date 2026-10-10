@@ -72,7 +72,8 @@ function detailLesson(record: LessonRecord): GuidedLessonReply {
         inputTokens: record.run?.inputTokens ?? 0,
         outputTokens: record.run?.outputTokens ?? 0,
         totalTokens: (record.run?.inputTokens ?? 0) + (record.run?.outputTokens ?? 0),
-        generationAttempts: record.run?.physicalAttempts ?? 0,
+        generationAttempts:
+          (record.run?.physicalAttempts ?? 0) + (record.run?.graphicsAttempts ?? 0),
         speechCharacters: record.run?.speechCharacters ?? 0,
         speechSeconds: record.speech.reduce((sum, item) => sum + item.durationMs / 1000, 0),
         artifactBytes: record.speech.reduce((sum, item) => sum + item.byteLength, 0),

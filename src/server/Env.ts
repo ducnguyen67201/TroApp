@@ -16,6 +16,8 @@ export interface ServerEnv {
   CLASSROOM_INSIGHT_COLLECTION_POLICY?: string | undefined;
   CLASSROOM_INSIGHT_RETENTION_DAYS?: number | undefined;
   GUIDED_LESSON_MODEL: string;
+  GUIDED_LESSON_CODING_MODEL: string;
+  GUIDED_LESSON_RENDER_IMAGE: string;
   GUIDED_LESSON_SPEECH_MODEL: string;
   GUIDED_LESSON_SPEECH_VOICE: string;
   PRACTICE_CHECK_MODEL?: string;
@@ -55,6 +57,11 @@ export function readServerEnv(environment: NodeJS.ProcessEnv): ServerEnv {
         .default('classroom-learning-v1'),
       CLASSROOM_INSIGHT_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(180),
       GUIDED_LESSON_MODEL: z.string().min(1).max(100).default('gpt-5.4'),
+      GUIDED_LESSON_CODING_MODEL: z.string().min(1).max(100).default('gpt-5.4'),
+      GUIDED_LESSON_RENDER_IMAGE: z
+        .string()
+        .regex(/^[a-z0-9][a-zA-Z0-9./:@_-]{0,199}$/)
+        .default('tro-lesson-renderer:local'),
       GUIDED_LESSON_SPEECH_MODEL: z.string().min(1).max(100).default('gpt-4o-mini-tts'),
       GUIDED_LESSON_SPEECH_VOICE: z
         .enum([

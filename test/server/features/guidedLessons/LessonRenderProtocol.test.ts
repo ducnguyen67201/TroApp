@@ -30,6 +30,8 @@ it.each([
   { y: 1000, height: 100 },
   { scrollWidth: 803 },
   { scrollHeight: 103 },
+  { clippedWidth: 3 },
+  { clippedHeight: 3 },
 ])('rejects essential clipping, overflow, or small text', (change) => {
   expect(() => validateLessonGeometry([{ ...Box, ...change }])).toThrow('clipped or below');
 });
@@ -39,6 +41,16 @@ it('rejects missing, malformed, and unbounded geometry evidence', () => {
   expect(() => validateLessonGeometry([{ ...Box, fontPx: NaN }])).toThrow();
   expect(() => validateLessonGeometry(Array.from({ length: 101 }, () => Box))).toThrow();
   expect(() => validateLessonGeometry([{ ...Box, html: '<script>' }])).toThrow();
+  expect(() => validateLessonGeometry([{ ...Box, clippedWidth: -1 }])).toThrow();
+  expect(() =>
+    validateLessonGeometry([{ ...Box, clippedHeight: Number.POSITIVE_INFINITY }]),
+  ).toThrow();
+});
+
+it('preserves older measurements and accepts ancestor clipping only within the existing tolerance', () => {
+  expect(validateLessonGeometry([Box])).toEqual([Box]);
+  const geometry = [{ ...Box, clippedWidth: 2, clippedHeight: 2 }];
+  expect(validateLessonGeometry(geometry)).toEqual(geometry);
 });
 
 it('accepts only typed bounded render inputs rather than arbitrary script or remote URLs', () => {

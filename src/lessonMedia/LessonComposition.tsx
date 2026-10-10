@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import {
   AbsoluteFill,
   Html5Audio,
+  Html5Video,
   Img,
   Sequence,
   getRemotionEnvironment,
@@ -91,6 +92,32 @@ export function LessonComposition({
   );
   const firstLine = Math.max(0, Math.min(activeIndex - 3, (code?.lines.length ?? 0) - 8));
   const isVietnamese = /[ăâđêôơưạảấầệịọộớờự]/i.test(projection.sceneTitle + caption);
+  const video = projection.videoArtifactId ? sourceAssets[projection.videoArtifactId] : undefined;
+  if (projection.videoArtifactId) {
+    return (
+      <AbsoluteFill style={{ background: '#f6f3eb' }}>
+        {video && (
+          <Html5Video
+            src={video}
+            muted
+            pauseWhenBuffering
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          />
+        )}
+        {projection.narrationCues.map((cue) =>
+          audioSources[cue.artifactId] ? (
+            <Sequence
+              key={cue.cueId}
+              from={cue.startFrame}
+              durationInFrames={cue.endFrame - cue.startFrame}
+            >
+              <Html5Audio src={audioSources[cue.artifactId]} pauseWhenBuffering />
+            </Sequence>
+          ) : null,
+        )}
+      </AbsoluteFill>
+    );
+  }
   return (
     <AbsoluteFill
       className="tro-lesson-canvas"

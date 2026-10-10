@@ -55,7 +55,7 @@ export const LessonRenderResultSchema = z.strictObject({
         phase: z.enum(LessonPhase).nullable(),
       }),
     )
-    .max(32),
+    .max(64),
 });
 
 export const LessonGeometrySchema = z
@@ -70,6 +70,8 @@ export const LessonGeometrySchema = z
       clientWidth: z.number(),
       scrollHeight: z.number(),
       clientHeight: z.number(),
+      clippedWidth: z.number().nonnegative().optional(),
+      clippedHeight: z.number().nonnegative().optional(),
     }),
   )
   .min(1)
@@ -86,7 +88,9 @@ export function validateLessonGeometry(raw: unknown): z.infer<typeof LessonGeome
         box.x + box.width > 1921 ||
         box.y + box.height > 1081 ||
         box.scrollWidth > box.clientWidth + 2 ||
-        box.scrollHeight > box.clientHeight + 2,
+        box.scrollHeight > box.clientHeight + 2 ||
+        (box.clippedWidth ?? 0) > 2 ||
+        (box.clippedHeight ?? 0) > 2,
     )
   ) {
     throw new Error('Essential lesson content is clipped or below the minimum readable size.');

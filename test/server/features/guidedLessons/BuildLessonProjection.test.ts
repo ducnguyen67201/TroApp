@@ -145,3 +145,33 @@ it('restores a bounded server cursor and reflects on the final authorized state'
   expect(reflection.visibleTraceStates[0]?.stateView).toBe('after');
   expect(reflection.visibleTraceStates[0]?.output).toBe(12);
 });
+
+it('allows only the approved video for the current scene and phase', () => {
+  const fixture = createLessonFixture();
+  const manifest = fixture.record.manifest;
+  if (!manifest) {
+    throw new Error('Fixture manifest absent.');
+  }
+  const evidence = (artifactId: string, phase: 'predict' | 'worked') => ({
+    evidenceId: `evidence-${artifactId}`,
+    artifactId,
+    kind: 'clip' as const,
+    digest: 'a'.repeat(64),
+    sceneId: 'predict',
+    phase,
+    frame: null,
+  });
+  manifest.evidence.push(evidence('pending-video', 'predict'), evidence('worked-video', 'worked'));
+  const pending = buildLessonProjection({ ...fixture, sceneId: 'predict' });
+  expect(pending.videoArtifactId).toBe('pending-video');
+  expect(pending.allowedArtifactIds).toContain('pending-video');
+  expect(pending.allowedArtifactIds).not.toContain('worked-video');
+  fixture.progress.revealed.push('checkpoint-1');
+  const worked = buildLessonProjection({ ...fixture, sceneId: 'predict' });
+  expect(worked.videoArtifactId).toBe('worked-video');
+  expect(worked.allowedArtifactIds).not.toContain('pending-video');
+  manifest.evidence.push(evidence('ambiguous-worked-video', 'worked'));
+  expect(() => buildLessonProjection({ ...fixture, sceneId: 'predict' })).toThrow(
+    'one exact approved video',
+  );
+});

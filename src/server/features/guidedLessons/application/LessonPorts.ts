@@ -88,7 +88,18 @@ export interface LessonSpeech {
   }>;
 }
 
+/** Reserves and settles every coding-agent request independently of render completion. */
+export interface LessonRenderLifecycle {
+  beforeModelCall(attemptId: string): Promise<void>;
+  afterModelCall(
+    attemptId: string,
+    usage: { inputTokens: number; outputTokens: number } | null,
+  ): Promise<void>;
+}
+
 export interface LessonRenderer {
+  /** Validate execution prerequisites before the first paid content request. */
+  checkReady?(signal: AbortSignal): Promise<void>;
   render(
     request: {
       revisionId: string;
@@ -99,5 +110,6 @@ export interface LessonRenderer {
       adjustments: RenderAdjustments | null;
     },
     signal: AbortSignal,
+    lifecycle?: LessonRenderLifecycle,
   ): Promise<{ manifest: RenderManifest; artifacts: LessonMediaArtifact[] }>;
 }

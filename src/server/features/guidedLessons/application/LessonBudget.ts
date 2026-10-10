@@ -8,13 +8,8 @@ import {
 import { LessonError, LessonFailure } from './LessonFailure.js';
 
 export const LessonPolicy = {
-  RUN_INPUT: 90000,
-  RUN_OUTPUT: 30000,
   RUN_ATTEMPTS: 7,
   DAY_RUNS: 5,
-  DAY_INPUT: 300000,
-  DAY_OUTPUT: 100000,
-  DAY_SPEECH_CHARACTERS: 20000,
   RUN_SPEECH_CHARACTERS: 6000,
   RUN_SPEECH_ATTEMPTS: 24,
   MAX_ARTIFACT_BYTES: 16777216,
@@ -22,6 +17,7 @@ export const LessonPolicy = {
   LEASE_MS: 60000,
   HEARTBEAT_MS: 15000,
   DEADLINE_MS: 600000,
+  GRAPHICS_DEADLINE_MS: 1800000,
 } as const;
 
 export const StageAllowance = {
@@ -36,29 +32,6 @@ export const StageAllowance = {
 
 export function createLessonBudget(id: string): LessonBudget {
   return { id, version: 0, runs: 0, helpRequests: 0, helpTimes: [], reservations: [] };
-}
-
-function countReserved(budget: LessonBudget): {
-  input: number;
-  output: number;
-  characters: number;
-} {
-  return budget.reservations.reduce(
-    (total, item) => ({
-      input:
-        total.input +
-        (item.state === LessonReservationState.SETTLED
-          ? (item.actualInput ?? item.input)
-          : item.input),
-      output:
-        total.output +
-        (item.state === LessonReservationState.SETTLED
-          ? (item.actualOutput ?? item.output)
-          : item.output),
-      characters: total.characters + item.speechCharacters,
-    }),
-    { input: 0, output: 0, characters: 0 },
-  );
 }
 
 export async function admitLessonRun(
@@ -86,7 +59,7 @@ export async function admitLessonRun(
   return day;
 }
 
-/** Called only in the stage-claim transaction. Unknown usage remains conservatively reserved. */
+/** Tracks attempts for measurement. Uncertain paid outcomes block replay, not measured token totals. */
 export async function reserveLessonAttempt(
   store: GuidedLessonStore,
   record: LessonRecord,
@@ -97,22 +70,7 @@ export async function reserveLessonAttempt(
   }
   const id = `${record.teacherId}:${record.run.day}`;
   const budget = (await store.readBudget(id)) ?? createLessonBudget(id);
-  const totals = countReserved(budget);
-  if (
-    budget.reservations.some((item) => item.state === LessonReservationState.UNCERTAIN) ||
-    totals.input + reservation.input > LessonPolicy.DAY_INPUT ||
-    totals.output + reservation.output > LessonPolicy.DAY_OUTPUT ||
-    totals.characters + reservation.speechCharacters > LessonPolicy.DAY_SPEECH_CHARACTERS
-  ) {
-    throw new LessonError(LessonFailure.BUDGET);
-  }
-  const runItems = budget.reservations.filter((item) => item.runId === record.run?.id);
-  const runBudget = countReserved({ ...budget, reservations: runItems });
-  if (
-    runBudget.input + reservation.input > LessonPolicy.RUN_INPUT ||
-    runBudget.output + reservation.output > LessonPolicy.RUN_OUTPUT ||
-    runBudget.characters + reservation.speechCharacters > LessonPolicy.RUN_SPEECH_CHARACTERS
-  ) {
+  if (budget.reservations.some((item) => item.state === LessonReservationState.UNCERTAIN)) {
     throw new LessonError(LessonFailure.BUDGET);
   }
   await store.saveBudget(

@@ -146,17 +146,56 @@ phase and evidence item, then approve and release it. Enrolled students can stud
 at home, answer formative questions, request help and keep private anchored notes.
 Explicit student requests enter the teacher queue without generating media.
 
-Generation needs the backend `OPENAI_API_KEY`; model/speech settings are validated
-in [Env.ts](src/server/Env.ts), and bounded allowances live in
-[LessonBudget.ts](src/server/features/guidedLessons/application/LessonBudget.ts).
-There is no feature flag. Missing provider configuration leaves the navigation and
-library available with an explicit generation failure. `pnpm dev:api` and
-`pnpm build:api` package the trusted Remotion composition, fonts and render browser;
-the first build downloads pinned Chrome for Testing for isolated rendering. `pnpm build` packages the
-matching desktop. Desktop builds also regenerate the matching presentation identity. The Dockerfile includes rendering libraries.
-Use a Linux backend with a container memory limit in addition to the render watchdog.
-No paid provider calls are needed for validation. The beta publishes interactive
-narrated lessons, with no MP4 export or arbitrary-code execution.
+Generation needs the backend `OPENAI_API_KEY`. After script approval, a Remotion
+coding agent writes a TSX scene for each authorized lesson phase, renders previews,
+receives actual images and geometry, revises its code and produces silent MP4 clips.
+The desktop plays those clips with the separately approved narration. Generated
+source never executes in Electron or on the API host. Reflection uses the trusted
+static presentation. There is no feature flag or template fallback on agent failure.
+
+Build the isolated Linux render image before generation or the manual benchmark:
+
+```sh
+docker build --platform linux/amd64 --target lesson-renderer -t tro-lesson-renderer:local .
+```
+
+The API host needs Docker CLI/daemon access to launch this image; running only the
+API container does not supply a render worker. The current Railway runtime lacks
+that service; production generation requires a Docker-capable backend host. A
+readiness check fails before paid content or speech calls when the sandbox is
+unavailable. The generated-code container has no network, credentials or Docker
+socket, a read-only root, non-root user, dropped capabilities and hard memory/CPU/PID/tmpfs bounds. The trusted API may launch only
+this fixed render protocol. Model/image/speech settings are validated in
+[Env.ts](src/server/Env.ts). `GUIDED_LESSON_CODING_MODEL` selects the coding model;
+`GUIDED_LESSON_RENDER_IMAGE` selects the locally built image. Neither setting is a
+feature flag. `pnpm dev:api` and `pnpm build:api` still package the shared playback
+composition and pinned fonts/browser; desktop builds regenerate its presentation
+identity. Builds download pinned Chrome for Testing when absent.
+
+Run a **paid manual generation benchmark** using synthetic course material, no
+real accounts/database, and no student release:
+
+```sh
+doppler run --project tro-api --config dev_personal -- pnpm benchmark:guided-lesson --language en --seconds 30 --runs 1
+```
+
+Choose the intended development Doppler config. The benchmark preflights the render
+image before provider calls, saves the generated script, makes a labelled
+benchmark-only script approval and stops at the private preview. Reports and source,
+audio, PNG, geometry and video artifacts remain under
+`.tro-development/guided-lesson-benchmark/`. It measures actual text/vision/coding
+usage (including cache/reasoning details when reported), speech characters/duration,
+render time, repairs and failures. These are measurement units for pricing; one run
+is not a representative pricing sample. The benchmark never silently retries a
+paid run. EN/VI, source size and repair cases need separate samples.
+
+Cumulative token totals do not interrupt generation while pricing is being
+measured. Unknown provider outcomes still block duplicate dispatch; daily admission,
+per-call output/context, turn/repair, lesson length and execution resource bounds
+remain owned by [LessonBudget.ts](src/server/features/guidedLessons/application/LessonBudget.ts)
+and the coding-agent/sandbox adapters. Automated validation uses synthetic providers
+and does not need credentials or open paid jobs. Build the render image before
+`pnpm test:integration` to exercise generated-code isolation and real MP4 rendering.
 
 ## Validation
 

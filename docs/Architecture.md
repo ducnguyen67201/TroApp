@@ -674,104 +674,149 @@ future scopes that require measured demand and their own validation. A real cent
 
 ## Guided lessons beta
 
-Guided Lessons is an always available navbar destination, labelled **Guided lessons
-(Beta)** / **Bài giảng hướng dẫn (Thử nghiệm)**. No flag or class allowlist gates it.
-The implemented creation scope is deliberately small: approved course passages and
-teacher confirmed Python integer accumulator examples, optionally with a separately
-approved input variant for Try. It does not turn arbitrary lectures or executable
-programs into videos. Figure contracts exist for future qualification, but figure
-creation is not admitted by this beta. A live classroom session or device lease is
-not required for home study.
+Guided Lessons is always available as **Guided lessons (Beta)** / **Bài giảng hướng
+dẫn (Thử nghiệm)**. No feature flag or class allowlist gates it. Teachers select
+approved passages and confirm a restricted Python integer running-total example,
+optionally a separate practice input. Students can study released lessons without
+a live classroom session. This scope does not support arbitrary lectures or code.
 
 ```mermaid
-flowchart LR
-  Sources[Approved publication and corrections] --> Draft[Bounded structured draft]
-  Draft --> Review[Validation and content review]
-  Review --> Script[Teacher script approval]
-  Script --> Speech[Persist exact speech beats]
-  Speech --> Render[Trusted Remotion presentation]
-  Render --> Visual[Rendered evidence and visual review]
-  Visual --> Preview[Teacher preview approval]
+flowchart TD
+  Source[Approved publication and confirmed code] --> Draft[AI content author and review]
+  Draft --> Script[Teacher script approval]
+  Script --> Speech[Persist exact narration]
+  Speech --> Agent[Remotion coding agent]
+  Agent --> Write[Write TSX for one authorized phase]
+  Write --> Sandbox[Isolated container renders preview]
+  Sandbox --> Inspect[Agent sees images and geometry]
+  Inspect -->|Revise| Write
+  Inspect --> Clip[Render MP4 phase clip]
+  Clip --> Review[Independent visual review]
+  Review --> Preview[Teacher previews exact video and narration]
   Preview --> Release[Immutable class release]
-  Release --> Player[Authorized phase player and private notes]
+  Release --> Player[Phase-gated video playback and private notes]
 ```
 
-[GuidedLessons.ts](../src/contracts/GuidedLessons.ts) owns the public schemas.
+[GuidedLessons.ts](../src/contracts/GuidedLessons.ts) owns strict public schemas.
 [GuidedLessonService.ts](../src/server/features/guidedLessons/application/GuidedLessonService.ts)
-owns class/enrollment authorization, idempotent commands, version checks, approvals,
-release availability, formative attempts and private notebook anchors. PostgreSQL
-stores validated aggregate JSON with indexed identities, versions and leases;
-immutable release snapshots and binary artifacts have separate Prisma records.
-Serializable transactions combine authorization and state mutations. This keeps
-the workflow inside the modular monolith without a new queue or service.
+owns teacher/enrollment authorization, idempotent commands, revisions, approvals,
+releases, deterministic checkpoints and private notes. Prisma adapters persist
+validated aggregate JSON, immutable releases, artifacts and attempt ledgers with
+serializable authorization/state transactions. This remains one modular monolith.
 
 [BuildLessonInput.ts](../src/server/features/guidedLessons/application/BuildLessonInput.ts)
-selects material from an immutable approved publication. Teacher page and document
-corrections remain separate citable entries with their own UTF-16 ranges and text
-digests; they never overwrite source text. The restricted
-[CompileAccumulator.ts](../src/server/features/guidedLessons/domain/CompileAccumulator.ts)
-calculates every trace state without executing Python. Semantic validation checks
-source ranges, compiler output, qualified templates, checkpoint references and
-approved practice variants. Generated TypeScript, JSX, arbitrary code, remote asset
-URLs and renderer bundles are never accepted as model output.
+selects immutable approved material. Published page/document corrections remain
+separate citable entries with their own UTF-16 ranges and digests; private notes
+never enter generation. [CompileAccumulator.ts](../src/server/features/guidedLessons/domain/CompileAccumulator.ts)
+calculates canonical trace states without executing Python. Content validation
+checks citations, exact code/traces, checkpoints and approved practice variants.
 
-[LessonGeneration.ts](../src/server/features/guidedLessons/application/LessonGeneration.ts)
-advances one durable stage at a time. It allows at most one content repair and one
-presentation repair. Saving script edits invalidates approvals and requires an
-explicit new review run; it never starts a model request implicitly.
-[LessonBudget.ts](../src/server/features/guidedLessons/application/LessonBudget.ts)
-owns physical attempt and token/character limits, reserved before dispatch. Provider
-usage settles even after an obsolete claim loses ownership. A lost dispatched
-request becomes uncertain and is not automatically replayed. Speech attempts are
-separate from content/vision calls. Help has a separate student allowance; replay,
-notes and deterministic grading do not invoke a model.
-
+[GuidedLessonRunner.ts](../src/server/features/guidedLessons/application/GuidedLessonRunner.ts)
+wakes one durable job stage. [LessonGeneration.ts](../src/server/features/guidedLessons/application/LessonGeneration.ts)
+advances content author/review/one repair, teacher script approval, speech, coding
+agent rendering, visual review/one repair and exact preview approval. Saving script
+edits invalidates dependent approvals and needs an explicit new review run. Speech
+is persisted per exact approved beat; decoded sample duration determines cue timing.
 [LessonPrompts.ts](../src/server/features/guidedLessons/infrastructure/LessonPrompts.ts)
-contains versioned author, critic, repair, visual critic, visual repair, contextual
-help and English/Vietnamese narration prompts with digests. Provider adapters
-count the same structured input they dispatch and disable SDK retries. Source text
-is untrusted data. Exact approved narration is persisted per beat before rendering;
-its decoded PCM sample duration sets the frame clock. Presentation repairs may
-change only qualified layout, caption slots and bounded holds/update delays.
+owns content/review/help/narration prompts. These content stages return structured
+data; only the separate coding agent writes rendering source.
 
-[LessonComposition.tsx](../src/lessonMedia/LessonComposition.tsx) is shared by
-Remotion Player and the backend renderer. Pinned Noto font bytes and trusted source
-identity are recorded in the manifest; a mismatched desktop asks for an update.
-[BuildLessonBundle.ts](../scripts/BuildLessonBundle.ts) packages the trusted
-composition and pinned Chrome for Testing for the backend build. A credential-free child
-renders actual PNG evidence and geometry for phase/cue samples. Essential text
-must fit its region at the qualified canvas/player scale. The renderer admits one
-child per API instance, bounds payload/output, sets a Node heap limit, monitors the
-worker/Chromium process tree against a resident-memory ceiling and terminates it on
-abort/deadline. The memory watchdog samples once per second; a production container
-memory limit remains the hard OS boundary. Backend rendering targets Linux/macOS;
-Windows desktop playback uses the same bundled presentation.
+[RemotionLessonAgent.ts](../src/server/features/guidedLessons/infrastructure/RemotionLessonAgent.ts)
+is the actual tool-using coding agent. Its versioned instructions live in
+[RemotionAgentPrompts.ts](../src/server/features/guidedLessons/infrastructure/RemotionAgentPrompts.ts).
+For each scene/phase it receives a safe projection, writes a React/Remotion component,
+renders previews, receives actual PNGs and geometry, revises and renders a silent
+MP4. Tools accept source or bounded frame selections, never arbitrary filesystem
+paths, commands, URLs, packages or infrastructure settings. Turn/deadline limits
+bound execution. Provider retries are disabled. Changing source invalidates previous
+preview/video evidence; a clip belongs to the current source digest.
+[RemotionModelFetch.ts](../src/server/features/guidedLessons/infrastructure/RemotionModelFetch.ts)
+uses matching Undici fetch/Agent instances with a fresh private pool for each coding
+request over IPv4 with certificate verification enabled. This avoids the IPv6 route
+that returned a TLS bad-record-MAC alert in a manual trial; it does not establish
+the alert's network or provider cause. The transport buffers the nonstreaming
+response before closing that pool, preventing socket reuse across long render gaps
+or other provider calls without retrying a failed dispatch. Test fetch injection
+remains explicit.
 
-Machine image review does not certify pronunciation or continuous motion. Teachers
-must inspect pending and worked checkpoint phases, evidence, and actual audio/video
-playback before approving the exact manifest and releasing it. This is a qualified
-interactive presentation with narration; the beta does not export a single MP4.
-The published artifact is the immutable plan, speech and frame timeline used by the
-player. A failed graphics or provider stage remains visible for explicit revision.
+[DockerLessonCodeSandbox.ts](../src/server/features/guidedLessons/infrastructure/DockerLessonCodeSandbox.ts)
+launches a fixed [RenderGeneratedLessonWorker.ts](../src/server/features/guidedLessons/infrastructure/RenderGeneratedLessonWorker.ts)
+inside a separately built Linux image. Generated code compiles and executes only
+there. The container has no network, provider credentials or Docker socket, a
+read-only root, non-root user, dropped capabilities, and hard memory/CPU/PID/tmpfs
+bounds. Its inputs contain only one phase projection and source. The host reads
+bounded fixed output filenames through a descriptor-checked container reader,
+confirms container termination, then removes temporary files. A container-side
+deadline also ends detached work if the API worker disconnects. Docker access belongs
+to the trusted API host; the API image alone is not a generated-code isolation service. The current
+Railway runtime requires a Docker-capable generation host before production use.
+Before the initial paid content dispatch, renderer readiness checks the provider,
+presentation identity and local sandbox image. Setup is owned by README.md. No
+generated source is imported into backend application code or the Electron renderer. A failed agent does not fall back to template rendering.
+
+Generated source also passes an AST quality contract: permitted imports and
+frame-driven React APIs, with console, DOM, timers and executable HTML rejected.
+This reduces measurement spoofing and nondeterministic output; container isolation
+remains the execution boundary. Images and teacher review still establish whether
+the graphics teach the approved content correctly.
+
+Bad preview layouts return their actual images and measured geometry to the agent
+for repair. [LessonGeometryDiagnostics.ts](../src/server/features/guidedLessons/infrastructure/LessonGeometryDiagnostics.ts)
+adds bounded numeric diagnostics identifying the failing measurement and exact
+font, viewport, overflow, ancestor clipping or overlap constraint. The worker
+intersects text ink with every clipping ancestor on its horizontal and vertical
+overflow axes, separately from the leaf's scroll/client sizes. Ancestor opacity
+filters invisible entrances; conservative transform and zoom scales determine the
+effective font size rather than glyph-box height. All visible text is measured;
+source annotations do not choose which regions count. Encoding is blocked until every sampled frame for the current source
+passes geometry checks and its images have reached a later agent turn.
+
+Each phase stores a source digest, representative PNG, geometry evidence and MP4;
+manifest evidence identifies scene and phase. Source artifacts are excluded from
+student projections. Independent image review cannot certify continuous motion or
+pronunciation. Teachers must inspect pending/worked phases, video and exact audio
+before approving the manifest and releasing it. Narration remains a separately
+approved artifact synchronized with the silent video. There is no combined lesson
+MP4 download; phase clips support interactive checkpoint gates. The old trusted
+[RemotionLessonRenderer.ts](../src/server/features/guidedLessons/infrastructure/RemotionLessonRenderer.ts)
+remains for legacy tests/evidence, not new production generation. Reflection uses
+the trusted static composition without an additional generated clip. Playback still
+requires the packaged composition/font identity to match the approved manifest.
+
+[LessonBudget.ts](../src/server/features/guidedLessons/application/LessonBudget.ts)
+records durable model/speech attempts. Every coding-agent provider call also has a
+prior durable dispatch reservation and settles actual usage even when rendering
+fails or its draft is cancelled. Unknown dispatch outcomes prevent automatic replay.
+The optional benchmark observer receives bounded failure categories, HTTP status
+and validated provider/transport identifiers through
+[RemotionProviderFailure.ts](../src/server/features/guidedLessons/infrastructure/RemotionProviderFailure.ts),
+never raw errors, response bodies or configuration. The manual benchmark can also
+observe validated connection stages and local socket counters through the existing
+[ModelTransportObserver.ts](../src/server/auth/ModelTransportObserver.ts). These
+measure local transport activity, not proof of provider receipt. Missing optional
+cache/reasoning details remain visible through measurement coverage counts.
+Cumulative token/day totals are measured without a pricing quota cutoff; daily run
+admission and bounded stage/agent execution remain. This lets explicit manual
+benchmarks measure real consumption before pricing policy is chosen. The benchmark
+uses synthetic sources, real configured providers and the production service, writes
+local measurement/artifact reports, and never creates a student release. Automated
+checks stay credentialless. Failed runs and repairs count in pricing evidence.
 
 [BuildLessonProjection.ts](../src/server/features/guidedLessons/domain/BuildLessonProjection.ts)
-is the sole student projection. It rebases cues per scene and phase and withholds
-worked narration, after states and their artifact IDs until the formative gate is
-resolved or explicitly revealed. The server grades against canonical traces;
-student seeking cannot unlock another phase. These are teaching gates, not exam
-security: students can infer answers from the approved source code. Enrollment,
-source publication and release availability are checked on every read and command.
-The desktop holds only current/next authorized media, verifies digests, revokes Blob
-URLs on identity changes and pauses while buffering or using help/notes.
+is the only student projection. It withholds worked narration, state and video until
+the formative gate is resolved or explicitly revealed. Only the exact scene/phase
+clip is allowlisted. Duplicate phase clips fail closed. The desktop verifies media
+digests and revokes Blob URLs on account/revision changes; generated TSX never reaches
+the player. [LessonComposition.tsx](../src/lessonMedia/LessonComposition.tsx) is a
+trusted video/audio wrapper with a static reflection surface. Its legacy template
+path remains for compatible fixtures. Teaching gates are not exam security; source
+code can reveal answers.
 
-Private notes are owner-only, versioned and anchored to release, scene, phase, frame
-and optional source range. Publishing a revised lesson preserves earlier releases
-for exact note revisits; explicit withdrawal blocks all versions. Notes are excluded from generation, help prompts and
-teacher insights. Initial note retention is 180 days; failed/cancelled unreferenced
-media expires after seven days while active releases and approval workflows retain
-media. Explicit student explanation requests go to the teacher's request queue;
-teachers can reuse a release, reply in text, defer to live teaching or start a draft.
-Requests never cause automatic video generation.
+Notes are owner-only and anchored to the exact release, scene, phase and frame.
+Revised releases preserve earlier notes; explicit withdrawal blocks all versions.
+Notes never enter generation, help or teacher insights. Note retention is 180 days;
+unreferenced failed/cancelled media expires after seven days. Explicit student
+requests enter the teacher queue and never dispatch generation automatically.
 
 ## Local presentation and app updates
 

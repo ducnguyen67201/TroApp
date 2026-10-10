@@ -694,6 +694,7 @@ export const LearnerProjectionSchema = z.strictObject({
   phase: z.enum(LessonPhase),
   visibleTraceStates: z.array(VisibleTraceStateSchema).min(0).max(128),
   narrationCues: z.array(PlaybackCueSchema).min(0).max(24),
+  videoArtifactId: z.string().min(1).max(100).optional(),
   allowedArtifactIds: z.array(z.string().min(1).max(100)).min(0).max(24),
   checkpoint: z.union([LearnerCheckpointSchema, z.null()]),
 });

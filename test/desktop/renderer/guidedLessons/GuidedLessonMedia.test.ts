@@ -41,6 +41,20 @@ describe('guided lesson permitted media', () => {
     expect(readNeededLessonArtifacts({ ...projection, allowedArtifactIds: [] }, 0)).toEqual([]);
   });
 
+  it('loads only the current phase video and keeps it while narration advances', () => {
+    const { projection } = createLessonPlaybackFixture();
+    const videoProjection = {
+      ...projection,
+      videoArtifactId: 'pending-video',
+      allowedArtifactIds: [...projection.allowedArtifactIds, 'pending-video'],
+    };
+    expect(readNeededLessonArtifacts(videoProjection, 0)).toContain('pending-video');
+    expect(readNeededLessonArtifacts(videoProjection, 29)).toContain('pending-video');
+    expect(readNeededLessonArtifacts({ ...videoProjection, allowedArtifactIds: [] }, 0)).toEqual(
+      [],
+    );
+  });
+
   it('rejects modified artifact bytes before creating a media URL', async () => {
     const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:verified');
     await expect(

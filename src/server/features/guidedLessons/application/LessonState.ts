@@ -30,6 +30,7 @@ export const LessonRunSchema = z.strictObject({
   contentRepairs: z.number().int().min(0).max(1),
   visualRepairs: z.number().int().min(0).max(1),
   physicalAttempts: z.number().int().min(0).max(7),
+  graphicsAttempts: z.number().int().min(0).max(256).optional(),
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
   speechAttempts: z.number().int().min(0).max(24),
@@ -125,7 +126,7 @@ export const LessonBudgetSchema = z.strictObject({
   runs: z.number().int().nonnegative(),
   helpRequests: z.number().int().nonnegative(),
   helpTimes: z.array(z.number()).max(30),
-  reservations: z.array(LessonReservationSchema).max(200),
+  reservations: z.array(LessonReservationSchema).max(4096),
 });
 
 export const LessonReceiptSchema = z.strictObject({

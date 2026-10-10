@@ -4,7 +4,8 @@ import { GuidedLessonRunner } from './features/guidedLessons/application/GuidedL
 import { registerGuidedLessonRoutes } from './features/guidedLessons/infrastructure/RegisterGuidedLessonRoutes.js';
 import { OpenAiLessonModel } from './features/guidedLessons/infrastructure/OpenAiLessonModel.js';
 import { OpenAiLessonSpeech } from './features/guidedLessons/infrastructure/OpenAiLessonSpeech.js';
-import { RemotionLessonRenderer } from './features/guidedLessons/infrastructure/RemotionLessonRenderer.js';
+import { RemotionLessonAgent } from './features/guidedLessons/infrastructure/RemotionLessonAgent.js';
+import { DockerLessonCodeSandbox } from './features/guidedLessons/infrastructure/DockerLessonCodeSandbox.js';
 import { ClassroomInsightService } from './features/classroom/application/ClassroomInsightService.js';
 import { registerClassroomInsightRoutes } from './features/classroom/infrastructure/RegisterClassroomInsightRoutes.js';
 import { ClassroomInsightRetentionRunner } from './features/classroom/infrastructure/ClassroomInsightRetentionRunner.js';
@@ -183,9 +184,11 @@ async function startApi(): Promise<void> {
       environment.GUIDED_LESSON_SPEECH_MODEL,
       environment.GUIDED_LESSON_SPEECH_VOICE,
     ),
-    new RemotionLessonRenderer(undefined, (event) => {
-      logger.warn(event, 'guided.lesson.render.failed');
-    }),
+    new RemotionLessonAgent(
+      environment.OPENAI_API_KEY,
+      environment.GUIDED_LESSON_CODING_MODEL,
+      new DockerLessonCodeSandbox(environment.GUIDED_LESSON_RENDER_IMAGE),
+    ),
     () => new Date(),
     (event) => {
       logger.warn(event, 'guided.lesson.stage.failed');
