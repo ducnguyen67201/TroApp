@@ -132,6 +132,8 @@ export const LessonBudgetSchema = z.strictObject({
 export const LessonReceiptSchema = z.strictObject({
   digest: z.string(),
   reply: GuidedLessonReplySchema,
+  /** Help may advance a checkpoint hint without returning a learner projection. */
+  progressVersion: z.number().int().nonnegative().optional(),
 });
 
 export const LessonRequestSchema = StudentLessonRequestSchema;

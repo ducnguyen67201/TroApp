@@ -1,7 +1,7 @@
 # Tro architecture
 
 This is the single maintained description of Tro's implemented system. Updated
-October 9, 2026. Change this document when ownership, component communication or
+October 10, 2026. Change this document when component ownership, communication or
 an architectural invariant changes. Contracts and configuration in the linked code
 own exact wire shapes and policy values. Setup and validation commands live in the
 [root README](../README.md). Research and UI prototypes are reference material,
@@ -80,6 +80,10 @@ Google returns to the backend callback; the backend sends a short-lived code thr
 The same running instance retains the pending proof-key verifier. Before sign-in,
 main registers the protocol and verifies that the OS handler points to that app.
 
+The desktop sidebar is mounted only for a signed-in user. Signed-out and initial
+session-loading screens reserve no sidebar space; the welcome screen retains
+Google sign-in, saved-account selection, sign-in cancellation, settings and updates.
+
 Saved accounts use independent backend sessions. `AccountSessions` owns selection
 and generation guards; `EncryptedAccountVault` stores cookies using Electron
 `safeStorage` with atomic replacement. It fails closed when native encryption is
@@ -99,6 +103,14 @@ use. The branded development host and installed Tro have different bundle
 identities and permission grants. `DesktopPermissions` requests access in main so
 the OS attributes it to Tro. Missing grants lead to onboarding; no driver task or
 model credential is issued before admission.
+
+[EmbeddedDesktopDriver.ts](../src/desktop/main/EmbeddedDesktopDriver.ts) owns one
+unreferenced timer shared by the daemon's subscribers. It checks the SDK's
+synchronous `connection()` and generation at a fixed interval; that API refreshes
+child exit state before returning. Missing/replaced
+connections and read failures invalidate subscribers once. Stop clears the timer
+before releasing the host. This avoids the pinned SDK's long-lived asynchronous
+exit watcher, whose repeated native callback registrations accumulate memory.
 
 ## Agent requests and model gateway
 
@@ -375,6 +387,14 @@ the callback does not await or acquire the render-controller lock. Coalesced or
 rejected images are released. The original one-second message deadline remains.
 Presented means CALayer accepted the current frame, not physical display scan-out.
 A message receipt alone does not satisfy a spatial teaching presentation.
+
+Settled HUD messages and stationary following cursors do not continuously publish
+or rasterize full-display images. Lightweight maintenance still checks leases,
+presentation deadlines and pointer movement; active cursor/HUD animations and
+drawing receipts retain their frame updates. Recurring macOS render/follow work
+drains scoped autorelease pools so temporary Cocoa objects do not accumulate over
+the lifetime of a background thread. These changes reduce idle work; they do not
+impose an OS memory limit on the desktop process tree.
 
 Common admission, explicit refresh commands and the installation fence keep HUD
 messages and receipts under the same owner. Native build provenance and the required
@@ -790,6 +810,9 @@ fails or its draft is cancelled. Its UUID is also sent as X-Client-Request-Id fo
 provider-side receipt reconciliation when a response is lost. This is a correlation
 header, not an idempotency key or retry permission. Unknown dispatch outcomes
 prevent automatic replay.
+Explicit render retries are capped by the per-run policy, persisted across day
+changes; starting a new review run uses normal daily admission. Replaying the same
+command never consumes another retry.
 The optional benchmark observer receives bounded failure categories, HTTP status
 and validated provider/transport identifiers through
 [RemotionProviderFailure.ts](../src/server/features/guidedLessons/infrastructure/RemotionProviderFailure.ts),
@@ -820,6 +843,11 @@ Revised releases preserve earlier notes; explicit withdrawal blocks all versions
 Notes never enter generation, help or teacher insights. Note retention is 180 days;
 unreferenced failed/cancelled media expires after seven days. Explicit student
 requests enter the teacher queue and never dispatch generation automatically.
+Retention runs when the generation worker starts and at most hourly thereafter,
+including after a failed cleanup attempt; one-second job polls still check pending
+lessons. Help receipts bind their reply to the resulting learner progress version
+and scene, so a lost response can replay the same hint without consuming another
+hint or exposing a stale answer after the learner moves.
 
 ## Local presentation and app updates
 

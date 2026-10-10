@@ -38,6 +38,8 @@ import {
 import { hashLessonText, hashLessonValue } from './BuildLessonInput.js';
 import { validateLessonPlan } from '../domain/ValidateLessonPlan.js';
 
+const ArtifactRetentionIntervalMs = 60 * 60 * 1000;
+
 const ModelStageSchema = {
   drafting: LessonModelStage.DRAFT,
   reviewingContent: LessonModelStage.REVIEW,
@@ -121,6 +123,7 @@ function validateReview(review: ReviewResult, expectedHash: string, visual: bool
 
 /** One durable stage per wake; no paid request is replayed because a worker lease expires. */
 export class LessonGeneration {
+  private nextArtifactRetentionAtMs = 0;
   private readonly controllers = new Map<
     string,
     { controller: AbortController; runId: string | null }
@@ -139,7 +142,7 @@ export class LessonGeneration {
   ) {}
 
   async runNext(): Promise<void> {
-    await this.store.deleteExpiredArtifacts(this.now());
+    await this.deleteExpiredArtifactsIfDue();
     for (const record of await this.store.listPendingLessons(this.now())) {
       if (record.run?.leaseUntil && new Date(record.run.leaseUntil) > this.now()) {
         continue;
@@ -164,6 +167,16 @@ export class LessonGeneration {
     for (const active of this.controllers.values()) {
       active.controller.abort();
     }
+  }
+
+  private async deleteExpiredArtifactsIfDue(): Promise<void> {
+    const now = this.now();
+    if (now.getTime() < this.nextArtifactRetentionAtMs) {
+      return;
+    }
+    /* Failed cleanup must also wait before retrying so idle job polls cannot hammer storage. */
+    this.nextArtifactRetentionAtMs = now.getTime() + ArtifactRetentionIntervalMs;
+    await this.store.deleteExpiredArtifacts(now);
   }
 
   private async stopExpiredDispatch(record: LessonRecord): Promise<void> {

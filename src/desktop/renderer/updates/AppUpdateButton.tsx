@@ -5,7 +5,7 @@ import { AppUpdatePhase, AppUpdateState } from '#contracts/AppUpdate.js';
 import { useLocale } from '../localization/UseLocale.js';
 import { useAppUpdate } from './UseAppUpdate.js';
 
-/** The full sidebar-width action stays above settings and survives sign-out. */
+/** The update action is available in the signed-in sidebar and the welcome screen. */
 export function AppUpdateButton({ isBusy }: { isBusy: boolean }): ReactElement | null {
   const update = useAppUpdate();
   const { messages, locale } = useLocale();

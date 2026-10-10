@@ -20,7 +20,6 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import {
-  IconArrowRight,
   IconSchool,
   IconChartBar,
   IconMicrophone,
@@ -169,21 +168,26 @@ export function App(): ReactElement {
       </Modal.Stack>
       <AppShell
         header={{ height: DesktopWindowAppearance.TITLE_BAR_HEIGHT }}
-        navbar={{ width: user ? 96 : 232, breakpoint: 0 }}
+        navbar={{
+          width: 96,
+          breakpoint: 0,
+          collapsed: { desktop: !user, mobile: !user },
+        }}
         padding={0}
         className="desktop-shell"
         data-compact={Boolean(user) || undefined}
+        data-signed-out={!user || undefined}
         data-page={page}
       >
         <AppShell.Header className="window-titlebar" withBorder={false} aria-hidden="true" />
-        <AppShell.Navbar className="desktop-sidebar" withBorder={false}>
-          <Group gap={10} className="brand">
-            <TroIcon size={32} />
-            <Stack gap={3}>
-              <Text fw={650} size="xl">
-                Tro
-              </Text>
-              {user && (
+        {user && (
+          <AppShell.Navbar className="desktop-sidebar" withBorder={false}>
+            <Group gap={10} className="brand">
+              <TroIcon size={32} />
+              <Stack gap={3}>
+                <Text fw={650} size="xl">
+                  Tro
+                </Text>
                 <Badge
                   size="sm"
                   variant="light"
@@ -191,24 +195,24 @@ export function App(): ReactElement {
                 >
                   {roleLabel}
                 </Badge>
-              )}
-            </Stack>
-          </Group>
-          <nav aria-label={messages.navigation} className="sidebar-navigation">
-            <UnstyledButton
-              className="sidebar-link"
-              disabled={accountTransition}
-              data-active={(!dialogs.state.settings && page === DesktopPage.WORKSPACE) || undefined}
-              aria-current={page === DesktopPage.WORKSPACE ? 'page' : undefined}
-              onClick={() => {
-                closeDialog(DesktopDialog.SETTINGS);
-                navigation.openWorkspace();
-              }}
-            >
-              <IconLayoutSidebar size={19} stroke={1.6} />
-              <span>{messages.workspace}</span>
-            </UnstyledButton>
-            {user && (
+              </Stack>
+            </Group>
+            <nav aria-label={messages.navigation} className="sidebar-navigation">
+              <UnstyledButton
+                className="sidebar-link"
+                disabled={accountTransition}
+                data-active={
+                  (!dialogs.state.settings && page === DesktopPage.WORKSPACE) || undefined
+                }
+                aria-current={page === DesktopPage.WORKSPACE ? 'page' : undefined}
+                onClick={() => {
+                  closeDialog(DesktopDialog.SETTINGS);
+                  navigation.openWorkspace();
+                }}
+              >
+                <IconLayoutSidebar size={19} stroke={1.6} />
+                <span>{messages.workspace}</span>
+              </UnstyledButton>
               <UnstyledButton
                 className="sidebar-link"
                 disabled={accountTransition}
@@ -224,8 +228,6 @@ export function App(): ReactElement {
                 <IconSchool size={19} stroke={1.6} />
                 <span>{classroomLabel}</span>
               </UnstyledButton>
-            )}
-            {user && (
               <UnstyledButton
                 className="sidebar-link"
                 disabled={accountTransition}
@@ -241,38 +243,36 @@ export function App(): ReactElement {
                 <IconChartBar size={19} stroke={1.6} />
                 <span>{locale === 'vi' ? 'Tiến độ học tập' : 'Insights'}</span>
               </UnstyledButton>
-            )}
-            <UnstyledButton
-              className="sidebar-link"
-              disabled={accountTransition}
-              data-active={
-                (!dialogs.state.settings && page === DesktopPage.GUIDED_LESSONS) || undefined
-              }
-              aria-current={page === DesktopPage.GUIDED_LESSONS ? 'page' : undefined}
-              onClick={() => {
-                closeDialog(DesktopDialog.SETTINGS);
-                navigation.openGuidedLessons();
-              }}
-            >
-              <IconPlayerPlay size={19} stroke={1.6} />
-              <span>{messages.guidedLessonsNavigation}</span>
-            </UnstyledButton>
-          </nav>
-          <div className="sidebar-bottom">
-            <AppUpdateButton
-              isBusy={
-                controller.isSending ||
-                controller.isResetting ||
-                controller.isSigning ||
-                controller.isSigningOut ||
-                controller.isSwitchingAccount ||
-                voice.isStarting ||
-                (voice.status.state !== VoiceState.IDLE &&
-                  voice.status.state !== VoiceState.DISABLED) ||
-                microphoneTests.activeDeviceId !== null
-              }
-            />
-            {user && (
+              <UnstyledButton
+                className="sidebar-link"
+                disabled={accountTransition}
+                data-active={
+                  (!dialogs.state.settings && page === DesktopPage.GUIDED_LESSONS) || undefined
+                }
+                aria-current={page === DesktopPage.GUIDED_LESSONS ? 'page' : undefined}
+                onClick={() => {
+                  closeDialog(DesktopDialog.SETTINGS);
+                  navigation.openGuidedLessons();
+                }}
+              >
+                <IconPlayerPlay size={19} stroke={1.6} />
+                <span>{messages.guidedLessonsNavigation}</span>
+              </UnstyledButton>
+            </nav>
+            <div className="sidebar-bottom">
+              <AppUpdateButton
+                isBusy={
+                  controller.isSending ||
+                  controller.isResetting ||
+                  controller.isSigning ||
+                  controller.isSigningOut ||
+                  controller.isSwitchingAccount ||
+                  voice.isStarting ||
+                  (voice.status.state !== VoiceState.IDLE &&
+                    voice.status.state !== VoiceState.DISABLED) ||
+                  microphoneTests.activeDeviceId !== null
+                }
+              />
               <UnstyledButton
                 className="sidebar-link"
                 disabled={accountTransition}
@@ -286,98 +286,53 @@ export function App(): ReactElement {
                 <IconMicrophone size={19} stroke={1.6} />
                 <span>{messages.microphone}</span>
               </UnstyledButton>
-            )}
-            <UnstyledButton
-              className="sidebar-link"
-              disabled={accountTransition}
-              data-active={dialogs.state.settings || undefined}
-              aria-haspopup="dialog"
-              aria-expanded={dialogs.state.settings}
-              onClick={() => {
-                dialogs.open(DesktopDialog.SETTINGS);
-              }}
-            >
-              <IconSettings size={19} stroke={1.6} />
-              <span>{messages.settings}</span>
-            </UnstyledButton>
-            <section className="sidebar-account" aria-label={messages.yourAccount}>
-              {controller.isLoading ? (
-                <Group gap="sm">
-                  <Loader size="xs" />
-                  <Text size="xs" c="dimmed">
-                    {messages.checkingSignIn}
-                  </Text>
-                </Group>
-              ) : user ? (
-                <>
-                  <AccountMenu
-                    controller={controller}
-                    roleLabel={roleLabel}
-                    disabled={
-                      accountTransition ||
-                      controller.isSending ||
-                      controller.isResetting ||
-                      voice.isStarting ||
-                      microphoneTests.activeDeviceId !== null
-                    }
-                  />
-                  <Button
-                    variant="subtle"
-                    fullWidth
-                    justify="flex-start"
-                    leftSection={<IconLogout size={16} />}
-                    loading={controller.isSigningOut}
-                    disabled={
-                      accountTransition ||
-                      controller.isSending ||
-                      controller.isResetting ||
-                      voice.isStarting ||
-                      microphoneTests.activeDeviceId !== null
-                    }
-                    onClick={() => void controller.signOut()}
-                    className="logout-button"
-                  >
-                    {messages.signOut}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Text size="sm" fw={500}>
-                    {messages.ownWorkspace}
-                  </Text>
-                  <Text size="xs" c="dimmed" mt={5} mb="sm">
-                    {messages.signInInvitation}
-                  </Text>
-                  <Button
-                    fullWidth
-                    variant="default"
-                    rightSection={<IconArrowRight size={15} />}
-                    loading={controller.isSigning}
-                    onClick={() => void controller.signInWithGoogle()}
-                  >
-                    {messages.signIn}
-                  </Button>
-                  {controller.savedAccounts && controller.savedAccounts.accounts.length > 0 && (
-                    <AccountMenu
-                      controller={controller}
-                      roleLabel={roleLabel}
-                      disabled={accountTransition}
-                    />
-                  )}
-                  {controller.isSigning && window.tro.cancelAccountSignIn && (
-                    <Button
-                      variant="subtle"
-                      fullWidth
-                      onClick={() => void controller.cancelAccountSignIn()}
-                    >
-                      {messages.accountCancelSignIn}
-                    </Button>
-                  )}
-                </>
-              )}
-            </section>
-          </div>
-        </AppShell.Navbar>
+              <UnstyledButton
+                className="sidebar-link"
+                disabled={accountTransition}
+                data-active={dialogs.state.settings || undefined}
+                aria-haspopup="dialog"
+                aria-expanded={dialogs.state.settings}
+                onClick={() => {
+                  dialogs.open(DesktopDialog.SETTINGS);
+                }}
+              >
+                <IconSettings size={19} stroke={1.6} />
+                <span>{messages.settings}</span>
+              </UnstyledButton>
+              <section className="sidebar-account" aria-label={messages.yourAccount}>
+                <AccountMenu
+                  controller={controller}
+                  roleLabel={roleLabel}
+                  disabled={
+                    accountTransition ||
+                    controller.isSending ||
+                    controller.isResetting ||
+                    voice.isStarting ||
+                    microphoneTests.activeDeviceId !== null
+                  }
+                />
+                <Button
+                  variant="subtle"
+                  fullWidth
+                  justify="flex-start"
+                  leftSection={<IconLogout size={16} />}
+                  loading={controller.isSigningOut}
+                  disabled={
+                    accountTransition ||
+                    controller.isSending ||
+                    controller.isResetting ||
+                    voice.isStarting ||
+                    microphoneTests.activeDeviceId !== null
+                  }
+                  onClick={() => void controller.signOut()}
+                  className="logout-button"
+                >
+                  {messages.signOut}
+                </Button>
+              </section>
+            </div>
+          </AppShell.Navbar>
+        )}
         <AppShell.Main className="desktop-main">
           {controller.isSwitchingAccount && (
             <div className="account-transition-status" role="status">
@@ -385,7 +340,7 @@ export function App(): ReactElement {
               <Text size="sm">{messages.accountSwitching}</Text>
             </div>
           )}
-          <div className="main-panel" inert={accountTransition}>
+          <div className="main-panel" inert={accountTransition && Boolean(user)}>
             <div className="panel-content">
               {(controller.message || companionMessage) && (
                 <Alert
@@ -403,11 +358,51 @@ export function App(): ReactElement {
                   {messages.microphoneVoiceError}
                 </Alert>
               )}
-              <div hidden={page !== DesktopPage.WORKSPACE && Boolean(user)}>
+              <div
+                className="workspace-content"
+                hidden={page !== DesktopPage.WORKSPACE && Boolean(user)}
+              >
                 {user && permissions.status?.kind !== 'ready' ? (
                   <PermissionsOnboardingPage controller={permissions} />
                 ) : (
-                  <ComputerUsePage controller={controller} />
+                  <ComputerUsePage
+                    controller={controller}
+                    signInActions={
+                      <Stack gap="sm" align="center" className="sign-in-controls">
+                        {controller.savedAccounts &&
+                          controller.savedAccounts.accounts.length > 0 && (
+                            <AccountMenu
+                              controller={controller}
+                              roleLabel={roleLabel}
+                              disabled={accountTransition}
+                            />
+                          )}
+                        {controller.isSigning && window.tro.cancelAccountSignIn && (
+                          <Button
+                            variant="subtle"
+                            onClick={() => void controller.cancelAccountSignIn()}
+                          >
+                            {messages.accountCancelSignIn}
+                          </Button>
+                        )}
+                        <Group gap="sm" justify="center">
+                          <AppUpdateButton isBusy={accountTransition} />
+                          <Button
+                            variant="subtle"
+                            leftSection={<IconSettings size={16} />}
+                            disabled={accountTransition}
+                            aria-haspopup="dialog"
+                            aria-expanded={dialogs.state.settings}
+                            onClick={() => {
+                              dialogs.open(DesktopDialog.SETTINGS);
+                            }}
+                          >
+                            {messages.settings}
+                          </Button>
+                        </Group>
+                      </Stack>
+                    }
+                  />
                 )}
               </div>
               {user && !accountTransition && (

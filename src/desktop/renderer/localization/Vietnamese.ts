@@ -147,7 +147,7 @@ export const vietnamese = {
   name: 'Tên',
   email: 'Email',
   signOutHint: 'Bạn có thể đăng xuất ở thanh bên.',
-  accountSignInHint: 'Đăng nhập ở thanh bên để xem tài khoản của bạn.',
+  accountSignInHint: 'Đăng nhập để xem tài khoản của bạn.',
   appearance: 'Giao diện',
   appearanceDescription: 'Giao diện sáng, đơn giản và ấm áp.',
   light: 'Sáng',

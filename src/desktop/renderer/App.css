@@ -211,6 +211,51 @@ textarea:focus-visible {
   padding-bottom: 16px;
 }
 
+.desktop-shell[data-signed-out='true'] .desktop-main {
+  padding-left: 16px;
+}
+
+.sign-in-controls {
+  width: min(100%, 340px);
+}
+
+.sign-in-controls .sidebar-update {
+  margin-bottom: 0;
+}
+
+.sign-in-controls .sidebar-account-trigger {
+  width: auto;
+  max-width: 100%;
+}
+
+.desktop-shell[data-signed-out='true'] .panel-content {
+  padding-block: 32px;
+}
+
+.desktop-shell[data-signed-out='true'] .workspace-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.desktop-shell[data-signed-out='true'] .workspace-page {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.desktop-shell[data-signed-out='true'] .page-heading {
+  justify-content: center;
+  max-width: 720px;
+}
+
+.desktop-shell[data-signed-out='true'] .workspace-empty {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 0;
+}
+
 .main-panel {
   display: flex;
   flex-direction: column;
@@ -621,7 +666,7 @@ textarea:focus-visible {
 }
 
 @media (max-width: 800px) {
-  .desktop-shell {
+  .desktop-shell[data-compact='true'] {
     --app-shell-navbar-width: 200px;
     --app-shell-navbar-offset: 200px;
   }

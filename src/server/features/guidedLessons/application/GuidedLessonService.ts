@@ -28,7 +28,7 @@ import {
 } from './LessonPorts.js';
 import { LessonGeneration } from './LessonGeneration.js';
 import { LessonError, LessonFailure } from './LessonFailure.js';
-import { admitLessonRun, createLessonBudget } from './LessonBudget.js';
+import { admitLessonRun, createLessonBudget, LessonPolicy } from './LessonBudget.js';
 import {
   buildLessonInput,
   buildPublicationLessonPassages,
@@ -560,6 +560,12 @@ export class GuidedLessonService {
                 throw new LessonError(LessonFailure.INVALID);
               }
               let run = record.run;
+              if (record.status !== LessonStatus.AWAITING_SCRIPT_APPROVAL) {
+                if (run.renderRetries >= LessonPolicy.RUN_RENDER_RETRIES) {
+                  throw new LessonError(LessonFailure.BUDGET);
+                }
+                run = { ...run, renderRetries: run.renderRetries + 1 };
+              }
               if (run.day !== this.now().toISOString().slice(0, 10)) {
                 const day = await admitLessonRun(store, userId, this.now());
                 run = { ...run, day };
@@ -1115,9 +1121,19 @@ export class GuidedLessonService {
         const projection = projectLesson({ ...release.record, releaseId: release.id }, progress);
         const pending =
           projection.phase === LessonPhase.PREDICT || projection.phase === LessonPhase.TRY;
-        const reply = pending
-          ? await this.projectReply(store, userId, release, progress)
-          : receipt.reply;
+        // Legacy receipts lack resulting progress; infer only the unambiguous hint/nonpending cases.
+        let receiptProgressVersion = receipt.progressVersion ?? null;
+        if (receiptProgressVersion === null) {
+          if (receipt.reply.kind === 'hint' && pending) {
+            receiptProgressVersion = command.expectedProgressVersion + 1;
+          } else if (!pending) {
+            receiptProgressVersion = command.expectedProgressVersion;
+          }
+        }
+        const reply =
+          progress.sceneId === command.sceneId && progress.version === receiptProgressVersion
+            ? receipt.reply
+            : await this.projectReply(store, userId, release, progress);
         return { reply, request: null, progress: null, budgetId: '' };
       }
       const release = await this.requireRelease(store, userId, command.classId, command.releaseId);
@@ -1140,6 +1156,7 @@ export class GuidedLessonService {
         await store.saveReceipt(userId, command.classId, command.commandId, {
           digest: hashLessonValue(command),
           reply,
+          progressVersion: progress.version + 1,
         });
         return { reply, request: null, progress: null, budgetId: '' };
       }
@@ -1320,6 +1337,7 @@ export class GuidedLessonService {
       await store.saveReceipt(userId, command.classId, command.commandId, {
         digest: hashLessonValue(command),
         reply,
+        progressVersion: currentVersion,
       });
       return reply;
     });

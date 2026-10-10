@@ -145,15 +145,18 @@ afterEach(() => {
 });
 
 describe('desktop scaffold', () => {
-  it('updates the sidebar after Google returns and enters the workspace', async () => {
+  it('hides the sidebar until Google returns and enters the workspace', async () => {
     const bridge = createDesktopBridge();
     bridge.readAuthSession.mockResolvedValueOnce({ kind: 'signed-out' });
     bridge.signInWithGoogle.mockResolvedValue({ kind: 'pending' });
     window.tro = bridge;
     renderDesktop();
-    fireEvent.click(await screen.findByRole('button', { name: 'Sign in' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
-    const account = screen.getByRole('region', { name: 'Your account', hidden: true });
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(document.querySelector('.desktop-sidebar')).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue with Google' }));
+    await screen.findByRole('button', { name: 'Waiting for Google…' });
+    expect(screen.queryByRole('navigation')).toBeNull();
+    const account = await screen.findByRole('region', { name: 'Your account' });
     await waitFor(
       () => {
         expect(within(account).getByText(testUser.email)).toBeTruthy();
@@ -163,6 +166,7 @@ describe('desktop scaffold', () => {
     await screen.findByRole('heading', { name: 'Welcome back, Alex' });
     expect(bridge.signInWithGoogle).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
+    expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeTruthy();
   });
 
   it('shows the signed-in account in the sidebar and classroom navigation and account role', async () => {
@@ -424,7 +428,7 @@ describe('desktop language', () => {
     expect(within(language).getByRole('option', { name: 'English' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Chọn micrô' })).toHaveProperty('disabled', true);
     fireEvent.click(screen.getByRole('tab', { name: 'Tài khoản' }));
-    expect(screen.getByText('Đăng nhập ở thanh bên để xem tài khoản của bạn.')).toBeTruthy();
+    expect(screen.getByText('Đăng nhập để xem tài khoản của bạn.')).toBeTruthy();
   });
 
   it('switches immediately, preserves draft and messages, and restores the saved locale', async () => {
@@ -1116,7 +1120,7 @@ it('answers a retained lesson through the narrow bridge while the original task 
 });
 
 describe('sidebar app updates', () => {
-  it('stays hidden without an update and shows above Settings even before sign-in', async () => {
+  it('keeps updates and settings on the welcome screen without a signed-out sidebar', async () => {
     const bridge = createDesktopBridge();
     bridge.readAuthSession.mockResolvedValue({ kind: 'signed-out' });
     let receive: ((snapshot: AppUpdateSnapshot) => void) | undefined;
@@ -1132,6 +1136,8 @@ describe('sidebar app updates', () => {
       receive?.({ revision: 1, status: { state: AppUpdateState.AVAILABLE, version: '0.2.0' } });
     });
     const button = await screen.findByRole('button', { name: /Update Tro/ });
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(document.querySelector('.desktop-sidebar')).toBeNull();
     const settings = screen.getByRole('button', { name: 'Settings' });
     expect(button.parentElement?.parentElement).toBe(settings.parentElement);
     expect(
@@ -1827,6 +1833,8 @@ it('offers saved accounts after signing out of only the current account', async 
   await screen.findByRole('textbox', { name: 'Your message' });
   fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
   await screen.findByRole('button', { name: 'Continue with Google' });
+  expect(screen.queryByRole('navigation')).toBeNull();
+  expect(document.querySelector('.desktop-sidebar')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Switch account' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Minh Nguyen, Student' }));
   await screen.findByText(fixture.student.email);

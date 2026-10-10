@@ -1,5 +1,5 @@
 diff --git a/libs/cua-driver/rust/Cargo.lock b/libs/cua-driver/rust/Cargo.lock
-index 74051d8..32d1881 100644
+index 74051d8..caee44c 100644
 --- a/libs/cua-driver/rust/Cargo.lock
 +++ b/libs/cua-driver/rust/Cargo.lock
 @@ -1205,7 +1205,7 @@ dependencies = [
@@ -7,7 +7,7 @@ index 74051d8..32d1881 100644
  [[package]]
  name = "cua-driver"
 -version = "0.30.4"
-+version = "0.30.4-tro.22"
++version = "0.30.4-tro.24"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -16,7 +16,7 @@ index 74051d8..32d1881 100644
  [[package]]
  name = "cua-driver-bindgen"
 -version = "0.30.4"
-+version = "0.30.4-tro.22"
++version = "0.30.4-tro.24"
  dependencies = [
   "cbindgen",
   "uniffi",
@@ -25,7 +25,7 @@ index 74051d8..32d1881 100644
  [[package]]
  name = "cua-driver-contract"
 -version = "0.30.4"
-+version = "0.30.4-tro.22"
++version = "0.30.4-tro.24"
  dependencies = [
   "schemars",
   "serde",
@@ -34,7 +34,7 @@ index 74051d8..32d1881 100644
  [[package]]
  name = "cua-driver-core"
 -version = "0.30.4"
-+version = "0.30.4-tro.22"
++version = "0.30.4-tro.24"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -43,7 +43,7 @@ index 74051d8..32d1881 100644
  [[package]]
  name = "cua-driver-e2e"
 -version = "0.30.4"
-+version = "0.30.4-tro.22"
++version = "0.30.4-tro.24"
  dependencies = [
   "base64",
   "core-foundation",
@@ -52,7 +52,7 @@ index 74051d8..32d1881 100644
  [[package]]
  name = "cua-driver-sdk"
 -version = "0.30.4"
-+version = "0.30.4-tro.22"
++version = "0.30.4-tro.24"
  dependencies = [
   "async-trait",
   "core-foundation",
@@ -61,7 +61,7 @@ index 74051d8..32d1881 100644
  [[package]]
  name = "cua-driver-testkit"
 -version = "0.30.4"
-+version = "0.30.4-tro.22"
++version = "0.30.4-tro.24"
  dependencies = [
   "arbitrary",
   "async-trait",
@@ -70,7 +70,7 @@ index 74051d8..32d1881 100644
  [[package]]
  name = "cua-driver-uia"
 -version = "0.30.4"
-+version = "0.30.4-tro.22"
++version = "0.30.4-tro.24"
  dependencies = [
   "anyhow",
   "cua-driver-core",
@@ -79,7 +79,7 @@ index 74051d8..32d1881 100644
  [[package]]
  name = "cursor-overlay"
 -version = "0.30.4"
-+version = "0.30.4-tro.22"
++version = "0.30.4-tro.24"
  dependencies = [
   "anyhow",
   "cua-driver-contract",
@@ -88,7 +88,7 @@ index 74051d8..32d1881 100644
  [[package]]
  name = "cursor-theme-cli"
 -version = "0.30.4"
-+version = "0.30.4-tro.22"
++version = "0.30.4-tro.24"
  dependencies = [
   "anyhow",
   "cursor-overlay",
@@ -97,7 +97,7 @@ index 74051d8..32d1881 100644
  [[package]]
  name = "pip-preview"
 -version = "0.30.4"
-+version = "0.30.4-tro.22"
++version = "0.30.4-tro.24"
  dependencies = [
   "serde_json",
  ]
@@ -106,7 +106,7 @@ index 74051d8..32d1881 100644
  [[package]]
  name = "platform-linux"
 -version = "0.30.4"
-+version = "0.30.4-tro.22"
++version = "0.30.4-tro.24"
  dependencies = [
   "anyhow",
   "ashpd",
@@ -115,7 +115,7 @@ index 74051d8..32d1881 100644
  [[package]]
  name = "platform-macos"
 -version = "0.30.4"
-+version = "0.30.4-tro.22"
++version = "0.30.4-tro.24"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -124,12 +124,12 @@ index 74051d8..32d1881 100644
  [[package]]
  name = "platform-windows"
 -version = "0.30.4"
-+version = "0.30.4-tro.22"
++version = "0.30.4-tro.24"
  dependencies = [
   "anyhow",
   "async-trait",
 diff --git a/libs/cua-driver/rust/Cargo.toml b/libs/cua-driver/rust/Cargo.toml
-index 53edeb0..a2bd798 100644
+index 53edeb0..c1ce83d 100644
 --- a/libs/cua-driver/rust/Cargo.toml
 +++ b/libs/cua-driver/rust/Cargo.toml
 @@ -19,7 +19,7 @@ members = [
@@ -137,7 +137,7 @@ index 53edeb0..a2bd798 100644
  
  [workspace.package]
 -version = "0.30.4"
-+version = "0.30.4-tro.22"
++version = "0.30.4-tro.24"
  edition = "2021"
  authors = ["trycua"]
  license = "MIT"
@@ -3316,10 +3316,10 @@ index 0000000..cceea34
 +}
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs
 new file mode 100644
-index 0000000..1d8163a
+index 0000000..edf8101
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs
-@@ -0,0 +1,574 @@
+@@ -0,0 +1,634 @@
 +//! Compact host HUD in logical points. Never posts input or performs submission.
 +use cua_driver_contract::{CompanionHudLocale as Locale, CompanionHudPhase as Phase};
 +use fontdue::layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle};
@@ -3363,6 +3363,23 @@ index 0000000..1d8163a
 +    }
 +    pub fn is_visible(&self) -> bool {
 +        self.phase != Phase::Idle || self.alpha > 0.002 || self.message.message.is_some()
++    }
++    /// Visibility does not imply animation. Keep a settled composite on its CALayer.
++    pub fn needs_frame_tick(&self, reduced: bool) -> bool {
++        let target = if self.phase == Phase::Idle { 0.0 } else { 1.0 };
++        self.transition < 1.0
++            || (target - self.alpha).abs() > 0.002
++            || (self.level - self.smoothed_level).abs() > 0.002
++            || (!reduced
++                && (matches!(
++                    self.phase,
++                    Phase::Thinking
++                        | Phase::Transcribing
++                        | Phase::Preparing
++                        | Phase::Checking
++                        | Phase::Submitting
++                ) || (self.phase == Phase::Listening && self.smoothed_level > 0.002)))
++            || self.message.needs_frame_tick(reduced)
 +    }
 +    pub fn tick(&mut self, dt: f32, reduced_motion: bool) {
 +        self.time += dt;
@@ -3869,6 +3886,49 @@ index 0000000..1d8163a
 +        }
 +    }
 +    #[test]
++    fn companion_settled_hud_keeps_pixels_without_requesting_frames() {
++        for phase in [
++            Phase::Waiting,
++            Phase::PracticeReady,
++            Phase::Done,
++            Phase::Showing,
++        ] {
++            let mut painter = CompanionHudPainter::default();
++            painter.update(phase, Locale::English, 0.0);
++            assert!(painter.needs_frame_tick(false));
++            painter.tick(0.3, false);
++            assert!(painter.is_visible());
++            assert!(!painter.needs_frame_tick(false));
++            let mut first = Pixmap::new(320, 180).unwrap();
++            let mut parked = Pixmap::new(320, 180).unwrap();
++            painter.paint(&mut first, (80.0, 60.0), 1.0, false);
++            painter.tick(5.0, false);
++            painter.paint(&mut parked, (80.0, 60.0), 1.0, false);
++            assert_eq!(first.data(), parked.data());
++            painter.update(Phase::Idle, Locale::English, 0.0);
++            assert!(painter.needs_frame_tick(false));
++            painter.tick(0.3, false);
++            assert!(!painter.is_visible());
++            assert!(!painter.needs_frame_tick(false));
++        }
++    }
++
++    #[test]
++    fn companion_hud_preserves_busy_and_meter_animation_until_reduced_or_silent() {
++        let mut painter = CompanionHudPainter::default();
++        painter.update(Phase::Thinking, Locale::English, 0.0);
++        painter.tick(0.3, false);
++        assert!(painter.needs_frame_tick(false));
++        assert!(!painter.needs_frame_tick(true));
++        painter.update(Phase::Listening, Locale::English, 1.0);
++        painter.tick(0.3, false);
++        assert!(painter.needs_frame_tick(false));
++        painter.update(Phase::Listening, Locale::English, 0.0);
++        painter.tick(5.0, false);
++        assert!(!painter.needs_frame_tick(false));
++    }
++
++    #[test]
 +    fn companion_hud_silence_stays_flat_and_levels_decay() {
 +        let mut painter = CompanionHudPainter::default();
 +        painter.update(Phase::Listening, Locale::English, 0.0);
@@ -3896,10 +3956,10 @@ index 0000000..1d8163a
 +}
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/companion_message.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_message.rs
 new file mode 100644
-index 0000000..fca1462
+index 0000000..5660481
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_message.rs
-@@ -0,0 +1,252 @@
+@@ -0,0 +1,287 @@
 +//! One bounded passive teaching message. Timing is independent of HUD meter frames.
 +use cua_driver_contract::{CompanionTeachingMessage, TeachingMessageKind};
 +use fontdue::{
@@ -3952,6 +4012,19 @@ index 0000000..fca1462
 +        }) {
 +            self.elapsed = self.elapsed.min(self.reveal_duration(reduced) + 1.0);
 +        }
++    }
++    /// Static instruction/hold frames stay installed; only reveal and fade change pixels.
++    pub fn needs_frame_tick(&self, reduced: bool) -> bool {
++        let Some(message) = &self.message else {
++            return false;
++        };
++        if !reduced && self.elapsed < self.reveal_duration(reduced) {
++            return true;
++        }
++        message.kind == TeachingMessageKind::Completion
++            && !reduced
++            && self.elapsed >= self.reveal_duration(reduced) + 2.0
++            && self.alpha(reduced) > 0.0
 +    }
 +    /// Timing signal only; the owner performs the matching conditional clear.
 +    pub fn has_finished_completion(&self, reduced: bool) -> bool {
@@ -4138,6 +4211,28 @@ index 0000000..fca1462
 +        painter.update(None);
 +        assert!(!painter.has_finished_completion(false));
 +    }
++    #[test]
++    fn companion_message_reveal_and_completion_fade_wake_only_when_pixels_change() {
++        let mut painter = MessagePainter::default();
++        painter.update(Some(message(TeachingMessageKind::Instruction, 1)));
++        assert!(painter.needs_frame_tick(false));
++        painter.tick(1.0, false);
++        assert!(!painter.needs_frame_tick(false));
++        assert!(painter.message.is_some());
++        painter.update(Some(message(TeachingMessageKind::Completion, 2)));
++        painter.tick(1.0, false);
++        assert!(!painter.needs_frame_tick(false)); // opaque hold needs only maintenance
++        painter.tick(2.0, false);
++        assert!(painter.needs_frame_tick(false));
++        painter.tick(5.0, false);
++        assert!(!painter.needs_frame_tick(false));
++        assert!(painter.has_finished_completion(false));
++        painter.update(Some(message(TeachingMessageKind::Completion, 3)));
++        assert!(!painter.needs_frame_tick(true));
++        painter.tick(2.1, true);
++        assert!(painter.has_finished_completion(true));
++    }
++
 +    #[test]
 +    fn companion_message_kind_is_part_of_projection_and_instruction_never_fades() {
 +        let mut painter = MessagePainter::default();
@@ -4381,7 +4476,7 @@ index 36f3717..9677a0e 100644
      SetPressed(bool),
      /// Show or hide the overlay.
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs
-index 264c427..5693d05 100644
+index 264c427..54e82f5 100644
 --- a/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs
 +++ b/libs/cua-driver/rust/crates/cursor-overlay/src/render_state.rs
 @@ -48,6 +48,13 @@ pub const SESSION_BADGE_FADE_SECS: f64 = 0.4;
@@ -4416,12 +4511,32 @@ index 264c427..5693d05 100644
      /// has nothing to animate.
      pub fn has_resting_motion(&self) -> bool {
 -        if !self.is_revealed()
-+        if self.companion_teaching
++        if self.companion_appearance
 +            || !self.is_revealed()
              || self.motion.idle_hide_ms <= 0.0
              || self.pinned_target_off_workspace
              || self.visual.reduced_motion == crate::ReducedMotion::On
-@@ -245,6 +259,9 @@ impl RenderStateCore {
+@@ -195,7 +209,8 @@ impl RenderStateCore {
+     /// Whether the idle-hide fade (the 180 ms alpha ramp after
+     /// `motion.idle_hide_ms` of inactivity) is currently animating.
+     pub fn idle_fade_in_progress(&self) -> bool {
+-        self.motion.idle_hide_ms > 0.0
++        !self.companion_appearance
++            && self.motion.idle_hide_ms > 0.0
+             && self.visible
+             && self.pos.0 >= -100.0
+             && self.idle_secs >= self.motion.idle_hide_ms / 1000.0
+@@ -224,7 +239,8 @@ impl RenderStateCore {
+     /// `None` when idle hide is off, the cursor is moving or not shown, or
+     /// the fade has already started.
+     pub fn idle_fade_wait(&self) -> Option<std::time::Duration> {
+-        if !self.visible
++        if self.companion_appearance
++            || !self.visible
+             || self.pos.0 < -100.0
+             || self.motion.idle_hide_ms <= 0.0
+             || self.path.is_some()
+@@ -245,6 +261,9 @@ impl RenderStateCore {
      }
  
      pub fn session_badge_alpha(&self) -> f32 {
@@ -4431,7 +4546,7 @@ index 264c427..5693d05 100644
          if self.session_label.is_none() {
              return 0.0;
          }
-@@ -261,6 +278,9 @@ impl RenderStateCore {
+@@ -261,6 +280,9 @@ impl RenderStateCore {
      }
  
      pub fn session_badge_chip_alpha(&self) -> f32 {
@@ -4441,19 +4556,19 @@ index 264c427..5693d05 100644
          if self.badge_modifiers.is_none() {
              return 0.0;
          }
-@@ -596,7 +616,10 @@ impl RenderStateCore {
+@@ -596,7 +618,10 @@ impl RenderStateCore {
          }
          let idle_hide_ms = self.motion.idle_hide_ms;
          if idle_hide_ms > 0.0 {
 -            let moving = self.path.is_some() || self.spring.is_some() || self.click_t.is_some();
-+            let moving = self.companion_teaching
++            let moving = self.companion_appearance
 +                || self.path.is_some()
 +                || self.spring.is_some()
 +                || self.click_t.is_some();
              if moving {
                  self.idle_secs = 0.0;
                  self.idle_alpha = 1.0;
-@@ -638,6 +661,51 @@ impl RenderStateCore {
+@@ -638,6 +663,51 @@ impl RenderStateCore {
          click_pulse_sentinel_only: bool,
      ) -> bool {
          match cmd {
@@ -4505,7 +4620,7 @@ index 264c427..5693d05 100644
              OverlayCommand::MoveTo {
                  x,
                  y,
-@@ -895,6 +963,13 @@ pub fn paint_cursor(
+@@ -895,6 +965,13 @@ pub fn paint_cursor(
          return;
      }
  
@@ -4519,7 +4634,7 @@ index 264c427..5693d05 100644
      let s = backing_scale.max(1.0) as f64; // logical-pt → pixmap-pixel scale
      let sf = s as f32;
  
-@@ -959,7 +1034,54 @@ pub fn paint_cursor(
+@@ -959,7 +1036,54 @@ pub fn paint_cursor(
          }
      }
  
@@ -4575,7 +4690,7 @@ index 264c427..5693d05 100644
          let tint = (theme.id == crate::DEFAULT_THEME_ID)
              .then(|| crate::session_fill_rgba(&core.cfg.cursor_id));
          crate::paint_compiled_theme_with_tint(
-@@ -989,6 +1111,9 @@ pub fn paint_cursor(
+@@ -989,6 +1113,9 @@ pub fn paint_cursor(
          );
      }
  
@@ -4585,7 +4700,7 @@ index 264c427..5693d05 100644
      let (delivery, target) = core.badge_modifiers.unwrap_or((None, None));
      if let Some(layout) = crate::session_badge_layout(crate::SessionBadgeInput {
          label: core.session_label.as_deref(),
-@@ -1003,12 +1128,56 @@ pub fn paint_cursor(
+@@ -1003,12 +1130,56 @@ pub fn paint_cursor(
          crate::paint_session_badge(
              pm,
              &layout,
@@ -4643,10 +4758,39 @@ index 264c427..5693d05 100644
  #[cfg(test)]
  mod glide_duration_tests {
      use super::*;
-@@ -1043,6 +1212,176 @@ mod glide_duration_tests {
+@@ -1043,6 +1214,205 @@ mod glide_duration_tests {
          t
      }
  
++    #[test]
++    fn companion_stationary_follower_stays_visible_without_resting_frame_ticks() {
++        use crate::guidance::{FrameFence, GuidanceFrame};
++        let frame = GuidanceFrame {
++            generation: 1,
++            revision: 1,
++            fence: Arc::new(std::sync::Mutex::new(FrameFence {
++                generation: 1,
++                rendered_revision: 0,
++            })),
++            receipt: Arc::new(std::sync::Mutex::new(None)),
++            paint_geometry: Arc::new(std::sync::Mutex::new(None)),
++            pointer: (100.0, 100.0),
++            cue: vec![],
++            cue_alpha: 0.0,
++            teaching: false,
++            visible: true,
++            pressed: false,
++        };
++        let mut core = RenderStateCore::new(CursorConfig::default());
++        core.motion.idle_hide_ms = 100.0;
++        core.apply_command_base(OverlayCommand::GuidanceFrame(frame), true, true);
++        core.tick_swift_constants(5.0);
++        assert_eq!(core.idle_alpha, 1.0);
++        assert!(core.is_revealed());
++        assert!(!core.needs_frame_tick());
++        assert!(core.idle_fade_wait().is_none());
++    }
++
 +    #[test]
 +    fn companion_atomic_frame_hides_badge_and_survives_hold() {
 +        use crate::guidance::{FrameFence, GuidanceFrame};
@@ -4822,10 +4966,10 @@ index 264c427..5693d05 100644
          for swift in [false, true] {
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/cursor/companion_hud.rs b/libs/cua-driver/rust/crates/platform-macos/src/cursor/companion_hud.rs
 new file mode 100644
-index 0000000..803290f
+index 0000000..8542cdd
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/platform-macos/src/cursor/companion_hud.rs
-@@ -0,0 +1,1022 @@
+@@ -0,0 +1,1077 @@
 +//! One presentation owner. Message admission, completion and CALayer installation share this mutex.
 +use cua_driver_contract::{
 +    CompanionHudCommand, CompanionHudLocale, CompanionHudPhase, CompanionRenderToken,
@@ -5360,7 +5504,13 @@ index 0000000..803290f
 +        }
 +    }
 +
++    /// Expiry and receipt deadlines need cheap wakeups even when the installed scene is static.
++    pub fn needs_maintenance(&self) -> bool {
++        self.expires.is_some() || self.painter.is_visible()
++    }
++
 +    pub fn tick(&mut self, dt: f32, reduced: bool) -> bool {
++        let scene_before_tick = self.scene_token();
 +        let now = Instant::now();
 +        if self.expires.is_some() && !self.has_live_lease(now) {
 +            self.retire_owner(CancelReason::LeaseExpired);
@@ -5385,7 +5535,7 @@ index 0000000..803290f
 +        {
 +            self.cancel_current(CancelReason::CompletionFinished);
 +        }
-+        self.painter.is_visible()
++        self.painter.needs_frame_tick(reduced) || self.scene_token() != scene_before_tick
 +    }
 +
 +    pub fn retire(&mut self, key: &str, prefix: bool) {
@@ -5466,6 +5616,55 @@ index 0000000..803290f
 +            || Ok(true),
 +        )
 +    }
++    #[test]
++    fn companion_static_scene_keeps_deadline_and_lease_maintenance_without_redraw() {
++        let mut state = fixture();
++        state
++            .painter
++            .update(CompanionHudPhase::Waiting, CompanionHudLocale::English, 0.0);
++        let pending = present(&mut state, 1);
++        assert!(install(&mut state, &pending));
++        assert!(!state.tick(1.0, false));
++        assert!(state.needs_maintenance());
++        assert_eq!(pending.outcome(), RenderOutcome::Presented);
++        state.expires = Some(Instant::now() - Duration::from_millis(1));
++        assert!(state.tick(0.1, false));
++        assert!(state.painter.message.message.is_none());
++        state.tick(0.3, false);
++        assert!(!state.needs_maintenance());
++
++        let mut state = fixture();
++        state
++            .painter
++            .update(CompanionHudPhase::Waiting, CompanionHudLocale::English, 0.0);
++        let pending = present(&mut state, 1);
++        state.current.as_mut().unwrap().frame.deadline = Instant::now() - Duration::from_millis(1);
++        assert!(state.tick(1.0, false));
++        assert_eq!(
++            pending.outcome(),
++            RenderOutcome::Failed(RenderFailure::DeadlineExceeded)
++        );
++    }
++
++    #[test]
++    fn companion_reduced_completion_clears_from_maintenance_and_preserves_receipt() {
++        let mut state = fixture();
++        state
++            .painter
++            .update(CompanionHudPhase::Waiting, CompanionHudLocale::English, 0.0);
++        let mut completion = message(1);
++        completion.kind = TeachingMessageKind::Completion;
++        let frame = state
++            .present_message("cursor", GROUP, CompanionHudLocale::English, completion)
++            .unwrap();
++        assert!(install(&mut state, &frame));
++        assert!(!state.tick(0.3, true));
++        assert!(state.needs_maintenance());
++        assert!(state.tick(2.0, true));
++        assert!(state.painter.message.message.is_none());
++        assert_eq!(frame.outcome(), RenderOutcome::Presented);
++    }
++
 +    #[test]
 +    fn companion_stale_refresh_preserves_pending_message_and_receipt() {
 +        let mut state = fixture();
@@ -5861,7 +6060,7 @@ index cb5012c..37247b6 100644
  /// System cursor shape reporting (what the OS draws, not what Cua draws).
  pub mod shape;
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs b/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
-index 8a4c547..d4f6cb0 100644
+index 8a4c547..54cc50d 100644
 --- a/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
 +++ b/libs/cua-driver/rust/crates/platform-macos/src/cursor/overlay.rs
 @@ -40,6 +40,143 @@ use cursor_overlay::{
@@ -6075,7 +6274,17 @@ index 8a4c547..d4f6cb0 100644
  /// Convenience for callsites not yet threaded with a session key: drives the
  /// seeded `"default"` cursor (the anonymous / one-shot identity).
  pub fn send_command_default(cmd: OverlayCommand) {
-@@ -541,6 +731,10 @@ unsafe fn run_appkit(_cfg: CursorConfig, rx: std::sync::mpsc::Receiver<OverlayMs
+@@ -527,7 +717,8 @@ impl RenderEntry for RenderState {
+     fn needs_frame_tick(&self) -> bool {
+         self.core.needs_frame_tick()
+             || self.focus_rect.is_some()
+-            || (self.core.motion.idle_hide_ms > 0.0
++            || (!self.core.companion_appearance
++                && self.core.motion.idle_hide_ms > 0.0
+                 && self.core.visible
+                 && self.core.pos.0 >= -100.0
+                 && self.core.idle_alpha >= 0.004)
+@@ -541,6 +732,10 @@ unsafe fn run_appkit(_cfg: CursorConfig, rx: std::sync::mpsc::Receiver<OverlayMs
      use objc2::{class, msg_send};
      use objc2_foundation::NSRect;
  
@@ -6086,7 +6295,50 @@ index 8a4c547..d4f6cb0 100644
      // ---- NSApplication ----
      // Verify main thread (MainThreadMarker is a zero-size compile-time token).
      let _mtm = objc2_foundation::MainThreadMarker::new()
-@@ -745,6 +939,19 @@ fn render_loop(
+@@ -663,6 +858,15 @@ unsafe fn run_appkit(_cfg: CursorConfig, rx: std::sync::mpsc::Receiver<OverlayMs
+     OVERLAY_WINDOW_ID.store(0, Ordering::Release);
+ }
+ 
++/// A new scene starts at t=0 after full idle; command traffic cannot pause a maintained HUD.
++fn elapsed_hud_time(elapsed: Duration, woke_for_command: bool, has_maintenance: bool) -> f32 {
++    if woke_for_command && !has_maintenance {
++        0.0
++    } else {
++        elapsed.as_secs_f32()
++    }
++}
++
+ fn render_loop(
+     layer_ptr: usize,
+     win_ptr: usize,
+@@ -675,6 +879,7 @@ fn render_loop(
+     let mut last_tick = Instant::now();
+     let mut frame_tick_needed = false;
+     let mut hover_poll_needed = false;
++    let mut last_hud_pointer = None;
+     // Repin bookkeeping: track last pinned wid and a frame counter for
+     // the periodic defensive-repin (every ~60 active frames ≈ 1 s).
+     let mut last_pinned: Option<u64> = None;
+@@ -701,13 +906,17 @@ fn render_loop(
+ 
+         let woke_from_idle = first_msg.is_some();
+         let now = Instant::now();
++        let elapsed_since_tick = now.duration_since(last_tick);
++        // Command wakeups must advance an existing HUD hold/expiry timer too.
++        // Only a truly idle wake starts a newly admitted scene at t=0.
++        let hud_dt = elapsed_hud_time(elapsed_since_tick, woke_from_idle, hover_poll_needed);
+         let dt = if woke_from_idle {
+             // The blocking recv() above can span an arbitrarily long idle period.
+             // Do not charge that time to the first animation tick after a command;
+             // let the wake-up frame render the newly-applied state at t=0.
+             0.0
+         } else {
+-            now.duration_since(last_tick).as_secs_f64().min(0.05)
++            elapsed_since_tick.as_secs_f64().min(0.05)
+         };
+         last_tick = now;
+ 
+@@ -745,6 +954,19 @@ fn render_loop(
                              last_key = Some(k);
                          }
                      }
@@ -6106,20 +6358,45 @@ index 8a4c547..d4f6cb0 100644
                      // Tick every cursor while an animation/fade is in progress
                      // or immediately after a command changed render state. The
                      // latter lets a just-created path/click/focus rect start on
-@@ -779,7 +986,11 @@ fn render_loop(
+@@ -753,7 +975,10 @@ fn render_loop(
+                     if frame_tick_needed || had_msg {
+                         arrived = map.tick_all(dt);
+                     }
++                    let mut hud = super::companion_hud::state().lock().unwrap();
++                    let hud_visible = hud.painter.is_visible();
+                     let pointer = if hover_poll_tick
++                        || hud_visible
+                         || map
+                             .cursors
+                             .values()
+@@ -763,7 +988,9 @@ fn render_loop(
+                     } else {
+                         None
+                     };
+-                    let mut hover_changed = false;
++                    let hud_pointer = if hud_visible { pointer } else { None };
++                    let mut hover_changed = hud_pointer != last_hud_pointer;
++                    last_hud_pointer = hud_pointer;
+                     if pointer.is_some() || hover_poll_tick {
+                         for rs in map.cursors.values_mut() {
+                             hover_changed |= rs.core.update_session_badge_hover(pointer);
+@@ -779,11 +1006,13 @@ fn render_loop(
                          .and_then(|k| map.cursors.get(k))
                          .is_some_and(cursor_is_externally_visible)
                          && pinned.is_none();
 -                    let next_frame_tick_needed = map.needs_frame_tick();
-+                    let hud_tick = super::companion_hud::state()
-+                        .lock()
-+                        .unwrap()
-+                        .tick(dt as f32, HUD_REDUCED_MOTION.load(Ordering::Acquire));
++                    let hud_tick = hud.tick(hud_dt, HUD_REDUCED_MOTION.load(Ordering::Acquire));
 +                    let next_frame_tick_needed = map.needs_frame_tick() || hud_tick;
                      let next_hover_poll_needed = map
                          .cursors
                          .values()
-@@ -815,7 +1026,13 @@ fn render_loop(
+-                        .any(|rs| rs.core.session_badge_needs_hover_poll());
++                        .any(|rs| rs.core.session_badge_needs_hover_poll())
++                        || hud.needs_maintenance();
+                     (
+                         pinned,
+                         raise_unpinned,
+@@ -815,7 +1044,13 @@ fn render_loop(
              if pinned_wid.is_some() && (pin_changed || repin_frames >= 60) {
                  MacZOrderEnforcer { win_ptr }.reassert(pinned_wid);
                  repin_frames = 0;
@@ -6134,7 +6411,7 @@ index 8a4c547..d4f6cb0 100644
                  // A direct move_cursor has no target window to pin against.
                  // Raise the normal-level, click-through overlay without
                  // activating the driver so a later foreground application
-@@ -832,7 +1049,7 @@ fn render_loop(
+@@ -832,7 +1067,7 @@ fn render_loop(
          // change pixels. A final frame is emitted as animations/fades finish so
          // the layer is left in the completed/cleared state before blocking.
          if had_msg || hover_changed || frame_tick_needed || next_frame_tick_needed {
@@ -6143,7 +6420,7 @@ index 8a4c547..d4f6cb0 100644
                  let guard = RENDER.lock().unwrap();
                  if let Some(map) = guard.as_ref() {
                      // Allocate the pixmap at the screen's PHYSICAL pixel
-@@ -843,8 +1060,9 @@ fn render_loop(
+@@ -843,8 +1078,9 @@ fn render_loop(
                      let scale = map.platform.backing_scale.max(1.0);
                      let w = (win_w * scale).max(1.0) as u32;
                      let h = (win_h * scale).max(1.0) as u32;
@@ -6155,7 +6432,7 @@ index 8a4c547..d4f6cb0 100644
                      let backing_scale_f32 = scale as f32;
                      note_overlay_frame(map.cursors.values().any(cursor_may_paint));
                      for (_k, rs) in &map.cursors {
-@@ -861,14 +1079,74 @@ fn render_loop(
+@@ -861,14 +1097,74 @@ fn render_loop(
                              backing_scale_f32,
                          );
                      }
@@ -6232,7 +6509,7 @@ index 8a4c547..d4f6cb0 100644
          }
  
          frame_tick_needed = next_frame_tick_needed;
-@@ -905,24 +1183,68 @@ fn cursor_is_externally_visible(state: &RenderState) -> bool {
+@@ -905,24 +1201,68 @@ fn cursor_is_externally_visible(state: &RenderState) -> bool {
  
  /// Convert a `tiny_skia::Pixmap` to a `CGImage` and set it as the contents
  /// of the given `CALayer` via `dispatch_async(main_queue, ...)`.
@@ -6314,11 +6591,39 @@ index 8a4c547..d4f6cb0 100644
          static _dispatch_main_q: u8;
          fn dispatch_async_f(
              queue: *const c_void,
-@@ -930,33 +1252,113 @@ fn dispatch_set_layer_contents(layer_ptr: usize, pixmap: tiny_skia::Pixmap) {
+@@ -930,33 +1270,115 @@ fn dispatch_set_layer_contents(layer_ptr: usize, pixmap: tiny_skia::Pixmap) {
              work: unsafe extern "C" fn(*mut c_void),
          );
      }
--
++    unsafe extern "C" fn set_contents_cb(_ctx: *mut c_void) {
++        objc2::rc::autoreleasepool(|_| {
++            // AppKit preference access stays on the main queue. Following renders
++            // before admission, so the controller reads the current preference.
++            let workspace: *mut objc2::runtime::AnyObject =
++                objc2::msg_send![objc2::class!(NSWorkspace), sharedWorkspace];
++            let reduced: objc2::runtime::Bool =
++                objc2::msg_send![workspace, accessibilityDisplayShouldReduceMotion];
++            SYSTEM_REDUCED_MOTION.store(reduced.as_bool(), Ordering::Release);
++            // Reset while holding the mailbox: a publication during composition
++            // schedules another callback instead of stranding its latest frame.
++            let payload = {
++                let mut mailbox = PENDING_LAYER_IMAGE.lock().unwrap();
++                LAYER_CALLBACK_PENDING.store(false, std::sync::atomic::Ordering::Release);
++                mailbox.take()
++            };
++            if let Some(payload) = payload {
++                install_current_composite(
++                    &mut super::companion_hud::state().lock().unwrap(),
++                    &payload.scene_token,
++                    payload.message_frame.as_ref().map(|frame| &frame.token),
++                    &payload.frames,
++                    Instant::now(),
++                    || {
++                        install_layer_image(&payload);
++                        Ok(())
++                    },
++                );
+ 
 -    unsafe extern "C" fn set_contents_cb(ctx: *mut c_void) {
 -        let (layer_ptr, cg_image_ptr): (usize, usize) = *Box::from_raw(ctx as *mut _);
 -        let layer = layer_ptr as *mut objc2::runtime::AnyObject;
@@ -6332,36 +6637,9 @@ index 8a4c547..d4f6cb0 100644
 -
 -    extern "C" {
 -        fn CGImageRelease(image: *mut c_void);
-+    unsafe extern "C" fn set_contents_cb(_ctx: *mut c_void) {
-+        // AppKit preference access stays on the main queue. Following renders
-+        // before admission, so the controller reads the current preference.
-+        let workspace: *mut objc2::runtime::AnyObject =
-+            objc2::msg_send![objc2::class!(NSWorkspace), sharedWorkspace];
-+        let reduced: objc2::runtime::Bool =
-+            objc2::msg_send![workspace, accessibilityDisplayShouldReduceMotion];
-+        SYSTEM_REDUCED_MOTION.store(reduced.as_bool(), Ordering::Release);
-+        // Reset while holding the mailbox: a publication during composition
-+        // schedules another callback instead of stranding its latest frame.
-+        let payload = {
-+            let mut mailbox = PENDING_LAYER_IMAGE.lock().unwrap();
-+            LAYER_CALLBACK_PENDING.store(false, std::sync::atomic::Ordering::Release);
-+            mailbox.take()
-+        };
-+        if let Some(payload) = payload {
-+            install_current_composite(
-+                &mut super::companion_hud::state().lock().unwrap(),
-+                &payload.scene_token,
-+                payload.message_frame.as_ref().map(|frame| &frame.token),
-+                &payload.frames,
-+                Instant::now(),
-+                || {
-+                    install_layer_image(&payload);
-+                    Ok(())
-+                },
-+            );
-+
-+            CGImageRelease(payload.image as *mut c_void);
-+        }
++                CGImageRelease(payload.image as *mut c_void);
++            }
++        });
      }
 -
      unsafe {
@@ -6447,7 +6725,104 @@ index 8a4c547..d4f6cb0 100644
  /// Raise the normal-level overlay without activating the driver application.
  ///
  /// This is used only for an externally visible cursor with no target window.
-@@ -1362,3 +1764,94 @@ mod tests {
+@@ -976,9 +1398,11 @@ fn dispatch_order_front(win_ptr: usize) {
+     }
+ 
+     unsafe extern "C" fn order_front_cb(ctx: *mut c_void) {
+-        let win_ptr = *Box::from_raw(ctx as *mut usize);
+-        let win = win_ptr as *mut objc2::runtime::AnyObject;
+-        let _: () = objc2::msg_send![win, orderFrontRegardless];
++        objc2::rc::autoreleasepool(|_| {
++            let win_ptr = *Box::from_raw(ctx as *mut usize);
++            let win = win_ptr as *mut objc2::runtime::AnyObject;
++            let _: () = objc2::msg_send![win, orderFrontRegardless];
++        });
+     }
+ 
+     let payload = Box::new(win_ptr);
+@@ -1040,26 +1464,29 @@ fn dispatch_pin_above(win_ptr: usize, target_wid: u64) {
+     }
+ 
+     unsafe extern "C" fn reorder_cb(ctx: *mut c_void) {
+-        let (win_ptr, target_wid, raise_front): (usize, u64, bool) =
+-            *Box::from_raw(ctx as *mut (usize, u64, bool));
+-        let win = win_ptr as *mut objc2::runtime::AnyObject;
+-        // NSWindowAbove = 1; relativeTo: takes NSInteger (i64 on 64-bit)
+-        let _: () = objc2::msg_send![win, orderWindow: 1i64 relativeTo: target_wid as i64];
+-
+-        // Tahoe can leave a normal-level transparent window behind an
+-        // already-frontmost cross-process target even after the relative
+-        // ordering request. `orderFrontRegardless` does not activate the
+-        // driver app. Use it only when the exact target is already the
+-        // frontmost visible normal window, so background browser actions do
+-        // not put the overlay above the user's foreground app.
+-        if raise_front {
+-            let _: () = objc2::msg_send![win, orderFrontRegardless];
+-        }
++        objc2::rc::autoreleasepool(|_| {
++            let (win_ptr, target_wid, raise_front): (usize, u64, bool) =
++                *Box::from_raw(ctx as *mut (usize, u64, bool));
++            let win = win_ptr as *mut objc2::runtime::AnyObject;
++            // NSWindowAbove = 1; relativeTo: takes NSInteger (i64 on 64-bit)
++            let _: () = objc2::msg_send![win, orderWindow: 1i64 relativeTo: target_wid as i64];
++
++            // Tahoe can leave a normal-level transparent window behind an
++            // already-frontmost cross-process target even after the relative
++            // ordering request. `orderFrontRegardless` does not activate the
++            // driver app. Use it only when the exact target is already the
++            // frontmost visible normal window, so background browser actions do
++            // not put the overlay above the user's foreground app.
++            if raise_front {
++                let _: () = objc2::msg_send![win, orderFrontRegardless];
++            }
++        });
+     }
+ 
+-    let windows = crate::windows::visible_windows();
+-    let raise_front =
+-        target_is_frontmost_visible_window(target_wid, crate::apps::frontmost_pid(), &windows);
++    let raise_front = objc2::rc::autoreleasepool(|_| {
++        let windows = crate::windows::visible_windows();
++        target_is_frontmost_visible_window(target_wid, crate::apps::frontmost_pid(), &windows)
++    });
+     let payload = Box::new((win_ptr, target_wid, raise_front));
+     unsafe {
+         let main_queue = &raw const _dispatch_main_q as *const c_void;
+@@ -1208,6 +1635,33 @@ mod tests {
+     // macOS adapter: window ordering, external visibility, and the macOS
+     // frame-tick terms layered on the shared predicate.
+ 
++    #[test]
++    fn companion_static_macos_adapter_parks_without_skipping_ordinary_idle_hide_or_focus_fade() {
++        let mut state = RenderState::from_config(CursorConfig::default());
++        state.core.motion.idle_hide_ms = 100.0;
++        state.core.pos = (100.0, 100.0);
++        state.apply_command(OverlayCommand::SetCompanionAppearance(true));
++        state.tick(5.0);
++        assert_eq!(state.core.idle_alpha, 1.0);
++        assert!(!state.core.needs_frame_tick());
++        assert!(!state.needs_frame_tick());
++
++        // Mac-specific focus drawing still receives its final fade/clear frame.
++        state.focus_rect = Some([10.0, 10.0, 20.0, 20.0]);
++        state.focus_rect_t = 0.0;
++        assert!(state.needs_frame_tick());
++        state.tick(0.6);
++        assert!(state.focus_rect.is_none());
++        assert!(!state.needs_frame_tick());
++
++        // Ordinary cursors keep their existing opaque idle-hide countdown and fade.
++        state.apply_command(OverlayCommand::SetCompanionAppearance(false));
++        assert!(state.needs_frame_tick());
++        state.tick(5.0);
++        assert_eq!(state.core.idle_alpha, 0.0);
++        assert!(!state.needs_frame_tick());
++    }
++
+     fn window(window_id: u32, pid: i32, z_index: usize) -> crate::windows::WindowInfo {
+         crate::windows::WindowInfo {
+             window_id,
+@@ -1362,3 +1816,138 @@ mod tests {
          ));
      }
  }
@@ -6488,6 +6863,50 @@ index 8a4c547..d4f6cb0 100644
 +            .unwrap();
 +        (hud, frame)
 +    }
++    #[test]
++    fn companion_completion_clock_survives_continuous_command_wakeups() {
++        let (mut hud, instruction) = fixture();
++        let mut completion = instruction.message.as_ref().clone();
++        completion.sequence += 1;
++        completion.kind = TeachingMessageKind::Completion;
++        let frame = hud
++            .present_message(
++                "host",
++                &completion.lesson_id.clone(),
++                CompanionHudLocale::English,
++                completion,
++            )
++            .unwrap();
++        let scene = hud.scene_token();
++        assert!(install_current_composite(
++            &mut hud,
++            &scene,
++            Some(&frame.token),
++            &[],
++            Instant::now(),
++            || Ok(())
++        ));
++        // A newly admitted scene after arbitrarily long complete idle must not skip its hold.
++        assert_eq!(elapsed_hud_time(Duration::from_secs(60), true, false), 0.0);
++        let mut cleared = false;
++        for _ in 0..80 {
++            let redraw = hud.tick(
++                elapsed_hud_time(Duration::from_millis(33), true, true),
++                true,
++            );
++            if hud.painter.message.message.is_none() {
++                assert!(redraw); // install the final cleared scene even with reduced motion
++                cleared = true;
++                break;
++            }
++        }
++        assert!(
++            cleared,
++            "incoming movement commands must not hold completion forever"
++        );
++        assert_eq!(frame.outcome(), RenderOutcome::Presented);
++    }
++
 +    #[test]
 +    fn companion_actual_composite_guard_rejects_invalid_drawing_and_old_hud_scene() {
 +        let (mut hud, message) = fixture();
@@ -7876,10 +8295,10 @@ index 0000000..f6f9d9a
 +}
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_tools.rs b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_tools.rs
 new file mode 100644
-index 0000000..b01c2fe
+index 0000000..18e0430
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/platform-macos/src/tools/companion_tools.rs
-@@ -0,0 +1,449 @@
+@@ -0,0 +1,535 @@
 +//! Native companion controller. This module never imports input executors.
 +//! A single desktop lease prevents competing agents from painting guidance.
 +use super::{cursor_tools::resolve_cursor_key, get_screen_size::main_screen_size, ToolState};
@@ -7903,6 +8322,14 @@ index 0000000..b01c2fe
 +};
 +use std::time::{Duration, Instant};
 +
++#[derive(Clone, Copy, PartialEq)]
++struct FollowingProjection {
++    generation: u64,
++    width: i64,
++    height: i64,
++    point: Option<(f64, f64)>,
++}
++
 +#[derive(Default)]
 +struct CompanionSession {
 +    owner: Option<String>,
@@ -7914,6 +8341,7 @@ index 0000000..b01c2fe
 +    fence: Arc<Mutex<cursor_overlay::guidance::FrameFence>>,
 +    revision: u64,
 +    pointer: Option<(f64, f64)>,
++    following_projection: Option<FollowingProjection>,
 +    generation: u64,
 +    follow_generation: u64,
 +    following: bool,
@@ -7921,6 +8349,44 @@ index 0000000..b01c2fe
 +    lease_until: Option<Instant>,
 +}
 +impl CompanionSession {
++    /// Keep polling takeover/lease state, but publish only changes to the visible follower.
++    fn create_following_frame(
++        &mut self,
++        pointer: (f64, f64),
++        width: i64,
++        height: i64,
++    ) -> Option<cursor_overlay::guidance::GuidanceFrame> {
++        let visible = pointer.0 >= 0.0
++            && pointer.1 >= 0.0
++            && pointer.0 < width as f64
++            && pointer.1 < height as f64;
++        let point = visible.then(|| {
++            (
++                (pointer.0 + 24.0).min(width as f64 - 2.0),
++                (pointer.1 + 24.0).min(height as f64 - 2.0),
++            )
++        });
++        let projection = FollowingProjection {
++            generation: self.generation,
++            width,
++            height,
++            point,
++        };
++        if self.following_projection == Some(projection) {
++            return None;
++        }
++        let frame = self.create_frame(
++            point.unwrap_or_else(|| self.pointer.unwrap_or((0.0, 0.0))),
++            vec![],
++            0.0,
++            false,
++            visible,
++            false,
++        );
++        self.following_projection = Some(projection);
++        Some(frame)
++    }
++
 +    fn begin_sequence(&mut self, session: &str) -> Result<u64, String> {
 +        if self.active || self.owner.as_deref().is_some_and(|owner| owner != session) {
 +            return Err("Desktop companion is busy.".into());
@@ -8076,18 +8542,10 @@ index 0000000..b01c2fe
 +                    cua_driver_core::cursor_sampler::read_cursor_position(),
 +                    main_screen_size(),
 +                ) {
-+                    let visible = x >= 0.0 && y >= 0.0 && x < width as f64 && y < height as f64;
-+                    if send(&session, OverlayCommand::SetEnabled(visible)).is_err() {
-+                        retire_owned_cursor(&mut state, &session);
-+                        break;
-+                    }
-+                    if visible {
-+                        let point = (
-+                            (x + 24.0).min(width as f64 - 2.0),
-+                            (y + 24.0).min(height as f64 - 2.0),
-+                        );
-+                        let frame = state.create_frame(point, vec![], 0.0, false, true, false);
-+                        if !crate::cursor::overlay::present_guidance_frame(&session, frame) {
++                    if let Some(frame) = state.create_following_frame((x, y), width, height) {
++                        if send(&session, OverlayCommand::SetEnabled(frame.visible)).is_err()
++                            || !crate::cursor::overlay::present_guidance_frame(&session, frame)
++                        {
 +                            retire_owned_cursor(&mut state, &session);
 +                            break;
 +                        }
@@ -8327,6 +8785,53 @@ index 0000000..b01c2fe
 +        );
 +        drop(guard);
 +        assert!(is_session_ended(&session));
++    }
++}
++
++#[cfg(test)]
++mod companion_following_memory_tests {
++    use super::*;
++
++    #[test]
++    fn companion_following_publishes_movement_visibility_and_generation_changes() {
++        let mut state = CompanionSession::default();
++        let initial = state
++            .create_following_frame((10.0, 20.0), 800, 600)
++            .unwrap();
++        assert_eq!(initial.pointer, (34.0, 44.0));
++        assert!(initial.visible);
++        for _ in 0..1000 {
++            assert!(state
++                .create_following_frame((10.0, 20.0), 800, 600)
++                .is_none());
++        }
++        assert_eq!(state.revision, initial.revision);
++        let moved = state
++            .create_following_frame((11.0, 20.0), 800, 600)
++            .unwrap();
++        assert!(moved.revision > initial.revision);
++        let hidden = state
++            .create_following_frame((-1.0, 20.0), 800, 600)
++            .unwrap();
++        assert!(!hidden.visible);
++        assert!(state
++            .create_following_frame((-20.0, 50.0), 800, 600)
++            .is_none());
++        assert!(
++            state
++                .create_following_frame((11.0, 20.0), 800, 600)
++                .unwrap()
++                .visible
++        );
++        state.generation += 1;
++        state.fence.lock().unwrap().generation = state.generation;
++        let resumed = state
++            .create_following_frame((11.0, 20.0), 800, 600)
++            .unwrap();
++        assert_eq!(resumed.generation, state.generation);
++        assert!(state
++            .create_following_frame((11.0, 20.0), 1024, 768)
++            .is_some());
 +    }
 +}
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/tools/desktop_observation_tools.rs b/libs/cua-driver/rust/crates/platform-macos/src/tools/desktop_observation_tools.rs
@@ -9048,6 +9553,23 @@ index 1bc6476..e28a24e 100644
          if full_size != (screenshot_width, screenshot_height) {
              structured["screenshot_original_width"] = serde_json::json!(full_size.0);
              structured["screenshot_original_height"] = serde_json::json!(full_size.1);
+diff --git a/libs/cua-driver/rust/crates/platform-macos/src/tools/get_screen_size.rs b/libs/cua-driver/rust/crates/platform-macos/src/tools/get_screen_size.rs
+index b18790a..eb6af90 100644
+--- a/libs/cua-driver/rust/crates/platform-macos/src/tools/get_screen_size.rs
++++ b/libs/cua-driver/rust/crates/platform-macos/src/tools/get_screen_size.rs
+@@ -59,6 +59,12 @@ impl Tool for GetScreenSizeTool {
+ /// which always returns `None` on async tokio threads, causing the tool to
+ /// return an error even when a display is attached.
+ pub(crate) fn main_screen_size() -> Option<(i64, i64, f64)> {
++    // Polling runs on long-lived Rust threads without an AppKit autorelease pool.
++    // Only numeric display metadata crosses this per-read ownership boundary.
++    objc2::rc::autoreleasepool(|_| read_main_screen_size())
++}
++
++fn read_main_screen_size() -> Option<(i64, i64, f64)> {
+     use core_graphics::display::{CGDisplayBounds, CGMainDisplayID};
+ 
+     // SAFETY: CGMainDisplayID / CGDisplayBounds are thread-safe CG APIs.
 diff --git a/libs/cua-driver/rust/crates/platform-macos/src/tools/mod.rs b/libs/cua-driver/rust/crates/platform-macos/src/tools/mod.rs
 index b6ec2b0..74f2153 100644
 --- a/libs/cua-driver/rust/crates/platform-macos/src/tools/mod.rs

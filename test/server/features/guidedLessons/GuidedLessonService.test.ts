@@ -2,7 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { LessonPhase, LessonStatus, type GuidedLessonCommand } from '#contracts/GuidedLessons.js';
 import { GuidedLessonService } from '../../../../src/server/features/guidedLessons/application/GuidedLessonService.js';
-import type { LessonRecord } from '../../../../src/server/features/guidedLessons/application/LessonState.js';
+import {
+  LessonReceiptSchema,
+  type LessonRecord,
+} from '../../../../src/server/features/guidedLessons/application/LessonState.js';
 import type {
   LessonModel,
   LessonRenderer,
@@ -181,6 +184,123 @@ describe('guided lesson authorization, learning gates and paid attempt lifecycle
     await expect(
       fixture.service.execute('student', { ...command, commandId: randomUUID() }),
     ).rejects.toMatchObject({ code: 'versionConflict' });
+  });
+
+  it('replays pending help receipts without consuming another hint and suppresses them after progress changes', async () => {
+    const fixture = setup();
+    await fixture.service.execute('student', {
+      action: 'progress',
+      ...studentBase(fixture.record, 0),
+      sceneId: 'predict',
+      intent: 'revisit',
+      frame: 0,
+      reflection: '',
+    });
+    const command: Extract<GuidedLessonCommand, { action: 'help' }> = {
+      action: 'help',
+      ...studentBase(fixture.record, 1),
+      sceneId: 'predict',
+      message: 'What should I consider?',
+    };
+    const hint = await fixture.service.execute('student', command);
+    expect(hint).toMatchObject({ kind: 'hint', hintId: 'hint-1' });
+    expect(await fixture.service.execute('student', command)).toEqual(hint);
+    expect(fixture.store.progress.get('student:release-1')).toMatchObject({
+      version: 2,
+      hintIds: ['hint-1'],
+    });
+    const receiptKey = `student:${command.commandId}`;
+    const receipt = fixture.store.receipts.get(receiptKey);
+    expect(receipt?.progressVersion).toBe(2);
+    // Old JSON documents remain valid, and a same-position legacy hint remains safe to replay.
+    const legacyReceipt = LessonReceiptSchema.parse({
+      digest: hashLessonValue(command),
+      reply: hint,
+    });
+    fixture.store.receipts.set(receiptKey, legacyReceipt);
+    expect(await fixture.service.execute('student', command)).toEqual(hint);
+    fixture.store.receipts.set(receiptKey, LessonReceiptSchema.parse(receipt));
+    await expect(
+      fixture.service.execute('student', { ...command, message: 'A different question.' }),
+    ).rejects.toMatchObject({ code: 'versionConflict' });
+    const exhaustedCommand: Extract<GuidedLessonCommand, { action: 'help' }> = {
+      ...command,
+      commandId: randomUUID(),
+      expectedProgressVersion: 2,
+    };
+    const exhausted = await fixture.service.execute('student', exhaustedCommand);
+    expect(exhausted).toMatchObject({
+      kind: 'help',
+      result: { kind: 'insufficientContext' },
+    });
+    expect(await fixture.service.execute('student', exhaustedCommand)).toEqual(exhausted);
+    expect(fixture.store.progress.get('student:release-1')?.version).toBe(3);
+    expect((await fixture.service.execute('student', command)).kind).toBe('projection');
+    await fixture.service.execute('student', {
+      action: 'progress',
+      ...studentBase(fixture.record, 3),
+      sceneId: 'predict',
+      intent: 'workedAnswer',
+      frame: 0,
+      reflection: '',
+    });
+    expect((await fixture.service.execute('student', exhaustedCommand)).kind).toBe('projection');
+    expect(fixture.generate).not.toHaveBeenCalled();
+    await fixture.store.withdrawLessonReleases(fixture.record.id);
+    await expect(fixture.service.execute('student', command)).rejects.toMatchObject({
+      code: 'forbidden',
+    });
+  });
+
+  it('does not replay a worked answer after Retry or later progress at the same checkpoint', async () => {
+    const fixture = setup();
+    fixture.generate.mockResolvedValue({
+      result: {
+        kind: 'answer',
+        text: 'The running total is now two.',
+        sourceRefs: [{ passageId: 'passage-1', startOffset: 0, endOffset: 10 }],
+      },
+      usage: { inputTokens: 100, outputTokens: 20 },
+    });
+    await fixture.service.execute('student', {
+      action: 'progress',
+      ...studentBase(fixture.record, 0),
+      sceneId: 'predict',
+      intent: 'workedAnswer',
+      frame: 0,
+      reflection: '',
+    });
+    const command: Extract<GuidedLessonCommand, { action: 'help' }> = {
+      action: 'help',
+      ...studentBase(fixture.record, 1),
+      sceneId: 'predict',
+      message: 'Explain the worked result.',
+    };
+    const answer = await fixture.service.execute('student', command);
+    expect(answer).toMatchObject({ kind: 'help', result: { kind: 'answer' } });
+    expect(await fixture.service.execute('student', command)).toEqual(answer);
+    await fixture.service.execute('student', {
+      action: 'progress',
+      ...studentBase(fixture.record, 1),
+      sceneId: 'predict',
+      intent: 'retry',
+      frame: 0,
+      reflection: '',
+    });
+    const pendingReplay = await fixture.service.execute('student', command);
+    expect(pendingReplay.kind === 'projection' && pendingReplay.projection.phase).toBe(
+      LessonPhase.PREDICT,
+    );
+    await fixture.service.execute('student', {
+      action: 'progress',
+      ...studentBase(fixture.record, 2),
+      sceneId: 'predict',
+      intent: 'workedAnswer',
+      frame: 0,
+      reflection: '',
+    });
+    expect((await fixture.service.execute('student', command)).kind).toBe('projection');
+    expect(fixture.generate).toHaveBeenCalledTimes(1);
   });
 
   it('keeps private notes separate across students and rejects a fabricated anchor', async () => {
@@ -612,6 +732,154 @@ describe('guided lesson authorization, learning gates and paid attempt lifecycle
         expectedVersion: record?.version ?? 0,
       }),
     ).rejects.toMatchObject({ code: 'usageUncertain' });
+  });
+
+  it('allows the initial approved render and one idempotent render retry before requiring a new admitted run', async () => {
+    const fixture = setup();
+    const day = await fixture.store.runAtomically((transaction) =>
+      admitLessonRun(transaction, 'teacher', now()),
+    );
+    const record: LessonRecord = {
+      ...fixture.record,
+      status: LessonStatus.AWAITING_SCRIPT_APPROVAL,
+      scriptApproval: {
+        commandId: randomUUID(),
+        contentHash: fixture.record.contentHash ?? '',
+        at: now().toISOString(),
+      },
+      run: {
+        id: 'render-retry-run',
+        day,
+        stage: LessonStatus.AWAITING_SCRIPT_APPROVAL,
+        claimId: null,
+        leaseUntil: null,
+        dispatched: false,
+        contentRepairs: 0,
+        visualRepairs: 0,
+        physicalAttempts: 0,
+        inputTokens: 400000,
+        outputTokens: 150000,
+        speechAttempts: 0,
+        speechCharacters: 0,
+        renderRetries: 0,
+      },
+    };
+    fixture.store.lessons.set(record.id, record);
+    const initial = await fixture.service.execute('teacher', {
+      action: 'render',
+      commandId: randomUUID(),
+      classId: record.classId,
+      lessonId: record.id,
+      expectedVersion: record.version,
+    });
+    expect(initial.kind === 'detail' && initial.lesson.status).toBe(LessonStatus.SYNTHESIZING);
+    const rendering = fixture.store.lessons.get(record.id);
+    if (!rendering?.run) {
+      throw new Error('Missing initial render run.');
+    }
+    expect(rendering.run.renderRetries).toBe(0);
+    const failed = { ...rendering, status: LessonStatus.FAILED };
+    fixture.store.lessons.set(record.id, failed);
+    const command: GuidedLessonCommand = {
+      action: 'render',
+      commandId: randomUUID(),
+      classId: record.classId,
+      lessonId: record.id,
+      expectedVersion: failed.version,
+    };
+    const retry = await fixture.service.execute('teacher', command);
+    expect(await fixture.service.execute('teacher', command)).toEqual(retry);
+    const retried = fixture.store.lessons.get(record.id);
+    if (!retried?.run) {
+      throw new Error('Missing retried render run.');
+    }
+    expect(retried.run).toMatchObject({
+      id: 'render-retry-run',
+      renderRetries: 1,
+      inputTokens: 400000,
+      outputTokens: 150000,
+    });
+    fixture.store.lessons.set(record.id, { ...retried, status: LessonStatus.BUDGET_BLOCKED });
+    await expect(
+      fixture.service.execute('teacher', {
+        ...command,
+        commandId: randomUUID(),
+        expectedVersion: retried.version,
+      }),
+    ).rejects.toMatchObject({ code: 'budgetBlocked' });
+    expect(fixture.store.lessons.get(record.id)?.run?.renderRetries).toBe(1);
+    expect(fixture.store.budgets.get(`teacher:${day}`)?.runs).toBe(1);
+    const restart = await fixture.service.execute('teacher', {
+      action: 'retry',
+      commandId: randomUUID(),
+      classId: record.classId,
+      lessonId: record.id,
+      expectedVersion: retried.version,
+    });
+    expect(restart.kind === 'detail' && restart.lesson.status).toBe(LessonStatus.ADMITTED);
+    expect(fixture.store.lessons.get(record.id)?.run?.renderRetries).toBe(0);
+    expect(fixture.store.budgets.get(`teacher:${day}`)?.runs).toBe(2);
+  });
+
+  it('preserves the render retry bound across daily admission changes', async () => {
+    const fixture = setup();
+    const record: LessonRecord = {
+      ...fixture.record,
+      status: LessonStatus.FAILED,
+      scriptApproval: {
+        commandId: randomUUID(),
+        contentHash: fixture.record.contentHash ?? '',
+        at: now().toISOString(),
+      },
+      run: {
+        id: 'previous-day-render-run',
+        day: '2026-10-08',
+        stage: LessonStatus.RENDERING,
+        claimId: null,
+        leaseUntil: null,
+        dispatched: false,
+        contentRepairs: 0,
+        visualRepairs: 0,
+        physicalAttempts: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        speechAttempts: 0,
+        speechCharacters: 0,
+        renderRetries: 0,
+      },
+    };
+    fixture.store.lessons.set(record.id, record);
+    await fixture.service.execute('teacher', {
+      action: 'render',
+      commandId: randomUUID(),
+      classId: record.classId,
+      lessonId: record.id,
+      expectedVersion: record.version,
+    });
+    const retried = fixture.store.lessons.get(record.id);
+    if (!retried?.run) {
+      throw new Error('Missing next-day render retry.');
+    }
+    expect(retried.run).toMatchObject({ day: '2026-10-09', renderRetries: 1 });
+    fixture.store.lessons.set(record.id, { ...retried, status: LessonStatus.FAILED });
+    const nextDay = new GuidedLessonService(
+      fixture.store,
+      fixture.model,
+      fixture.speech,
+      fixture.renderer,
+      () => new Date('2026-10-10T12:00:00.000Z'),
+    );
+    await expect(
+      nextDay.execute('teacher', {
+        action: 'render',
+        commandId: randomUUID(),
+        classId: record.classId,
+        lessonId: record.id,
+        expectedVersion: retried.version,
+      }),
+    ).rejects.toMatchObject({ code: 'budgetBlocked' });
+    expect(fixture.store.budgets.has('teacher:2026-10-10')).toBe(false);
+    expect(fixture.store.lessons.get(record.id)?.run).toEqual(retried.run);
   });
 
   it('charges known usage for malformed output and stops without a hidden format repair', async () => {

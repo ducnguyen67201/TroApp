@@ -12,7 +12,7 @@ import {
 } from '@mantine/core';
 import { IconArrowUp, IconBrandGoogle, IconPlus } from '@tabler/icons-react';
 import { TroIcon } from './TroIcon.js';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { AgentTaskMode, AgentTaskModeSchema } from '#contracts/CursorCompanion.js';
 import { useLocale } from './localization/UseLocale.js';
 import { TeachingOutcomeLabel } from './TeachingResultPresentation.js';
@@ -21,10 +21,11 @@ import { CompletionMode, TaskOutcomeStatus } from '#contracts/TaskOutcome.js';
 
 interface ComputerUsePageProps {
   controller: ComputerUseController;
+  signInActions?: ReactNode;
 }
 
 /** The workspace uses the existing worker bridge; it never calls models directly. */
-export function ComputerUsePage({ controller }: ComputerUsePageProps): ReactElement {
+export function ComputerUsePage({ controller, signInActions }: ComputerUsePageProps): ReactElement {
   const { messages: translations } = useLocale();
   const { user, isLoading, isSigning, isSending, isSigningOut, isResetting, messages } = controller;
   const firstName = user?.name.trim().split(/\s+/)[0];
@@ -78,10 +79,12 @@ export function ComputerUsePage({ controller }: ComputerUsePageProps): ReactElem
           <Button
             leftSection={<IconBrandGoogle size={16} />}
             loading={isSigning}
+            disabled={controller.isSwitchingAccount || isSigningOut}
             onClick={() => void controller.signInWithGoogle()}
           >
             {isSigning ? translations.waitingForGoogle : translations.continueWithGoogle}
           </Button>
+          {signInActions}
         </div>
       ) : (
         <>

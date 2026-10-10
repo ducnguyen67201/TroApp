@@ -145,7 +145,7 @@ export const english = {
   name: 'Name',
   email: 'Email',
   signOutHint: 'You can sign out from the sidebar.',
-  accountSignInHint: 'Sign in from the sidebar to see your account.',
+  accountSignInHint: 'Sign in to see your account.',
   appearance: 'Appearance',
   appearanceDescription: 'A simple, warm light theme.',
   light: 'Light',
