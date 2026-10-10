@@ -1,7 +1,7 @@
 # Tro architecture
 
 This is the single maintained description of Tro's implemented system. Updated
-October 8, 2026. Change this document when ownership, component communication or
+October 9, 2026. Change this document when ownership, component communication or
 an architectural invariant changes. Contracts and configuration in the linked code
 own exact wire shapes and policy values. Setup and validation commands live in the
 [root README](../README.md). Research and UI prototypes are reference material,
@@ -14,6 +14,7 @@ not requirements or evidence that a capability exists.
 - [Native companion and HUD](#native-companion-and-hud)
 - [Voice input and narration](#voice-input-and-narration)
 - [Classroom and materials](#classroom-and-materials)
+- [Guided lessons beta](#guided-lessons-beta)
 - [Local presentation and app updates](#local-presentation-and-app-updates)
 - [Code ownership](#code-ownership)
 - [Verification and current limits](#verification-and-current-limits)
@@ -671,6 +672,107 @@ and deterministic report wording. Stored projections, a separate analytics worke
 private object storage, cross-center roles, AI wording and PDF generation remain
 future scopes that require measured demand and their own validation. A real center still requires its collection decision and a reconciled pilot.
 
+## Guided lessons beta
+
+Guided Lessons is an always available navbar destination, labelled **Guided lessons
+(Beta)** / **Bài giảng hướng dẫn (Thử nghiệm)**. No flag or class allowlist gates it.
+The implemented creation scope is deliberately small: approved course passages and
+teacher confirmed Python integer accumulator examples, optionally with a separately
+approved input variant for Try. It does not turn arbitrary lectures or executable
+programs into videos. Figure contracts exist for future qualification, but figure
+creation is not admitted by this beta. A live classroom session or device lease is
+not required for home study.
+
+```mermaid
+flowchart LR
+  Sources[Approved publication and corrections] --> Draft[Bounded structured draft]
+  Draft --> Review[Validation and content review]
+  Review --> Script[Teacher script approval]
+  Script --> Speech[Persist exact speech beats]
+  Speech --> Render[Trusted Remotion presentation]
+  Render --> Visual[Rendered evidence and visual review]
+  Visual --> Preview[Teacher preview approval]
+  Preview --> Release[Immutable class release]
+  Release --> Player[Authorized phase player and private notes]
+```
+
+[GuidedLessons.ts](../src/contracts/GuidedLessons.ts) owns the public schemas.
+[GuidedLessonService.ts](../src/server/features/guidedLessons/application/GuidedLessonService.ts)
+owns class/enrollment authorization, idempotent commands, version checks, approvals,
+release availability, formative attempts and private notebook anchors. PostgreSQL
+stores validated aggregate JSON with indexed identities, versions and leases;
+immutable release snapshots and binary artifacts have separate Prisma records.
+Serializable transactions combine authorization and state mutations. This keeps
+the workflow inside the modular monolith without a new queue or service.
+
+[BuildLessonInput.ts](../src/server/features/guidedLessons/application/BuildLessonInput.ts)
+selects material from an immutable approved publication. Teacher page and document
+corrections remain separate citable entries with their own UTF-16 ranges and text
+digests; they never overwrite source text. The restricted
+[CompileAccumulator.ts](../src/server/features/guidedLessons/domain/CompileAccumulator.ts)
+calculates every trace state without executing Python. Semantic validation checks
+source ranges, compiler output, qualified templates, checkpoint references and
+approved practice variants. Generated TypeScript, JSX, arbitrary code, remote asset
+URLs and renderer bundles are never accepted as model output.
+
+[LessonGeneration.ts](../src/server/features/guidedLessons/application/LessonGeneration.ts)
+advances one durable stage at a time. It allows at most one content repair and one
+presentation repair. Saving script edits invalidates approvals and requires an
+explicit new review run; it never starts a model request implicitly.
+[LessonBudget.ts](../src/server/features/guidedLessons/application/LessonBudget.ts)
+owns physical attempt and token/character limits, reserved before dispatch. Provider
+usage settles even after an obsolete claim loses ownership. A lost dispatched
+request becomes uncertain and is not automatically replayed. Speech attempts are
+separate from content/vision calls. Help has a separate student allowance; replay,
+notes and deterministic grading do not invoke a model.
+
+[LessonPrompts.ts](../src/server/features/guidedLessons/infrastructure/LessonPrompts.ts)
+contains versioned author, critic, repair, visual critic, visual repair, contextual
+help and English/Vietnamese narration prompts with digests. Provider adapters
+count the same structured input they dispatch and disable SDK retries. Source text
+is untrusted data. Exact approved narration is persisted per beat before rendering;
+its decoded PCM sample duration sets the frame clock. Presentation repairs may
+change only qualified layout, caption slots and bounded holds/update delays.
+
+[LessonComposition.tsx](../src/lessonMedia/LessonComposition.tsx) is shared by
+Remotion Player and the backend renderer. Pinned Noto font bytes and trusted source
+identity are recorded in the manifest; a mismatched desktop asks for an update.
+[BuildLessonBundle.ts](../scripts/BuildLessonBundle.ts) packages the trusted
+composition and pinned Chrome for Testing for the backend build. A credential-free child
+renders actual PNG evidence and geometry for phase/cue samples. Essential text
+must fit its region at the qualified canvas/player scale. The renderer admits one
+child per API instance, bounds payload/output, sets a Node heap limit, monitors the
+worker/Chromium process tree against a resident-memory ceiling and terminates it on
+abort/deadline. The memory watchdog samples once per second; a production container
+memory limit remains the hard OS boundary. Backend rendering targets Linux/macOS;
+Windows desktop playback uses the same bundled presentation.
+
+Machine image review does not certify pronunciation or continuous motion. Teachers
+must inspect pending and worked checkpoint phases, evidence, and actual audio/video
+playback before approving the exact manifest and releasing it. This is a qualified
+interactive presentation with narration; the beta does not export a single MP4.
+The published artifact is the immutable plan, speech and frame timeline used by the
+player. A failed graphics or provider stage remains visible for explicit revision.
+
+[BuildLessonProjection.ts](../src/server/features/guidedLessons/domain/BuildLessonProjection.ts)
+is the sole student projection. It rebases cues per scene and phase and withholds
+worked narration, after states and their artifact IDs until the formative gate is
+resolved or explicitly revealed. The server grades against canonical traces;
+student seeking cannot unlock another phase. These are teaching gates, not exam
+security: students can infer answers from the approved source code. Enrollment,
+source publication and release availability are checked on every read and command.
+The desktop holds only current/next authorized media, verifies digests, revokes Blob
+URLs on identity changes and pauses while buffering or using help/notes.
+
+Private notes are owner-only, versioned and anchored to release, scene, phase, frame
+and optional source range. Publishing a revised lesson preserves earlier releases
+for exact note revisits; explicit withdrawal blocks all versions. Notes are excluded from generation, help prompts and
+teacher insights. Initial note retention is 180 days; failed/cancelled unreferenced
+media expires after seven days while active releases and approval workflows retain
+media. Explicit student explanation requests go to the teacher's request queue;
+teachers can reuse a release, reply in text, defer to live teaching or start a draft.
+Requests never cause automatic video generation.
+
 ## Local presentation and app updates
 
 Mantine defaults and semantic styling belong in `Theme.ts` and
@@ -723,6 +825,7 @@ try-on generation remain future work; there is no implemented try-on job pipelin
 | Chat and worker composition      | [AgentChatController.ts](../src/desktop/main/AgentChatController.ts), [ComputerUseTaskRunner.ts](../src/desktop/worker/agent/ComputerUseTaskRunner.ts)                                                                                                                                                                                                       |
 | Execution and verification       | [TaskHarness.ts](../src/desktop/worker/execution/TaskHarness.ts), [TaskVerifier.ts](../src/desktop/worker/execution/TaskVerifier.ts), [CompletionGate.ts](../src/desktop/worker/execution/CompletionGate.ts)                                                                                                                                                 |
 | Teaching and native tool adapter | [TeachingTaskRunner.ts](../src/desktop/worker/teaching/TeachingTaskRunner.ts), [TeachingPresenter.ts](../src/desktop/worker/teaching/TeachingPresenter.ts), [LoggedCuaServer.ts](../src/desktop/worker/cua/LoggedCuaServer.ts)                                                                                                                               |
+| Guided lessons                   | [GuidedLessonService.ts](../src/server/features/guidedLessons/application/GuidedLessonService.ts), [GuidedLessons.ts](../src/contracts/GuidedLessons.ts), [LessonComposition.tsx](../src/lessonMedia/LessonComposition.tsx), [GuidedLessonsPage.tsx](../src/desktop/renderer/guidedLessons/GuidedLessonsPage.tsx)                                            |
 | Local observation                | [DesktopObservationClient.ts](../src/desktop/worker/observation/DesktopObservationClient.ts), [TeachingObservationPolicy.ts](../src/desktop/worker/observation/TeachingObservationPolicy.ts)                                                                                                                                                                 |
 | Companion presentation           | [DesktopCompanion.ts](../src/desktop/main/companion/DesktopCompanion.ts), [CompanionHudPublisher.ts](../src/desktop/worker/companion/CompanionHudPublisher.ts)                                                                                                                                                                                               |
 | Voice and microphones            | [VoiceInputController.ts](../src/desktop/main/voice/VoiceInputController.ts), [VoiceoverController.ts](../src/desktop/main/voiceover/VoiceoverController.ts), [Microphones.ts](../src/desktop/renderer/voice/Microphones.ts)                                                                                                                                 |

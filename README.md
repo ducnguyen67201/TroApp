@@ -46,14 +46,14 @@ container, not the development database.
 
 ## Configuration
 
-| Process                                     | Settings                                                                                                                                                                                                       |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Backend                                     | `DATABASE_URL` and unique `AUTH_SECRET` are required. `APP_ENV=dev                                                                                                                                             | stage | prod`, `HOST`, `PORT`and`AUTH_BASE_URL` select the API environment/address. |
-| Google sign-in                              | Backend-only `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Register the web OAuth redirect as `AUTH_BASE_URL + /api/auth/callback/google`; local default is `http://127.0.0.1:3000/api/auth/callback/google`. |
-| Chat, transcription, materials and practice | Backend-only `OPENAI_API_KEY`. Feature budgets and settings are validated in [server Env.ts](src/server/Env.ts) and owning config modules. The API can start with provider features unavailable.               |
-| HUD narration                               | Backend-only `OPENAI_API_KEY` (shared with other OpenAI features); speech model, instructions and locale/voice mapping belongs in [VoiceoverConfig.ts](src/server/features/voiceover/VoiceoverConfig.ts).      |
-| Desktop                                     | Public `MAIN_VITE_API_BASE_URL` and `MAIN_VITE_APP_ENV`. Local defaults work without overrides; `.env.local` may override these public values. `ELECTRON_RENDERER_URL` is supplied by electron-vite.           |
-| Installed updates                           | Public build-time `MAIN_VITE_UPDATE_FEED_URL`, an HTTPS release directory. Unset disables updates.                                                                                                             |
+| Process                                                     | Settings                                                                                                                                                                                                       |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend                                                     | `DATABASE_URL` and unique `AUTH_SECRET` are required. `APP_ENV=dev                                                                                                                                             | stage | prod`, `HOST`, `PORT`and`AUTH_BASE_URL` select the API environment/address. |
+| Google sign-in                                              | Backend-only `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Register the web OAuth redirect as `AUTH_BASE_URL + /api/auth/callback/google`; local default is `http://127.0.0.1:3000/api/auth/callback/google`. |
+| Chat, transcription, materials, practice and guided lessons | Backend-only `OPENAI_API_KEY`. Feature budgets and settings are validated in [server Env.ts](src/server/Env.ts) and owning config modules. The API can start with provider features unavailable.               |
+| HUD narration                                               | Backend-only `OPENAI_API_KEY` (shared with other OpenAI features); speech model, instructions and locale/voice mapping belongs in [VoiceoverConfig.ts](src/server/features/voiceover/VoiceoverConfig.ts).      |
+| Desktop                                                     | Public `MAIN_VITE_API_BASE_URL` and `MAIN_VITE_APP_ENV`. Local defaults work without overrides; `.env.local` may override these public values. `ELECTRON_RENDERER_URL` is supplied by electron-vite.           |
+| Installed updates                                           | Public build-time `MAIN_VITE_UPDATE_FEED_URL`, an HTTPS release directory. Unset disables updates.                                                                                                             |
 
 Keep backend credentials in `tro-api`, never `tro-local` or Electron. T3 Env modules
 validate runtime values; they do not inject secrets. JSON file configuration is
@@ -136,6 +136,27 @@ class summaries and teacher reports. Access follows class ownership/enrollment.
 Collection records accepted classroom work; historical work is not imported
 implicitly. Backend collection and retention settings live in
 [Env.ts](src/server/Env.ts), with 180-day retention by default.
+
+Guided Lessons is available immediately in the navbar as **Guided lessons (Beta)**
+(**Bài giảng hướng dẫn (Thử nghiệm)**). Teachers select passages from an approved
+publication, confirm a supported Python integer running-total example, optionally
+confirm a separate practice input, and explicitly start generation. Review and
+approve the script, make a private narrated preview, inspect every scene/checkpoint
+phase and evidence item, then approve and release it. Enrolled students can study
+at home, answer formative questions, request help and keep private anchored notes.
+Explicit student requests enter the teacher queue without generating media.
+
+Generation needs the backend `OPENAI_API_KEY`; model/speech settings are validated
+in [Env.ts](src/server/Env.ts), and bounded allowances live in
+[LessonBudget.ts](src/server/features/guidedLessons/application/LessonBudget.ts).
+There is no feature flag. Missing provider configuration leaves the navigation and
+library available with an explicit generation failure. `pnpm dev:api` and
+`pnpm build:api` package the trusted Remotion composition, fonts and render browser;
+the first build downloads pinned Chrome for Testing for isolated rendering. `pnpm build` packages the
+matching desktop. Desktop builds also regenerate the matching presentation identity. The Dockerfile includes rendering libraries.
+Use a Linux backend with a container memory limit in addition to the render watchdog.
+No paid provider calls are needed for validation. The beta publishes interactive
+narrated lessons, with no MP4 export or arbitrary-code execution.
 
 ## Validation
 

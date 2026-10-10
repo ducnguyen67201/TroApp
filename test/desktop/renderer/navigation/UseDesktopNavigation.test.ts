@@ -43,3 +43,19 @@ it('opens insights directly from navigation and returns to classes', () => {
   });
   expect(result.current.route.page).toBe(DesktopPage.CLASSROOM);
 });
+
+it('navigates to guided lessons without replacing classroom history', () => {
+  const classId = '11111111-1111-4111-8111-111111111111';
+  const { result } = renderHook(useDesktopNavigation);
+  act(() => {
+    result.current.openGuidedLessons(classId);
+  });
+  expect(result.current.route).toMatchObject({
+    page: DesktopPage.GUIDED_LESSONS,
+    classId,
+  });
+  act(() => {
+    result.current.openClassroom();
+  });
+  expect(result.current.route.page).toBe(DesktopPage.CLASSROOM);
+});

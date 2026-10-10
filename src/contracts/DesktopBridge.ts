@@ -1,3 +1,10 @@
+import type {
+  GuidedLessonReadRequest,
+  GuidedLessonCommand,
+  GuidedLessonReply,
+  GuidedLessonArtifactRequest,
+  GuidedLessonArtifactReply,
+} from './GuidedLessons.js';
 import type { PracticeCaptureCommand, PracticeCaptureReply } from './PracticeCapture.js';
 import type { PetCommand, PetReply, PetSnapshot } from './Pet.js';
 import type { PracticeShortcutEvent } from './PracticeShortcut.js';
@@ -35,6 +42,11 @@ import type { ClassroomCommand, ClassroomReply } from './Classroom.js';
  * turns and controls the worker lifecycle.
  */
 export interface DesktopBridge {
+  readGuidedLessons?: (request: GuidedLessonReadRequest) => Promise<GuidedLessonReply>;
+  commandGuidedLesson?: (command: GuidedLessonCommand) => Promise<GuidedLessonReply>;
+  readGuidedLessonArtifact?: (
+    request: GuidedLessonArtifactRequest,
+  ) => Promise<GuidedLessonArtifactReply>;
   readPets?: () => Promise<PetReply>;
   controlPet?: (command: PetCommand) => Promise<PetReply>;
   subscribePet?: (listener: (snapshot: PetSnapshot) => void) => () => void;

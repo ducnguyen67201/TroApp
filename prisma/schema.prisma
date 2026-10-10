@@ -66,6 +66,7 @@ model ClassroomCourseRevision {
 }
 
 model ClassroomGroup {
+  guidedLessons GuidedLessonRecord[]
   materialDerivations ClassroomMaterialDerivation[]
   id String @id @db.Uuid
   teacherId String
@@ -86,6 +87,105 @@ model ClassroomGroup {
   @@index([teacherId])
   materialCollection ClassroomMaterialCollection?
   materialFiles ClassroomMaterialFile[]
+}
+
+// Guided lesson drafts use validated aggregate documents. Immutable revisions,
+// releases, command receipts, allowances and private learner records stay separate.
+model GuidedLessonRecord {
+  id String @id @db.Uuid
+  classId String @db.Uuid
+  schoolClass ClassroomGroup @relation(fields: [classId], references: [id], onDelete: Restrict)
+  version Int
+  status String
+  leaseUntil DateTime?
+  document Json
+  updatedAt DateTime @updatedAt
+  revisions GuidedLessonRevisionRecord[]
+  releases GuidedLessonReleaseRecord[]
+  artifacts GuidedLessonArtifactRecord[]
+  @@index([classId, updatedAt])
+  @@index([status, leaseUntil])
+}
+
+model GuidedLessonRevisionRecord {
+  id String @id @db.Uuid
+  lessonId String @db.Uuid
+  lesson GuidedLessonRecord @relation(fields: [lessonId], references: [id], onDelete: Restrict)
+  document Json
+  createdAt DateTime @default(now())
+  @@index([lessonId, createdAt])
+}
+
+model GuidedLessonReleaseRecord {
+  id String @id @db.Uuid
+  lessonId String @db.Uuid
+  classId String @db.Uuid
+  lesson GuidedLessonRecord @relation(fields: [lessonId], references: [id], onDelete: Restrict)
+  available Boolean
+  document Json
+  createdAt DateTime @default(now())
+  @@index([classId, available])
+}
+
+model GuidedLessonBudgetRecord {
+  id String @id
+  version Int
+  document Json
+}
+
+model GuidedLessonCommandRecord {
+  userId String
+  commandId String @db.Uuid
+  classId String @db.Uuid
+  document Json
+  createdAt DateTime @default(now())
+  @@id([userId, commandId])
+}
+
+model GuidedLessonProgressRecord {
+  studentId String
+  releaseId String @db.Uuid
+  version Int
+  document Json
+  @@id([studentId, releaseId])
+}
+
+model GuidedLessonNoteRecord {
+  id String @id @db.Uuid
+  studentId String
+  classId String @db.Uuid
+  releaseId String @db.Uuid
+  version Int
+  document Json
+  updatedAt DateTime @updatedAt
+  @@index([studentId, releaseId])
+}
+
+model GuidedLessonRequestRecord {
+  id String @id @db.Uuid
+  classId String @db.Uuid
+  studentId String
+  document Json
+  createdAt DateTime @default(now())
+  @@index([classId, createdAt])
+}
+
+model GuidedLessonArtifactRecord {
+  id String @id @db.Uuid
+  classId String @db.Uuid
+  lessonId String @db.Uuid
+  lesson GuidedLessonRecord @relation(fields: [lessonId], references: [id], onDelete: Restrict)
+  revisionId String @db.Uuid
+  kind String
+  mimeType String
+  digest String
+  sceneId String?
+  phase String?
+  bytes Bytes
+  size Int
+  createdAt DateTime @default(now())
+  @@index([classId])
+  @@index([lessonId, revisionId])
 }
 
 model ClassroomEnrollment {

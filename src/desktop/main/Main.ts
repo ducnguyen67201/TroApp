@@ -1,3 +1,13 @@
+import {
+  GuidedLessonReadRequestSchema,
+  GuidedLessonCommandSchema,
+  GuidedLessonArtifactRequestSchema,
+  GuidedLessonFailure,
+} from '#contracts/GuidedLessons.js';
+import {
+  GuidedLessonApiClient,
+  failure as guidedLessonFailure,
+} from './guidedLessons/GuidedLessonApiClient.js';
 import { PetController } from './pets/PetController.js';
 import { PetWindow } from './pets/PetWindow.js';
 import { PetPreferences } from './pets/PetPreferences.js';
@@ -621,6 +631,48 @@ async function startDesktop(): Promise<void> {
   agentWorker.setClassroomToolHandler((command, context) =>
     classroomController.executeTool(command, context),
   );
+  const guidedLessonApi = new GuidedLessonApiClient(environment.API_BASE_URL, () =>
+    auth.readCookie(),
+  );
+  ipcMain.handle('tro:guided-lesson-read', (event, raw: unknown) => {
+    if (!isTrustedSender(event)) {
+      return guidedLessonFailure(GuidedLessonFailure.UNAUTHORIZED);
+    }
+    const parsed = GuidedLessonReadRequestSchema.safeParse(raw);
+    if (!parsed.success) {
+      return guidedLessonFailure(GuidedLessonFailure.INVALID_REQUEST);
+    }
+    return accountGate.runRequest(
+      () => guidedLessonApi.read(parsed.data),
+      guidedLessonFailure(GuidedLessonFailure.UNAVAILABLE),
+    );
+  });
+  ipcMain.handle('tro:guided-lesson-command', (event, raw: unknown) => {
+    if (!isTrustedSender(event)) {
+      return guidedLessonFailure(GuidedLessonFailure.UNAUTHORIZED);
+    }
+    const parsed = GuidedLessonCommandSchema.safeParse(raw);
+    if (!parsed.success) {
+      return guidedLessonFailure(GuidedLessonFailure.INVALID_REQUEST);
+    }
+    return accountGate.runRequest(
+      () => guidedLessonApi.command(parsed.data),
+      guidedLessonFailure(GuidedLessonFailure.UNAVAILABLE),
+    );
+  });
+  ipcMain.handle('tro:guided-lesson-artifact', (event, raw: unknown) => {
+    if (!isTrustedSender(event)) {
+      return guidedLessonFailure(GuidedLessonFailure.UNAUTHORIZED);
+    }
+    const parsed = GuidedLessonArtifactRequestSchema.safeParse(raw);
+    if (!parsed.success) {
+      return guidedLessonFailure(GuidedLessonFailure.INVALID_REQUEST);
+    }
+    return accountGate.runRequest(
+      () => guidedLessonApi.readArtifact(parsed.data),
+      guidedLessonFailure(GuidedLessonFailure.UNAVAILABLE),
+    );
+  });
   const materialApi = new MaterialApiClient(
     environment.API_BASE_URL,
     () => auth.readCookie(),

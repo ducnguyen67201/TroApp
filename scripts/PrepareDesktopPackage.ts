@@ -20,6 +20,8 @@ const packageMetadata = z
 
 await cp('scripts/DesktopEntitlements.plist', 'out/DesktopEntitlements.plist');
 await cp('src/desktop/assets/pets/PageMascotLicense.txt', 'out/renderer/PageMascotLicense.txt');
+await cp('node_modules/@fontsource/noto-sans/LICENSE', 'out/renderer/NotoSansLicense.txt');
+await cp('node_modules/@fontsource/noto-sans-mono/LICENSE', 'out/renderer/NotoSansMonoLicense.txt');
 await cp('src/desktop/assets', 'out/branding', { recursive: true });
 const require = createRequire(import.meta.url);
 const nativeLoaderDirectory = dirname(

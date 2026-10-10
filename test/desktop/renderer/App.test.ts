@@ -175,7 +175,16 @@ describe('desktop scaffold', () => {
       'page',
     );
     expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Guided Lessons (Beta)' })).toBeTruthy();
     expect(await screen.findByRole('heading', { name: 'Welcome back, Alex' })).toBeTruthy();
+  });
+
+  it('always shows localized guided lesson navigation for Vietnamese accounts', async () => {
+    window.localStorage.setItem(localeStorageKey, DesktopLocale.VIETNAMESE);
+    renderDesktop();
+    expect(
+      await screen.findByRole('button', { name: 'Bài giảng hướng dẫn (Thử nghiệm)' }),
+    ).toBeTruthy();
   });
 
   it('preserves the draft, messages and session when switching to Settings and back', async () => {

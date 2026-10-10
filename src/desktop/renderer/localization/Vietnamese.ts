@@ -1,12 +1,15 @@
 import { readInsightMessages } from './InsightMessages.js';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
 import { readClassroomMessages } from '../../localization/ClassroomMessages.js';
+import { readGuidedLessonMessages } from './GuidedLessonMessages.js';
 
 import type { TranslationCatalog } from './English.js';
 
 export const vietnamese = {
   ...readInsightMessages(DesktopLocale.VIETNAMESE),
   ...readClassroomMessages(DesktopLocale.VIETNAMESE),
+  ...readGuidedLessonMessages(DesktopLocale.VIETNAMESE),
+  guidedLessonsNavigation: 'Bài giảng hướng dẫn (Thử nghiệm)',
   switchAccount: 'Chuyển tài khoản',
   savedAccounts: 'Tài khoản trên máy này',
   currentAccount: 'Hiện tại',
