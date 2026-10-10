@@ -81,3 +81,50 @@ export function readDesktopReleaseEnv(
 export function loadDesktopReleaseEnv(): ReturnType<typeof readDesktopReleaseEnv> {
   return readDesktopReleaseEnv(process.env, loadEnv('production', process.cwd(), 'MAIN_VITE_'));
 }
+
+export type WindowsSigningEnv =
+  | { enabled: false }
+  | { enabled: true; endpoint: string; account: string; profile: string; publisher: string };
+
+/** Signing is opt-in for release jobs; local packaging never needs Azure credentials. */
+export function readWindowsSigningEnv(
+  environment: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform,
+  architecture: string,
+): WindowsSigningEnv {
+  const fail = (): never => {
+    throw new Error('Windows release configuration is invalid.');
+  };
+  const mode = environment['TRO_SIGN_WINDOWS'];
+  if (mode === undefined || mode === '' || mode === 'false') {
+    return { enabled: false };
+  }
+  if (mode !== 'true' || platform !== 'win32' || architecture !== 'x64') {
+    return fail();
+  }
+  const validated = createEnv({
+    server: {
+      AZURE_SIGNING_ENDPOINT: AppUpdateUrlSchema,
+      AZURE_SIGNING_ACCOUNT: z.string().regex(/^[a-zA-Z0-9-]+$/),
+      AZURE_CERTIFICATE_PROFILE: z.string().regex(/^[a-zA-Z0-9-]+$/),
+      AZURE_SIGNING_PUBLISHER: z.string().trim().min(1).max(256),
+      MAIN_VITE_API_BASE_URL: AppUpdateUrlSchema,
+      MAIN_VITE_APP_ENV: z.literal('prod'),
+      MAIN_VITE_UPDATE_FEED_URL: AppUpdateUrlSchema.optional(),
+    },
+    runtimeEnv: environment,
+    emptyStringAsUndefined: true,
+    onValidationError: fail,
+  });
+  const apiHostname = new URL(validated.MAIN_VITE_API_BASE_URL).hostname;
+  if (['localhost', '127.0.0.1', '[::1]'].includes(apiHostname)) {
+    return fail();
+  }
+  return {
+    enabled: true,
+    endpoint: validated.AZURE_SIGNING_ENDPOINT,
+    account: validated.AZURE_SIGNING_ACCOUNT,
+    profile: validated.AZURE_CERTIFICATE_PROFILE,
+    publisher: validated.AZURE_SIGNING_PUBLISHER,
+  };
+}

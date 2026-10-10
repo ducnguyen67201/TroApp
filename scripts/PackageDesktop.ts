@@ -1,9 +1,18 @@
 import { access, cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { build } from 'electron-builder';
+import { build, WinPackager } from 'electron-builder';
 import { z } from 'zod';
 import { prepareCuaCompanion } from './PrepareCuaCompanion.js';
+import { readWindowsSigningEnv } from './Env.js';
+import {
+  createWindowsSigningConfig,
+  signAndVerifyWindowsFile,
+  signWindowsResources,
+} from './WindowsSigning.js';
+
+const signingSettings = readWindowsSigningEnv(process.env, process.platform, process.arch);
+const signingConfig = createWindowsSigningConfig(signingSettings);
 
 /* electron-builder discovers this repository's pnpm workspace when out/ is
    inside the root. Stage the already-built app outside that workspace so its
@@ -40,6 +49,7 @@ try {
     dir: process.argv.includes('--dir'),
     publish: 'never',
     config: {
+      ...signingConfig,
       afterPack: async (context) => {
         const resourcesPath = context.packager.getResourcesDir(context.appOutDir);
         /* electron-builder skips a node_modules directory at a resource
@@ -52,6 +62,17 @@ try {
           join('cua-driver', process.platform === 'darwin' ? 'cua-driver' : 'cua-driver.exe'),
         ]) {
           await access(join(resourcesPath, entry));
+        }
+        if (signingSettings.enabled) {
+          const packager = context.packager;
+          if (!(packager instanceof WinPackager)) {
+            throw new Error('Windows release requires a Windows packager.');
+          }
+          /* NSIS deletes its temporary uninstaller before final artifact verification.
+           * Wrap this packager instance's signing boundary to verify it before embedding. */
+          const signFile = packager.signIf.bind(packager);
+          packager.signIf = (path) => signAndVerifyWindowsFile(path, signFile);
+          await signWindowsResources(context.appOutDir, (path) => packager.signIf(path));
         }
       },
     },

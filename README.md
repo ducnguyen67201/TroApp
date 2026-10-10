@@ -225,6 +225,89 @@ Set the HTTPS update feed during the same build/package invocation. Development
 updates remain disabled. Signing/notarization and distribution require a separate
 reviewed release; ad hoc local signing is not release signing.
 
+### Windows release from GitHub Actions
+
+The **Windows Release** workflow builds a signed x64 NSIS installer from `main`
+when manually dispatched. It validates the project without cloud credentials,
+then uses the GitHub environment `release` and Azure OIDC to sign during packaging.
+It uploads verified build artifacts for 14 days; it does not publish a GitHub
+Release, deploy the API, or provision an update feed. No separate release branch
+or client secret is needed.
+
+Before the first run, restrict the repository's `release` environment deployment
+branches to `main`, confirm the Azure Public Trust certificate profile is Active,
+and assign **Artifact Signing Certificate Profile Signer** to the app service
+principal on the signing account. Assigning it only to your personal user does not
+authorize Actions. The app's federated credential must have issuer
+`https://token.actions.githubusercontent.com`, audience `api://AzureADTokenExchange`
+and a subject matching this repository and the `release` environment. New GitHub
+repositories use immutable owner/repository IDs in that subject; copy the full
+value from your federation setup instead of using an older names-only example.
+
+Configure these **environment variables** under repository Settings → Environments
+→ release. These are public settings/identifiers; never place provider credentials
+or Azure tokens in a `MAIN_VITE_*` variable.
+
+| Variable                    | Value                                                    |
+| --------------------------- | -------------------------------------------------------- |
+| `AZURE_CLIENT_ID`           | Application (client) ID for the signing app registration |
+| `AZURE_TENANT_ID`           | Directory tenant ID                                      |
+| `AZURE_SUBSCRIPTION_ID`     | Subscription containing the signing account              |
+| `AZURE_SIGNING_ENDPOINT`    | Signing account's regional HTTPS endpoint                |
+| `AZURE_SIGNING_ACCOUNT`     | Artifact Signing account name                            |
+| `AZURE_CERTIFICATE_PROFILE` | Active Public Trust profile name                         |
+| `AZURE_SIGNING_PUBLISHER`   | Exact certificate common name (CN), including name order |
+| `MAIN_VITE_API_BASE_URL`    | Public production HTTPS API URL; required, no localhost  |
+| `MAIN_VITE_UPDATE_FEED_URL` | Optional public HTTPS generic update feed                |
+
+The workflow supplies `MAIN_VITE_APP_ENV=prod` and `TRO_SIGN_WINDOWS=true`. Ordinary
+local packaging keeps signing optional. Source version comes from committed
+`package.json`; change it through normal review before producing a new version.
+Azure signing settings stay in the packaging process and are not copied into app
+metadata. The pinned electron-builder v26 uses `win.azureSignOptions`; its upstream
+PowerShell signing module and hosted runner image are not completely pinned by
+the pnpm lockfile.
+
+After the workflow is merged into `main`, open Actions → Windows Release → Run
+workflow → main. Download the successful run's `Tro-windows-x64-…` artifact. It
+contains `Tro-<version>-windows-x64-setup.exe`, its blockmap, a signature inventory,
+and update metadata when a feed is configured. Signing failures or invalid
+signatures prevent upload. The verifier checks all loose Windows PE executables,
+DLLs and native addons, preserving valid vendor signatures where the builder has
+not already signed them. The main app and installer must match the configured
+publisher and have a trusted timestamp. Non-Windows native prebuilds are excluded
+by their file header, not merely their extension.
+Each new signing result is also verified before packaging continues, including
+the temporary NSIS uninstaller before it is embedded and deleted by the builder.
+
+To verify a locally packaged signed Windows build with the expected publisher set:
+
+```powershell
+./scripts/VerifyWindowsRelease.ps1 -Directory release
+./scripts/VerifyWindowsRelease.ps1 -Mode Test
+```
+
+With a configured feed, also pass `-RequireUpdateMetadata`; its hashes and size
+must match the final signed installer. The verifier accepts the pinned builder's
+single-file YAML layout for this x64 target and fails if the layout changes.
+Without a feed, updates remain disabled. Actions artifacts are not a public update
+server. Never modify or re-sign installer bytes after generating update metadata.
+
+For OIDC login errors, compare the full subject, issuer and audience. For signing
+403 errors, check the app service principal's signer role and allow role changes
+to propagate. Publisher mismatches require the certificate's exact CN. Timestamp
+or trust failures require checking the reported signing/network stage rather than
+falling back to unsigned output. Missing Cua/addon files are packaging failures.
+Azure configuration and actual signing must be verified in a real Windows run;
+offline tests do not prove that authorization works.
+
+Before public distribution, perform the Windows hardware checks below and inspect
+the installed uninstaller's signature on a disposable Windows machine. Confirm
+install, launch and uninstall, and test a signed older-to-newer update when a feed
+is enabled. Windows teaching parity with the patched macOS companion is not
+established by this workflow. Signing identifies the publisher; it does not
+guarantee a SmartScreen warning will never appear.
+
 After building, use the local artifact probes where applicable:
 
 ```sh
