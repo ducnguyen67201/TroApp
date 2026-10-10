@@ -732,12 +732,12 @@ bound execution. Provider retries are disabled. Changing source invalidates prev
 preview/video evidence; a clip belongs to the current source digest.
 [RemotionModelFetch.ts](../src/server/features/guidedLessons/infrastructure/RemotionModelFetch.ts)
 uses matching Undici fetch/Agent instances with a fresh private pool for each coding
-request over IPv4 with certificate verification enabled. This avoids the IPv6 route
-that returned a TLS bad-record-MAC alert in a manual trial; it does not establish
-the alert's network or provider cause. The transport buffers the nonstreaming
-response before closing that pool, preventing socket reuse across long render gaps
-or other provider calls without retrying a failed dispatch. Test fetch injection
-remains explicit.
+request with certificate verification enabled and runtime address-family selection.
+The transport buffers the nonstreaming response before closing that pool, preventing
+socket reuse across long render gaps or other provider calls without retrying a
+failed dispatch. Manual trials reproduced a TLS bad-record-MAC alert on fresh IPv6
+and IPv4 sockets before HTTP; route selection is not a confirmed remedy and the
+network/provider cause remains unknown. Test fetch injection remains explicit.
 
 [DockerLessonCodeSandbox.ts](../src/server/features/guidedLessons/infrastructure/DockerLessonCodeSandbox.ts)
 launches a fixed [RenderGeneratedLessonWorker.ts](../src/server/features/guidedLessons/infrastructure/RenderGeneratedLessonWorker.ts)
@@ -786,7 +786,10 @@ requires the packaged composition/font identity to match the approved manifest.
 [LessonBudget.ts](../src/server/features/guidedLessons/application/LessonBudget.ts)
 records durable model/speech attempts. Every coding-agent provider call also has a
 prior durable dispatch reservation and settles actual usage even when rendering
-fails or its draft is cancelled. Unknown dispatch outcomes prevent automatic replay.
+fails or its draft is cancelled. Its UUID is also sent as X-Client-Request-Id for
+provider-side receipt reconciliation when a response is lost. This is a correlation
+header, not an idempotency key or retry permission. Unknown dispatch outcomes
+prevent automatic replay.
 The optional benchmark observer receives bounded failure categories, HTTP status
 and validated provider/transport identifiers through
 [RemotionProviderFailure.ts](../src/server/features/guidedLessons/infrastructure/RemotionProviderFailure.ts),

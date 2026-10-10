@@ -7,9 +7,9 @@ export interface RemotionModelFetchOptions {
 
 /** Buffer the coding model's nonstreaming JSON response, then release its private connection pool.
  * A fresh matching Undici fetch/Agent pair prevents reuse across long render gaps and other providers.
- * Coding requests use IPv4 after a fresh IPv6 connection failed with a TLS bad-record-MAC alert.
- * This avoids that observed route; it does not establish the remote or network cause of the alert.
- * Certificate verification remains enabled and the route choice does not affect other providers.
+ * Certificate verification remains enabled and the runtime chooses the address family.
+ * Fresh connections on both IPv4 and IPv6 have failed with TLS bad-record-MAC alerts;
+ * private pooling does not establish or resolve the remote or network cause of those failures.
  * This is a transport boundary, not a retry: each invocation dispatches at most once. */
 export function createRemotionModelFetch(options: RemotionModelFetchOptions = {}): typeof fetch {
   const dispatch = options.dispatch ?? fetchUndici;
@@ -27,8 +27,7 @@ export function createRemotionModelFetch(options: RemotionModelFetchOptions = {}
     const agent = createAgent({
       connections: 1,
       pipelining: 0,
-      autoSelectFamily: false,
-      connect: { family: 4, rejectUnauthorized: true },
+      connect: { rejectUnauthorized: true },
     });
     let bodyRead = false;
     try {

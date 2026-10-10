@@ -426,7 +426,7 @@ export class RemotionLessonAgent implements LessonRenderer {
           include: ['reasoning.encrypted_content'],
           max_output_tokens: 12_000,
         },
-        { signal },
+        { signal, headers: { 'X-Client-Request-Id': attemptId } },
       );
       providerResponded = true;
       const envelope = UsageEnvelopeSchema.safeParse(raw);

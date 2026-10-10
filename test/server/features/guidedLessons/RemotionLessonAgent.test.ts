@@ -161,13 +161,17 @@ function basicSequence(): unknown[][] {
 }
 
 describe('Remotion coding agent', () => {
-  it('preserves an explicitly injected fetch transport across consecutive SDK calls', async () => {
+  it('preserves injected transport and uses a unique client correlation ID for each SDK call', async () => {
     const fetcher = createSequence(basicSequence());
     await new RemotionLessonAgent('synthetic-test-key', 'gpt-5.4', createSandbox(), {
       fetch: fetcher,
       identity: Identity,
     }).render(buildRequest(), new AbortController().signal);
     expect(fetcher.mock.calls.length).toBeGreaterThan(1);
+    const clientRequestIds = fetcher.mock.calls.map(([, init]) =>
+      z.uuid().parse(new Headers(init?.headers).get('X-Client-Request-Id')),
+    );
+    expect(new Set(clientRequestIds).size).toBe(fetcher.mock.calls.length);
     for (const [, init] of fetcher.mock.calls) {
       expect(new Headers(init?.headers).get('connection')).toBeNull();
     }
@@ -423,6 +427,12 @@ describe('Remotion coding agent', () => {
     'records only a validated failed-provider request ID ($requestId)',
     async ({ requestId, expected }) => {
       const measurements: RemotionAgentMeasurement[] = [];
+      const beforeModelCall = vi.fn<LessonRenderLifecycle['beforeModelCall']>(() =>
+        Promise.resolve(),
+      );
+      const afterModelCall = vi.fn<LessonRenderLifecycle['afterModelCall']>(() =>
+        Promise.resolve(),
+      );
       const fetcher = vi.fn<typeof fetch>(() =>
         Promise.resolve(
           Response.json(
@@ -443,11 +453,20 @@ describe('Remotion coding agent', () => {
           fetch: fetcher,
           identity: Identity,
           onMeasurement: (measurement) => measurements.push(measurement),
-        }).render(buildRequest(), new AbortController().signal),
+        }).render(buildRequest(), new AbortController().signal, {
+          beforeModelCall,
+          afterModelCall,
+        }),
       ).rejects.toThrow();
       expect(fetcher).toHaveBeenCalledTimes(1);
+      const clientRequestId = z
+        .uuid()
+        .parse(new Headers(fetcher.mock.calls[0]?.[1]?.headers).get('X-Client-Request-Id'));
+      expect(beforeModelCall).toHaveBeenCalledExactlyOnceWith(clientRequestId);
+      expect(afterModelCall).toHaveBeenCalledExactlyOnceWith(clientRequestId, null);
       expect(measurements[0]).toMatchObject({
         kind: 'model',
+        attemptId: clientRequestId,
         status: 'uncertain',
         inputTokens: null,
         requestId: expected,

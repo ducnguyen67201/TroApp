@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createRemotionModelFetch } from '../../../../src/server/features/guidedLessons/infrastructure/RemotionModelFetch.js';
 
 describe('owned coding model transport', () => {
-  it('forces IPv4 without family fallback and retains TLS certificate verification', async () => {
+  it('retains TLS certificate verification and leaves address family selection to the runtime', async () => {
     const agents: Agent[] = [];
     const createAgent = vi.fn((options: Agent.Options) => {
       const agent = new Agent(options);
@@ -21,8 +21,7 @@ describe('owned coding model transport', () => {
     expect(createAgent).toHaveBeenCalledExactlyOnceWith({
       connections: 1,
       pipelining: 0,
-      autoSelectFamily: false,
-      connect: { family: 4, rejectUnauthorized: true },
+      connect: { rejectUnauthorized: true },
     });
     expect(dispatch.mock.calls[0]?.[1]?.dispatcher).toBe(agents[0]);
     expect(agents[0]?.closed).toBe(true);
