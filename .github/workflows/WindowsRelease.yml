@@ -36,6 +36,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: Build isolated lesson renderer
+        run: docker build --platform linux/amd64 --target lesson-renderer -t tro-lesson-renderer:local .
       - run: pnpm test:integration
 
   package:
