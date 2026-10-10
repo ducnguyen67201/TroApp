@@ -1,11 +1,14 @@
 import { readInsightMessages } from './InsightMessages.js';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
 import { readClassroomMessages } from '../../localization/ClassroomMessages.js';
+import { readGuidedLessonMessages } from './GuidedLessonMessages.js';
 
 /** Canonical desktop copy. Other catalogs must implement every key and parameter. */
 export const english = {
   ...readInsightMessages(DesktopLocale.ENGLISH),
   ...readClassroomMessages(DesktopLocale.ENGLISH),
+  ...readGuidedLessonMessages(DesktopLocale.ENGLISH),
+  guidedLessonsNavigation: 'Guided Lessons (Beta)',
   switchAccount: 'Switch account',
   savedAccounts: 'Accounts on this device',
   currentAccount: 'Current',
@@ -142,7 +145,7 @@ export const english = {
   name: 'Name',
   email: 'Email',
   signOutHint: 'You can sign out from the sidebar.',
-  accountSignInHint: 'Sign in from the sidebar to see your account.',
+  accountSignInHint: 'Sign in to see your account.',
   appearance: 'Appearance',
   appearanceDescription: 'A simple, warm light theme.',
   light: 'Light',

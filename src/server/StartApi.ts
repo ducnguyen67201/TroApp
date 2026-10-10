@@ -1,3 +1,11 @@
+import { createPrismaGuidedLessonStore } from './persistence/PrismaGuidedLessonStore.js';
+import { GuidedLessonService } from './features/guidedLessons/application/GuidedLessonService.js';
+import { GuidedLessonRunner } from './features/guidedLessons/application/GuidedLessonRunner.js';
+import { registerGuidedLessonRoutes } from './features/guidedLessons/infrastructure/RegisterGuidedLessonRoutes.js';
+import { OpenAiLessonModel } from './features/guidedLessons/infrastructure/OpenAiLessonModel.js';
+import { OpenAiLessonSpeech } from './features/guidedLessons/infrastructure/OpenAiLessonSpeech.js';
+import { RemotionLessonAgent } from './features/guidedLessons/infrastructure/RemotionLessonAgent.js';
+import { DockerLessonCodeSandbox } from './features/guidedLessons/infrastructure/DockerLessonCodeSandbox.js';
 import { ClassroomInsightService } from './features/classroom/application/ClassroomInsightService.js';
 import { registerClassroomInsightRoutes } from './features/classroom/infrastructure/RegisterClassroomInsightRoutes.js';
 import { ClassroomInsightRetentionRunner } from './features/classroom/infrastructure/ClassroomInsightRetentionRunner.js';
@@ -167,6 +175,38 @@ async function startApi(): Promise<void> {
     logger.warn({ event: 'material.runner.failed' }, 'Material preparation runner failed.');
   });
   materialRunner.start();
+  const guidedLessons = createPrismaGuidedLessonStore(environment.DATABASE_URL);
+  const guidedLessonService = new GuidedLessonService(
+    guidedLessons.store,
+    new OpenAiLessonModel(environment.OPENAI_API_KEY, environment.GUIDED_LESSON_MODEL),
+    new OpenAiLessonSpeech(
+      environment.OPENAI_API_KEY,
+      environment.GUIDED_LESSON_SPEECH_MODEL,
+      environment.GUIDED_LESSON_SPEECH_VOICE,
+    ),
+    new RemotionLessonAgent(
+      environment.OPENAI_API_KEY,
+      environment.GUIDED_LESSON_CODING_MODEL,
+      new DockerLessonCodeSandbox(environment.GUIDED_LESSON_RENDER_IMAGE),
+    ),
+    () => new Date(),
+    (event) => {
+      logger.warn(event, 'guided.lesson.stage.failed');
+    },
+  );
+  const guidedLessonRunner = new GuidedLessonRunner(guidedLessonService, () => {
+    logger.warn({ operation: 'guided-lesson-runner' }, 'guided.lesson.runner.failed');
+  });
+  registerGuidedLessonRoutes(
+    api,
+    authentication.readSignedInUserId,
+    guidedLessonService,
+    logger,
+    () => {
+      guidedLessonRunner.wake();
+    },
+  );
+  guidedLessonRunner.start();
   const transcriptionAllowance = createPrismaTranscriptionAllowance(environment.DATABASE_URL);
   await registerTranscriptionRoutes(
     api,
@@ -193,6 +233,8 @@ async function startApi(): Promise<void> {
   api.addHook('onClose', async () => {
     await retentionRunner.close();
     await materialRunner.close();
+    await guidedLessonRunner.close();
+    await guidedLessons.close();
     await database.close();
     await authentication.close();
     await transcriptionAllowance.close();

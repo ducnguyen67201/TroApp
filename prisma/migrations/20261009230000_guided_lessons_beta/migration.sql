@@ -1,0 +1,22 @@
+-- Additive guided lesson beta: no existing classroom/material data is rewritten.
+CREATE TABLE "GuidedLessonRecord" ("id" UUID NOT NULL, "classId" UUID NOT NULL, "version" INTEGER NOT NULL, "status" TEXT NOT NULL, "leaseUntil" TIMESTAMP(3), "document" JSONB NOT NULL, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "GuidedLessonRecord_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "GuidedLessonRevisionRecord" ("id" UUID NOT NULL, "lessonId" UUID NOT NULL, "document" JSONB NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "GuidedLessonRevisionRecord_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "GuidedLessonReleaseRecord" ("id" UUID NOT NULL, "lessonId" UUID NOT NULL, "classId" UUID NOT NULL, "available" BOOLEAN NOT NULL, "document" JSONB NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "GuidedLessonReleaseRecord_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "GuidedLessonBudgetRecord" ("id" TEXT NOT NULL, "version" INTEGER NOT NULL, "document" JSONB NOT NULL, CONSTRAINT "GuidedLessonBudgetRecord_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "GuidedLessonCommandRecord" ("userId" TEXT NOT NULL, "commandId" UUID NOT NULL, "classId" UUID NOT NULL, "document" JSONB NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "GuidedLessonCommandRecord_pkey" PRIMARY KEY ("userId", "commandId"));
+CREATE TABLE "GuidedLessonProgressRecord" ("studentId" TEXT NOT NULL, "releaseId" UUID NOT NULL, "version" INTEGER NOT NULL, "document" JSONB NOT NULL, CONSTRAINT "GuidedLessonProgressRecord_pkey" PRIMARY KEY ("studentId", "releaseId"));
+CREATE TABLE "GuidedLessonNoteRecord" ("id" UUID NOT NULL, "studentId" TEXT NOT NULL, "classId" UUID NOT NULL, "releaseId" UUID NOT NULL, "version" INTEGER NOT NULL, "document" JSONB NOT NULL, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "GuidedLessonNoteRecord_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "GuidedLessonRequestRecord" ("id" UUID NOT NULL, "classId" UUID NOT NULL, "studentId" TEXT NOT NULL, "document" JSONB NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "GuidedLessonRequestRecord_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "GuidedLessonArtifactRecord" ("id" UUID NOT NULL, "classId" UUID NOT NULL, "lessonId" UUID NOT NULL, "revisionId" UUID NOT NULL, "kind" TEXT NOT NULL, "mimeType" TEXT NOT NULL, "digest" TEXT NOT NULL, "sceneId" TEXT, "phase" TEXT, "bytes" BYTEA NOT NULL, "size" INTEGER NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "GuidedLessonArtifactRecord_pkey" PRIMARY KEY ("id"));
+CREATE INDEX "GuidedLessonRecord_classId_updatedAt_idx" ON "GuidedLessonRecord" ("classId", "updatedAt");
+CREATE INDEX "GuidedLessonRecord_status_leaseUntil_idx" ON "GuidedLessonRecord" ("status", "leaseUntil");
+CREATE INDEX "GuidedLessonRevisionRecord_lessonId_createdAt_idx" ON "GuidedLessonRevisionRecord" ("lessonId", "createdAt");
+CREATE INDEX "GuidedLessonReleaseRecord_classId_available_idx" ON "GuidedLessonReleaseRecord" ("classId", "available");
+CREATE INDEX "GuidedLessonNoteRecord_studentId_releaseId_idx" ON "GuidedLessonNoteRecord" ("studentId", "releaseId");
+CREATE INDEX "GuidedLessonRequestRecord_classId_createdAt_idx" ON "GuidedLessonRequestRecord" ("classId", "createdAt");
+CREATE INDEX "GuidedLessonArtifactRecord_classId_idx" ON "GuidedLessonArtifactRecord" ("classId");
+CREATE INDEX "GuidedLessonArtifactRecord_lessonId_revisionId_idx" ON "GuidedLessonArtifactRecord" ("lessonId", "revisionId");
+ALTER TABLE "GuidedLessonRecord" ADD CONSTRAINT "GuidedLessonRecord_classId_fkey" FOREIGN KEY ("classId") REFERENCES "ClassroomGroup"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "GuidedLessonRevisionRecord" ADD CONSTRAINT "GuidedLessonRevisionRecord_lessonId_fkey" FOREIGN KEY ("lessonId") REFERENCES "GuidedLessonRecord"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "GuidedLessonReleaseRecord" ADD CONSTRAINT "GuidedLessonReleaseRecord_lessonId_fkey" FOREIGN KEY ("lessonId") REFERENCES "GuidedLessonRecord"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "GuidedLessonArtifactRecord" ADD CONSTRAINT "GuidedLessonArtifactRecord_lessonId_fkey" FOREIGN KEY ("lessonId") REFERENCES "GuidedLessonRecord"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

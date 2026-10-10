@@ -1,7 +1,7 @@
 # Tro architecture
 
 This is the single maintained description of Tro's implemented system. Updated
-October 10, 2026. Change this document when ownership, component communication or
+October 10, 2026. Change this document when component ownership, communication or
 an architectural invariant changes. Contracts and configuration in the linked code
 own exact wire shapes and policy values. Setup and validation commands live in the
 [root README](../README.md). Research and UI prototypes are reference material,
@@ -14,6 +14,7 @@ not requirements or evidence that a capability exists.
 - [Native companion and HUD](#native-companion-and-hud)
 - [Voice input and narration](#voice-input-and-narration)
 - [Classroom and materials](#classroom-and-materials)
+- [Guided lessons beta](#guided-lessons-beta)
 - [Local presentation and app updates](#local-presentation-and-app-updates)
 - [Code ownership](#code-ownership)
 - [Verification and current limits](#verification-and-current-limits)
@@ -78,6 +79,10 @@ Google returns to the backend callback; the backend sends a short-lived code thr
 `app.tro.desktop://auth/callback#token=…`. Electron main exchanges and verifies it.
 The same running instance retains the pending proof-key verifier. Before sign-in,
 main registers the protocol and verifies that the OS handler points to that app.
+
+The desktop sidebar is mounted only for a signed-in user. Signed-out and initial
+session-loading screens reserve no sidebar space; the welcome screen retains
+Google sign-in, saved-account selection, sign-in cancellation, settings and updates.
 
 Saved accounts use independent backend sessions. `AccountSessions` owns selection
 and generation guards; `EncryptedAccountVault` stores cookies using Electron
@@ -687,6 +692,163 @@ and deterministic report wording. Stored projections, a separate analytics worke
 private object storage, cross-center roles, AI wording and PDF generation remain
 future scopes that require measured demand and their own validation. A real center still requires its collection decision and a reconciled pilot.
 
+## Guided lessons beta
+
+Guided Lessons is always available as **Guided lessons (Beta)** / **Bài giảng hướng
+dẫn (Thử nghiệm)**. No feature flag or class allowlist gates it. Teachers select
+approved passages and confirm a restricted Python integer running-total example,
+optionally a separate practice input. Students can study released lessons without
+a live classroom session. This scope does not support arbitrary lectures or code.
+
+```mermaid
+flowchart TD
+  Source[Approved publication and confirmed code] --> Draft[AI content author and review]
+  Draft --> Script[Teacher script approval]
+  Script --> Speech[Persist exact narration]
+  Speech --> Agent[Remotion coding agent]
+  Agent --> Write[Write TSX for one authorized phase]
+  Write --> Sandbox[Isolated container renders preview]
+  Sandbox --> Inspect[Agent sees images and geometry]
+  Inspect -->|Revise| Write
+  Inspect --> Clip[Render MP4 phase clip]
+  Clip --> Review[Independent visual review]
+  Review --> Preview[Teacher previews exact video and narration]
+  Preview --> Release[Immutable class release]
+  Release --> Player[Phase-gated video playback and private notes]
+```
+
+[GuidedLessons.ts](../src/contracts/GuidedLessons.ts) owns strict public schemas.
+[GuidedLessonService.ts](../src/server/features/guidedLessons/application/GuidedLessonService.ts)
+owns teacher/enrollment authorization, idempotent commands, revisions, approvals,
+releases, deterministic checkpoints and private notes. Prisma adapters persist
+validated aggregate JSON, immutable releases, artifacts and attempt ledgers with
+serializable authorization/state transactions. This remains one modular monolith.
+
+[BuildLessonInput.ts](../src/server/features/guidedLessons/application/BuildLessonInput.ts)
+selects immutable approved material. Published page/document corrections remain
+separate citable entries with their own UTF-16 ranges and digests; private notes
+never enter generation. [CompileAccumulator.ts](../src/server/features/guidedLessons/domain/CompileAccumulator.ts)
+calculates canonical trace states without executing Python. Content validation
+checks citations, exact code/traces, checkpoints and approved practice variants.
+
+[GuidedLessonRunner.ts](../src/server/features/guidedLessons/application/GuidedLessonRunner.ts)
+wakes one durable job stage. [LessonGeneration.ts](../src/server/features/guidedLessons/application/LessonGeneration.ts)
+advances content author/review/one repair, teacher script approval, speech, coding
+agent rendering, visual review/one repair and exact preview approval. Saving script
+edits invalidates dependent approvals and needs an explicit new review run. Speech
+is persisted per exact approved beat; decoded sample duration determines cue timing.
+[LessonPrompts.ts](../src/server/features/guidedLessons/infrastructure/LessonPrompts.ts)
+owns content/review/help/narration prompts. These content stages return structured
+data; only the separate coding agent writes rendering source.
+
+[RemotionLessonAgent.ts](../src/server/features/guidedLessons/infrastructure/RemotionLessonAgent.ts)
+is the actual tool-using coding agent. Its versioned instructions live in
+[RemotionAgentPrompts.ts](../src/server/features/guidedLessons/infrastructure/RemotionAgentPrompts.ts).
+For each scene/phase it receives a safe projection, writes a React/Remotion component,
+renders previews, receives actual PNGs and geometry, revises and renders a silent
+MP4. Tools accept source or bounded frame selections, never arbitrary filesystem
+paths, commands, URLs, packages or infrastructure settings. Turn/deadline limits
+bound execution. Provider retries are disabled. Changing source invalidates previous
+preview/video evidence; a clip belongs to the current source digest.
+[RemotionModelFetch.ts](../src/server/features/guidedLessons/infrastructure/RemotionModelFetch.ts)
+uses matching Undici fetch/Agent instances with a fresh private pool for each coding
+request with certificate verification enabled and runtime address-family selection.
+The transport buffers the nonstreaming response before closing that pool, preventing
+socket reuse across long render gaps or other provider calls without retrying a
+failed dispatch. Manual trials reproduced a TLS bad-record-MAC alert on fresh IPv6
+and IPv4 sockets before HTTP; route selection is not a confirmed remedy and the
+network/provider cause remains unknown. Test fetch injection remains explicit.
+
+[DockerLessonCodeSandbox.ts](../src/server/features/guidedLessons/infrastructure/DockerLessonCodeSandbox.ts)
+launches a fixed [RenderGeneratedLessonWorker.ts](../src/server/features/guidedLessons/infrastructure/RenderGeneratedLessonWorker.ts)
+inside a separately built Linux image. Generated code compiles and executes only
+there. The container has no network, provider credentials or Docker socket, a
+read-only root, non-root user, dropped capabilities, and hard memory/CPU/PID/tmpfs
+bounds. Its inputs contain only one phase projection and source. The host reads
+bounded fixed output filenames through a descriptor-checked container reader,
+confirms container termination, then removes temporary files. A container-side
+deadline also ends detached work if the API worker disconnects. Docker access belongs
+to the trusted API host; the API image alone is not a generated-code isolation service. The current
+Railway runtime requires a Docker-capable generation host before production use.
+Before the initial paid content dispatch, renderer readiness checks the provider,
+presentation identity and local sandbox image. Setup is owned by README.md. No
+generated source is imported into backend application code or the Electron renderer. A failed agent does not fall back to template rendering.
+
+Generated source also passes an AST quality contract: permitted imports and
+frame-driven React APIs, with console, DOM, timers and executable HTML rejected.
+This reduces measurement spoofing and nondeterministic output; container isolation
+remains the execution boundary. Images and teacher review still establish whether
+the graphics teach the approved content correctly.
+
+Bad preview layouts return their actual images and measured geometry to the agent
+for repair. [LessonGeometryDiagnostics.ts](../src/server/features/guidedLessons/infrastructure/LessonGeometryDiagnostics.ts)
+adds bounded numeric diagnostics identifying the failing measurement and exact
+font, viewport, overflow, ancestor clipping or overlap constraint. The worker
+intersects text ink with every clipping ancestor on its horizontal and vertical
+overflow axes, separately from the leaf's scroll/client sizes. Ancestor opacity
+filters invisible entrances; conservative transform and zoom scales determine the
+effective font size rather than glyph-box height. All visible text is measured;
+source annotations do not choose which regions count. Encoding is blocked until every sampled frame for the current source
+passes geometry checks and its images have reached a later agent turn.
+
+Each phase stores a source digest, representative PNG, geometry evidence and MP4;
+manifest evidence identifies scene and phase. Source artifacts are excluded from
+student projections. Independent image review cannot certify continuous motion or
+pronunciation. Teachers must inspect pending/worked phases, video and exact audio
+before approving the manifest and releasing it. Narration remains a separately
+approved artifact synchronized with the silent video. There is no combined lesson
+MP4 download; phase clips support interactive checkpoint gates. The old trusted
+[RemotionLessonRenderer.ts](../src/server/features/guidedLessons/infrastructure/RemotionLessonRenderer.ts)
+remains for legacy tests/evidence, not new production generation. Reflection uses
+the trusted static composition without an additional generated clip. Playback still
+requires the packaged composition/font identity to match the approved manifest.
+
+[LessonBudget.ts](../src/server/features/guidedLessons/application/LessonBudget.ts)
+records durable model/speech attempts. Every coding-agent provider call also has a
+prior durable dispatch reservation and settles actual usage even when rendering
+fails or its draft is cancelled. Its UUID is also sent as X-Client-Request-Id for
+provider-side receipt reconciliation when a response is lost. This is a correlation
+header, not an idempotency key or retry permission. Unknown dispatch outcomes
+prevent automatic replay.
+Explicit render retries are capped by the per-run policy, persisted across day
+changes; starting a new review run uses normal daily admission. Replaying the same
+command never consumes another retry.
+The optional benchmark observer receives bounded failure categories, HTTP status
+and validated provider/transport identifiers through
+[RemotionProviderFailure.ts](../src/server/features/guidedLessons/infrastructure/RemotionProviderFailure.ts),
+never raw errors, response bodies or configuration. The manual benchmark can also
+observe validated connection stages and local socket counters through the existing
+[ModelTransportObserver.ts](../src/server/auth/ModelTransportObserver.ts). These
+measure local transport activity, not proof of provider receipt. Missing optional
+cache/reasoning details remain visible through measurement coverage counts.
+Cumulative token/day totals are measured without a pricing quota cutoff; daily run
+admission and bounded stage/agent execution remain. This lets explicit manual
+benchmarks measure real consumption before pricing policy is chosen. The benchmark
+uses synthetic sources, real configured providers and the production service, writes
+local measurement/artifact reports, and never creates a student release. Automated
+checks stay credentialless. Failed runs and repairs count in pricing evidence.
+
+[BuildLessonProjection.ts](../src/server/features/guidedLessons/domain/BuildLessonProjection.ts)
+is the only student projection. It withholds worked narration, state and video until
+the formative gate is resolved or explicitly revealed. Only the exact scene/phase
+clip is allowlisted. Duplicate phase clips fail closed. The desktop verifies media
+digests and revokes Blob URLs on account/revision changes; generated TSX never reaches
+the player. [LessonComposition.tsx](../src/lessonMedia/LessonComposition.tsx) is a
+trusted video/audio wrapper with a static reflection surface. Its legacy template
+path remains for compatible fixtures. Teaching gates are not exam security; source
+code can reveal answers.
+
+Notes are owner-only and anchored to the exact release, scene, phase and frame.
+Revised releases preserve earlier notes; explicit withdrawal blocks all versions.
+Notes never enter generation, help or teacher insights. Note retention is 180 days;
+unreferenced failed/cancelled media expires after seven days. Explicit student
+requests enter the teacher queue and never dispatch generation automatically.
+Retention runs when the generation worker starts and at most hourly thereafter,
+including after a failed cleanup attempt; one-second job polls still check pending
+lessons. Help receipts bind their reply to the resulting learner progress version
+and scene, so a lost response can replay the same hint without consuming another
+hint or exposing a stale answer after the learner moves.
+
 ## Local presentation and app updates
 
 Mantine defaults and semantic styling belong in `Theme.ts` and
@@ -739,6 +901,7 @@ try-on generation remain future work; there is no implemented try-on job pipelin
 | Chat and worker composition      | [AgentChatController.ts](../src/desktop/main/AgentChatController.ts), [ComputerUseTaskRunner.ts](../src/desktop/worker/agent/ComputerUseTaskRunner.ts)                                                                                                                                                                                                       |
 | Execution and verification       | [TaskHarness.ts](../src/desktop/worker/execution/TaskHarness.ts), [TaskVerifier.ts](../src/desktop/worker/execution/TaskVerifier.ts), [CompletionGate.ts](../src/desktop/worker/execution/CompletionGate.ts)                                                                                                                                                 |
 | Teaching and native tool adapter | [TeachingTaskRunner.ts](../src/desktop/worker/teaching/TeachingTaskRunner.ts), [TeachingPresenter.ts](../src/desktop/worker/teaching/TeachingPresenter.ts), [LoggedCuaServer.ts](../src/desktop/worker/cua/LoggedCuaServer.ts)                                                                                                                               |
+| Guided lessons                   | [GuidedLessonService.ts](../src/server/features/guidedLessons/application/GuidedLessonService.ts), [GuidedLessons.ts](../src/contracts/GuidedLessons.ts), [LessonComposition.tsx](../src/lessonMedia/LessonComposition.tsx), [GuidedLessonsPage.tsx](../src/desktop/renderer/guidedLessons/GuidedLessonsPage.tsx)                                            |
 | Local observation                | [DesktopObservationClient.ts](../src/desktop/worker/observation/DesktopObservationClient.ts), [TeachingObservationPolicy.ts](../src/desktop/worker/observation/TeachingObservationPolicy.ts)                                                                                                                                                                 |
 | Companion presentation           | [DesktopCompanion.ts](../src/desktop/main/companion/DesktopCompanion.ts), [CompanionHudPublisher.ts](../src/desktop/worker/companion/CompanionHudPublisher.ts)                                                                                                                                                                                               |
 | Voice and microphones            | [VoiceInputController.ts](../src/desktop/main/voice/VoiceInputController.ts), [VoiceoverController.ts](../src/desktop/main/voiceover/VoiceoverController.ts), [Microphones.ts](../src/desktop/renderer/voice/Microphones.ts)                                                                                                                                 |
