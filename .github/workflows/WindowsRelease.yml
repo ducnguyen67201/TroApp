@@ -97,5 +97,5 @@ jobs:
           path: |
             release/Tro-*-windows-x64-setup.exe
             release/Tro-*-windows-x64-setup.exe.blockmap
-            release/*.yml
+            release/latest.yml
             release/WindowsSignatures.json

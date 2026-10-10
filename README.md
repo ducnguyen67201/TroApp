@@ -302,9 +302,13 @@ To verify a locally packaged signed Windows build with the expected publisher se
 ./scripts/VerifyWindowsRelease.ps1 -Mode Test
 ```
 
-With a configured feed, also pass `-RequireUpdateMetadata`; its hashes and size
-must match the final signed installer. The verifier accepts the pinned builder's
-single-file YAML layout for this x64 target and fails if the layout changes.
+With a configured feed, also pass `-RequireUpdateMetadata`; `latest.yml` must exist
+and its hashes and size must match the final signed installer. The verifier accepts
+the pinned builder's single-file YAML layout for this x64 target and fails if the
+layout changes. It reports the manifest name and mismatch category without dumping
+its contents. Builder diagnostic files such as `builder-debug.yml` are excluded
+from update verification and artifact upload. Any `latest.yml` present is checked
+even when the feed is unset.
 Without a feed, updates remain disabled. Actions artifacts are not a public update
 server. Never modify or re-sign installer bytes after generating update metadata.
 
