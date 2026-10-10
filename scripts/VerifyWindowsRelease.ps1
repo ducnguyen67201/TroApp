@@ -66,12 +66,34 @@ function Assert-UpdateMetadata {
     $paths = [regex]::Matches($Content, '(?m)^path: ([A-Za-z0-9._-]+)\r?$')
     $hashes = [regex]::Matches($Content, '(?m)^(?:    )?sha512: ([A-Za-z0-9+/=]+)\r?$')
     $sizes = [regex]::Matches($Content, '(?m)^    size: ([0-9]+)\r?$')
-    if ($urls.Count -ne 1 -or $paths.Count -ne 1 -or $hashes.Count -ne 2 -or $sizes.Count -ne 1 -or
-        $urls[0].Groups[1].Value -cne $InstallerName -or $paths[0].Groups[1].Value -cne $InstallerName -or
-        $hashes[0].Groups[1].Value -cne $Sha512 -or $hashes[1].Groups[1].Value -cne $Sha512 -or
-        [long]$sizes[0].Groups[1].Value -ne $Size) {
-        throw 'Update metadata does not describe the final signed installer.'
+    if ($urls.Count -ne 1 -or $paths.Count -ne 1 -or $hashes.Count -ne 2 -or $sizes.Count -ne 1) {
+        throw "Invalid latest.yml layout (urls=$($urls.Count), paths=$($paths.Count), hashes=$($hashes.Count), sizes=$($sizes.Count))."
     }
+    if ($urls[0].Groups[1].Value -cne $InstallerName -or $paths[0].Groups[1].Value -cne $InstallerName) {
+        throw 'latest.yml installer name does not match the final signed installer.'
+    }
+    if ($hashes[0].Groups[1].Value -cne $Sha512 -or $hashes[1].Groups[1].Value -cne $Sha512) {
+        throw 'latest.yml SHA-512 does not match the final signed installer.'
+    }
+    $metadataSize = 0L
+    if (-not [long]::TryParse($sizes[0].Groups[1].Value, [ref]$metadataSize) -or $metadataSize -ne $Size) {
+        throw 'latest.yml size does not match the final signed installer.'
+    }
+}
+
+function Assert-UpdateManifest {
+    param([string]$Directory, [System.IO.FileInfo]$Installer, [switch]$Required)
+    # The generic feed for this Windows x64 target uses latest.yml. Builder diagnostic
+    # YAML can exist even without a feed and must not be verified or uploaded as updates.
+    $metadataPath = Join-Path $Directory 'latest.yml'
+    if (-not (Test-Path -LiteralPath $metadataPath -PathType Leaf)) {
+        if ($Required) { throw 'Required Windows update metadata is missing: latest.yml.' }
+        return
+    }
+    $digest = [System.Security.Cryptography.SHA512]::HashData([System.IO.File]::ReadAllBytes($Installer.FullName))
+    Assert-UpdateMetadata (Get-Content -LiteralPath $metadataPath -Raw) $Installer.Name `
+        ([Convert]::ToBase64String($digest)) $Installer.Length
+    Write-Output 'Verified Windows update metadata: latest.yml.'
 }
 
 function Invoke-VerificationTests {
@@ -100,12 +122,43 @@ function Invoke-VerificationTests {
         }
         $metadata = "version: 0.1.0`nfiles:`n  - url: Tro-setup.exe`n    sha512: YWJj`n    size: 10`npath: Tro-setup.exe`nsha512: YWJj`n"
         Assert-UpdateMetadata $metadata 'Tro-setup.exe' 'YWJj' 10
-        foreach ($invalid in @($metadata.Replace('size: 10', 'size: 11'),
-            $metadata.Replace('YWJj', 'bad'), $metadata.Replace('Tro-setup.exe', '../bad.exe'), '')) {
+        foreach ($case in @(
+            @{ content = $metadata.Replace('size: 10', 'size: 11'); reason = 'size does not match' },
+            @{ content = $metadata.Replace('size: 10', 'size: 999999999999999999999'); reason = 'size does not match' },
+            @{ content = $metadata.Replace('YWJj', 'bad'); reason = 'SHA-512 does not match' },
+            @{ content = $metadata.Replace('Tro-setup.exe', 'Wrong-setup.exe'); reason = 'installer name does not match' },
+            @{ content = $metadata.Replace('Tro-setup.exe', '../bad.exe'); reason = 'layout' },
+            @{ content = ''; reason = 'layout' }
+        )) {
             $rejected = $false
-            try { Assert-UpdateMetadata $invalid 'Tro-setup.exe' 'YWJj' 10 }
-            catch { $rejected = $true }
+            try { Assert-UpdateMetadata $case.content 'Tro-setup.exe' 'YWJj' 10 }
+            catch {
+                $rejected = $_.Exception.Message.Contains('latest.yml') -and
+                    $_.Exception.Message.Contains($case.reason)
+            }
             if (-not $rejected) { throw 'Invalid update fixture was accepted.' }
+        }
+        $installerPath = Join-Path $temporaryDirectory 'Tro-setup.exe'
+        [System.IO.File]::WriteAllBytes($installerPath, [byte[]]@(0x4d, 0x5a))
+        $installer = Get-Item -LiteralPath $installerPath
+        [System.IO.File]::WriteAllText((Join-Path $temporaryDirectory 'builder-debug.yml'), "x64:`n  firstOrDefaultFilePatterns: []`n")
+        Assert-UpdateManifest -Directory $temporaryDirectory -Installer $installer
+        $rejected = $false
+        try { Assert-UpdateManifest -Directory $temporaryDirectory -Installer $installer -Required }
+        catch { $rejected = $_.Exception.Message -ceq 'Required Windows update metadata is missing: latest.yml.' }
+        if (-not $rejected) { throw 'Builder diagnostic YAML was accepted as a required update manifest.' }
+        $digest = [System.Security.Cryptography.SHA512]::HashData([System.IO.File]::ReadAllBytes($installerPath))
+        $manifestPath = Join-Path $temporaryDirectory 'latest.yml'
+        $manifest = $metadata.Replace('YWJj', [Convert]::ToBase64String($digest)).Replace('size: 10', 'size: 2')
+        [System.IO.File]::WriteAllText($manifestPath, $manifest)
+        Assert-UpdateManifest -Directory $temporaryDirectory -Installer $installer -Required
+        # Changing signed installer bytes after metadata generation must still fail.
+        [System.IO.File]::WriteAllBytes($installerPath, [byte[]]@(0x4d, 0x5b))
+        foreach ($required in @($false, $true)) {
+            $rejected = $false
+            try { Assert-UpdateManifest -Directory $temporaryDirectory -Installer $installer -Required:$required }
+            catch { $rejected = $_.Exception.Message -ceq 'latest.yml SHA-512 does not match the final signed installer.' }
+            if (-not $rejected) { throw 'Changed installer bytes were accepted.' }
         }
         Write-Output 'Windows verification fixtures passed.'
     } finally {
@@ -179,14 +232,6 @@ foreach ($file in @((Get-ChildItem -LiteralPath $appDirectory -File -Recurse)) +
     if ($record.path -match '/uiohook-napi/prebuilds/win32-x64/[^/]+\.node$') { $hasNativeHook = $true }
 }
 if (-not $hasNativeHook) { throw 'Windows x64 native shortcut addon is missing.' }
-$metadataFiles = @(Get-ChildItem -LiteralPath $root -File -Filter '*.yml')
-if ($RequireUpdateMetadata -and $metadataFiles.Count -ne 1) {
-    throw 'Expected exactly one Windows update manifest.'
-}
-foreach ($metadata in $metadataFiles) {
-    $digest = [System.Security.Cryptography.SHA512]::HashData([System.IO.File]::ReadAllBytes($installer.FullName))
-    Assert-UpdateMetadata (Get-Content -LiteralPath $metadata.FullName -Raw) $installer.Name `
-        ([Convert]::ToBase64String($digest)) $installer.Length
-}
+Assert-UpdateManifest -Directory $root -Installer $installer -Required:$RequireUpdateMetadata
 $records.ToArray() | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $root 'WindowsSignatures.json') -Encoding utf8
 Write-Output "Verified $($records.Count) Windows executable signatures."
