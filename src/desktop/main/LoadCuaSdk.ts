@@ -9,7 +9,7 @@ type NativeCuaSdk = Pick<
 
 export type DesktopDriverHost = Pick<
   import('@trycua/cua-driver').EmbeddedCuaDriverHost,
-  'start' | 'stop' | 'waitForExit' | 'uniffiDestroy'
+  'start' | 'stop' | 'connection' | 'uniffiDestroy'
 >;
 
 export interface CuaSdk {

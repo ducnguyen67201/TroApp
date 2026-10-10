@@ -76,6 +76,21 @@ rebuilding so its daemon loads that executable.
 owns the required version/source commit. Packaged driver resources take precedence
 over development caches.
 
+To measure desktop memory on macOS, use Tro's main process PID from Activity
+Monitor (replace `12345` below):
+
+```sh
+pnpm check:desktop-memory --pid 12345 --duration-seconds 60
+```
+
+The read-only check reports physical footprint for main and all current helper
+processes, including compressed/swapped allocations. It reports growth and whether
+the combined footprint is below a 1 GB idle target. Measure after startup settles
+and again during the intended workload; the target is not a guaranteed ceiling
+for active teaching, media playback or development tooling. The API, database and
+other applications are outside this desktop process tree. The check never restarts
+Tro or starts an agent/model request.
+
 The macOS launcher uses the checkout-owned `.tro-development/Tro.app`. Quit it
 before rebuilding its static host. The development bundle has a separate identity
 from installed `app.tro.desktop`; grant each its own Screen Recording, Accessibility

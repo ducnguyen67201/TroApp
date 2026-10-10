@@ -10,6 +10,8 @@ import { DesktopPermissions } from './DesktopPermissions.js';
 import { loadCuaSdk, type DesktopDriverHost } from './LoadCuaSdk.js';
 import type { DesktopDriverPort } from './DesktopDriverPort.js';
 
+const driverExitCheckIntervalMs = 500;
+
 /** Main directly owns the embedded macOS daemon and its private MCP endpoint.
  * No LaunchServices launch or connection to an independent driver's daemon. */
 export class EmbeddedDesktopDriver implements DesktopDriverPort {
@@ -18,6 +20,7 @@ export class EmbeddedDesktopDriver implements DesktopDriverPort {
   private stopPromise: Promise<void> | null = null;
   private generation = 0;
   private connection: DesktopDriverConnection | null = null;
+  private exitCheckTimer: ReturnType<typeof setInterval> | null = null;
   private readonly exitListeners = new Set<() => void>();
 
   async start(onExit: () => void): Promise<DesktopDriverConnection> {
@@ -43,6 +46,7 @@ export class EmbeddedDesktopDriver implements DesktopDriverPort {
       return this.stopPromise;
     }
     this.generation += 1;
+    this.clearExitCheckTimer();
     this.connection = null;
     this.exitListeners.clear();
     const pendingStart = this.startPromise;
@@ -74,12 +78,44 @@ export class EmbeddedDesktopDriver implements DesktopDriverPort {
   }
 
   private notifyExit(): void {
+    this.clearExitCheckTimer();
     this.connection = null;
     const listeners = [...this.exitListeners];
     this.exitListeners.clear();
     for (const listener of listeners) {
       listener();
     }
+  }
+
+  private clearExitCheckTimer(): void {
+    if (this.exitCheckTimer) {
+      clearInterval(this.exitCheckTimer);
+      this.exitCheckTimer = null;
+    }
+  }
+
+  /** The SDK's synchronous read refreshes child exit status. Its long-lived
+   * async wait polls through a native callback leak in the pinned SDK runtime. */
+  private watchDriverExit(
+    host: DesktopDriverHost,
+    driverGeneration: string,
+    generation: number,
+  ): void {
+    this.clearExitCheckTimer();
+    this.exitCheckTimer = setInterval(() => {
+      if (generation !== this.generation || this.host !== host) {
+        return;
+      }
+      try {
+        if (host.connection()?.generation === driverGeneration) {
+          return;
+        }
+      } catch {
+        /* Losing lifecycle visibility invalidates every worker connection. */
+      }
+      this.notifyExit();
+    }, driverExitCheckIntervalMs);
+    this.exitCheckTimer.unref();
   }
 
   private async startDriver(generation: number): Promise<DesktopDriverConnection> {
@@ -101,23 +137,12 @@ export class EmbeddedDesktopDriver implements DesktopDriverPort {
     if (generation !== this.generation) {
       throw new Error('Desktop driver startup was canceled.');
     }
-    void host
-      .waitForExit(connection.generation)
-      .then(() => {
-        if (generation === this.generation && this.host === host) {
-          this.notifyExit();
-        }
-      })
-      .catch(() => {
-        if (generation === this.generation && this.host === host) {
-          this.notifyExit();
-        }
-      });
     this.connection = DesktopDriverConnectionSchema.parse({
       command: connection.mcp.command,
       args: connection.mcp.args,
       env: Object.fromEntries(connection.mcp.environment.map(({ name, value }) => [name, value])),
     });
+    this.watchDriverExit(host, connection.generation, generation);
     return this.connection;
   }
 }
