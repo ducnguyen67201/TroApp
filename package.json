@@ -33,6 +33,7 @@
     "build:desktop": "electron-vite build && tsx scripts/PrepareDesktopPackage.ts",
     "check:pet-presentation": "tsx scripts/CheckPetPresentation.ts",
     "check:microphone-package": "tsx scripts/CheckMicrophonePackage.ts",
+    "check:desktop-memory": "tsx scripts/CheckDesktopMemory.ts",
     "package:desktop": "pnpm build:desktop && tsx scripts/PackageDesktop.ts",
     "lint": "eslint . && tsx scripts/CheckBoundaries.ts",
     "format": "prettier --write . && eslint . --fix",

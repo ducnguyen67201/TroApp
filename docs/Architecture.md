@@ -1,7 +1,7 @@
 # Tro architecture
 
 This is the single maintained description of Tro's implemented system. Updated
-October 8, 2026. Change this document when ownership, component communication or
+October 10, 2026. Change this document when ownership, component communication or
 an architectural invariant changes. Contracts and configuration in the linked code
 own exact wire shapes and policy values. Setup and validation commands live in the
 [root README](../README.md). Research and UI prototypes are reference material,
@@ -98,6 +98,14 @@ use. The branded development host and installed Tro have different bundle
 identities and permission grants. `DesktopPermissions` requests access in main so
 the OS attributes it to Tro. Missing grants lead to onboarding; no driver task or
 model credential is issued before admission.
+
+[EmbeddedDesktopDriver.ts](../src/desktop/main/EmbeddedDesktopDriver.ts) owns one
+unreferenced timer shared by the daemon's subscribers. It checks the SDK's
+synchronous `connection()` and generation at a fixed interval; that API refreshes
+child exit state before returning. Missing/replaced
+connections and read failures invalidate subscribers once. Stop clears the timer
+before releasing the host. This avoids the pinned SDK's long-lived asynchronous
+exit watcher, whose repeated native callback registrations accumulate memory.
 
 ## Agent requests and model gateway
 
@@ -374,6 +382,14 @@ the callback does not await or acquire the render-controller lock. Coalesced or
 rejected images are released. The original one-second message deadline remains.
 Presented means CALayer accepted the current frame, not physical display scan-out.
 A message receipt alone does not satisfy a spatial teaching presentation.
+
+Settled HUD messages and stationary following cursors do not continuously publish
+or rasterize full-display images. Lightweight maintenance still checks leases,
+presentation deadlines and pointer movement; active cursor/HUD animations and
+drawing receipts retain their frame updates. Recurring macOS render/follow work
+drains scoped autorelease pools so temporary Cocoa objects do not accumulate over
+the lifetime of a background thread. These changes reduce idle work; they do not
+impose an OS memory limit on the desktop process tree.
 
 Common admission, explicit refresh commands and the installation fence keep HUD
 messages and receipts under the same owner. Native build provenance and the required
