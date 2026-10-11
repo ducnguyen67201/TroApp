@@ -271,6 +271,18 @@ class PrismaPetWorldTransaction implements PetWorldTransaction {
     return rows.map(readPetRecognitionRow);
   }
 
+  async countClassroomMoments(classId: string, to: string) {
+    const batches = await this.client.petRecognition.groupBy({
+      by: ['batchId'],
+      where: {
+        classId,
+        createdAt: { gte: new Date('1970-01-01T00:00:00.000Z'), lt: new Date(to) },
+        correction: { is: null },
+      },
+    });
+    return batches.length;
+  }
+
   async saveCorrection(
     recognitionId: string,
     teacherId: string,
@@ -292,6 +304,19 @@ class PrismaPetWorldTransaction implements PetWorldTransaction {
   async readWorld(studentId: string) {
     const row = await this.client.petWorld.findUnique({ where: { studentId } });
     return row ? readPetWorldRow(row) : null;
+  }
+
+  async listSharedWorlds(classId: string) {
+    const rows = await this.client.petWorld.findMany({
+      where: {
+        student: {
+          classEnrollments: { some: { classId, active: true } },
+          petHomeShares: { some: { classId, enabled: true } },
+        },
+      },
+      orderBy: { studentId: 'asc' },
+    });
+    return rows.map(readPetWorldRow);
   }
 
   async createWorldIfMissing(world: PetWorldState) {

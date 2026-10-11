@@ -1,6 +1,10 @@
-import type { PetRecognition, PetRecognitionCoverage } from '#contracts/PetWorld.js';
+import type { PetGarden, PetRecognition, PetRecognitionCoverage } from '#contracts/PetWorld.js';
 import { AccountRole } from '#contracts/AccountRole.js';
 import type { PetRosterStudent } from './PetWorldState.js';
+
+export function calculateGardenProgress(classroomMoments: number): PetGarden {
+  return { classroomMoments, gardenMilestone: Math.floor(classroomMoments / 5) };
+}
 
 /** Recognition describes teacher choices, never mastery, attention, or motivation. */
 export function calculateRecognitionCoverage(
@@ -28,7 +32,6 @@ export function calculateRecognitionCoverage(
     eligibleStudents: eligible.size,
     recognizedStudents: recognizedStudentIds.length,
     recognizedStudentIds,
-    classroomMoments,
-    gardenMilestone: Math.floor(classroomMoments / 5),
+    ...calculateGardenProgress(classroomMoments),
   };
 }

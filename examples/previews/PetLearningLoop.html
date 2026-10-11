@@ -501,7 +501,9 @@ SOFTWARE.
         background-position: 50% 50%;
         background-repeat: no-repeat;
       }
-      .pet-button .scarf {
+      .pet-button .scarf,
+      .desktop-pet-body .scarf,
+      .pet-figure .scarf {
         position: absolute;
         top: 60%;
         left: 30%;
@@ -512,7 +514,9 @@ SOFTWARE.
         transform: rotate(-3deg);
         box-shadow: inset 0 3px #e8bc94;
       }
-      .pet-button .scarf::after {
+      .pet-button .scarf::after,
+      .desktop-pet-body .scarf::after,
+      .pet-figure .scarf::after {
         content: '';
         position: absolute;
         left: 70%;
@@ -1849,29 +1853,6 @@ SOFTWARE.
         width: 19%;
         aspect-ratio: 1;
         filter: drop-shadow(0 8px 3px #485b3920);
-      }
-      .desktop-pet-body .scarf,
-      .pet-figure .scarf {
-        position: absolute;
-        top: 60%;
-        left: 30%;
-        width: 42%;
-        height: 10%;
-        background: #bb785e;
-        border-radius: 5px;
-        transform: rotate(-3deg);
-        box-shadow: inset 0 3px #e8bc94;
-      }
-      .desktop-pet-body .scarf::after,
-      .pet-figure .scarf::after {
-        content: '';
-        position: absolute;
-        left: 70%;
-        width: 20%;
-        height: 230%;
-        top: 40%;
-        background: #bb785e;
-        border-radius: 2px;
       }
       .desktop-current {
         display: flex;

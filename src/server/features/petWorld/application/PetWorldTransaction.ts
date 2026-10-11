@@ -44,12 +44,16 @@ export interface PetWorldTransaction {
   ): Promise<PetRecognitionState[]>;
   readOwnerRecognitionRevision(studentId: string): Promise<number>;
   listClassRecognitions(classId: string, from: string, to: string): Promise<PetRecognitionState[]>;
+  /** Counts distinct batches before the cutoff with at least one uncorrected recognition. */
+  countClassroomMoments(classId: string, to: string): Promise<number>;
   saveCorrection(
     recognitionId: string,
     teacherId: string,
     correction: NonNullable<PetRecognition['correction']>,
   ): Promise<void>;
   readWorld(studentId: string): Promise<PetWorldState | null>;
+  /** Lists cosmetic worlds with enabled consent and active enrollment in this class. */
+  listSharedWorlds(classId: string): Promise<PetWorldState[]>;
   createWorldIfMissing(world: PetWorldState): Promise<PetWorldState>;
   saveWorld(world: PetWorldState, expectedRevision: number): Promise<void>;
   listInventory(studentId: string): Promise<PetInventoryState[]>;

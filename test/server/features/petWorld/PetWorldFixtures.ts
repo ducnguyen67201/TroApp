@@ -196,6 +196,22 @@ export class MemoryPetWorldStore implements PetWorldStore, PetWorldTransaction {
     );
   }
 
+  countClassroomMoments(classId: string, to: string): Promise<number> {
+    return Promise.resolve(
+      new Set(
+        [...this.recognitions.values()]
+          .filter(
+            (recognition) =>
+              recognition.classId === classId &&
+              recognition.createdAt >= '1970-01-01T00:00:00.000Z' &&
+              recognition.createdAt < to &&
+              !recognition.correction,
+          )
+          .map((recognition) => recognition.batchId),
+      ).size,
+    );
+  }
+
   saveCorrection(
     recognitionId: string,
     teacherId: string,
@@ -211,6 +227,18 @@ export class MemoryPetWorldStore implements PetWorldStore, PetWorldTransaction {
 
   readWorld(studentId: string): Promise<PetWorldState | null> {
     return Promise.resolve(this.worlds.get(studentId) ?? null);
+  }
+
+  listSharedWorlds(classId: string): Promise<PetWorldState[]> {
+    return Promise.resolve(
+      [...this.worlds.values()]
+        .filter(
+          (world) =>
+            this.enrollments.has(`${classId}:${world.studentId}`) &&
+            this.shares.get(`${world.studentId}:${classId}`)?.enabled,
+        )
+        .sort((first, second) => first.studentId.localeCompare(second.studentId)),
+    );
   }
 
   createWorldIfMissing(world: PetWorldState): Promise<PetWorldState> {

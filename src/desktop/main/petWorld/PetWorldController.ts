@@ -56,6 +56,7 @@ export class PetWorldController {
   private catalog: PetCatalog | null = null;
   private walletRevision = -1;
   private canPoll = true;
+  private isPolling = false;
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
@@ -82,9 +83,7 @@ export class PetWorldController {
     await this.ready;
     if (accountId && generation === this.generation) {
       this.timer = setInterval(() => {
-        if (this.canPoll && this.pets.readSnapshot().isVisible) {
-          void this.execute({ kind: PetWorldCommandKind.OWN_WORLD }, () => true);
-        }
+        void this.refreshVisibleCompanion();
       }, PetWorldTiming.REFRESH_MS);
       this.timer.unref();
     }
@@ -237,7 +236,23 @@ export class PetWorldController {
     this.catalog = null;
     this.walletRevision = -1;
     this.canPoll = true;
+    this.isPolling = false;
     this.ready = Promise.resolve();
+  }
+
+  private async refreshVisibleCompanion(): Promise<void> {
+    if (this.isPolling || !this.canPoll || !this.pets.readSnapshot().isVisible) {
+      return;
+    }
+    const generation = this.generation;
+    this.isPolling = true;
+    try {
+      await this.execute({ kind: PetWorldCommandKind.OWN_WORLD }, () => true);
+    } finally {
+      if (generation === this.generation) {
+        this.isPolling = false;
+      }
+    }
   }
 
   private async loadAccount(accountId: string, generation: number): Promise<void> {

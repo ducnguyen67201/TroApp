@@ -11,6 +11,7 @@ import {
   PetWorldCommandKind,
   PetWorldFailure,
   PetRecognitionCategory,
+  PetWorldTiming,
   type PetWorldCommand,
   type PetWorldReply,
 } from '#contracts/PetWorld.js';
@@ -133,9 +134,33 @@ afterEach(() => {
     controller.dispose();
   });
   controllers.length = 0;
+  vi.useRealTimers();
 });
 
 describe('pet world desktop synchronization', () => {
+  it('keeps one companion poll in flight when the API takes longer than the refresh interval', async () => {
+    vi.useFakeTimers();
+    const harness = createHarness();
+    harness.pets.readSnapshot.mockReturnValue({
+      ...harness.pets.readSnapshot(),
+      isVisible: true,
+    });
+    let finishPoll: ((reply: PetWorldReply) => void) | undefined;
+    harness.api.execute.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishPoll = resolve;
+        }),
+    );
+    await harness.controller.setAccount('student');
+    await vi.advanceTimersByTimeAsync(PetWorldTiming.REFRESH_MS * 3);
+    expect(harness.api.execute).toHaveBeenCalledOnce();
+    finishPoll?.({ kind: 'failed', code: PetWorldFailure.UNAVAILABLE });
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(PetWorldTiming.REFRESH_MS);
+    expect(harness.api.execute).toHaveBeenCalledTimes(2);
+  });
+
   it('shares account initialization across concurrent initial reads', async () => {
     const harness = createHarness();
     await Promise.all([

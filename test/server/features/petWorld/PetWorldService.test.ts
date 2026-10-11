@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AccountRole } from '#contracts/AccountRole.js';
 import { PetId } from '#contracts/Pet.js';
 import {
@@ -412,6 +412,52 @@ describe('Pet World accounting and authorization', () => {
     await expect(service.execute('other-teacher', visit)).rejects.toMatchObject({
       code: PetWorldFailure.FORBIDDEN,
     });
+  });
+
+  it('loads a full classroom neighborhood without per-student queries or private recognition reads', async () => {
+    const { store, service } = createFixture();
+    for (let index = 0; index < 200; index += 1) {
+      const studentId = `pupil-${index.toString().padStart(3, '0')}`;
+      store.roles.set(studentId, AccountRole.STUDENT);
+      store.enrollments.add(`${PetWorldFixtureIds.CLASS}:${studentId}`);
+      store.worlds.set(studentId, {
+        studentId,
+        activePetId: PetId.CAT,
+        names: { cat: 'Mochi', fox: 'Maple' },
+        backdropItemId: null,
+        outfitItemId: null,
+        slots: { garden: null, home: null, feature: null },
+        revision: 0,
+      });
+      store.shares.set(`${studentId}:${PetWorldFixtureIds.CLASS}`, {
+        studentId,
+        classId: PetWorldFixtureIds.CLASS,
+        enabled: index < 150,
+        revision: 1,
+      });
+    }
+    store.enrollments.delete(`${PetWorldFixtureIds.CLASS}:pupil-000`);
+    const listSharedWorlds = vi.spyOn(store, 'listSharedWorlds');
+    const countClassroomMoments = vi.spyOn(store, 'countClassroomMoments');
+    const readHomeShare = vi.spyOn(store, 'readHomeShare');
+    const readWorld = vi.spyOn(store, 'readWorld');
+    const listClassRecognitions = vi.spyOn(store, 'listClassRecognitions');
+    const neighborhood = await service.execute('teacher', {
+      kind: PetWorldCommandKind.CLASS_NEIGHBORHOOD,
+      classId: PetWorldFixtureIds.CLASS,
+    });
+    if (neighborhood.kind !== 'neighborhood') {
+      throw new Error('Expected neighborhood projection.');
+    }
+    expect(neighborhood.homes).toHaveLength(149);
+    expect(neighborhood.homes.some((home) => home.studentId === 'pupil-000')).toBe(false);
+    expect(neighborhood.homes.some((home) => home.studentId === 'pupil-150')).toBe(false);
+    expect(listSharedWorlds).toHaveBeenCalledTimes(1);
+    expect(countClassroomMoments).toHaveBeenCalledTimes(1);
+    expect(readHomeShare).not.toHaveBeenCalled();
+    expect(readWorld).not.toHaveBeenCalled();
+    expect(listClassRecognitions).not.toHaveBeenCalled();
+    expect(JSON.stringify(neighborhood)).not.toMatch(/wallet|recognitions|note|teacherId/);
   });
 
   it('binds history cursors to the owner and wallet revision', async () => {

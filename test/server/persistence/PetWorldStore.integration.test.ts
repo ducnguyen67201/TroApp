@@ -416,6 +416,91 @@ describe('Pet World PostgreSQL accounting and ownership', () => {
 });
 
 describe('Pet World PostgreSQL sharing lifecycle and integrity constraints', () => {
+  it('projects shared enrolled homes in bulk and counts distinct nonvoided award batches', async () => {
+    const fixture = await createFixture();
+    await initializeWorld(fixture.first);
+    await initializeWorld(fixture.second);
+    await initializeWorld(fixture.stranger);
+    await service.execute(fixture.first, {
+      kind: PetWorldCommandKind.SET_HOME_SHARING,
+      requestId: randomUUID(),
+      classId: fixture.classId,
+      enabled: true,
+      expectedShareRevision: 0,
+    });
+    /* A stale consent row must never admit an unenrolled owner into the bulk projection. */
+    await client.petHomeShare.create({
+      data: { studentId: fixture.stranger, classId: fixture.classId, enabled: true, revision: 1 },
+    });
+    const group = await service.execute(
+      fixture.teacher,
+      createGrant(fixture.classId, [fixture.first, fixture.second]),
+    );
+    if (group.kind !== 'granted' || !group.recognitions[0] || !group.recognitions[1]) {
+      throw new Error('Missing group award.');
+    }
+    await service.execute(fixture.teacher, {
+      kind: PetWorldCommandKind.VOID_RECOGNITION,
+      requestId: randomUUID(),
+      recognitionId: group.recognitions[0].id,
+      reason: 'One group recipient was selected accidentally.',
+    });
+    const corrected = await service.execute(
+      fixture.teacher,
+      createGrant(fixture.classId, [fixture.first]),
+    );
+    if (corrected.kind !== 'granted' || !corrected.recognitions[0]) {
+      throw new Error('Missing corrected award.');
+    }
+    await service.execute(fixture.teacher, {
+      kind: PetWorldCommandKind.REVERSE_GRANT,
+      requestId: randomUUID(),
+      recognitionId: corrected.recognitions[0].id,
+      reason: 'A whole accidental award was reversed.',
+    });
+    for (let index = 0; index < 4; index += 1) {
+      await service.execute(fixture.teacher, createGrant(fixture.classId, [fixture.first]));
+    }
+    const futureService = new PetWorldService(
+      database.store,
+      () => new Date('2099-01-01T00:00:00.000Z'),
+    );
+    await futureService.execute(fixture.teacher, createGrant(fixture.classId, [fixture.first]));
+    const neighborhood = await service.execute(fixture.second, {
+      kind: PetWorldCommandKind.CLASS_NEIGHBORHOOD,
+      classId: fixture.classId,
+    });
+    expect(neighborhood).toMatchObject({
+      kind: 'neighborhood',
+      homes: [{ studentId: fixture.first }],
+      garden: { classroomMoments: 5, gardenMilestone: 1 },
+    });
+    if (neighborhood.kind !== 'neighborhood') {
+      throw new Error('Expected neighborhood projection.');
+    }
+    expect(neighborhood.homes).toHaveLength(1);
+    expect(JSON.stringify(neighborhood)).not.toMatch(/wallet|recognitions|note|teacherId/);
+    await classroom.store.enrollStudent(fixture.classId, fixture.first, false);
+    expect(
+      await service.execute(fixture.second, {
+        kind: PetWorldCommandKind.CLASS_NEIGHBORHOOD,
+        classId: fixture.classId,
+      }),
+    ).toMatchObject({ kind: 'neighborhood', homes: [], garden: { classroomMoments: 5 } });
+    await service.execute(fixture.teacher, {
+      kind: PetWorldCommandKind.VOID_RECOGNITION,
+      requestId: randomUUID(),
+      recognitionId: group.recognitions[1].id,
+      reason: 'The remaining group recognition was recorded by mistake.',
+    });
+    expect(
+      await service.execute(fixture.second, {
+        kind: PetWorldCommandKind.CLASS_NEIGHBORHOOD,
+        classId: fixture.classId,
+      }),
+    ).toMatchObject({ kind: 'neighborhood', garden: { classroomMoments: 4, gardenMilestone: 0 } });
+  });
+
   it('expires private recognition prose while preserving accounting, ownership and receipt replay', async () => {
     const fixture = await createFixture();
     const historicalService = new PetWorldService(

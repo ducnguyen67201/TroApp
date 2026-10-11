@@ -5,6 +5,7 @@ import {
   PetWorldCommandKind,
   PetWorldCommandSchema,
   PetWorldFailure,
+  PetWorldTiming,
   type PetCatalog,
   type PetOwnWorld,
   type PetWorldCommand,
@@ -56,6 +57,8 @@ export function usePetWorld(
   const [failure, setFailure] = useState<PetWorldFailure | null>(null);
   const generation = useRef(0);
   const readVersion = useRef(0);
+  const activeRefresh = useRef<{ generation: number; readVersion: number } | null>(null);
+  const historyReadVersion = useRef(0);
   const pending = useRef(false);
   const worldRevision = useRef({ wallet: -1, profile: -1 });
   const isAvailable = Boolean(window.tro.executePetWorld);
@@ -66,6 +69,12 @@ export function usePetWorld(
       (next.profile?.revision ?? -1) < worldRevision.current.profile
     ) {
       return;
+    }
+    if (next.wallet.revision > worldRevision.current.wallet) {
+      historyReadVersion.current += 1;
+      setHistory((current) =>
+        current && current.walletRevision < next.wallet.revision ? null : current,
+      );
     }
     worldRevision.current = {
       wallet: next.wallet.revision,
@@ -81,7 +90,15 @@ export function usePetWorld(
       return;
     }
     const currentGeneration = generation.current;
+    if (
+      activeRefresh.current?.generation === currentGeneration &&
+      activeRefresh.current.readVersion === readVersion.current
+    ) {
+      return;
+    }
     const currentRead = ++readVersion.current;
+    const refreshRequest = { generation: currentGeneration, readVersion: currentRead };
+    activeRefresh.current = refreshRequest;
     const isCurrent = (): boolean =>
       currentGeneration === generation.current && currentRead === readVersion.current;
     try {
@@ -113,14 +130,7 @@ export function usePetWorld(
       if (catalogReply.kind === 'catalog') {
         setCatalog(catalogReply.catalog);
       } else if (catalogReply.kind === 'failed') {
-        const isTeacherWithoutWallet =
-          classroomReply?.kind === 'home' &&
-          classroomReply.home.role === AccountRole.TEACHER &&
-          worldReply.kind === 'failed' &&
-          worldReply.code === PetWorldFailure.FORBIDDEN;
-        if (catalogReply.code !== PetWorldFailure.FORBIDDEN || !isTeacherWithoutWallet) {
-          setFailure(catalogReply.code);
-        }
+        setFailure(catalogReply.code);
       }
       if (!classId) {
         setRecognition(null);
@@ -156,11 +166,15 @@ export function usePetWorld(
         setFailure(PetWorldFailure.UNAVAILABLE);
       }
     } finally {
+      if (activeRefresh.current === refreshRequest) {
+        activeRefresh.current = null;
+      }
       if (isCurrent()) {
         setLoading(false);
       }
     }
   }, [classId, period, acceptWorld]);
+  const latestRefresh = useRef(refresh);
 
   useEffect(() => {
     generation.current += 1;
@@ -182,6 +196,7 @@ export function usePetWorld(
   }, [userId]);
 
   useEffect(() => {
+    latestRefresh.current = refresh;
     setRecognition(null);
     setNeighborhood(null);
     void refresh();
@@ -189,83 +204,89 @@ export function usePetWorld(
       if (!document.hidden && !pending.current) {
         void refresh();
       }
-    }, 15_000);
+    }, PetWorldTiming.REFRESH_MS);
     return () => {
       readVersion.current += 1;
       window.clearInterval(timer);
     };
   }, [userId, refresh]);
 
-  const sendCommand = useCallback(
-    async (command: PetWorldCommand): Promise<boolean> => {
-      if (!window.tro.executePetWorld || pending.current) {
+  const sendCommand = useCallback(async (command: PetWorldCommand): Promise<boolean> => {
+    if (!window.tro.executePetWorld || pending.current) {
+      return false;
+    }
+    const parsed = PetWorldCommandSchema.safeParse(command);
+    if (!parsed.success) {
+      setFailure(PetWorldFailure.INVALID);
+      return false;
+    }
+    const currentGeneration = generation.current;
+    pending.current = true;
+    setSaving(true);
+    setFailure(null);
+    let succeeded = false;
+    try {
+      const reply = await window.tro.executePetWorld(parsed.data);
+      if (currentGeneration !== generation.current) {
         return false;
       }
-      const parsed = PetWorldCommandSchema.safeParse(command);
-      if (!parsed.success) {
-        setFailure(PetWorldFailure.INVALID);
-        return false;
+      if (reply.kind === 'failed') {
+        setFailure(reply.code);
+      } else {
+        succeeded = true;
+        historyReadVersion.current += 1;
+        setHistory(null);
       }
-      const currentGeneration = generation.current;
-      pending.current = true;
-      setSaving(true);
-      setFailure(null);
-      let succeeded = false;
+    } catch {
+      if (currentGeneration === generation.current) {
+        setFailure(PetWorldFailure.UNAVAILABLE);
+      }
+    } finally {
       try {
-        const reply = await window.tro.executePetWorld(parsed.data);
-        if (currentGeneration !== generation.current) {
-          return false;
-        }
-        if (reply.kind === 'failed') {
-          setFailure(reply.code);
-        } else {
-          succeeded = true;
-          setHistory(null);
+        const unresolved = await window.tro.readPetWorldPending?.();
+        if (currentGeneration === generation.current && unresolved) {
+          setPendingCommands(unresolved);
         }
       } catch {
         if (currentGeneration === generation.current) {
           setFailure(PetWorldFailure.UNAVAILABLE);
         }
-      } finally {
-        try {
-          const unresolved = await window.tro.readPetWorldPending?.();
-          if (currentGeneration === generation.current && unresolved) {
-            setPendingCommands(unresolved);
-          }
-        } catch {
-          if (currentGeneration === generation.current) {
-            setFailure(PetWorldFailure.UNAVAILABLE);
-          }
-        }
-        if (currentGeneration === generation.current) {
-          pending.current = false;
-          setSaving(false);
-        }
       }
-      if (succeeded && currentGeneration === generation.current) {
-        await refresh();
+      if (currentGeneration === generation.current) {
+        pending.current = false;
+        setSaving(false);
       }
-      return succeeded;
-    },
-    [refresh],
-  );
+    }
+    if (succeeded && currentGeneration === generation.current) {
+      /* A read started before the mutation cannot satisfy its confirmation refresh. */
+      readVersion.current += 1;
+      await latestRefresh.current();
+    }
+    return succeeded;
+  }, []);
 
   const readOlderHistory = useCallback(async (): Promise<void> => {
     const currentGeneration = generation.current;
+    const currentRead = ++historyReadVersion.current;
+    const isCurrent = (): boolean =>
+      currentGeneration === generation.current && currentRead === historyReadVersion.current;
     try {
       const reply = await window.tro.executePetWorld?.({
         kind: PetWorldCommandKind.OWN_HISTORY,
         ...(history?.nextCursor ? { cursor: history.nextCursor } : {}),
       });
-      if (currentGeneration === generation.current && reply?.kind === 'history') {
+      if (isCurrent() && reply?.kind === 'history') {
         if (reply.walletRevision >= worldRevision.current.wallet) {
           setHistory(reply);
         }
-      } else if (currentGeneration === generation.current && reply?.kind === 'failed') {
+      } else if (isCurrent() && reply?.kind === 'failed') {
         setFailure(reply.code);
+        if (reply.code === PetWorldFailure.STALE) {
+          setHistory(null);
+        }
       }
     } catch {
-      if (currentGeneration === generation.current) {
+      if (isCurrent()) {
         setFailure(PetWorldFailure.UNAVAILABLE);
       }
     }

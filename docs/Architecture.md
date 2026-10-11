@@ -904,6 +904,10 @@ enrollment and consent. Visitor projections contain cosmetics without balances,
 teacher notes, email or learning evidence. Teacher recognition views expose only
 their class's awards and descriptive coverage, never student-wide wealth/spending.
 A class garden counts distinct nonvoided award batches and changes shared scenery.
+Neighborhood reads fetch consented, currently enrolled homes in one bulk projection
+and group distinct uncorrected batches in PostgreSQL; they do not load private
+recognition prose or issue per-student home queries. These reads share the same
+serializable snapshot as the caller's class authorization.
 Recognition coverage describes recorded teacher choices within its displayed period;
 it does not establish mastery, attention or engagement. Existing practice review and
 learning insights remain the evidence owners.

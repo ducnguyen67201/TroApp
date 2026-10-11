@@ -13,12 +13,11 @@ import { PetItemCategory, type PetCatalogItem } from '#contracts/PetWorld.js';
 
 interface PetItemArtworkProps {
   item: PetCatalogItem;
-  size?: number;
 }
 
 /** Cosmetic asset IDs select trusted bundled artwork; unknown IDs have a quiet fallback. */
-export function PetItemArtwork({ item, size = 62 }: PetItemArtworkProps): ReactElement {
-  const props = { size, stroke: 1.2, 'aria-hidden': true } as const;
+export function PetItemArtwork({ item }: PetItemArtworkProps): ReactElement {
+  const props = { size: 62, stroke: 1.2, 'aria-hidden': true } as const;
   switch (item.assetId) {
     case 'little-fern':
       return <IconPlant2 {...props} />;

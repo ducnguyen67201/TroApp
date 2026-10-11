@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PetWorldCommandKind, type PetSharedHome } from '#contracts/PetWorld.js';
+import { PetWorldCommandKind, PetWorldTiming, type PetSharedHome } from '#contracts/PetWorld.js';
 
 export interface PetHomeVisitView {
   home: PetSharedHome | null;
@@ -18,9 +18,11 @@ export function usePetHomeVisit(userId: string, classId: string): PetHomeVisitVi
   const [isUnavailable, setUnavailable] = useState(false);
   const generation = useRef(0);
   const visitVersion = useRef(0);
+  const activeVisit = useRef<{ generation: number; version: number } | null>(null);
 
   useEffect(() => {
     generation.current += 1;
+    activeVisit.current = null;
     setHome(null);
     setStudentId(null);
     setLoading(false);
@@ -34,6 +36,8 @@ export function usePetHomeVisit(userId: string, classId: string): PetHomeVisitVi
     async (nextStudentId: string): Promise<void> => {
       const currentGeneration = generation.current;
       const currentVisit = ++visitVersion.current;
+      const visitRequest = { generation: currentGeneration, version: currentVisit };
+      activeVisit.current = visitRequest;
       setStudentId(nextStudentId);
       setHome(null);
       setLoading(true);
@@ -57,6 +61,9 @@ export function usePetHomeVisit(userId: string, classId: string): PetHomeVisitVi
           setUnavailable(true);
         }
       } finally {
+        if (activeVisit.current === visitRequest) {
+          activeVisit.current = null;
+        }
         if (currentGeneration === generation.current && currentVisit === visitVersion.current) {
           setLoading(false);
         }
@@ -70,8 +77,10 @@ export function usePetHomeVisit(userId: string, classId: string): PetHomeVisitVi
       return;
     }
     const timer = window.setInterval(() => {
-      void visitHome(studentId);
-    }, 15_000);
+      if (!activeVisit.current) {
+        void visitHome(studentId);
+      }
+    }, PetWorldTiming.REFRESH_MS);
     return () => {
       window.clearInterval(timer);
     };
@@ -79,6 +88,7 @@ export function usePetHomeVisit(userId: string, classId: string): PetHomeVisitVi
 
   const closeHome = useCallback((): void => {
     visitVersion.current += 1;
+    activeVisit.current = null;
     setStudentId(null);
     setHome(null);
     setLoading(false);

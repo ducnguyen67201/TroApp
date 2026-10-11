@@ -26,6 +26,15 @@ export function buildPetProfile(world: PetWorldState): PetWorldProfile {
   };
 }
 
+/** Visitor-facing cosmetic projection, without wallet or recognition data. */
+export function buildSharedHome(world: PetWorldState): PetSharedHome {
+  return {
+    studentId: world.studentId,
+    displayName: world.names[world.activePetId],
+    profile: buildPetProfile(world),
+  };
+}
+
 export function buildRecognitionView(recognition: PetRecognitionState): PetRecognition {
   return {
     id: recognition.id,
@@ -93,9 +102,5 @@ export async function readSharedHome(
   if (!world) {
     throw new PetWorldError(PetWorldFailure.HOME_UNAVAILABLE);
   }
-  return {
-    studentId,
-    displayName: world.names[world.activePetId],
-    profile: buildPetProfile(world),
-  };
+  return buildSharedHome(world);
 }
