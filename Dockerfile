@@ -5,6 +5,7 @@ FROM base AS build
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
 COPY prisma ./prisma
 COPY prisma.config.ts tsconfig.json tsconfig.server.json ./
 RUN ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install --frozen-lockfile
