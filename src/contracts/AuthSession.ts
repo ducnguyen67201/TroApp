@@ -12,7 +12,11 @@ export const AuthResultSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('signed-in'), user: AuthUserSchema }),
   z.strictObject({ kind: z.literal('signed-out') }),
   z.strictObject({ kind: z.literal('pending') }),
-  z.strictObject({ kind: z.literal('failed'), message: z.string() }),
+  z.strictObject({
+    kind: z.literal('failed'),
+    message: z.string(),
+    retryable: z.boolean().optional(),
+  }),
 ]);
 
 export type AuthResult = z.infer<typeof AuthResultSchema>;

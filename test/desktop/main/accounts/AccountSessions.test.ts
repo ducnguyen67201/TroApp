@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AccountRole } from '#contracts/AccountRole.js';
+import { AuthResultSchema } from '#contracts/AuthSession.js';
 import {
   AccountSessions,
   AccountVaultSchema,
@@ -18,6 +19,8 @@ const student = {
   email: 'student@example.test',
   role: AccountRole.STUDENT,
 };
+
+const durationMatcher: unknown = expect.any(Number);
 
 function createAccounts() {
   let state: AccountVaultState | null = null;
@@ -68,6 +71,38 @@ async function saveBothAccounts(harness: ReturnType<typeof createAccounts>) {
 }
 
 describe('saved account sessions', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('keeps failure contracts compatible while validating optional retry permission', () => {
+    const failure = { kind: 'failed', message: 'Could not check your sign-in.' };
+    expect(AuthResultSchema.parse(failure)).toEqual(failure);
+    expect(AuthResultSchema.parse({ ...failure, retryable: true })).toEqual({
+      ...failure,
+      retryable: true,
+    });
+    expect(AuthResultSchema.parse({ ...failure, retryable: false })).toEqual({
+      ...failure,
+      retryable: false,
+    });
+    expect(AuthResultSchema.safeParse({ ...failure, retryable: 'true' }).success).toBe(false);
+    expect(AuthResultSchema.safeParse({ kind: 'signed-out', retryable: true }).success).toBe(false);
+  });
+
+  it('returns signed out without contacting the backend when no session is stored', async () => {
+    const harness = createAccounts();
+    harness.setCookie(null);
+    expect(await harness.accounts.readSession()).toEqual({ kind: 'signed-out' });
+    expect(harness.request).not.toHaveBeenCalled();
+    expect(harness.save).not.toHaveBeenCalled();
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+
   it('migrates the existing login and exposes metadata without credentials', async () => {
     const harness = createAccounts();
     expect(await harness.accounts.readSession()).toEqual({
@@ -164,6 +199,183 @@ describe('saved account sessions', () => {
     harness.request.mockRejectedValueOnce(new Error('network'));
     expect((await harness.accounts.switchAccount(teacherAccount.id)).kind).toBe('failed');
     expect(harness.accounts.readCookie()).toBe('student-cookie');
+  });
+
+  it.each([408, 429, 500, 503, 599])(
+    'allows bounded recovery from HTTP %i without expiring the saved account',
+    async (status) => {
+      const harness = createAccounts();
+      await harness.accounts.readSession();
+      const savedAccounts = harness.accounts.listAccounts();
+      harness.save.mockClear();
+      harness.request.mockResolvedValueOnce(new Response('private response body', { status }));
+
+      expect(await harness.accounts.readSession()).toEqual({
+        kind: 'failed',
+        message: 'Could not check your sign-in.',
+        retryable: true,
+      });
+      expect(harness.accounts.listAccounts()).toEqual(savedAccounts);
+      expect(harness.accounts.readCookie()).toBe('teacher-cookie');
+      expect(harness.save).not.toHaveBeenCalled();
+      expect(console.warn).toHaveBeenCalledExactlyOnceWith('auth.session.failed', {
+        stage: 'response',
+        reason: 'http-status',
+        status,
+        durationMs: durationMatcher,
+      });
+    },
+  );
+
+  it.each([400, 403, 404, 422])(
+    'does not permit automatic retries for HTTP %i or expire the saved account',
+    async (status) => {
+      const harness = createAccounts();
+      await harness.accounts.readSession();
+      const savedAccounts = harness.accounts.listAccounts();
+      harness.save.mockClear();
+      harness.request.mockResolvedValueOnce(new Response('private response body', { status }));
+
+      expect(await harness.accounts.readSession()).toEqual({
+        kind: 'failed',
+        message: 'Could not check your sign-in.',
+      });
+      expect(harness.accounts.listAccounts()).toEqual(savedAccounts);
+      expect(harness.accounts.readCookie()).toBe('teacher-cookie');
+      expect(harness.save).not.toHaveBeenCalled();
+      expect(console.warn).toHaveBeenCalledExactlyOnceWith('auth.session.failed', {
+        stage: 'response',
+        reason: 'http-status',
+        status,
+        durationMs: durationMatcher,
+      });
+    },
+  );
+
+  it.each([
+    {
+      name: 'connection failure',
+      error: new TypeError('private transport message and URL', {
+        cause: Object.assign(new Error('private cookie and configuration'), {
+          code: 'ECONNREFUSED',
+          address: 'private address',
+        }),
+      }),
+      reason: 'transport',
+      networkCode: 'ECONNREFUSED',
+    },
+    {
+      name: 'request timeout',
+      error: new DOMException('private timeout message', 'TimeoutError'),
+      reason: 'timeout',
+      networkCode: undefined,
+    },
+    {
+      name: 'unknown network code',
+      error: Object.assign(new Error('private request content'), { code: 'private network code' }),
+      reason: 'transport',
+      networkCode: undefined,
+    },
+  ])('permits recovery from $name and logs only safe transport evidence', async (failure) => {
+    const harness = createAccounts();
+    await harness.accounts.readSession();
+    const savedAccounts = harness.accounts.listAccounts();
+    harness.save.mockClear();
+    harness.request.mockRejectedValueOnce(failure.error);
+
+    expect(await harness.accounts.readSession()).toEqual({
+      kind: 'failed',
+      message: 'Could not reach the sign-in service.',
+      retryable: true,
+    });
+    expect(harness.accounts.listAccounts()).toEqual(savedAccounts);
+    expect(harness.accounts.readCookie()).toBe('teacher-cookie');
+    expect(harness.save).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledExactlyOnceWith('auth.session.failed', {
+      stage: 'request',
+      reason: failure.reason,
+      ...(failure.networkCode === undefined ? {} : { networkCode: failure.networkCode }),
+      durationMs: durationMatcher,
+    });
+  });
+
+  it('permits recovery after interrupted response reading without logging content', async () => {
+    const harness = createAccounts();
+    await harness.accounts.readSession();
+    const savedAccounts = harness.accounts.listAccounts();
+    harness.save.mockClear();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.error(new Error('private response body and credentials'));
+      },
+    });
+    harness.request.mockResolvedValueOnce(new Response(body));
+
+    expect(await harness.accounts.readSession()).toEqual({
+      kind: 'failed',
+      message: 'Could not reach the sign-in service.',
+      retryable: true,
+    });
+    expect(harness.accounts.listAccounts()).toEqual(savedAccounts);
+    expect(harness.accounts.readCookie()).toBe('teacher-cookie');
+    expect(harness.save).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledExactlyOnceWith('auth.session.failed', {
+      stage: 'response-body',
+      reason: 'transport',
+      status: 200,
+      durationMs: durationMatcher,
+    });
+  });
+
+  it.each([
+    {
+      body: 'private invalid JSON and credentials',
+      stage: 'response-json',
+      reason: 'invalid-json',
+    },
+    {
+      body: JSON.stringify({ user: { name: 'private profile', email: 'private@example.test' } }),
+      stage: 'response-schema',
+      reason: 'invalid-session',
+    },
+  ])(
+    'rejects invalid sessions at $stage without retrying or expiring accounts',
+    async (failure) => {
+      const harness = createAccounts();
+      await harness.accounts.readSession();
+      const savedAccounts = harness.accounts.listAccounts();
+      harness.save.mockClear();
+      harness.request.mockResolvedValueOnce(new Response(failure.body));
+
+      expect(await harness.accounts.readSession()).toEqual({
+        kind: 'failed',
+        message: 'Could not read your sign-in.',
+      });
+      expect(harness.accounts.listAccounts()).toEqual(savedAccounts);
+      expect(harness.accounts.readCookie()).toBe('teacher-cookie');
+      expect(harness.save).not.toHaveBeenCalled();
+      expect(console.warn).toHaveBeenCalledExactlyOnceWith('auth.session.failed', {
+        stage: failure.stage,
+        reason: failure.reason,
+        status: 200,
+        durationMs: durationMatcher,
+      });
+    },
+  );
+
+  it.each([
+    { name: 'HTTP 401', response: () => new Response(null, { status: 401 }) },
+    { name: 'a null session', response: () => Response.json(null) },
+    { name: 'an empty response', response: () => new Response(null) },
+  ])('marks $name as signed out without retry permission or failure logs', async (failure) => {
+    const harness = createAccounts();
+    await harness.accounts.readSession();
+    harness.request.mockResolvedValueOnce(failure.response());
+
+    expect(await harness.accounts.readSession()).toEqual({ kind: 'signed-out' });
+    expect(harness.accounts.readCookie()).toBeNull();
+    expect(harness.accounts.listAccounts().accounts[0]?.requiresSignIn).toBe(true);
+    expect(console.warn).not.toHaveBeenCalled();
   });
 
   it('invalidates a session reply that arrives after cancellation', async () => {

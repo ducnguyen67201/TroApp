@@ -12,7 +12,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { AccountRole } from '#contracts/AccountRole.js';
 import { createTeachingContext } from '../../server/features/classroom/ClassroomFixtures.js';
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
-import type { AuthUser } from '#contracts/AuthSession.js';
+import type { AccountReply } from '#contracts/DesktopAccounts.js';
+import type { AuthResult, AuthUser } from '#contracts/AuthSession.js';
 import type { AgentResult } from '#contracts/AgentSession.js';
 import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import type { VoiceReply } from '#contracts/VoiceInput.js';
@@ -140,8 +141,203 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.restoreAllMocks();
   window.localStorage.clear();
+});
+
+describe('startup sign-in checks', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+  });
+
+  async function advanceSignInCheckTime(durationMs: number): Promise<void> {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(durationMs);
+    });
+  }
+
+  it.each([
+    {
+      kind: 'failed',
+      message: 'Could not reach the sign-in service.',
+      retryable: true,
+    } satisfies AuthResult,
+    { kind: 'pending' } satisfies AuthResult,
+  ])(
+    'restores the saved session after a transient $kind result without an alert',
+    async (initial) => {
+      const bridge = createDesktopBridge();
+      bridge.readAuthSession.mockResolvedValueOnce(initial);
+      window.tro = bridge;
+      renderDesktop();
+      await advanceSignInCheckTime(0);
+      expect(screen.getByText('Checking sign-in…')).toBeTruthy();
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Continue with Google' })).toBeNull();
+      await advanceSignInCheckTime(999);
+      expect(bridge.readAuthSession).toHaveBeenCalledTimes(1);
+      await advanceSignInCheckTime(1);
+      expect(screen.getByRole('heading', { name: 'Welcome back, Alex' })).toBeTruthy();
+      expect(screen.getByText(testUser.email)).toBeTruthy();
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(bridge.readAuthSession).toHaveBeenCalledTimes(2);
+      expect(bridge.signInWithGoogle).not.toHaveBeenCalled();
+    },
+  );
+
+  it('stops automatic checks after the startup window and retries on request without opening Google', async () => {
+    const bridge = createDesktopBridge();
+    bridge.readAuthSession.mockResolvedValue({
+      kind: 'failed',
+      message: 'Could not reach the sign-in service.',
+      retryable: true,
+    });
+    let finishSavedAccountsRead: ((result: AccountReply) => void) | undefined;
+    const pendingSavedAccounts = new Promise<AccountReply>((resolve) => {
+      finishSavedAccountsRead = resolve;
+    });
+    const readSavedAccounts = vi
+      .fn<NonNullable<DesktopBridge['readSavedAccounts']>>()
+      .mockResolvedValue({
+        kind: 'accounts',
+        accounts: [
+          { id: sessionId, user: testUser, role: AccountRole.STUDENT, requiresSignIn: false },
+        ],
+        activeAccountId: sessionId,
+      })
+      .mockImplementationOnce(() => pendingSavedAccounts);
+    window.tro = { ...bridge, readSavedAccounts };
+    renderDesktop();
+    await advanceSignInCheckTime(14_999);
+    expect(screen.getByText('Checking sign-in…')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+    await advanceSignInCheckTime(1);
+    expect(screen.getByRole('alert').textContent).toContain('Could not reach the sign-in service.');
+    const completedChecks = bridge.readAuthSession.mock.calls.length;
+    await advanceSignInCheckTime(30_000);
+    expect(bridge.readAuthSession).toHaveBeenCalledTimes(completedChecks);
+
+    let finishRetry: ((result: AuthResult) => void) | undefined;
+    const pendingRetry = new Promise<AuthResult>((resolve) => {
+      finishRetry = resolve;
+    });
+    bridge.readAuthSession.mockImplementationOnce(() => pendingRetry);
+    const retryButton = screen.getByRole('button', { name: 'Retry sign-in check' });
+    act(() => {
+      fireEvent.click(retryButton);
+      fireEvent.click(retryButton);
+    });
+    await advanceSignInCheckTime(0);
+    expect(bridge.readAuthSession).toHaveBeenCalledTimes(completedChecks + 1);
+    expect(screen.getByText('Checking sign-in…')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(bridge.signInWithGoogle).not.toHaveBeenCalled();
+    expect(bridge.signOut).not.toHaveBeenCalled();
+    await act(async () => {
+      finishRetry?.({
+        kind: 'failed',
+        message: 'Could not reach the sign-in service.',
+        retryable: true,
+      });
+      await pendingRetry;
+    });
+    bridge.readAuthSession.mockResolvedValue({ kind: 'signed-in', user: testUser });
+    await advanceSignInCheckTime(1000);
+    expect(screen.getByRole('heading', { name: 'Welcome back, Alex' })).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(bridge.readAuthSession).toHaveBeenCalledTimes(completedChecks + 2);
+    expect(readSavedAccounts).toHaveBeenCalledTimes(2);
+    expect(bridge.signInWithGoogle).not.toHaveBeenCalled();
+    expect(bridge.signOut).not.toHaveBeenCalled();
+    await act(async () => {
+      finishSavedAccountsRead?.({ kind: 'failed', message: 'Could not load saved accounts.' });
+      await pendingSavedAccounts;
+    });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Welcome back, Alex' })).toBeTruthy();
+  });
+
+  it('offers a manual retry when the initial session stays pending past the startup window', async () => {
+    const bridge = createDesktopBridge();
+    bridge.readAuthSession.mockResolvedValue({ kind: 'pending' });
+    window.tro = bridge;
+    renderDesktop();
+    await advanceSignInCheckTime(15_000);
+    expect(screen.getByRole('alert').textContent).toContain('Could not check sign-in.');
+    expect(screen.getByRole('button', { name: 'Retry sign-in check' })).toBeTruthy();
+    const completedChecks = bridge.readAuthSession.mock.calls.length;
+    await advanceSignInCheckTime(10_000);
+    expect(bridge.readAuthSession).toHaveBeenCalledTimes(completedChecks);
+  });
+
+  it.each([
+    { kind: 'signed-out' } satisfies AuthResult,
+    { kind: 'failed', message: 'Could not reach the sign-in service.' } satisfies AuthResult,
+  ])('does not automatically retry a $kind result without retry permission', async (initial) => {
+    const bridge = createDesktopBridge();
+    bridge.readAuthSession.mockResolvedValue(initial);
+    window.tro = bridge;
+    renderDesktop();
+    await advanceSignInCheckTime(0);
+    expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeTruthy();
+    expect(screen.queryByText('Checking sign-in…')).toBeNull();
+    if (initial.kind === 'failed') {
+      expect(screen.getByRole('alert').textContent).toContain(
+        'Could not reach the sign-in service.',
+      );
+    } else {
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Retry sign-in check' })).toBeNull();
+    }
+    await advanceSignInCheckTime(30_000);
+    expect(bridge.readAuthSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels a scheduled startup retry when the app unmounts', async () => {
+    const bridge = createDesktopBridge();
+    bridge.readAuthSession.mockResolvedValue({
+      kind: 'failed',
+      message: 'Could not reach the sign-in service.',
+      retryable: true,
+    });
+    window.tro = bridge;
+    renderDesktop();
+    await advanceSignInCheckTime(0);
+    expect(bridge.readAuthSession).toHaveBeenCalledTimes(1);
+    cleanup();
+    await advanceSignInCheckTime(30_000);
+    expect(bridge.readAuthSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores an initial session reply received after the app unmounts', async () => {
+    const bridge = createDesktopBridge();
+    let finishSessionRead: ((result: AuthResult) => void) | undefined;
+    const pendingSessionRead = new Promise<AuthResult>((resolve) => {
+      finishSessionRead = resolve;
+    });
+    bridge.readAuthSession.mockImplementationOnce(() => pendingSessionRead);
+    const readSavedAccounts = vi
+      .fn<NonNullable<DesktopBridge['readSavedAccounts']>>()
+      .mockResolvedValue({ kind: 'accounts', accounts: [], activeAccountId: null });
+    window.tro = { ...bridge, readSavedAccounts };
+    renderDesktop();
+    expect(bridge.readAuthSession).toHaveBeenCalledTimes(1);
+    await advanceSignInCheckTime(5000);
+    expect(bridge.readAuthSession).toHaveBeenCalledTimes(1);
+    cleanup();
+    await act(async () => {
+      finishSessionRead?.({
+        kind: 'failed',
+        message: 'Could not reach the sign-in service.',
+        retryable: true,
+      });
+      await pendingSessionRead;
+    });
+    await advanceSignInCheckTime(30_000);
+    expect(bridge.readAuthSession).toHaveBeenCalledTimes(1);
+    expect(readSavedAccounts).not.toHaveBeenCalled();
+  });
 });
 
 describe('desktop scaffold', () => {

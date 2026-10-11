@@ -131,6 +131,7 @@ export const vietnamese = {
   settings: 'Cài đặt',
   yourAccount: 'Tài khoản của bạn',
   checkingSignIn: 'Đang kiểm tra đăng nhập…',
+  retrySignIn: 'Kiểm tra đăng nhập lại',
   signOut: 'Đăng xuất',
   ownWorkspace: 'Không gian làm việc của riêng bạn',
   signInInvitation: 'Đăng nhập để bắt đầu.',

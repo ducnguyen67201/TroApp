@@ -7,10 +7,12 @@ import { AgentTaskMode, TeachingOutcome } from '#contracts/CursorCompanion.js';
 import { useLocale } from './localization/UseLocale.js';
 import { resolveBridgeError } from './localization/BridgeErrors.js';
 import type { TranslationKey } from './localization/English.js';
-import type { AuthUser } from '#contracts/AuthSession.js';
+import type { AuthResult, AuthUser } from '#contracts/AuthSession.js';
 import type { AgentCompletion } from '#contracts/TaskOutcome.js';
 
 export const MessageRole = { USER: 'user', AGENT: 'agent' } as const;
+
+const SessionRestorePolicy = { RETRY_DELAY_MS: 1000, RETRY_WINDOW_MS: 15_000 } as const;
 
 interface TaskMessage {
   role: (typeof MessageRole)[keyof typeof MessageRole];
@@ -22,6 +24,8 @@ interface TaskMessage {
 export interface ComputerUseController {
   user: AuthUser | null;
   isLoading: boolean;
+  canRetrySignIn: boolean;
+  retrySignIn: () => void;
   isSigning: boolean;
   isSigningOut: boolean;
   isSwitchingAccount: boolean;
@@ -60,6 +64,8 @@ export function useComputerUse(): ComputerUseController {
   const taskGeneration = useRef(0);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionCheck, setSessionCheck] = useState(0);
+  const [canRetrySignIn, setCanRetrySignIn] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);
@@ -112,33 +118,77 @@ export function useComputerUse(): ComputerUseController {
   );
 
   useEffect(() => {
-    const effectState = { active: true };
-    void (async () => {
-      try {
-        const auth = await window.tro.readAuthSession();
-        if (!effectState.active) {
-          return;
-        }
-        if (auth.kind === 'signed-in') {
-          setUser(auth.user);
-        } else if (auth.kind === 'failed') {
-          setMessage(resolveBridgeError(auth.message, 'errorCheckSignIn'));
-        }
-      } catch {
-        if (effectState.active) {
-          setMessage('errorCheckSignIn');
-        }
-      } finally {
-        if (effectState.active) {
-          setIsLoading(false);
-          void refreshAccounts();
-        }
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const generation = accountGeneration.current;
+    const deadlineMs = Date.now() + SessionRestorePolicy.RETRY_WINDOW_MS;
+    accountOperation.current = true;
+
+    function isCurrentSessionCheck(): boolean {
+      return active && generation === accountGeneration.current;
+    }
+
+    function finishSessionCheck(auth: AuthResult): void {
+      if (!isCurrentSessionCheck()) {
+        return;
       }
-    })();
+      if (auth.kind === 'signed-in') {
+        setUser(auth.user);
+      } else if (auth.kind === 'failed' || auth.kind === 'pending') {
+        setMessage(
+          auth.kind === 'failed'
+            ? resolveBridgeError(auth.message, 'errorCheckSignIn')
+            : 'errorCheckSignIn',
+        );
+        setCanRetrySignIn(true);
+      }
+      accountOperation.current = false;
+      setIsLoading(false);
+      void refreshAccounts();
+    }
+
+    async function checkSession(): Promise<void> {
+      let auth: AuthResult;
+      try {
+        auth = await window.tro.readAuthSession();
+      } catch {
+        auth = { kind: 'failed', message: 'Could not check your sign-in.' };
+      }
+      if (!isCurrentSessionCheck()) {
+        return;
+      }
+      const canRetry = auth.kind === 'pending' || (auth.kind === 'failed' && auth.retryable);
+      const remainingMs = deadlineMs - Date.now();
+      if (canRetry && remainingMs > 0) {
+        /* Keep one read in flight. A local API may still be preparing its
+           database and bundles; saved metadata never establishes a login. */
+        timer = setTimeout(
+          () => {
+            if (!isCurrentSessionCheck()) {
+              return;
+            }
+            if (Date.now() >= deadlineMs) {
+              finishSessionCheck(auth);
+            } else {
+              void checkSession();
+            }
+          },
+          Math.min(SessionRestorePolicy.RETRY_DELAY_MS, remainingMs),
+        );
+        return;
+      }
+      finishSessionCheck(auth);
+    }
+
+    void checkSession();
     return () => {
-      effectState.active = false;
+      active = false;
+      clearTimeout(timer);
+      if (generation === accountGeneration.current) {
+        accountOperation.current = false;
+      }
     };
-  }, []);
+  }, [sessionCheck]);
 
   useEffect(() => {
     if (!isSigning) {
@@ -257,12 +307,25 @@ export function useComputerUse(): ComputerUseController {
     );
   }
 
+  function retrySignIn(): void {
+    if (!canRetrySignIn || !canChangeAccount()) {
+      return;
+    }
+    accountOperation.current = true;
+    accountGeneration.current += 1;
+    setCanRetrySignIn(false);
+    setMessage(null);
+    setIsLoading(true);
+    setSessionCheck((current) => current + 1);
+  }
+
   async function openGoogleAccount(addAccount: boolean): Promise<void> {
     if (!canChangeAccount()) {
       return;
     }
     accountOperation.current = true;
     accountGeneration.current += 1;
+    setCanRetrySignIn(false);
     clearAccountTask();
     setIsSigning(true);
     try {
@@ -336,6 +399,7 @@ export function useComputerUse(): ComputerUseController {
     }
     accountOperation.current = true;
     accountGeneration.current += 1;
+    setCanRetrySignIn(false);
     clearAccountTask();
     setIsSwitchingAccount(true);
     try {
@@ -681,6 +745,8 @@ export function useComputerUse(): ComputerUseController {
   return {
     user,
     isLoading,
+    canRetrySignIn,
+    retrySignIn,
     isSigning,
     isSigningOut,
     isSwitchingAccount,

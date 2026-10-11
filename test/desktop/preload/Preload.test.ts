@@ -19,6 +19,32 @@ vi.mock('electron', () => ({
   },
 }));
 
+it('preserves validated session retry advice and rejects malformed auth replies', async () => {
+  await import('../../../src/desktop/preload/Preload.js');
+  electron.invoke.mockClear();
+  const bridge = electron.expose.mock.calls[0]?.[1];
+  if (!bridge) {
+    throw new Error('Missing preload bridge');
+  }
+  const unavailableSession = {
+    kind: 'failed',
+    message: 'Could not reach the sign-in service.',
+    retryable: true,
+  } as const;
+  electron.invoke.mockResolvedValue(unavailableSession);
+  expect(await bridge.readAuthSession()).toEqual(unavailableSession);
+  expect(electron.invoke).toHaveBeenCalledWith('tro:auth-command', { kind: 'status' });
+
+  electron.invoke.mockResolvedValue({ kind: 'signed-out' });
+  expect(await bridge.readAuthSession()).toEqual({ kind: 'signed-out' });
+
+  electron.invoke.mockResolvedValue({ ...unavailableSession, retryable: 'yes' });
+  expect(await bridge.readAuthSession()).toEqual({
+    kind: 'failed',
+    message: 'Could not check your sign-in.',
+  });
+});
+
 it('exposes only validated feature commands and narrow parent export identity', async () => {
   await import('../../../src/desktop/preload/Preload.js');
   electron.invoke.mockClear();
