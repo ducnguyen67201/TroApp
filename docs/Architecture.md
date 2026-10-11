@@ -1,7 +1,7 @@
 # Tro architecture
 
 This is the single maintained description of Tro's implemented system. Updated
-October 10, 2026. Change this document when component ownership, communication or
+October 11, 2026. Change this document when component ownership, communication or
 an architectural invariant changes. Contracts and configuration in the linked code
 own exact wire shapes and policy values. Setup and validation commands live in the
 [root README](../README.md). Research and UI prototypes are reference material,
@@ -83,6 +83,20 @@ main registers the protocol and verifies that the OS handler points to that app.
 The desktop sidebar is mounted only for a signed-in user. Signed-out and initial
 session-loading screens reserve no sidebar space; the welcome screen retains
 Google sign-in, saved-account selection, sign-in cancellation, settings and updates.
+
+The renderer restores a session through sequential, bounded status reads while
+showing a neutral sign-in check. Only main-classified temporary service failures
+and pending status are retried automatically. An expired session ends the check;
+storage and invalid-response failures remain visible. An exhausted check offers
+an explicit retry without opening Google or discarding saved accounts. The retry
+window belongs to `SessionRestorePolicy` in
+[UseComputerUse.ts](../src/desktop/renderer/UseComputerUse.ts); an in-flight read
+retains main's request timeout. Unmount and account generations fence late replies.
+
+`AccountSessions` emits `auth.session.failed` only for failed verification reads.
+Its stage and reason distinguish transport, response reading, HTTP status and
+invalid JSON/schema; duration and allowlisted network codes help diagnose startup
+ordering. These warnings contain no cookies, response bodies, URLs or profiles.
 
 Saved accounts use independent backend sessions. `AccountSessions` owns selection
 and generation guards; `EncryptedAccountVault` stores cookies using Electron

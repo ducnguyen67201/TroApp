@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { AccountRoleSchema } from '#contracts/AccountRole.js';
 import { AuthUserSchema, type AuthResult } from '#contracts/AuthSession.js';
+import { NetworkErrorCodeSchema } from '#contracts/ModelGatewayError.js';
 import {
   DesktopAccountLimits,
   SavedAccountSchema,
@@ -37,6 +38,32 @@ export interface AccountVault {
 const SessionResponseSchema = z.looseObject({
   user: AuthUserSchema.extend({ role: AccountRoleSchema.optional() }).loose(),
 });
+
+const SessionVerificationStage = {
+  REQUEST: 'request',
+  RESPONSE: 'response',
+  BODY: 'response-body',
+  JSON: 'response-json',
+  SCHEMA: 'response-schema',
+} as const;
+
+type SessionVerificationStage =
+  (typeof SessionVerificationStage)[keyof typeof SessionVerificationStage];
+
+const SessionVerificationFailure = {
+  TRANSPORT: 'transport',
+  TIMEOUT: 'timeout',
+  HTTP_STATUS: 'http-status',
+  INVALID_JSON: 'invalid-json',
+  INVALID_SESSION: 'invalid-session',
+} as const;
+
+interface SessionVerificationFailureDetails {
+  stage: SessionVerificationStage;
+  reason: (typeof SessionVerificationFailure)[keyof typeof SessionVerificationFailure];
+  status?: number;
+  networkCode?: z.infer<typeof NetworkErrorCodeSchema>;
+}
 
 /** Owns saved sessions. The SDK's OAuth slot is staging, never the active account after migration. */
 export class AccountSessions {
@@ -278,33 +305,112 @@ export class AccountSessions {
   }
 
   private async verifyCookie(cookie: string) {
+    const startedAt = performance.now();
+    let stage: SessionVerificationStage = SessionVerificationStage.REQUEST;
+    let status: number | undefined;
+    let text: string;
     try {
       const response = await this.request(`${this.apiBaseUrl}/api/auth/get-session`, {
         headers: { cookie },
         signal: AbortSignal.timeout(10_000),
       });
+      stage = SessionVerificationStage.RESPONSE;
+      status = response.status;
       if (response.status === 401) {
         return { kind: 'signed-out' } as const;
       }
       if (!response.ok) {
-        return { kind: 'failed', message: 'Could not check your sign-in.' } as const;
+        logSessionVerificationFailure(startedAt, {
+          stage,
+          reason: SessionVerificationFailure.HTTP_STATUS,
+          status,
+        });
+        return {
+          kind: 'failed',
+          message: 'Could not check your sign-in.',
+          ...(isRetryableSessionStatus(response.status) ? { retryable: true } : {}),
+        } as const;
       }
-      const text = await response.text();
-      if (!text) {
-        return { kind: 'signed-out' } as const;
-      }
-      const body: unknown = JSON.parse(text);
-      if (body === null) {
-        return { kind: 'signed-out' } as const;
-      }
-      const parsed = SessionResponseSchema.safeParse(body);
-      if (!parsed.success) {
-        return { kind: 'failed', message: 'Could not read your sign-in.' } as const;
-      }
-      const { id, name, email, role } = parsed.data.user;
-      return { kind: 'verified', user: { id, name, email }, role: role ?? null } as const;
-    } catch {
-      return { kind: 'failed', message: 'Could not reach the sign-in service.' } as const;
+      stage = SessionVerificationStage.BODY;
+      text = await response.text();
+    } catch (error) {
+      const networkCode = readSessionNetworkCode(error);
+      logSessionVerificationFailure(startedAt, {
+        stage,
+        reason:
+          error instanceof Error && error.name === 'TimeoutError'
+            ? SessionVerificationFailure.TIMEOUT
+            : SessionVerificationFailure.TRANSPORT,
+        ...(status === undefined ? {} : { status }),
+        ...(networkCode === undefined ? {} : { networkCode }),
+      });
+      return {
+        kind: 'failed',
+        message: 'Could not reach the sign-in service.',
+        retryable: true,
+      } as const;
     }
+    if (!text) {
+      return { kind: 'signed-out' } as const;
+    }
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      logSessionVerificationFailure(startedAt, {
+        stage: SessionVerificationStage.JSON,
+        reason: SessionVerificationFailure.INVALID_JSON,
+        status,
+      });
+      return { kind: 'failed', message: 'Could not read your sign-in.' } as const;
+    }
+    if (body === null) {
+      return { kind: 'signed-out' } as const;
+    }
+    const parsed = SessionResponseSchema.safeParse(body);
+    if (!parsed.success) {
+      logSessionVerificationFailure(startedAt, {
+        stage: SessionVerificationStage.SCHEMA,
+        reason: SessionVerificationFailure.INVALID_SESSION,
+        status,
+      });
+      return { kind: 'failed', message: 'Could not read your sign-in.' } as const;
+    }
+    const { id, name, email, role } = parsed.data.user;
+    return { kind: 'verified', user: { id, name, email }, role: role ?? null } as const;
   }
+}
+
+function isRetryableSessionStatus(status: number): boolean {
+  return status === 408 || status === 429 || (status >= 500 && status <= 599);
+}
+
+/** Read only a bounded network-code allowlist; raw transport errors stay private. */
+function readSessionNetworkCode(
+  error: unknown,
+): z.infer<typeof NetworkErrorCodeSchema> | undefined {
+  let candidate = error;
+  for (let depth = 0; depth < 3; depth += 1) {
+    if (typeof candidate !== 'object' || candidate === null) {
+      return undefined;
+    }
+    if ('code' in candidate) {
+      const parsed = NetworkErrorCodeSchema.safeParse(candidate.code);
+      if (parsed.success) {
+        return parsed.data;
+      }
+    }
+    candidate = 'cause' in candidate ? candidate.cause : undefined;
+  }
+  return undefined;
+}
+
+function logSessionVerificationFailure(
+  startedAt: number,
+  details: SessionVerificationFailureDetails,
+): void {
+  console.warn('auth.session.failed', {
+    ...details,
+    durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+  });
 }

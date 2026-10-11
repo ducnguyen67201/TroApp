@@ -76,6 +76,15 @@ export function ComputerUsePage({ controller, signInActions }: ComputerUsePagePr
           <Text c="dimmed" size="sm" maw={340} ta="center">
             {translations.googleInvitation}
           </Text>
+          {controller.canRetrySignIn && (
+            <Button
+              variant="default"
+              disabled={isSigning || controller.isSwitchingAccount || isSigningOut}
+              onClick={controller.retrySignIn}
+            >
+              {translations.retrySignIn}
+            </Button>
+          )}
           <Button
             leftSection={<IconBrandGoogle size={16} />}
             loading={isSigning}

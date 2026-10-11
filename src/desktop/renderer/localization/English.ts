@@ -129,6 +129,7 @@ export const english = {
   settings: 'Settings',
   yourAccount: 'Your account',
   checkingSignIn: 'Checking sign-in…',
+  retrySignIn: 'Retry sign-in check',
   signOut: 'Sign out',
   ownWorkspace: 'Your own little workspace',
   signInInvitation: 'Sign in to make it yours.',
