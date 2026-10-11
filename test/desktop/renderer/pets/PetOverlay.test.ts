@@ -28,6 +28,7 @@ it('renders a localized pet and sends only bounded hover and drag commands', asy
     isVisible: true,
     hasPresentationError: false,
     encouragement: true,
+    backdropId: null,
   };
   const bridge = {
     readPet: vi.fn<PetOverlayBridge['readPet']>().mockResolvedValue(snapshot),
@@ -92,6 +93,7 @@ it('suppresses a mascot click after dragging or cancellation, but permits the ne
       isVisible: true,
       hasPresentationError: false,
       encouragement: false,
+      backdropId: null,
     }),
     subscribePet: vi.fn<PetOverlayBridge['subscribePet']>().mockReturnValue(() => {}),
     interactWithPet: vi.fn<PetOverlayBridge['interactWithPet']>(),

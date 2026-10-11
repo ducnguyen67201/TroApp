@@ -8,6 +8,7 @@ import {
   type PetSnapshot,
 } from '#contracts/Pet.js';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
+import { PetWorldCommandKind, PetWorldFailure } from '#contracts/PetWorld.js';
 
 const doubles = vi.hoisted(() => {
   const exposed: { bridge: DesktopBridge | null } = { bridge: null };
@@ -49,6 +50,7 @@ const snapshot: PetSnapshot = {
   isVisible: false,
   hasPresentationError: false,
   encouragement: false,
+  backdropId: null,
 };
 
 beforeEach(() => {
@@ -57,6 +59,36 @@ beforeEach(() => {
 });
 
 describe('pet preload boundaries', () => {
+  it('validates the world bridge and exposes only original mutation intents for retry', async () => {
+    const bridge = doubles.exposed.bridge;
+    if (!bridge?.executePetWorld || !bridge.readPetWorldPending) {
+      throw new Error('Missing pet world bridge');
+    }
+    doubles.invoke.mockResolvedValue({ kind: 'catalog', catalog: { revision: '1', items: [] } });
+    expect((await bridge.executePetWorld({ kind: PetWorldCommandKind.CATALOG })).kind).toBe(
+      'catalog',
+    );
+    expect(doubles.invoke).toHaveBeenLastCalledWith('tro:pet-world-command', {
+      kind: PetWorldCommandKind.CATALOG,
+    });
+    doubles.invoke.mockResolvedValue({
+      kind: 'catalog',
+      catalog: { revision: '1', items: [], cookies: 'forbidden' },
+    });
+    expect(await bridge.executePetWorld({ kind: PetWorldCommandKind.CATALOG })).toEqual({
+      kind: 'failed',
+      code: PetWorldFailure.UNAVAILABLE,
+    });
+    const mutation = {
+      kind: PetWorldCommandKind.INITIALIZE_WORLD,
+      requestId: '0a03e53a-0b39-4dbc-87ab-0671d20a7b77',
+      activePetId: PetId.CAT,
+      names: { cat: 'Mochi', fox: 'Maple' },
+    };
+    doubles.invoke.mockResolvedValue([mutation, { kind: PetWorldCommandKind.CATALOG }]);
+    expect(await bridge.readPetWorldPending()).toEqual([mutation]);
+  });
+
   it('validates commands, replies and subscribed snapshots', async () => {
     const bridge = doubles.exposed.bridge;
     if (!bridge?.readPets || !bridge.controlPet || !bridge.subscribePet) {

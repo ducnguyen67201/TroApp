@@ -31,6 +31,7 @@ import {
   IconLogout,
   IconSettings,
   IconPlayerPlay,
+  IconPaw,
 } from '@tabler/icons-react';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { ComputerUsePage } from './ComputerUsePage.js';
@@ -46,6 +47,7 @@ import { AppUpdateButton } from './updates/AppUpdateButton.js';
 import { ClassroomPage } from './classroom/ClassroomPage.js';
 import { GuidedLessonsPage } from './guidedLessons/GuidedLessonsPage.js';
 import { AccountRole } from '#contracts/AccountRole.js';
+import { PetWorldPage } from './petWorld/PetWorldPage.js';
 
 import { DesktopPage } from './navigation/DesktopRoute.js';
 import { useDesktopNavigation } from './navigation/UseDesktopNavigation.js';
@@ -302,6 +304,21 @@ export function App(): ReactElement {
                 className="sidebar-link"
                 disabled={accountTransition}
                 data-active={
+                  (!dialogs.state.settings && page === DesktopPage.PET_WORLD) || undefined
+                }
+                aria-current={page === DesktopPage.PET_WORLD ? 'page' : undefined}
+                onClick={() => {
+                  closeDialog(DesktopDialog.SETTINGS);
+                  navigation.openPetWorld();
+                }}
+              >
+                <IconPaw size={19} stroke={1.6} />
+                <span>{locale === 'vi' ? 'Thế giới thú cưng' : 'Pet world'}</span>
+              </UnstyledButton>
+              <UnstyledButton
+                className="sidebar-link"
+                disabled={accountTransition}
+                data-active={
                   (!dialogs.state.settings && page === DesktopPage.GUIDED_LESSONS) || undefined
                 }
                 aria-current={page === DesktopPage.GUIDED_LESSONS ? 'page' : undefined}
@@ -520,6 +537,16 @@ export function App(): ReactElement {
                   userId={user.id}
                   initialClassId={navigation.route.classId}
                   onChooseClass={navigation.openGuidedLessons}
+                  onRoleChange={setAccountRole}
+                />
+              )}
+              {user && !accountTransition && page === DesktopPage.PET_WORLD && (
+                <PetWorldPage
+                  key={user.id}
+                  userId={user.id}
+                  userName={user.name}
+                  initialClassId={navigation.route.classId}
+                  onChooseClass={navigation.openPetWorld}
                   onRoleChange={setAccountRole}
                 />
               )}

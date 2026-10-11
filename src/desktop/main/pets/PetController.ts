@@ -4,6 +4,7 @@ import {
   PetFailure,
   PetReaction,
   type PetCommand,
+  type PetBackdropId,
   type PetPlacement,
   type PetPreferences,
   type PetReply,
@@ -24,6 +25,14 @@ export interface PetClock {
   schedule(callback: () => void, delayMs: number): () => void;
 }
 
+/** Confirmed cloud identity and cosmetics; device visibility and placement stay local. */
+export interface PetCloudAppearance {
+  revision: number;
+  activePetId: PetPreferences['activePetId'];
+  names: PetPreferences['names'];
+  backdropId: PetBackdropId | null;
+}
+
 const PetTiming = { REACTION_MS: 800, ENCOURAGEMENT_MS: 600_000, BUBBLE_MS: 5_000 } as const;
 
 /** Owns local pet state. Account epochs fence disk reads, saves and queued commands. */
@@ -35,6 +44,7 @@ export class PetController {
   private cancelReaction: (() => void) | null = null;
   private cancelEncouragement: (() => void) | null = null;
   private suspended = false;
+  private cloudRevision = -1;
   private snapshot: PetSnapshot = {
     revision: 0,
     preferences: createPetPreferences(),
@@ -42,6 +52,7 @@ export class PetController {
     isVisible: false,
     hasPresentationError: false,
     encouragement: false,
+    backdropId: null,
   };
 
   constructor(
@@ -60,6 +71,7 @@ export class PetController {
     const generation = this.generation;
     this.accountId = accountId;
     this.suspended = false;
+    this.cloudRevision = -1;
     this.clearTimers();
     this.snapshot = {
       ...this.snapshot,
@@ -68,6 +80,7 @@ export class PetController {
       reaction: PetReaction.IDLE,
       hasPresentationError: false,
       encouragement: false,
+      backdropId: null,
     };
     this.publish();
     this.ready = accountId ? this.loadAccount(accountId, generation) : Promise.resolve();
@@ -76,6 +89,24 @@ export class PetController {
 
   readSnapshot(): PetSnapshot {
     return structuredClone(this.snapshot);
+  }
+
+  /** Apply only confirmed state for the loaded account, without enabling its overlay. */
+  applyCloudAppearance(accountId: string, appearance: PetCloudAppearance): void {
+    if (accountId !== this.accountId || appearance.revision < this.cloudRevision) {
+      return;
+    }
+    this.cloudRevision = appearance.revision;
+    this.snapshot = {
+      ...this.snapshot,
+      preferences: {
+        ...this.snapshot.preferences,
+        activePetId: appearance.activePetId,
+        names: { ...appearance.names },
+      },
+      backdropId: appearance.backdropId,
+    };
+    this.publish();
   }
 
   executeCommand(command: PetCommand): Promise<PetReply> {
@@ -158,9 +189,15 @@ export class PetController {
   dispose(): void {
     this.generation += 1;
     this.accountId = null;
+    this.cloudRevision = -1;
     this.ready = Promise.resolve();
     this.clearTimers();
-    this.snapshot = { ...this.snapshot, isVisible: false, encouragement: false };
+    this.snapshot = {
+      ...this.snapshot,
+      isVisible: false,
+      encouragement: false,
+      backdropId: null,
+    };
     this.publish();
   }
 
@@ -190,7 +227,19 @@ export class PetController {
     if (generation !== this.generation) {
       return { kind: 'failed', reason: PetFailure.UNAVAILABLE };
     }
-    this.snapshot = { ...this.snapshot, preferences, hasPresentationError: false };
+    const confirmedPreferences =
+      this.cloudRevision >= 0
+        ? {
+            ...preferences,
+            activePetId: this.snapshot.preferences.activePetId,
+            names: this.snapshot.preferences.names,
+          }
+        : preferences;
+    this.snapshot = {
+      ...this.snapshot,
+      preferences: confirmedPreferences,
+      hasPresentationError: false,
+    };
     this.refreshVisibility();
     return { kind: 'ok', snapshot: this.readSnapshot() };
   }

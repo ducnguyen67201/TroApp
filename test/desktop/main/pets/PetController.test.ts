@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createPetPreferences,
   PetAction,
+  PetBackdropId,
   PetFailure,
   PetId,
   PetMotion,
@@ -58,6 +59,80 @@ afterEach(() => {
 });
 
 describe('local pet lifecycle', () => {
+  it('applies confirmed cloud cosmetics without changing device settings and rejects older accounts or revisions', async () => {
+    const { controller } = createHarness();
+    await controller.setAccount('student');
+    await controller.executeCommand(adoption);
+    controller.applyCloudAppearance('student', {
+      revision: 4,
+      activePetId: PetId.CAT,
+      names: { cat: 'Cloud Mochi', fox: 'Cloud Maple' },
+      backdropId: PetBackdropId.MEADOW,
+    });
+    controller.applyCloudAppearance('student', {
+      revision: 3,
+      activePetId: PetId.FOX,
+      names: { cat: 'Old Mochi', fox: 'Old Maple' },
+      backdropId: null,
+    });
+    expect(controller.readSnapshot()).toMatchObject({
+      preferences: { enabled: true, activePetId: PetId.CAT, names: { cat: 'Cloud Mochi' } },
+      backdropId: PetBackdropId.MEADOW,
+    });
+    await controller.setAccount('other-student');
+    controller.applyCloudAppearance('student', {
+      revision: 5,
+      activePetId: PetId.FOX,
+      names: { cat: 'Cloud Mochi', fox: 'Cloud Maple' },
+      backdropId: PetBackdropId.STARRY_SKY,
+    });
+    expect(controller.readSnapshot()).toMatchObject({
+      isVisible: false,
+      preferences: { enabled: false, names: { cat: 'Mochi', fox: 'Maple' } },
+      backdropId: null,
+    });
+    controller.dispose();
+  });
+
+  it('preserves newer cloud identity when a device preference save finishes late', async () => {
+    const { controller, store } = createHarness();
+    await controller.setAccount('student');
+    let finishSave: (() => void) | undefined;
+    store.savePreferences.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSave = resolve;
+        }),
+    );
+    const saving = controller.executeCommand({
+      kind: PetAction.PREFERENCES,
+      quiet: true,
+      motion: PetMotion.REDUCED,
+      locale: DesktopLocale.ENGLISH,
+    });
+    await vi.waitFor(() => {
+      expect(finishSave).toBeDefined();
+    });
+    controller.applyCloudAppearance('student', {
+      revision: 7,
+      activePetId: PetId.FOX,
+      names: { cat: 'Clover', fox: 'Fern' },
+      backdropId: PetBackdropId.READING_NOOK,
+    });
+    finishSave?.();
+    await saving;
+    expect(controller.readSnapshot()).toMatchObject({
+      preferences: {
+        quiet: true,
+        motion: PetMotion.REDUCED,
+        activePetId: PetId.FOX,
+        names: { fox: 'Fern' },
+      },
+      backdropId: PetBackdropId.READING_NOOK,
+    });
+    controller.dispose();
+  });
+
   it('adopts only after a successful save, preserves names and recovers from save failure', async () => {
     const { controller, store, presentation } = createHarness();
     await controller.setAccount('student');

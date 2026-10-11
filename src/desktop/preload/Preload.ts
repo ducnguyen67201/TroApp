@@ -19,6 +19,12 @@ import {
 } from '#contracts/PracticeCapture.js';
 import { petOverlayBridge } from './PetPreload.js';
 import {
+  PetWorldCommandSchema,
+  PetWorldReplySchema,
+  PetWorldFailure,
+  isPetWorldMutationCommand,
+} from '#contracts/PetWorld.js';
+import {
   ClassroomInsightCommandSchema,
   ClassroomInsightReplySchema,
   InsightFailure,
@@ -100,6 +106,30 @@ import {
 /* Expose named session operations, not generic IPC or direct computer tools.
    Validate IPC data before it enters the renderer. */
 const bridge: DesktopBridge = {
+  async executePetWorld(command) {
+    try {
+      const raw: unknown = await ipcRenderer.invoke(
+        'tro:pet-world-command',
+        PetWorldCommandSchema.parse(command),
+      );
+      return PetWorldReplySchema.parse(raw);
+    } catch {
+      return { kind: 'failed', code: PetWorldFailure.UNAVAILABLE };
+    }
+  },
+  async readPetWorldPending() {
+    try {
+      const raw: unknown = await ipcRenderer.invoke('tro:pet-world-pending');
+      if (!Array.isArray(raw) || raw.length > 30) {
+        return [];
+      }
+      return raw
+        .map((value: unknown) => PetWorldCommandSchema.parse(value))
+        .filter(isPetWorldMutationCommand);
+    } catch {
+      return [];
+    }
+  },
   async readGuidedLessons(request) {
     try {
       const raw: unknown = await ipcRenderer.invoke(

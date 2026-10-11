@@ -11,6 +11,7 @@ export interface DesktopNavigation {
   openWorkspace: () => void;
   openClassroom: (insights?: boolean) => void;
   openGuidedLessons: (classId?: string) => void;
+  openPetWorld: (classId?: string) => void;
   openClass: (classId: string, view: ClassView) => void;
 }
 
@@ -44,6 +45,12 @@ export function useDesktopNavigation(): DesktopNavigation {
     openGuidedLessons: useCallback(
       (classId?: string) => {
         navigate(classId ? `#/guided-lessons/${classId}` : '#/guided-lessons');
+      },
+      [navigate],
+    ),
+    openPetWorld: useCallback(
+      (classId?: string) => {
+        navigate(classId ? `#/pet-world/${classId}` : '#/pet-world');
       },
       [navigate],
     ),
