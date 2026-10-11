@@ -15,6 +15,7 @@ not requirements or evidence that a capability exists.
 - [Voice input and narration](#voice-input-and-narration)
 - [Classroom and materials](#classroom-and-materials)
 - [Guided lessons beta](#guided-lessons-beta)
+- [Pet World and classroom recognition](#pet-world-and-classroom-recognition)
 - [Local presentation and app updates](#local-presentation-and-app-updates)
 - [Code ownership](#code-ownership)
 - [Verification and current limits](#verification-and-current-limits)
@@ -881,13 +882,16 @@ database mapping, conditional revision writes and complete serializable transact
 retries, including commit conflicts.
 
 Each student owns one account-wide wallet and home across classes and devices.
+Wallets begin at zero; initializing the free home and pet creates no point award
+or purchased inventory. Leaving a class preserves the student's wallet and items.
 Only a current teacher owning a nondeleted class can issue positive points to its
 currently enrolled student-role accounts. Amounts have no teacher budget or product
 quota; the owning contract rejects values beyond database storage capacity. Wire
 amounts are canonical decimal strings and persistence uses bigint. A grant batch,
 ledger entries, wallet revisions and deduplication receipt commit together. Purchases
 atomically debit the server catalog price and create permanent inventory, optionally
-equipping with a world revision guard. A failed purchase leaves no charge or item.
+equipping with a world revision guard. Each student can own an item only once;
+buying an already owned item is rejected. A failed purchase leaves no charge or item.
 The additive migration also checks ledger signs/provenance, final wallet/ledger
 agreement and immutable accounting history.
 
@@ -938,6 +942,11 @@ backdrops fit the existing window and remain click-through around the pet; outfi
 await compatible animation artwork. Last confirmed account-scoped cosmetics can
 display offline. School tenancy, shared purchased inventory, transfers and real-money
 commerce are outside the current feature.
+
+The [HTML prototype](../examples/previews/PetLearningLoop.html) is a visual
+reference with fictional, in-memory interactions. Implemented ownership, boundaries
+and behavior are maintained here; the contracts and source linked above own their
+details.
 
 ## Local presentation and app updates
 
