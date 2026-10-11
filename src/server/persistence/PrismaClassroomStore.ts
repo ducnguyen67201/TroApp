@@ -359,6 +359,10 @@ class PrismaClassroomStore implements ClassroomStore {
     if (updated.count !== 1) {
       throw new ClassroomError(ClassroomFailure.STALE);
     }
+    await this.client.petHomeShare.updateMany({
+      where: { classId, enabled: true },
+      data: { enabled: false, revision: { increment: 1 } },
+    });
     await this.invalidateClassroomInsights(classId);
   }
 
@@ -389,6 +393,12 @@ class PrismaClassroomStore implements ClassroomStore {
       create: { classId, studentId, active },
       update: { active },
     });
+    if (!active) {
+      await this.client.petHomeShare.updateMany({
+        where: { classId, studentId, enabled: true },
+        data: { enabled: false, revision: { increment: 1 } },
+      });
+    }
     await this.invalidateClassroomInsights(classId);
   }
 

@@ -152,6 +152,19 @@ Collection records accepted classroom work; historical work is not imported
 implicitly. Backend collection and retention settings live in
 [Env.ts](src/server/Env.ts), with 180-day retention by default.
 
+Select **Pet world** in the navbar to recognize students and personalize a pet's
+home. Teachers select an owned class and enrolled students, enter a positive whole
+point amount and grant it manually. There is no teacher issuance budget. Students
+spend their own points in the shop, place owned decorations and equip passive pet
+backgrounds. The existing pet gallery controls whether the floating companion is
+shown on this device. Homes stay private until their owner shares with a class.
+Class garden milestones count recognized moments; learning evidence remains in
+Insights and practice review. Interrupted actions appear as pending requests;
+retry the original action to reconcile its result. Awards and purchases require
+the API, while confirmed cosmetic appearance can remain available offline.
+Normal startup applies the additive Pet World migration; it does not import demo
+balances or award points automatically. This feature makes no model calls.
+
 Guided Lessons is available immediately in the navbar as **Guided lessons (Beta)**
 (**Bài giảng hướng dẫn (Thử nghiệm)**). Teachers select passages from an approved
 publication, confirm a supported Python integer running-total example, optionally

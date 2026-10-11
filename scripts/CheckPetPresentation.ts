@@ -26,6 +26,7 @@ const snapshot: PetSnapshot = {
   isVisible: true,
   hasPresentationError: false,
   encouragement: true,
+  backdropId: null,
 };
 
 /* An isolated offscreen Electron fixture loads the actual built preload/renderer.

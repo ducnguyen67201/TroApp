@@ -5,6 +5,15 @@ export const PetId = { CAT: 'cat', FOX: 'fox' } as const;
 
 export type PetId = (typeof PetId)[keyof typeof PetId];
 
+/** Bundled passive scenes; these identifiers never resolve arbitrary asset paths. */
+export const PetBackdropId = {
+  MEADOW: 'meadow',
+  READING_NOOK: 'reading-nook',
+  STARRY_SKY: 'starry-sky',
+} as const;
+
+export type PetBackdropId = (typeof PetBackdropId)[keyof typeof PetBackdropId];
+
 export const PetReaction = { IDLE: 'idle', HAPPY: 'happy', STARTLED: 'startled' } as const;
 
 export type PetReaction = (typeof PetReaction)[keyof typeof PetReaction];
@@ -82,6 +91,7 @@ export const PetSnapshotSchema = z.strictObject({
   isVisible: z.boolean(),
   hasPresentationError: z.boolean(),
   encouragement: z.boolean(),
+  backdropId: z.enum(PetBackdropId).nullable(),
 });
 
 export type PetSnapshot = z.infer<typeof PetSnapshotSchema>;

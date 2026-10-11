@@ -52,3 +52,15 @@ it('opens guided lessons with a validated optional class selection', () => {
   });
   expect(parseDesktopRoute('#/guided-lessons/not-a-class').classId).toBeNull();
 });
+
+it('opens pet world with a validated optional class selection', () => {
+  expect(parseDesktopRoute('#/pet-world')).toMatchObject({
+    page: DesktopPage.PET_WORLD,
+    classId: null,
+  });
+  expect(parseDesktopRoute(`#/pet-world/${classId}`)).toMatchObject({
+    page: DesktopPage.PET_WORLD,
+    classId,
+  });
+  expect(parseDesktopRoute('#/pet-world/not-a-class').classId).toBeNull();
+});

@@ -863,6 +863,78 @@ lessons. Help receipts bind their reply to the resulting learner progress versio
 and scene, so a lost response can replay the same hint without consuming another
 hint or exposing a stale answer after the learner moves.
 
+## Pet World and classroom recognition
+
+[PetWorld.ts](../src/contracts/PetWorld.ts) owns strict commands, replies, decimal
+point strings, catalog capabilities and separate owner, teacher, visitor and garden
+projections. The authenticated versioned HTTP route is wired in `StartApi.ts`;
+there is no award capability in agent, model, worker or MCP tools.
+
+[PetWorldService.ts](../src/server/features/petWorld/application/PetWorldService.ts)
+is the application facade. Focused operation functions own awards, purchases,
+profile/equipment changes, sharing, corrections and reads. Framework-free domain
+functions own arithmetic, compatibility and recognition coverage. The root
+`PetWorldStore` port owns one atomic callback; its scoped `PetWorldTransaction`
+port exposes no nested transaction runner, network or Prisma surface.
+[PrismaPetWorldStore.ts](../src/server/persistence/PrismaPetWorldStore.ts) contains
+database mapping, conditional revision writes and complete serializable transaction
+retries, including commit conflicts.
+
+Each student owns one account-wide wallet and home across classes and devices.
+Only a current teacher owning a nondeleted class can issue positive points to its
+currently enrolled student-role accounts. Amounts have no teacher budget or product
+quota; the owning contract rejects values beyond database storage capacity. Wire
+amounts are canonical decimal strings and persistence uses bigint. A grant batch,
+ledger entries, wallet revisions and deduplication receipt commit together. Purchases
+atomically debit the server catalog price and create permanent inventory, optionally
+equipping with a world revision guard. A failed purchase leaves no charge or item.
+The additive migration also checks ledger signs/provenance, final wallet/ledger
+agreement and immutable accounting history.
+
+Mutation request IDs identify one logical intent. Matching authorized retries return
+the original minimal outcome; changed content conflicts. Replays recheck current
+resource access. The original teacher can reverse a whole uncorrected award only
+when the wallet can cover it, or finally void recognition while preserving points
+and items. Corrections cannot credit points. Sign-in, practice feedback, pet actions
+and garden milestones never mint points automatically.
+
+Homes start private, with consent scoped to one class. Class withdrawal/deletion
+disables sharing in its own transaction; visits still recheck class access, current
+enrollment and consent. Visitor projections contain cosmetics without balances,
+teacher notes, email or learning evidence. Teacher recognition views expose only
+their class's awards and descriptive coverage, never student-wide wealth/spending.
+A class garden counts distinct nonvoided award batches and changes shared scenery.
+Recognition coverage describes recorded teacher choices within its displayed period;
+it does not establish mastery, attention or engagement. Existing practice review and
+learning insights remain the evidence owners.
+
+Private recognition notes and correction reasons expire using the existing validated
+classroom retention duration. A bounded purge, scheduled through the existing
+retention runner, removes prose while preserving accounting, ownership and minimal
+receipts. Ordinary logs record bounded operation/error identifiers and timing,
+without note content or raw requests. Successful routine reads remain quiet.
+
+[PetWorldController.ts](../src/desktop/main/petWorld/PetWorldController.ts) owns
+account fences, cancellation, confirmed appearance and persisted unresolved online
+intents. Its API client validates transport JSON; the renderer uses named,
+sender-checked preload methods. React hooks consume authoritative state rather than
+calculating balances. The Pet World page provides manual teacher awards, history,
+shop, inventory, home decoration and opted-in class visits. Active views and the
+visible companion refresh at the owning interval and on focus/resume. Mutations
+require online confirmation; retries reuse the saved intent across restarts.
+
+Owner initialization imports the full validated local cat/fox identity/name map only
+when the cloud profile is absent. Teacher grants create wallets without pet profiles.
+Existing cloud profiles win on subsequent devices. The existing pet picker routes
+owner identity/name edits through the cloud profile; teacher pets without wallets
+keep their local flow. Device preferences retain enabled state, placement, quiet
+mode, locale and reduced motion. Main publishes only confirmed cosmetic appearance
+through the existing pet controller and restricted overlay bridge. Bundled passive
+backdrops fit the existing window and remain click-through around the pet; outfits
+await compatible animation artwork. Last confirmed account-scoped cosmetics can
+display offline. School tenancy, shared purchased inventory, transfers and real-money
+commerce are outside the current feature.
+
 ## Local presentation and app updates
 
 Mantine defaults and semantic styling belong in `Theme.ts` and
@@ -870,8 +942,9 @@ Mantine defaults and semantic styling belong in `Theme.ts` and
 typed and voice tasks. The optional pet is composed separately by `PetController`
 and `PetWindow`: account-scoped local preferences, bundled raster assets, restricted
 preload and a sandboxed transparent window. It hides during agent work and voice
-capture, captures no screen and makes no model request. Generated pets and cloud
-collections are not implemented. `PetPresentation.ts` selects one shared
+capture, captures no screen and makes no model request. Cloud identity and equipped
+backdrops arrive through Pet World; generated pets and uploaded artwork are not
+implemented. `PetPresentation.ts` selects one shared
 `PetRenderer` implementation for the gallery and overlay. The stateless
 `PageMascotRenderer` class adapts the pinned, unmodified `page-mascot` dependency
 for bundled cat/fox direction and reaction sheets. The legacy slime asset and
@@ -925,6 +998,7 @@ try-on generation remain future work; there is no implemented try-on job pipelin
 | Materials and retrieval          | [MaterialService.ts](../src/server/features/materials/application/MaterialService.ts), [PrepareMaterialCollection.ts](../src/server/features/materials/application/PrepareMaterialCollection.ts), [ReadMaterialSources.ts](../src/server/features/materials/application/ReadMaterialSources.ts)                                                              |
 | Persistence                      | [PrismaClassroomStore.ts](../src/server/persistence/PrismaClassroomStore.ts), [schema.prisma](../prisma/schema.prisma), reviewed additive migrations                                                                                                                                                                                                         |
 | Updates and pets                 | [AppUpdateController.ts](../src/desktop/main/updates/AppUpdateController.ts), [PetController.ts](../src/desktop/main/pets/PetController.ts)                                                                                                                                                                                                                  |
+| Pet World and recognition        | [PetWorldService.ts](../src/server/features/petWorld/application/PetWorldService.ts), [PetWorld.ts](../src/contracts/PetWorld.ts), [PetWorldController.ts](../src/desktop/main/petWorld/PetWorldController.ts), [PetWorldPage.tsx](../src/desktop/renderer/petWorld/PetWorldPage.tsx)                                                                        |
 | Runtime configuration            | [backend Env.ts](../src/server/Env.ts), [main Env.ts](../src/desktop/main/Env.ts), [scripts Env.ts](../scripts/Env.ts)                                                                                                                                                                                                                                       |
 
 Tests mirror `src` under `test`. Production code never imports tests or sibling

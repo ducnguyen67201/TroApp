@@ -45,6 +45,9 @@ import { createPrismaDatabaseStatus } from './persistence/PrismaDatabaseStatus.j
 import { createPrismaClassroomStore } from './persistence/PrismaClassroomStore.js';
 import { ClassroomService } from './features/classroom/application/ClassroomService.js';
 import { registerClassroomRoutes } from './features/classroom/infrastructure/RegisterClassroomRoutes.js';
+import { PetWorldService } from './features/petWorld/application/PetWorldService.js';
+import { registerPetWorldRoutes } from './features/petWorld/infrastructure/RegisterPetWorldRoutes.js';
+import { createPrismaPetWorldStore } from './persistence/PrismaPetWorldStore.js';
 
 async function startApi(): Promise<void> {
   const environment = readServerEnv(process.env);
@@ -96,6 +99,20 @@ async function startApi(): Promise<void> {
     authentication.readSignedInUserId,
     new ClassroomService(classroom.store),
     logger,
+  );
+  const petWorld = createPrismaPetWorldStore(environment.DATABASE_URL);
+  registerPetWorldRoutes(
+    api,
+    authentication.readSignedInUserId,
+    new PetWorldService(petWorld.store),
+    logger,
+  );
+  const petRetentionRunner = new ClassroomInsightRetentionRunner(
+    petWorld,
+    capturePolicy.retentionDays,
+    () => {
+      logger.warn({ operation: 'purge-expired-pet-recognition' }, 'petWorld.retention.failed');
+    },
   );
   const practice = createPrismaPracticeCheckStore(environment.DATABASE_URL, capturePolicy);
   registerPracticeCheckRoutes(
@@ -232,6 +249,7 @@ async function startApi(): Promise<void> {
 
   api.addHook('onClose', async () => {
     await retentionRunner.close();
+    await petRetentionRunner.close();
     await materialRunner.close();
     await guidedLessonRunner.close();
     await guidedLessons.close();
@@ -242,10 +260,12 @@ async function startApi(): Promise<void> {
     await classroom.close();
     await practice.close();
     await insights.close();
+    await petWorld.close();
   });
 
   try {
     await retentionRunner.start();
+    await petRetentionRunner.start();
     await api.listen({ host: environment.HOST, port: environment.PORT });
   } catch (error: unknown) {
     await api.close();
