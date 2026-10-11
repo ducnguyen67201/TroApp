@@ -899,6 +899,35 @@ Main validates events before preload exposes progress; the renderer has no arbit
 installer path or update URL capability. Signing, notarization and live installed-app
 update acceptance remain release work.
 
+“What’s new” is a permanent action beside Settings, with manual replay also
+available on the signed-out screen. The bundled, EN/VI release catalog in
+[ReleaseNotes.ts](../src/desktop/updates/ReleaseNotes.ts) owns versioned highlights
+and feature illustrations; it is independent of update feeds and contains no
+remote HTML. Add an entry for the shipped package version when there are meaningful
+highlights; a patch without an entry retains earlier notes for manual viewing.
+Future release notes are excluded from older installed versions.
+
+[WhatsNewController.ts](../src/desktop/main/updates/WhatsNewController.ts) compares
+Electron’s installed version with installation-scoped preferences. The first
+launch establishes a baseline without automatically opening a tour. A later stable
+upgrade with unseen highlights introduced after the previous installed version
+records a pending introduction; skipped
+versions show only the latest installed release. Downgrades do not trigger a tour.
+The renderer waits for a signed-in, permission-ready, idle window with no other
+dialog before automatic presentation. Pending state survives an interrupted startup.
+Presentation clears the unread dot and records the release as seen, even if the
+user closes early; manual replay remains unlimited. This state is per installation,
+not per account, and does not use the backend database.
+
+[WhatsNewPreferences.ts](../src/desktop/main/updates/WhatsNewPreferences.ts) owns a
+validated `WhatsNew.json` file under Electron’s userData directory and atomic writes.
+Unreadable/unsupported files are preserved, automatic presentation is suppressed,
+and bounded `whats-new.preferences.failed` events identify `load` or `mark-seen`.
+A save failure leaves the current tour usable and explains that it may reappear
+after restart. Preload exposes only named read/mark-seen methods; main verifies
+the sender and selects the release itself. The renderer receives no file paths,
+arbitrary release-write capability or database access.
+
 The backend deployment target is Railway using the repository Dockerfile and
 versioned migrations. `/health/live` reports the process, while `/health/ready`
 requires database readiness. Deployment is not implied by local tests. AWS and

@@ -2082,3 +2082,131 @@ it('restores an existing classroom participation when the desktop opens', async 
     false,
   );
 });
+
+function createReleaseBridge(shouldAutoShow = false) {
+  const status = {
+    installedVersion: '0.1.0',
+    releaseId: '0.1.0',
+    hasUnseenRelease: true,
+    shouldAutoShow,
+  };
+  return {
+    ...createDesktopBridge(),
+    readWhatsNew: vi
+      .fn<NonNullable<DesktopBridge['readWhatsNew']>>()
+      .mockResolvedValue({ kind: 'ok', status }),
+    markWhatsNewSeen: vi.fn<NonNullable<DesktopBridge['markWhatsNewSeen']>>().mockResolvedValue({
+      kind: 'ok',
+      status: { ...status, hasUnseenRelease: false, shouldAutoShow: false },
+    }),
+  } satisfies DesktopBridge;
+}
+
+describe('what’s new', () => {
+  it('keeps a permanent entry before Settings, clears the unread dot and replays from the first slide', async () => {
+    const bridge = createReleaseBridge();
+    window.tro = bridge;
+    renderDesktop();
+    const open = await screen.findByRole('button', { name: 'What’s new' });
+    await screen.findByRole('img', { name: 'New release highlights' });
+    expect(
+      open.compareDocumentPosition(screen.getByRole('button', { name: 'Settings' })) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(screen.queryByRole('dialog', { name: 'What’s new' })).toBeNull();
+    fireEvent.click(open);
+    let dialog = await screen.findByRole('dialog', { name: 'What’s new' });
+    expect(within(dialog).getByRole('heading', { name: 'Bring lessons to life.' })).toBeTruthy();
+    await waitFor(() => {
+      expect(bridge.markWhatsNewSeen).toHaveBeenCalledOnce();
+    });
+    expect(screen.queryByRole('img', { name: 'New release highlights' })).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Next' }));
+    expect(within(dialog).getByRole('heading', { name: 'A hint when it matters.' })).toBeTruthy();
+    fireEvent.keyDown(within(dialog).getByRole('button', { name: 'Next' }), {
+      key: 'ArrowRight',
+    });
+    expect(
+      within(dialog).getByRole('heading', { name: 'Know your class a little better.' }),
+    ).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Start exploring' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'What’s new' })).toBeNull();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'What’s new' }));
+    dialog = await screen.findByRole('dialog', { name: 'What’s new' });
+    expect(within(dialog).getByRole('heading', { name: 'Bring lessons to life.' })).toBeTruthy();
+    expect(bridge.markWhatsNewSeen).toHaveBeenCalledOnce();
+  });
+
+  it('automatically presents pending highlights once after sign-in and permission readiness', async () => {
+    const bridge = createReleaseBridge(true);
+    let completePermissions:
+      ((value: Awaited<ReturnType<DesktopBridge['readDesktopPermissions']>>) => void) | undefined;
+    bridge.readDesktopPermissions.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          completePermissions = resolve;
+        }),
+    );
+    window.tro = bridge;
+    renderDesktop();
+    await screen.findByRole('button', { name: 'What’s new' });
+    expect(screen.queryByRole('dialog', { name: 'What’s new' })).toBeNull();
+    act(() => {
+      completePermissions?.({
+        kind: 'ready',
+        accessibility: 'granted',
+        screenRecording: 'granted',
+      });
+    });
+    const dialog = await screen.findByRole('dialog', { name: 'What’s new' });
+    await waitFor(() => {
+      expect(bridge.markWhatsNewSeen).toHaveBeenCalledOnce();
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close introduction' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'What’s new' })).toBeNull();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Close settings' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull();
+    });
+    expect(screen.queryByRole('dialog', { name: 'What’s new' })).toBeNull();
+    expect(bridge.markWhatsNewSeen).toHaveBeenCalledOnce();
+  });
+
+  it('supports Vietnamese manual replay while signed out without auto-opening pending highlights', async () => {
+    window.localStorage.setItem(localeStorageKey, DesktopLocale.VIETNAMESE);
+    const bridge = createReleaseBridge(true);
+    bridge.readAuthSession.mockResolvedValue({ kind: 'signed-out' });
+    window.tro = bridge;
+    renderDesktop();
+    const open = await screen.findByRole('button', { name: 'Có gì mới' });
+    expect(screen.queryByRole('dialog', { name: 'Có gì mới' })).toBeNull();
+    fireEvent.click(open);
+    const dialog = await screen.findByRole('dialog', { name: 'Có gì mới' });
+    expect(within(dialog).getByRole('heading', { name: 'Bài giảng sống động hơn.' })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Đóng phần giới thiệu' }));
+    await waitFor(() => {
+      expect(bridge.markWhatsNewSeen).toHaveBeenCalledOnce();
+    });
+  });
+
+  it('keeps the tour usable and explains a seen-state save failure', async () => {
+    const bridge = createReleaseBridge();
+    bridge.markWhatsNewSeen.mockResolvedValue({ kind: 'failed', reason: 'unavailable' });
+    window.tro = bridge;
+    renderDesktop();
+    fireEvent.click(await screen.findByRole('button', { name: 'What’s new' }));
+    const dialog = await screen.findByRole('dialog', { name: 'What’s new' });
+    expect(
+      await within(dialog).findByText(
+        'Could not save that you viewed this release. It may appear again after restarting.',
+      ),
+    ).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Next' }));
+    expect(within(dialog).getByRole('heading', { name: 'A hint when it matters.' })).toBeTruthy();
+  });
+});

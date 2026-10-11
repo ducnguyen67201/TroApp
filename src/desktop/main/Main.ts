@@ -1,3 +1,5 @@
+import { WhatsNewController } from './updates/WhatsNewController.js';
+import { WhatsNewPreferences } from './updates/WhatsNewPreferences.js';
 import {
   GuidedLessonReadRequestSchema,
   GuidedLessonCommandSchema,
@@ -338,6 +340,13 @@ async function startDesktop(): Promise<void> {
   const updateController = updates;
   ipcMain.handle('tro:update-command', (event, rawCommand: unknown): Promise<AppUpdateReply> =>
     runAppUpdateCommand(updateController, rawCommand, isTrustedSender(event)),
+  );
+  const whatsNew = new WhatsNewController(
+    new WhatsNewPreferences(app.getPath('userData')),
+    app.getVersion(),
+  );
+  ipcMain.handle('tro:whats-new', (event, raw: unknown) =>
+    whatsNew.execute(raw, isTrustedSender(event)),
   );
   let isStartingMicrophone = false;
   const cancelShortcut = new GlobalTaskCancelShortcut(globalShortcut);

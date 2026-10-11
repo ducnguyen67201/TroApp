@@ -113,6 +113,24 @@ pnpm inspect:cua:mcp --list
 pnpm inspect:cua:mcp browser_click
 ```
 
+### What’s new
+
+Open **What’s new** (**Có gì mới**) beside Settings to replay the installed release’s
+highlights. It is also available on the welcome screen. The first launch establishes
+a local baseline; later updates with new highlights show the tour once, after
+sign-in, permission setup and active work have settled. Closing counts as viewed.
+The amber dot clears when viewed. Seen state belongs to this installation, works
+offline and is shared by accounts using it.
+
+When preparing a release, add localized highlights to
+[ReleaseNotes.ts](src/desktop/updates/ReleaseNotes.ts) with the shipped `package.json`
+version. Keep newest entries first. Builds without new highlights need no new entry
+and retain earlier notes for manual replay. Do not bump the app version merely to
+edit preview content. For acceptance, launch an older version to establish a
+baseline, update to a newer build with notes, verify one automatic tour when idle,
+close and relaunch, then reopen it through the permanent entry. Confirm a fresh
+installation and a patch without notes do not interrupt startup.
+
 ## Classroom pilot
 
 Apply committed migrations through normal startup. Accounts default to Student;

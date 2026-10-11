@@ -225,3 +225,27 @@ it('validates narrow practice capture requests and rejects native window IDs in 
   electron.invoke.mockResolvedValue({ kind: 'discarded' });
   expect(await bridge.controlPracticeCapture({ kind: 'discard' })).toEqual({ kind: 'discarded' });
 });
+
+it('exposes narrow release presentation operations and rejects malformed replies', async () => {
+  await import('../../../src/desktop/preload/Preload.js');
+  electron.invoke.mockClear();
+  const bridge = electron.expose.mock.calls[0]?.[1];
+  if (!bridge?.readWhatsNew || !bridge.markWhatsNewSeen) {
+    throw new Error('Missing release presentation bridge');
+  }
+  const status = {
+    installedVersion: '0.1.0',
+    releaseId: '0.1.0',
+    hasUnseenRelease: true,
+    shouldAutoShow: false,
+  };
+  electron.invoke.mockResolvedValue({ kind: 'ok', status });
+  expect(await bridge.readWhatsNew()).toEqual({ kind: 'ok', status });
+  expect(electron.invoke).toHaveBeenLastCalledWith('tro:whats-new', { kind: 'read' });
+  await bridge.markWhatsNewSeen();
+  expect(electron.invoke).toHaveBeenLastCalledWith('tro:whats-new', { kind: 'mark-seen' });
+  electron.invoke.mockResolvedValue({ kind: 'ok', status: { ...status, filePath: '/private' } });
+  expect(await bridge.readWhatsNew()).toEqual({ kind: 'failed', reason: 'unavailable' });
+  electron.invoke.mockRejectedValue(new Error('IPC unavailable'));
+  expect(await bridge.markWhatsNewSeen()).toEqual({ kind: 'failed', reason: 'unavailable' });
+});
