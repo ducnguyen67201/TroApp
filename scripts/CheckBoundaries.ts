@@ -83,6 +83,12 @@ for (const file of await collectFiles(root)) {
         failures.push(`${filePath}: production code cannot import test implementation.`);
       }
 
+      if (filePath.startsWith('src/') && importPath.startsWith('examples/')) {
+        failures.push(
+          `${filePath}: production code cannot import preview/authoring implementation.`,
+        );
+      }
+
       if (
         ownerPath.startsWith('src/desktop/') &&
         (importPath.startsWith('src/server/') || /prisma/.test(specifier))
@@ -111,6 +117,16 @@ for (const file of await collectFiles(root)) {
         /(?:^@prisma|generated\/prisma)/.test(specifier)
       ) {
         failures.push(`${filePath}: Prisma belongs in persistence adapters.`);
+      }
+
+      if (
+        filePath.startsWith('src/desktop/onboarding/') &&
+        !importPath.startsWith('src/desktop/onboarding/') &&
+        !specifier.startsWith('#contracts/')
+      ) {
+        failures.push(
+          `${filePath}: onboarding domain/application can import only their feature and public contracts; adapters own frameworks and I/O.`,
+        );
       }
 
       if (

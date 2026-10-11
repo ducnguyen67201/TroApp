@@ -1,3 +1,6 @@
+import { OnboardingStep } from '#contracts/OnboardingValues.js';
+import { useOnboarding } from './onboarding/UseOnboarding.js';
+import { OnboardingFlow, type OnboardingAnchors } from './onboarding/OnboardingFlow.js';
 import { AccountMenu } from './accounts/AccountMenu.js';
 import { useVoiceover } from './voiceover/UseVoiceover.js';
 import { useFocusReturn } from '@mantine/hooks';
@@ -78,6 +81,21 @@ export function App(): ReactElement {
     controller.isSigning || controller.isSwitchingAccount || controller.isSigningOut;
   const activeUserId = accountTransition ? null : (user?.id ?? null);
   const voiceover = useVoiceover(activeUserId);
+  const onboarding = useOnboarding(activeUserId);
+  const workspaceAnchor = useRef<HTMLButtonElement>(null);
+  const classesAnchor = useRef<HTMLButtonElement>(null);
+  const insightsAnchor = useRef<HTMLButtonElement>(null);
+  const lessonsAnchor = useRef<HTMLButtonElement>(null);
+  const microphoneAnchor = useRef<HTMLButtonElement>(null);
+  const settingsAnchor = useRef<HTMLButtonElement>(null);
+  const onboardingAnchors: OnboardingAnchors = {
+    [OnboardingStep.WORKSPACE]: workspaceAnchor,
+    [OnboardingStep.CLASSES]: classesAnchor,
+    [OnboardingStep.INSIGHTS]: insightsAnchor,
+    [OnboardingStep.GUIDED_LESSONS]: lessonsAnchor,
+    [OnboardingStep.MICROPHONE]: microphoneAnchor,
+    [OnboardingStep.PETS]: settingsAnchor,
+  };
   useEffect(() => {
     if (signedInUserId.current && signedInUserId.current !== user?.id) {
       navigation.openWorkspace();
@@ -142,6 +160,7 @@ export function App(): ReactElement {
             }
           }}
           user={user}
+          onboarding={onboarding}
           microphones={microphones}
           voiceStatus={voice.status}
           voiceover={voiceover}
@@ -199,6 +218,7 @@ export function App(): ReactElement {
             </Group>
             <nav aria-label={messages.navigation} className="sidebar-navigation">
               <UnstyledButton
+                ref={workspaceAnchor}
                 className="sidebar-link"
                 disabled={accountTransition}
                 data-active={
@@ -214,6 +234,7 @@ export function App(): ReactElement {
                 <span>{messages.workspace}</span>
               </UnstyledButton>
               <UnstyledButton
+                ref={classesAnchor}
                 className="sidebar-link"
                 disabled={accountTransition}
                 data-active={
@@ -229,6 +250,7 @@ export function App(): ReactElement {
                 <span>{classroomLabel}</span>
               </UnstyledButton>
               <UnstyledButton
+                ref={insightsAnchor}
                 className="sidebar-link"
                 disabled={accountTransition}
                 data-active={
@@ -244,6 +266,7 @@ export function App(): ReactElement {
                 <span>{locale === 'vi' ? 'Tiến độ học tập' : 'Insights'}</span>
               </UnstyledButton>
               <UnstyledButton
+                ref={lessonsAnchor}
                 className="sidebar-link"
                 disabled={accountTransition}
                 data-active={
@@ -274,6 +297,7 @@ export function App(): ReactElement {
                 }
               />
               <UnstyledButton
+                ref={microphoneAnchor}
                 className="sidebar-link"
                 disabled={accountTransition}
                 data-active={dialogs.state.microphone || undefined}
@@ -287,6 +311,7 @@ export function App(): ReactElement {
                 <span>{messages.microphone}</span>
               </UnstyledButton>
               <UnstyledButton
+                ref={settingsAnchor}
                 className="sidebar-link"
                 disabled={accountTransition}
                 data-active={dialogs.state.settings || undefined}
@@ -439,6 +464,23 @@ export function App(): ReactElement {
           </div>
         </AppShell.Main>
       </AppShell>
+      <OnboardingFlow
+        key={activeUserId ?? 'signed-out'}
+        view={onboarding}
+        anchors={onboardingAnchors}
+        role={accountRole}
+        canPresent={
+          Boolean(activeUserId) &&
+          !dialogs.state.settings &&
+          !dialogs.state.microphone &&
+          !controller.isSending &&
+          !controller.isResetting &&
+          !voice.isStarting &&
+          (voice.status.state === VoiceState.IDLE || voice.status.state === VoiceState.DISABLED) &&
+          microphoneTests.activeDeviceId === null &&
+          (page !== DesktopPage.WORKSPACE || permissions.status?.kind === 'ready')
+        }
+      />
     </>
   );
 }

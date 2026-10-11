@@ -865,6 +865,84 @@ hint or exposing a stale answer after the learner moves.
 
 ## Local presentation and app updates
 
+The account-scoped introductory tour is separate from OS permission onboarding.
+Framework-free rules and locale-content selection belong in
+[onboarding/domain](../src/desktop/onboarding/domain/OnboardingProgress.ts).
+[OnboardingService](../src/desktop/onboarding/application/OnboardingService.ts)
+serializes progress reads and revision-checked transitions through the explicit
+[OnboardingStore](../src/desktop/onboarding/application/OnboardingStore.ts) port.
+The inner feature imports no renderer, Electron, filesystem or provider adapter;
+`CheckBoundaries.ts` enforces that direction. The public
+[Onboarding](../src/contracts/Onboarding.ts) schemas own IPC/storage validation and
+[OnboardingValues](../src/contracts/OnboardingValues.ts) owns stable step IDs and
+state/action vocabulary. Progress has no locale or playback-duration dependency.
+
+[OnboardingPreferences](../src/desktop/main/onboarding/OnboardingPreferences.ts)
+adapts the port to private atomic files under Electron userData. Hashed account
+identifiers cannot become paths. Only a missing file means new progress; invalid
+or unsupported data remains untouched and produces a visible storage failure.
+[RegisterOnboarding](../src/desktop/main/onboarding/RegisterOnboarding.ts) validates
+requests/replies, verifies the trusted sender and active session, and holds the
+account transition gate through storage access. The caller's expected account ID
+only fences stale requests; the verified session determines ownership. Stale
+revisions fail instead of overwriting newer progress or a reset. Preload exposes
+only named read, update and restart operations, with no media URL/path capability.
+
+[UseOnboarding](../src/desktop/renderer/onboarding/UseOnboarding.ts) fences late
+reads and saves across account changes. App supplies navbar anchors and activity
+admission; [OnboardingFlow](../src/desktop/renderer/onboarding/OnboardingFlow.tsx)
+owns modal focus, anchor measurement and presentation. It defers during active
+work, visible permission setup and other dialogs, including exit transitions.
+The six steps cover Workspace, Classes, Insights, Guided Lessons, Microphone and
+Pets. Microphone points to its navbar button; Pets points to Settings and describes
+the Pets tab. Advancing highlights controls without navigating or starting work.
+New steps retain version-one progress and do not reopen completed/dismissed tours.
+First-time accounts receive an invitation; an in-progress tour resumes. Dismissal
+and completion suppress automatic presentation. Settings restart changes only the
+current account's local tour progress and opens the first step after Settings closes.
+
+[OnboardingContent](../src/desktop/renderer/onboarding/OnboardingContent.ts) owns
+student/teacher copy and recording stems. The existing selected desktop locale
+chooses the recording, captions and transcript. A Vietnamese video fallback is
+explicitly labelled while requested-locale copy is retained. Transcripts are
+independently optional and hidden when absent/blank; missing/failed videos retain
+the explanation and controls. [OnboardingMedia](../src/desktop/renderer/onboarding/OnboardingMedia.ts)
+accepts only build-owned bundled assets, with lazy browser media loading. Playback
+requires a user action and pauses on unmount, language/account changes, deferral
+or a hidden window. Ending a video does not advance progress. Actual presenter
+recordings are not yet supplied; five approved Vietnamese AI-narrated exports are
+bundled instead. The three classroom clips are student-specific; teachers retain
+their written classroom guidance. Microphone and Pets recordings serve both roles. Contextual first-use guides and cross-device
+progress sync remain future work. Recording setup and manual checks live in README.
+
+The five Vietnamese Remotion walkthroughs in `examples/previews/onboarding/` are
+authoring source, outside the runtime. Framework-free `VideoContent` owns the
+editorial shot definitions; `VideoNarration` owns the five concise spoken scripts
+and public speech profile. Remotion components consume those records and frozen
+renderer captures in ten-second timelines. The authoring speech adapter in
+`PrepareOnboardingNarration` receives a validated OpenAI key from the tooling Env
+boundary through Doppler, outside the renderer. It requires explicit generation,
+caches input/audio hashes, bounds provider responses, does not retry paid calls,
+and saves only audio plus non-secret receipts. `CheckOnboardingVideos` verifies
+these artifacts without credentials or provider calls.
+`CaptureDesktop` is a preview-only in-memory bridge with fictional data and no
+backend/native capability. Root tooling checks timing and asset geometry; production
+source cannot import `examples/`. The authoring CLI and media package are development
+dependencies. `VideoExports` maps approved compositions to runtime recording stems;
+`ExportOnboardingVideos` manually renders H.264/AAC MP4s, posters and transcripts,
+checks duration/codecs and fully decodes each clip before installing the set into
+build-owned assets. It reuses speech without provider calls. Normal desktop builds
+package these media assets, never authoring source, raw audio or capture screens.
+No startup/build hook regenerates or exports videos. Preview, export, audio
+preparation and asset provenance are documented in the root README.
+
+Safe diagnostics use `onboarding.preferences.failed` with read/save stage,
+`onboarding.access.failed` with authorization stage, and `onboarding.video.failed`
+with playback stage, guide ID and recording locale. They exclude account IDs,
+file contents, filesystem/media paths and raw validation errors. These events
+identify the failing boundary; a playback error does not establish why a codec or
+file failed.
+
 Mantine defaults and semantic styling belong in `Theme.ts` and
 `DesktopAppearance.ts`; renderer layout consumes those values. Locale is shared by
 typed and voice tasks. The optional pet is composed separately by `PetController`
@@ -924,6 +1002,7 @@ try-on generation remain future work; there is no implemented try-on job pipelin
 | Learning insights and reports    | [ClassroomInsightService.ts](../src/server/features/classroom/application/ClassroomInsightService.ts), [ClassroomInsights.ts](../src/contracts/ClassroomInsights.ts), [ClassroomInsightsPanel.tsx](../src/desktop/renderer/classroom/ClassroomInsightsPanel.tsx), [PrismaClassroomInsightStore.ts](../src/server/persistence/PrismaClassroomInsightStore.ts) |
 | Materials and retrieval          | [MaterialService.ts](../src/server/features/materials/application/MaterialService.ts), [PrepareMaterialCollection.ts](../src/server/features/materials/application/PrepareMaterialCollection.ts), [ReadMaterialSources.ts](../src/server/features/materials/application/ReadMaterialSources.ts)                                                              |
 | Persistence                      | [PrismaClassroomStore.ts](../src/server/persistence/PrismaClassroomStore.ts), [schema.prisma](../prisma/schema.prisma), reviewed additive migrations                                                                                                                                                                                                         |
+| Onboarding                       | [OnboardingService.ts](../src/desktop/onboarding/application/OnboardingService.ts), [OnboardingFlow.tsx](../src/desktop/renderer/onboarding/OnboardingFlow.tsx), [OnboardingPreferences.ts](../src/desktop/main/onboarding/OnboardingPreferences.ts)                                                                                                         |
 | Updates and pets                 | [AppUpdateController.ts](../src/desktop/main/updates/AppUpdateController.ts), [PetController.ts](../src/desktop/main/pets/PetController.ts)                                                                                                                                                                                                                  |
 | Runtime configuration            | [backend Env.ts](../src/server/Env.ts), [main Env.ts](../src/desktop/main/Env.ts), [scripts Env.ts](../scripts/Env.ts)                                                                                                                                                                                                                                       |
 

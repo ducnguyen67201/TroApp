@@ -3,6 +3,19 @@ import { loadEnv } from 'vite';
 import { AppUpdateUrlSchema } from '../src/contracts/AppUpdate.js';
 import { z } from 'zod';
 
+/** Authoring-only speech generation receives its key from Doppler in this process. */
+export function readOnboardingSpeechEnv(environment: NodeJS.ProcessEnv): { apiKey: string } {
+  const validated = createEnv({
+    server: { OPENAI_API_KEY: z.string().trim().min(1) },
+    runtimeEnv: environment,
+    emptyStringAsUndefined: true,
+    onValidationError: () => {
+      throw new Error('Onboarding narration requires OPENAI_API_KEY through Doppler.');
+    },
+  });
+  return { apiKey: validated.OPENAI_API_KEY };
+}
+
 /** Return configuration presence only. Proxy addresses, CA paths and keys stay private. */
 export function readModelConnectionEnv(
   environment: NodeJS.ProcessEnv,

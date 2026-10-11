@@ -113,6 +113,190 @@ pnpm inspect:cua:mcp --list
 pnpm inspect:cua:mcp browser_click
 ```
 
+## Onboarding and recordings
+
+After sign-in, Tro offers a short six-step tour when the interface is idle and ready.
+Students and teachers receive role-specific explanations. Skip/close suppresses
+future automatic offers; an interrupted tour resumes at its saved step. Use
+**Settings → General → Restart onboarding** (**Cài đặt → Chung → Bắt đầu lại hướng dẫn**)
+to replay it. Progress belongs to the selected account on this device; changing
+language or updating a recording does not reset it. Reset changes only onboarding.
+
+### Add or replace a recording
+
+There is currently no in-app upload screen. Copy your recordings into this
+checkout before building the desktop. Five Vietnamese AI-narrated clips are included for students: classes, insights,
+guided lessons, microphone and pets. Microphone and pet clips also serve teachers.
+Teacher classroom steps and Workspace use written explanations until recordings
+for those audiences are added.
+
+**Filenames must match exactly, including capitalization and the lowercase `.mp4`
+extension.** Rename your exported file to one of the names below. The mapping is
+owned by [OnboardingContent.ts](src/desktop/renderer/onboarding/OnboardingContent.ts);
+an unrecognized filename will not appear in the tour.
+
+| Navbar panel                         | Audience              | Exact video filename       |
+| ------------------------------------ | --------------------- | -------------------------- |
+| Workspace / Không gian làm việc      | Students and teachers | `Workspace.mp4`            |
+| Classroom / Lớp học                  | Students              | `StudentClasses.mp4`       |
+| Classroom / Lớp học                  | Teachers              | `TeacherClasses.mp4`       |
+| Insights / Tiến độ học tập           | Students              | `StudentInsights.mp4`      |
+| Insights / Tiến độ học tập           | Teachers              | `TeacherInsights.mp4`      |
+| Guided lessons / Bài giảng hướng dẫn | Students              | `StudentGuidedLessons.mp4` |
+| Guided lessons / Bài giảng hướng dẫn | Teachers              | `TeacherGuidedLessons.mp4` |
+| Microphone / Micrô                   | Students and teachers | `Microphone.mp4`           |
+| Settings → Pets / Cài đặt → Thú cưng | Students and teachers | `Pets.mp4`                 |
+
+1. Create `src/desktop/assets/onboarding/vi/` if it does not exist, then copy your
+   Vietnamese clips there using the exact filenames above. For example, rename
+   `my-workspace-intro.mp4` to `Workspace.mp4` and place it directly in that folder.
+2. Optionally add supporting files beside each clip, using the same name before
+   the extension:
+
+   | Example file    | Purpose                        |
+   | --------------- | ------------------------------ |
+   | `Workspace.png` | Poster shown before playback   |
+   | `Workspace.vtt` | Captions in WebVTT format      |
+   | `Workspace.txt` | Transcript as UTF-8 plain text |
+
+   Each is independently optional. An absent or blank `.txt` file hides the
+   transcript control. Captions do not automatically create a transcript.
+
+3. Build the desktop after adding or replacing files:
+
+   ```sh
+   pnpm build:desktop
+   ```
+
+   Relaunch the desktop and use **Settings → General → Restart onboarding** to
+   review the clips. Changing a recording alone does not reset saved progress.
+   Installed users receive new recordings through a rebuilt desktop package.
+
+Keep clips short and compatible with Electron's video player; review playback,
+captions and package size in the packaged app. Renaming another video format to
+`.mp4` does not convert it. Videos require a click to play and never automatically
+advance the tour. No provider calls or media generation are involved.
+
+### English recordings and missing media
+
+Add English clips under `src/desktop/assets/onboarding/en/` using the same exact
+filenames. Supporting files also belong in their language's folder. For example,
+`vi/Workspace.mp4` and `en/Workspace.mp4` are two recordings for the same panel.
+You can add English clips later without changing the mapping or resetting progress.
+
+The app's selected language chooses the clip. When an English clip is missing,
+an available Vietnamese clip is used and labelled as Vietnamese. Written panel
+text stays in the selected language, and only that language's transcript is shown
+if supplied. If neither clip exists, the written explanation remains available.
+A playback failure keeps the explanation visible and offers a retry.
+
+Manual acceptance: sign in as a student and a teacher, start/skip/resume the tour,
+finish it, restart from Settings, and switch languages. Add a synthetic short clip
+with captions/transcript and check playback, optional transcript hiding, media
+failure/retry, keyboard/Escape/focus, navbar scrolling and window resizing. Verify
+that another dialog or active task defers the tour and account switching stops
+playback without exposing another account's progress. Automated checks use local
+fixtures and do not require your recordings.
+
+### Remotion onboarding previews
+
+Five Vietnamese videos are authored separately from the desktop in
+[examples/previews/onboarding](examples/previews/onboarding/RegisterOnboardingVideos.tsx).
+They cover Lớp học, Tiến độ học tập, Bài giảng hướng dẫn, Micrô and Thú cưng.
+The approved exports are bundled under `src/desktop/assets/onboarding/vi/`.
+The tour keeps Workspace as a text introduction, then covers the five video topics.
+Micrô highlights the navbar microphone button; Thú cưng highlights Settings and
+explains where to find its Pets tab. Adding steps preserves completed/dismissed
+tours; use Restart onboarding to replay. The three classroom clips demonstrate
+student actions and are not substituted for teacher-specific instructions.
+
+```sh
+pnpm preview:onboarding
+```
+
+Open the printed Studio address (normally `http://localhost:4310`) and select
+`TroClassesVi`, `TroInsightsVi`, `TroGuidedLessonsVi`, `TroMicrophoneVi` or
+`TroPetsVi`. Press Play to hear Vietnamese AI narration from OpenAI Marin.
+Each is exactly 10 seconds, 1280×720 at 30 fps. Shot direction lives in
+[VideoContent.ts](examples/previews/onboarding/VideoContent.ts); concise spoken
+scripts and the speech profile live in
+[VideoNarration.ts](examples/previews/onboarding/VideoNarration.ts).
+The five exports are H.264/AAC MP4s with half-size PNG posters and Vietnamese
+plain-text transcripts. Each video is exactly ten seconds. The selected locale
+uses the existing Vietnamese fallback until English recordings are supplied.
+Export requires FFmpeg (including `ffprobe`). It is manual and reuses the existing
+speech tracks without provider calls:
+
+```sh
+# Run only after approving the source previews.
+pnpm export:onboarding
+# Optionally use an already installed Chrome executable:
+pnpm export:onboarding --browser-executable "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+pnpm build:desktop
+```
+
+[VideoExports.ts](examples/previews/onboarding/VideoExports.ts) owns the approved
+composition-to-filename mapping. The command renders all five into a temporary
+folder, checks duration/codecs and decodes every frame before copying MP4s,
+posters and transcripts into the app. It runs no paid generation and is never
+part of normal startup/build. Source screens and Remotion tooling stay outside
+the desktop bundle; only exported media is packaged. Review a new export before
+releasing a desktop update. The `onboarding.export.encoded` event reports each
+composition’s raw encoded duration, frame count and frame rate before the final
+ten-second audio edit. It contains no account, credential or capture data.
+
+Audio uses OpenAI's `gpt-4o-mini-tts` speech endpoint with the built-in `marin`
+voice, not a clone of the user's voice. See the
+[official speech guide](https://developers.openai.com/api/docs/guides/text-to-speech).
+To regenerate after changing a spoken script, install FFmpeg (including `ffprobe`)
+and explicitly authorize the provider calls, then run with the intended backend
+Doppler config:
+
+```sh
+doppler run --project tro-api --config dev_personal -- pnpm prepare:onboarding-audio --generate
+pnpm check:onboarding-videos
+```
+
+Generation may incur provider charges. It sends only the five short scripts to
+OpenAI; Doppler injects the key only into the command process. The key never
+enters source files, Studio, browser assets or logs. A matching input/audio hash
+receipt reuses an existing track rather than making another paid request. The
+command makes no automatic provider retries. Without `--generate`, it refuses
+to dispatch. Safe failure events contain only provider status and request ID.
+
+The command creates MP3 narration and non-secret hash/duration receipts, never
+video exports. Audio is mono, 24 kHz, 64 kbps, normalized for clear speech. If a
+track slightly exceeds the target, at most 15% tempo adjustment may fit it; longer
+speech is preserved for review rather than truncated or silently regenerated.
+Source audio remains under ignored `.tro-development/onboarding-narration/`.
+Existing audio lets Studio work without credentials or paid calls. The local
+checker verifies narration hashes, measures duration to prevent speech being cut
+off at 10 seconds, and checks screenshot dimensions and crop/cursor bounds.
+Review pronunciation, pacing and visual fit in Studio before approving export.
+
+Screens under `public/Screens/` were captured at 1280×800 on October 11, 2026 from
+Tro's actual React renderer using
+[CaptureDesktop.ts](examples/previews/onboarding/CaptureDesktop.ts) with fictional
+classes, learning records, and accounts. They are frozen demonstration assets,
+not real student data or evidence of learning outcomes. To refresh them:
+
+```sh
+pnpm preview:onboarding-capture
+```
+
+Open `http://127.0.0.1:4311/examples/previews/onboarding/CaptureScreens.html`.
+Add `?onboarding` to review the installed clips in the real tour using ephemeral
+preview progress, without touching any real account.
+This capture page connects no backend, real account, model or native capabilities;
+its microphone inventory is synthetic and no microphone test should be recorded
+as a real hardware result. Capture the intended states at 1280×800 and review the
+matching crops after replacing an image. Brand assets are copied from Tro's owned
+asset directory; the pet provider notice remains beside the copied sprite.
+
+Studio currently warns that the application's Zod version differs from its
+recommended Zod version. These compositions use no Zod props editor; do not
+downgrade the application's shared validation dependency just to silence the warning.
+
 ## Classroom pilot
 
 Apply committed migrations through normal startup. Accounts default to Student;

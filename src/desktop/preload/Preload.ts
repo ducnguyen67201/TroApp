@@ -1,4 +1,11 @@
 import {
+  OnboardingReadSchema,
+  OnboardingUpdateSchema,
+  OnboardingRestartSchema,
+  OnboardingReplySchema,
+} from '#contracts/Onboarding.js';
+import { OnboardingFailure } from '#contracts/OnboardingValues.js';
+import {
   GuidedLessonReadRequestSchema,
   GuidedLessonCommandSchema,
   GuidedLessonReplySchema,
@@ -93,6 +100,39 @@ import {
 /* Expose named session operations, not generic IPC or direct computer tools.
    Validate IPC data before it enters the renderer. */
 const bridge: DesktopBridge = {
+  async readOnboardingProgress(request) {
+    try {
+      const raw: unknown = await ipcRenderer.invoke(
+        'tro:onboarding-read',
+        OnboardingReadSchema.parse(request),
+      );
+      return OnboardingReplySchema.parse(raw);
+    } catch {
+      return { kind: 'failed', reason: OnboardingFailure.UNAVAILABLE };
+    }
+  },
+  async updateOnboardingProgress(request) {
+    try {
+      const raw: unknown = await ipcRenderer.invoke(
+        'tro:onboarding-update',
+        OnboardingUpdateSchema.parse(request),
+      );
+      return OnboardingReplySchema.parse(raw);
+    } catch {
+      return { kind: 'failed', reason: OnboardingFailure.UNAVAILABLE };
+    }
+  },
+  async restartOnboarding(request) {
+    try {
+      const raw: unknown = await ipcRenderer.invoke(
+        'tro:onboarding-restart',
+        OnboardingRestartSchema.parse(request),
+      );
+      return OnboardingReplySchema.parse(raw);
+    } catch {
+      return { kind: 'failed', reason: OnboardingFailure.UNAVAILABLE };
+    }
+  },
   async readGuidedLessons(request) {
     try {
       const raw: unknown = await ipcRenderer.invoke(
