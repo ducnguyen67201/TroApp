@@ -1,3 +1,6 @@
+import { WhatsNewDialog } from './updates/WhatsNewDialog.js';
+import { useWhatsNew } from './updates/UseWhatsNew.js';
+import { whatsNewMessages } from './updates/WhatsNewMessages.js';
 import { AccountMenu } from './accounts/AccountMenu.js';
 import { useVoiceover } from './voiceover/UseVoiceover.js';
 import { useFocusReturn } from '@mantine/hooks';
@@ -20,6 +23,7 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import {
+  IconMessageCircleStar,
   IconSchool,
   IconChartBar,
   IconMicrophone,
@@ -45,10 +49,17 @@ import { AccountRole } from '#contracts/AccountRole.js';
 
 import { DesktopPage } from './navigation/DesktopRoute.js';
 import { useDesktopNavigation } from './navigation/UseDesktopNavigation.js';
-const DesktopDialog = { SETTINGS: 'settings', MICROPHONE: 'microphone' } as const;
+const DesktopDialog = {
+  SETTINGS: 'settings',
+  MICROPHONE: 'microphone',
+  WHATS_NEW: 'whats-new',
+} as const;
 
 export function App(): ReactElement {
   const { messages, locale } = useLocale();
+  const whatsNew = useWhatsNew();
+  const releaseMessages = whatsNewMessages[locale];
+  const hasAutoOpenedWhatsNew = useRef(false);
   const navigation = useDesktopNavigation();
   const page = navigation.route.page;
   const signedInUserId = useRef<string | null>(null);
@@ -60,7 +71,11 @@ export function App(): ReactElement {
       : accountRole === AccountRole.STUDENT
         ? messages.accountStudent
         : '…';
-  const dialogs = useModalsStack([DesktopDialog.SETTINGS, DesktopDialog.MICROPHONE]);
+  const dialogs = useModalsStack([
+    DesktopDialog.SETTINGS,
+    DesktopDialog.MICROPHONE,
+    DesktopDialog.WHATS_NEW,
+  ]);
   const { close: closeDialog } = dialogs;
   /* Modal.Stack changes trapFocus when the top dialog changes. Restore the
      captured opener after that transition instead of coupling it to the trap. */
@@ -70,6 +85,10 @@ export function App(): ReactElement {
   });
   const returnMicrophoneFocus = useFocusReturn({
     opened: dialogs.state.microphone,
+    shouldReturnFocus: false,
+  });
+  const returnWhatsNewFocus = useFocusReturn({
+    opened: dialogs.state['whats-new'],
     shouldReturnFocus: false,
   });
   const controller = useComputerUse();
@@ -111,6 +130,7 @@ export function App(): ReactElement {
     if (!user || accountTransition) {
       closeDialog(DesktopDialog.MICROPHONE);
       closeDialog(DesktopDialog.SETTINGS);
+      closeDialog(DesktopDialog.WHATS_NEW);
       return;
     }
     if (voice.status.state === VoiceState.IDLE) {
@@ -131,9 +151,44 @@ export function App(): ReactElement {
     previousPermissionKind.current = permissions.status?.kind;
   }, [permissions.status?.kind, closeDialog]);
 
+  useEffect(() => {
+    const canShowTour =
+      Boolean(activeUserId) &&
+      permissions.status?.kind === 'ready' &&
+      !controller.isSending &&
+      !controller.isResetting &&
+      !voice.isStarting &&
+      (voice.status.state === VoiceState.IDLE || voice.status.state === VoiceState.DISABLED) &&
+      microphoneTests.activeDeviceId === null &&
+      !dialogs.state.settings &&
+      !dialogs.state.microphone &&
+      !dialogs.state['whats-new'];
+    if (whatsNew.shouldAutoShow && canShowTour && !hasAutoOpenedWhatsNew.current) {
+      hasAutoOpenedWhatsNew.current = true;
+      dialogs.open(DesktopDialog.WHATS_NEW);
+    }
+  }, [
+    activeUserId,
+    permissions.status?.kind,
+    controller.isSending,
+    controller.isResetting,
+    voice.isStarting,
+    voice.status.state,
+    microphoneTests.activeDeviceId,
+    dialogs,
+    whatsNew.shouldAutoShow,
+  ]);
+
   return (
     <>
       <Modal.Stack>
+        <WhatsNewDialog
+          {...dialogs.register(DesktopDialog.WHATS_NEW)}
+          onExitTransitionEnd={returnWhatsNewFocus}
+          onPresented={whatsNew.markSeen}
+          release={whatsNew.release}
+          didFailToSave={whatsNew.didFailToSave}
+        />
         <SettingsDialog
           {...dialogs.register(DesktopDialog.SETTINGS)}
           onExitTransitionEnd={() => {
@@ -287,6 +342,27 @@ export function App(): ReactElement {
                 <span>{messages.microphone}</span>
               </UnstyledButton>
               <UnstyledButton
+                className="sidebar-link sidebar-whats-new"
+                aria-label={releaseMessages.title}
+                disabled={accountTransition}
+                data-active={dialogs.state['whats-new'] || undefined}
+                aria-haspopup="dialog"
+                aria-expanded={dialogs.state['whats-new']}
+                onClick={() => {
+                  dialogs.open(DesktopDialog.WHATS_NEW);
+                }}
+              >
+                <IconMessageCircleStar size={19} stroke={1.6} />
+                <span>{releaseMessages.title}</span>
+                {whatsNew.hasUnseenRelease && (
+                  <span
+                    className="whats-new-unseen-dot"
+                    role="img"
+                    aria-label={releaseMessages.unseen}
+                  />
+                )}
+              </UnstyledButton>
+              <UnstyledButton
                 className="sidebar-link"
                 disabled={accountTransition}
                 data-active={dialogs.state.settings || undefined}
@@ -387,6 +463,18 @@ export function App(): ReactElement {
                         )}
                         <Group gap="sm" justify="center">
                           <AppUpdateButton isBusy={accountTransition} />
+                          <Button
+                            variant="subtle"
+                            leftSection={<IconMessageCircleStar size={16} />}
+                            disabled={accountTransition}
+                            aria-haspopup="dialog"
+                            aria-expanded={dialogs.state['whats-new']}
+                            onClick={() => {
+                              dialogs.open(DesktopDialog.WHATS_NEW);
+                            }}
+                          >
+                            {releaseMessages.title}
+                          </Button>
                           <Button
                             variant="subtle"
                             leftSection={<IconSettings size={16} />}

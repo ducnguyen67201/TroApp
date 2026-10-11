@@ -1,3 +1,4 @@
+import type { WhatsNewReply } from './WhatsNew.js';
 import type {
   GuidedLessonReadRequest,
   GuidedLessonCommand,
@@ -71,6 +72,8 @@ export interface DesktopBridge {
   controlClassroom?: (command: ClassroomCommand) => Promise<ClassroomReply>;
   readPreparedClassroomSubmission?(): Promise<ClassroomReply>;
   updateTeachingLocale?: (sessionId: string, locale: DesktopLocale) => Promise<AgentResult>;
+  readWhatsNew?: () => Promise<WhatsNewReply>;
+  markWhatsNewSeen?: () => Promise<WhatsNewReply>;
   readAppUpdate(): Promise<AppUpdateSnapshot>;
   checkAppUpdate(): Promise<AppUpdateReply>;
   downloadAppUpdate(): Promise<AppUpdateReply>;
