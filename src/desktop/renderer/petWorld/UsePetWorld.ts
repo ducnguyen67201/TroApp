@@ -59,9 +59,17 @@ export function usePetWorld(
   const readVersion = useRef(0);
   const activeRefresh = useRef<{ generation: number; readVersion: number } | null>(null);
   const historyReadVersion = useRef(0);
+  const recognitionReadVersion = useRef(0);
+  const firstRecognitionCursor = useRef<string | null>(null);
   const pending = useRef(false);
   const worldRevision = useRef({ wallet: -1, profile: -1 });
   const isAvailable = Boolean(window.tro.executePetWorld);
+
+  const resetRecognition = useCallback((): void => {
+    recognitionReadVersion.current += 1;
+    firstRecognitionCursor.current = null;
+    setRecognition(null);
+  }, []);
 
   const acceptWorld = useCallback((next: PetOwnWorld): void => {
     if (
@@ -117,7 +125,7 @@ export function usePetWorld(
         setClassroom(classroomReply.home);
       } else if (classroomReply?.kind === 'failed') {
         setClassroom(null);
-        setRecognition(null);
+        resetRecognition();
         setNeighborhood(null);
       }
       if (worldReply.kind === 'world') {
@@ -133,7 +141,7 @@ export function usePetWorld(
         setFailure(catalogReply.code);
       }
       if (!classId) {
-        setRecognition(null);
+        resetRecognition();
         setNeighborhood(null);
         return;
       }
@@ -149,13 +157,25 @@ export function usePetWorld(
       }
       for (const [index, reply] of replies.entries()) {
         if (reply.kind === 'class-recognition') {
-          setRecognition(reply);
+          /* Cursors bind the whole dataset. An unchanged first cursor preserves loaded pages. */
+          const keepLoadedPages =
+            firstRecognitionCursor.current !== null &&
+            firstRecognitionCursor.current === reply.nextCursor;
+          if (!keepLoadedPages) {
+            recognitionReadVersion.current += 1;
+          }
+          firstRecognitionCursor.current = reply.nextCursor;
+          setRecognition((current) =>
+            keepLoadedPages && current
+              ? { ...reply, recognitions: current.recognitions, nextCursor: current.nextCursor }
+              : reply,
+          );
         } else if (reply.kind === 'neighborhood') {
           setNeighborhood(reply);
         } else if (reply.kind === 'failed') {
           setFailure(reply.code);
           if (commands[index]?.kind === PetWorldCommandKind.CLASS_RECOGNITION) {
-            setRecognition(null);
+            resetRecognition();
           } else {
             setNeighborhood(null);
           }
@@ -173,7 +193,7 @@ export function usePetWorld(
         setLoading(false);
       }
     }
-  }, [classId, period, acceptWorld]);
+  }, [classId, period, acceptWorld, resetRecognition]);
   const latestRefresh = useRef(refresh);
 
   useEffect(() => {
@@ -183,7 +203,7 @@ export function usePetWorld(
     setClassroom(null);
     setWorld(null);
     setCatalog(null);
-    setRecognition(null);
+    resetRecognition();
     setNeighborhood(null);
     setHistory(null);
     setPendingCommands([]);
@@ -193,11 +213,11 @@ export function usePetWorld(
     return () => {
       generation.current += 1;
     };
-  }, [userId]);
+  }, [userId, resetRecognition]);
 
   useEffect(() => {
     latestRefresh.current = refresh;
-    setRecognition(null);
+    resetRecognition();
     setNeighborhood(null);
     void refresh();
     const timer = window.setInterval(() => {
@@ -207,9 +227,10 @@ export function usePetWorld(
     }, PetWorldTiming.REFRESH_MS);
     return () => {
       readVersion.current += 1;
+      recognitionReadVersion.current += 1;
       window.clearInterval(timer);
     };
-  }, [userId, refresh]);
+  }, [userId, refresh, resetRecognition]);
 
   const sendCommand = useCallback(async (command: PetWorldCommand): Promise<boolean> => {
     if (!window.tro.executePetWorld || pending.current) {
@@ -266,6 +287,10 @@ export function usePetWorld(
   }, []);
 
   const readOlderHistory = useCallback(async (): Promise<void> => {
+    if (history && !history.nextCursor) {
+      return;
+    }
+    const cursor = history?.nextCursor;
     const currentGeneration = generation.current;
     const currentRead = ++historyReadVersion.current;
     const isCurrent = (): boolean =>
@@ -273,11 +298,23 @@ export function usePetWorld(
     try {
       const reply = await window.tro.executePetWorld?.({
         kind: PetWorldCommandKind.OWN_HISTORY,
-        ...(history?.nextCursor ? { cursor: history.nextCursor } : {}),
+        ...(cursor ? { cursor } : {}),
       });
       if (isCurrent() && reply?.kind === 'history') {
         if (reply.walletRevision >= worldRevision.current.wallet) {
-          setHistory(reply);
+          setHistory((current) => {
+            if (!cursor) {
+              return reply;
+            }
+            if (current?.nextCursor !== cursor || current.walletRevision !== reply.walletRevision) {
+              return current;
+            }
+            return {
+              ...reply,
+              entries: [...current.entries, ...reply.entries],
+              recognitions: [...current.recognitions, ...reply.recognitions],
+            };
+          });
         }
       } else if (isCurrent() && reply?.kind === 'failed') {
         setFailure(reply.code);
@@ -290,43 +327,46 @@ export function usePetWorld(
         setFailure(PetWorldFailure.UNAVAILABLE);
       }
     }
-  }, [history?.nextCursor]);
+  }, [history]);
 
   const readOlderRecognitions = useCallback(async (): Promise<void> => {
     if (!classId || !recognition?.nextCursor) {
       return;
     }
+    const cursor = recognition.nextCursor;
     const currentGeneration = generation.current;
-    const currentRead = readVersion.current;
+    const currentRead = ++recognitionReadVersion.current;
+    const isCurrent = (): boolean =>
+      currentGeneration === generation.current && currentRead === recognitionReadVersion.current;
     try {
       const reply = await window.tro.executePetWorld?.({
         kind: PetWorldCommandKind.CLASS_RECOGNITION,
         classId,
         ...period,
-        cursor: recognition.nextCursor,
+        cursor,
       });
-      if (
-        currentGeneration === generation.current &&
-        currentRead === readVersion.current &&
-        reply?.kind === 'class-recognition'
-      ) {
-        setRecognition(reply);
-      } else if (
-        currentGeneration === generation.current &&
-        currentRead === readVersion.current &&
-        reply?.kind === 'failed'
-      ) {
+      if (isCurrent() && reply?.kind === 'class-recognition') {
+        setRecognition((current) =>
+          current?.nextCursor === cursor
+            ? { ...reply, recognitions: [...current.recognitions, ...reply.recognitions] }
+            : current,
+        );
+      } else if (isCurrent() && reply?.kind === 'failed') {
         setFailure(reply.code);
         if (reply.code === PetWorldFailure.FORBIDDEN) {
-          setRecognition(null);
+          resetRecognition();
+        } else if (reply.code === PetWorldFailure.STALE) {
+          resetRecognition();
+          readVersion.current += 1;
+          await latestRefresh.current();
         }
       }
     } catch {
-      if (currentGeneration === generation.current) {
+      if (isCurrent()) {
         setFailure(PetWorldFailure.UNAVAILABLE);
       }
     }
-  }, [classId, recognition?.nextCursor, period]);
+  }, [classId, recognition?.nextCursor, period, resetRecognition]);
 
   return {
     classroom,

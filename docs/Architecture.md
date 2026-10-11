@@ -930,6 +930,12 @@ calculating balances. The Pet World page provides manual teacher awards, history
 shop, inventory, home decoration and opted-in class visits. Active views and the
 visible companion refresh at the owning interval and on focus/resume. Mutations
 require online confirmation; retries reuse the saved intent across restarts.
+Owner history and teacher recognition append older pages while retaining the
+newest rows. Unchanged background refreshes preserve loaded teacher pages and
+their continuation cursor. Server cursors bind the full recognition dataset;
+a changed first-page cursor or an expired continuation resets that snapshot.
+Account, class and period changes discard pending recognition pages. Wallet
+revision changes invalidate owner history before another page can be accepted.
 
 Owner initialization imports the full validated local cat/fox identity/name map only
 when the cloud profile is absent. Teacher grants create wallets without pet profiles.

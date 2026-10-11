@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+import type { DesktopBridge } from '#contracts/DesktopBridge.js';
 import { AccountRole } from '#contracts/AccountRole.js';
 import type { ClassroomHome } from '#contracts/Classroom.js';
 import { PetId } from '#contracts/Pet.js';
@@ -58,3 +60,20 @@ export const emptyRecognition: Extract<PetWorldReply, { kind: 'class-recognition
   coverage: emptyGarden,
   nextCursor: null,
 };
+
+export function installPetWorldBridge(
+  executePetWorld: NonNullable<DesktopBridge['executePetWorld']>,
+  role: AccountRole = AccountRole.STUDENT,
+): void {
+  const bridge = {
+    executePetWorld,
+    controlClassroom: vi.fn<NonNullable<DesktopBridge['controlClassroom']>>().mockResolvedValue({
+      kind: 'home',
+      home: { role, courses: [], classes: [] },
+    }),
+    readPetWorldPending: vi
+      .fn<NonNullable<DesktopBridge['readPetWorldPending']>>()
+      .mockResolvedValue([]),
+  } satisfies Pick<DesktopBridge, 'executePetWorld' | 'controlClassroom' | 'readPetWorldPending'>;
+  Object.defineProperty(window, 'tro', { configurable: true, value: bridge });
+}

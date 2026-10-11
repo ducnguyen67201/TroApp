@@ -12,26 +12,14 @@ import {
   type PetWorldReply,
 } from '#contracts/PetWorld.js';
 import { usePetWorld } from '../../../../src/desktop/renderer/petWorld/UsePetWorld.js';
-import { createOwnWorld, emptyRecognition, petWorldClassId } from './PetWorldFixtures.js';
+import {
+  createOwnWorld,
+  emptyRecognition,
+  installPetWorldBridge,
+  petWorldClassId,
+} from './PetWorldFixtures.js';
 
 const period = { from: '2026-10-01T00:00:00.000Z', to: '2026-10-31T23:59:59.999Z' };
-
-function installBridge(
-  executePetWorld: NonNullable<DesktopBridge['executePetWorld']>,
-  role: AccountRole = AccountRole.STUDENT,
-): void {
-  const bridge = {
-    executePetWorld,
-    controlClassroom: vi.fn<NonNullable<DesktopBridge['controlClassroom']>>().mockResolvedValue({
-      kind: 'home',
-      home: { role, courses: [], classes: [] },
-    }),
-    readPetWorldPending: vi
-      .fn<NonNullable<DesktopBridge['readPetWorldPending']>>()
-      .mockResolvedValue([]),
-  } satisfies Pick<DesktopBridge, 'executePetWorld' | 'controlClassroom' | 'readPetWorldPending'>;
-  Object.defineProperty(window, 'tro', { configurable: true, value: bridge });
-}
 
 afterEach(() => {
   cleanup();
@@ -57,7 +45,7 @@ it('lets a slow refresh finish without adding or superseding it on each polling 
       }
       return Promise.resolve({ kind: 'catalog', catalog: { revision: 'one', items: [] } });
     });
-  installBridge(execute);
+  installPetWorldBridge(execute);
   const rendered = renderHook(() => usePetWorld('student', null, period));
   await act(async () => {
     await vi.advanceTimersByTimeAsync(PetWorldTiming.REFRESH_MS * 3);
@@ -97,7 +85,7 @@ it('restarts history without a stale cursor after recognition changes without a 
       }
       return Promise.resolve({ kind: 'catalog', catalog: { revision: 'one', items: [] } });
     });
-  installBridge(execute);
+  installPetWorldBridge(execute);
   const rendered = renderHook(() => usePetWorld('student', null, period));
   await waitFor(() => {
     expect(rendered.result.current.isLoading).toBe(false);
@@ -147,7 +135,7 @@ it('drops a browsed history page when a fresh wallet revision arrives', async ()
       }
       return Promise.resolve({ kind: 'catalog', catalog: { revision: 'one', items: [] } });
     });
-  installBridge(execute);
+  installPetWorldBridge(execute);
   const rendered = renderHook(() => usePetWorld('student', null, period));
   await waitFor(() => {
     expect(rendered.result.current.isLoading).toBe(false);
@@ -194,7 +182,7 @@ it('refreshes the current class when an award finishes after the teacher switche
       }
       return Promise.resolve({ kind: 'catalog', catalog: { revision: 'one', items: [] } });
     });
-  installBridge(execute, AccountRole.TEACHER);
+  installPetWorldBridge(execute, AccountRole.TEACHER);
   const rendered = renderHook(({ classId }) => usePetWorld('teacher', classId, period), {
     initialProps: { classId: petWorldClassId },
   });
