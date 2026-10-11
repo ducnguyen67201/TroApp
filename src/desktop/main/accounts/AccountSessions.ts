@@ -38,12 +38,34 @@ const SessionResponseSchema = z.looseObject({
   user: AuthUserSchema.extend({ role: AccountRoleSchema.optional() }).loose(),
 });
 
+const SessionVerificationStage = {
+  HTTP: 'http',
+  RESPONSE: 'response',
+  REQUEST: 'request',
+} as const;
+
+const SessionVerificationReason = {
+  HTTP_ERROR: 'http-error',
+  INVALID_RESPONSE: 'invalid-response',
+  REQUEST_FAILED: 'request-failed',
+} as const;
+
+/** Bounded failure metadata excludes session credentials, user details and response content. */
+export interface AccountSessionVerificationFailure {
+  stage: (typeof SessionVerificationStage)[keyof typeof SessionVerificationStage];
+  reason: (typeof SessionVerificationReason)[keyof typeof SessionVerificationReason];
+  httpStatus?: number;
+  elapsedMs: number;
+  hasSavedAccount: boolean;
+}
+
 /** Owns saved sessions. The SDK's OAuth slot is staging, never the active account after migration. */
 export class AccountSessions {
   private state: AccountVaultState | null = null;
   private loaded = false;
   private generation = 0;
   private pending: { baselineCookie: string | null; deadlineMs: number } | null = null;
+  private previousVerificationFailure: string | null = null;
 
   constructor(
     private readonly vault: AccountVault,
@@ -51,6 +73,11 @@ export class AccountSessions {
     private readonly request: typeof fetch,
     private readonly apiBaseUrl: string,
     private readonly now: () => number = Date.now,
+    private readonly writeVerificationFailure: (
+      event: AccountSessionVerificationFailure,
+    ) => void = (event) => {
+      console.warn('auth.session.verification.failed', event);
+    },
   ) {}
 
   private load(): void {
@@ -126,6 +153,7 @@ export class AccountSessions {
       return { kind: 'pending' };
     }
     if (!cookie) {
+      this.previousVerificationFailure = null;
       return { kind: 'signed-out' };
     }
     const generation = this.generation;
@@ -278,33 +306,83 @@ export class AccountSessions {
   }
 
   private async verifyCookie(cookie: string) {
+    const startedAt = performance.now();
+    const hasSavedAccount =
+      this.state?.accounts.some((account) => account.cookie === cookie) ?? false;
+    let httpStatus: number | undefined;
     try {
       const response = await this.request(`${this.apiBaseUrl}/api/auth/get-session`, {
         headers: { cookie },
         signal: AbortSignal.timeout(10_000),
       });
+      httpStatus = response.status;
       if (response.status === 401) {
+        this.previousVerificationFailure = null;
         return { kind: 'signed-out' } as const;
       }
       if (!response.ok) {
+        this.reportVerificationFailure({
+          stage: SessionVerificationStage.HTTP,
+          reason: SessionVerificationReason.HTTP_ERROR,
+          httpStatus,
+          elapsedMs: Math.round(performance.now() - startedAt),
+          hasSavedAccount,
+        });
         return { kind: 'failed', message: 'Could not check your sign-in.' } as const;
       }
       const text = await response.text();
       if (!text) {
+        this.previousVerificationFailure = null;
         return { kind: 'signed-out' } as const;
       }
       const body: unknown = JSON.parse(text);
       if (body === null) {
+        this.previousVerificationFailure = null;
         return { kind: 'signed-out' } as const;
       }
       const parsed = SessionResponseSchema.safeParse(body);
       if (!parsed.success) {
+        this.reportVerificationFailure({
+          stage: SessionVerificationStage.RESPONSE,
+          reason: SessionVerificationReason.INVALID_RESPONSE,
+          httpStatus,
+          elapsedMs: Math.round(performance.now() - startedAt),
+          hasSavedAccount,
+        });
         return { kind: 'failed', message: 'Could not read your sign-in.' } as const;
       }
+      this.previousVerificationFailure = null;
       const { id, name, email, role } = parsed.data.user;
       return { kind: 'verified', user: { id, name, email }, role: role ?? null } as const;
     } catch {
+      this.reportVerificationFailure({
+        stage:
+          httpStatus === undefined
+            ? SessionVerificationStage.REQUEST
+            : SessionVerificationStage.RESPONSE,
+        reason:
+          httpStatus === undefined
+            ? SessionVerificationReason.REQUEST_FAILED
+            : SessionVerificationReason.INVALID_RESPONSE,
+        ...(httpStatus === undefined ? {} : { httpStatus }),
+        elapsedMs: Math.round(performance.now() - startedAt),
+        hasSavedAccount,
+      });
       return { kind: 'failed', message: 'Could not reach the sign-in service.' } as const;
+    }
+  }
+
+  /** Consecutive identical poll failures emit once; a verified or signed-out check resets the event. */
+  private reportVerificationFailure(event: AccountSessionVerificationFailure): void {
+    const fingerprint = `${event.stage}:${event.reason}:${String(event.httpStatus ?? '')}:${String(event.hasSavedAccount)}`;
+    if (fingerprint === this.previousVerificationFailure) {
+      return;
+    }
+    this.previousVerificationFailure = fingerprint;
+    try {
+      this.writeVerificationFailure(event);
+    } catch {
+      /* Diagnostics must not change account verification or saved-session behavior. */
     }
   }
 }

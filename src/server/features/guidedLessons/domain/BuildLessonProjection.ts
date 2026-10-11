@@ -60,6 +60,21 @@ function requireValue<Value>(value: Value | null | undefined, message: string): 
   return value;
 }
 
+/** Expose only phases used by the approved plan, without exposing later questions or answers. */
+function readLessonPhases(plan: LessonPlan): LessonPhase[] {
+  const phases = new Set<LessonPhase>([LessonPhase.REFLECT]);
+  for (const scene of plan.scenes) {
+    const checkpoint = plan.checkpoints.find((candidate) => candidate.sceneId === scene.sceneId);
+    if (checkpoint) {
+      phases.add(checkpoint.phase);
+      phases.add(LessonPhase.WORKED);
+    } else {
+      phases.add(LessonPhase.WATCH);
+    }
+  }
+  return Object.values(LessonPhase).filter((phase) => phases.has(phase));
+}
+
 function selectPhase(
   scene: Scene,
   checkpoint: Checkpoint | undefined,
@@ -123,6 +138,17 @@ function readPresentation(
           y,
         })),
       },
+    };
+  }
+  if (scene.kind === LessonTemplateKind.SOURCE_EXPLANATION) {
+    return {
+      ...base,
+      kind: LessonTemplateKind.SOURCE_EXPLANATION,
+      points: scene.params.points.map((point) => ({
+        pointId: point.pointId,
+        text: point.text,
+        sourceRefs: point.sourceRefs.map((reference) => ({ ...reference })),
+      })),
     };
   }
   if (scene.params.traceId !== null) {
@@ -275,7 +301,10 @@ function readVisibleStates(
   adjustment: SceneAdjustment,
 ): { states: VisibleTraceState[]; visualCues: VisualCue[] } {
   const phaseEnd = Math.max(30, ...cues.map((cue) => cue.endFrame));
-  if (scene.kind === LessonTemplateKind.ANNOTATED_SOURCE) {
+  if (
+    scene.kind === LessonTemplateKind.ANNOTATED_SOURCE ||
+    scene.kind === LessonTemplateKind.SOURCE_EXPLANATION
+  ) {
     return { states: [], visualCues: [] };
   }
   const traceId = scene.params.traceId;
@@ -482,7 +511,10 @@ export function buildLessonProjection(input: BuildLessonProjectionInput): Learne
     sceneAdjustment,
   );
   const figureId =
-    presentation.kind === LessonTemplateKind.CODE_TRACE ? null : presentation.figure?.assetId;
+    presentation.kind === LessonTemplateKind.ANNOTATED_SOURCE ||
+    presentation.kind === LessonTemplateKind.CHECKPOINT
+      ? presentation.figure?.assetId
+      : null;
   const video = manifest.evidence.filter(
     (item) => item.kind === 'clip' && item.sceneId === scene.sceneId && item.phase === phase,
   );
@@ -526,6 +558,8 @@ export function buildLessonProjection(input: BuildLessonProjectionInput): Learne
     ),
     sceneId: scene.sceneId,
     sceneTitle: scene.title,
+    language: record.input.language,
+    lessonPhases: readLessonPhases(plan),
     presentation,
     compositionBundleHash: manifest.compositionBundleHash,
     fontBundleHash: manifest.fontBundleHash,

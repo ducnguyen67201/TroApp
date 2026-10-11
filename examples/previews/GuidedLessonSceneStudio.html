@@ -1,0 +1,3122 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Tro · Phòng dựng bài giảng</title>
+    <style>
+      :root {
+        --paper: #f5f2e9;
+        --surface: #fffcf4;
+        --ink: #243b30;
+        --muted: #798174;
+        --line: #dcded0;
+        --forest: #254c3d;
+        --forest-dark: #1b352c;
+        --apricot: #edac72;
+        --orange-pale: #fae6ce;
+        --sage: #dce6d4;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: var(--paper);
+        color: var(--ink);
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+      button {
+        color: inherit;
+        cursor: pointer;
+      }
+      button,
+      a {
+        -webkit-tap-highlight-color: transparent;
+      }
+      button {
+        border: 0;
+        background: none;
+      }
+      a {
+        color: inherit;
+        text-underline-offset: 4px;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      svg {
+        display: block;
+        flex-shrink: 0;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible,
+      textarea:focus-visible,
+      summary:focus-visible {
+        outline: 3px solid #af6d31;
+        outline-offset: 4px;
+      }
+      button:disabled {
+        opacity: 0.42;
+        cursor: not-allowed;
+      }
+      #canvas:focus-visible {
+        outline: 3px solid #af6d31;
+        outline-offset: 4px;
+      }
+      .studio-header {
+        height: 69px;
+        padding: 0 26px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 18px;
+        align-items: center;
+        background: #faf7ee;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font:
+          27px Georgia,
+          serif;
+        letter-spacing: -0.8px;
+        flex-shrink: 0;
+      }
+      .brand-mark {
+        display: grid;
+        place-items: center;
+        width: 31px;
+        height: 31px;
+        border-radius: 10px;
+        background: var(--forest);
+        color: #f5d0a0;
+      }
+      .header-divider {
+        width: 1px;
+        height: 23px;
+        background: var(--line);
+      }
+      .lesson-heading {
+        min-width: 0;
+      }
+      .lesson-heading h1 {
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: -0.2px;
+      }
+      .lesson-heading p {
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 5px;
+      }
+      .header-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+      .return-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 11px;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .return-link svg {
+        width: 14px;
+        height: 14px;
+      }
+      .demo-button {
+        padding: 6px 9px;
+        border: 1px solid #d7c9ad;
+        border-radius: 6px;
+        background: #f6eddd;
+        color: #826a42;
+        font-size: 10px;
+        white-space: nowrap;
+      }
+      .demo-button span {
+        font-size: 11px;
+        padding-left: 6px;
+      }
+      .studio-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 328px;
+        min-height: calc(100vh - 69px);
+      }
+      .editing-area {
+        min-width: 0;
+        padding: 0 30px 23px;
+      }
+      .canvas-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 20px 1px 16px;
+      }
+      .scene-title {
+        display: flex;
+        gap: 11px;
+        align-items: center;
+      }
+      .scene-index {
+        color: #a47848;
+        font-size: 11px;
+        border: 1px solid #ddc8aa;
+        width: 29px;
+        height: 29px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+      }
+      .scene-title h2 {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .scene-title p {
+        font-size: 10px;
+        margin-top: 4px;
+        color: var(--muted);
+      }
+      .frame-badge {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 10px;
+        color: #75816f;
+        white-space: nowrap;
+      }
+      .frame-badge::before {
+        content: '';
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #8a9a7b;
+      }
+      .canvas {
+        min-height: 470px;
+        aspect-ratio: 16 / 9.5;
+        max-height: 660px;
+        border: 1px solid #d4d8c7;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #fdfaf0;
+        position: relative;
+        box-shadow: 0 8px 30px #233b3006;
+      }
+      .teaching-frame {
+        min-height: inherit;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        padding: 32px 42px 25px;
+        position: relative;
+      }
+      .frame-topline {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        font-size: 9px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #7d8c71;
+      }
+      .frame-topline .tiny-pill {
+        letter-spacing: 0;
+        text-transform: none;
+        padding: 5px 8px;
+        background: #e9ecdf;
+        border-radius: 20px;
+        font-size: 9px;
+      }
+      .frame-heading {
+        font:
+          34px/1.15 Georgia,
+          'Times New Roman',
+          serif;
+        letter-spacing: -0.8px;
+        margin-top: 22px;
+      }
+      .frame-heading em {
+        font-style: normal;
+        color: #b1773b;
+      }
+      .frame-caption {
+        margin-top: auto;
+        padding-top: 19px;
+        border-top: 1px solid #dce0cd;
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        font-size: 11px;
+        line-height: 1.6;
+        color: #6e7d64;
+      }
+      .frame-caption code {
+        font: 11px var(--mono);
+        color: var(--forest);
+        white-space: nowrap;
+      }
+      .opening-body {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        align-items: center;
+        padding: 18px 0 30px;
+      }
+      .zero-figure {
+        display: flex;
+        align-items: center;
+        gap: 25px;
+        padding-left: 20px;
+      }
+      .zero {
+        font:
+          176px/0.95 Georgia,
+          serif;
+        letter-spacing: -13px;
+        color: var(--forest);
+      }
+      .zero-annotation {
+        align-self: center;
+        border-left: 1px solid #cbd4bd;
+        padding-left: 18px;
+        font-size: 11px;
+        line-height: 1.8;
+        color: #7b876e;
+      }
+      .variable-label {
+        font: 13px var(--mono);
+        padding: 6px 10px;
+        border: 1px solid #ced8c1;
+        border-radius: 6px;
+        color: var(--forest);
+        display: inline-block;
+        margin-bottom: 7px;
+      }
+      .waiting-numbers {
+        border-left: 1px solid #d9decb;
+        padding: 16px 0 13px 37px;
+        position: relative;
+      }
+      .waiting-numbers::before {
+        content: '';
+        position: absolute;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #c8d0bc;
+        left: -3px;
+        top: 46%;
+      }
+      .waiting-label {
+        font: 12px var(--mono);
+        color: #647658;
+      }
+      .waiting-row {
+        display: flex;
+        gap: 10px;
+        margin-top: 16px;
+      }
+      .waiting-number {
+        width: 58px;
+        height: 64px;
+        border: 1px solid #d1d9c4;
+        border-radius: 9px;
+        display: grid;
+        place-items: center;
+        font:
+          33px Georgia,
+          serif;
+        background: #f0f3e6;
+        position: relative;
+      }
+      .waiting-number.active {
+        background: #f5d4aa;
+        border-color: #dcae76;
+      }
+      .waiting-subtitle {
+        font-size: 10px;
+        color: #8a947d;
+        margin-top: 13px;
+      }
+      .accumulator-frame {
+        background: #f1f3e7;
+      }
+      .accumulator-body {
+        flex: 1;
+        display: grid;
+        align-content: center;
+        padding: 35px 0 29px;
+      }
+      .accumulator-chain {
+        display: grid;
+        grid-template-columns: 1fr 25px 1fr 25px 1fr;
+        align-items: center;
+        gap: 9px;
+      }
+      .addition {
+        border: 1px solid #d1dac4;
+        border-radius: 11px;
+        padding: 16px 15px 17px;
+        background: #fbfcf3;
+        position: relative;
+      }
+      .addition.active {
+        border-color: #d6a367;
+        background: #f9e7cd;
+      }
+      .addition-index {
+        font-size: 9px;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: #8b987e;
+        display: block;
+        margin-bottom: 15px;
+      }
+      .addition.active .addition-index {
+        color: #9a7445;
+      }
+      .equation {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        font:
+          39px/1 Georgia,
+          serif;
+        letter-spacing: -0.6px;
+      }
+      .equation .operator {
+        font:
+          19px Georgia,
+          serif;
+        color: #9ca98c;
+      }
+      .equation .input-number {
+        color: #bd803f;
+      }
+      .equation-result {
+        border-top: 1px solid #d9dfcd;
+        margin-top: 13px;
+        padding-top: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+      }
+      .addition.active .equation-result {
+        border-color: #e5c8a4;
+      }
+      .equation-result span {
+        font: 10px var(--mono);
+        color: #728165;
+      }
+      .equation-result strong {
+        font:
+          40px/0.9 Georgia,
+          serif;
+      }
+      .chain-arrow {
+        color: #a2ae95;
+      }
+      .chain-arrow svg {
+        width: 25px;
+        height: 25px;
+      }
+      .sum-rail {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        margin-top: 23px;
+      }
+      .sum-rail .rail-line {
+        flex: 1;
+        height: 1px;
+        background: #cdd7bf;
+      }
+      .sum-rail p {
+        font-size: 10px;
+        color: #7b8b6e;
+      }
+      .sum-rail code {
+        color: #4d6845;
+        font: 11px var(--mono);
+      }
+      .python-frame {
+        background: #edf0e4;
+      }
+      .python-frame .frame-heading {
+        font-size: 30px;
+      }
+      .python-body {
+        flex: 1;
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(150px, 0.7fr);
+        gap: 28px;
+        align-items: center;
+        padding: 23px 0 28px;
+      }
+      .teaching-code {
+        background: #fcfcf3;
+        border: 1px solid #d0d9c2;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .teaching-code-head {
+        font-size: 9px;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+        padding: 11px 14px;
+        border-bottom: 1px solid #dce2d0;
+        color: #849277;
+      }
+      .code-lines {
+        padding: 16px 0;
+      }
+      .code-line {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        padding: 5px 14px;
+        font: 12px/1.6 var(--mono);
+        white-space: pre;
+        color: #365139;
+      }
+      .code-line .line-number {
+        color: #a8b39a;
+        font-size: 9px;
+        min-width: 9px;
+      }
+      .code-line.current-line {
+        background: #fae4c6;
+        border-left: 3px solid #dca064;
+        padding-left: 11px;
+      }
+      .code-line .keyword {
+        color: #986437;
+      }
+      .code-line .code-number {
+        color: #af783f;
+      }
+      .code-line .code-name {
+        color: #476b41;
+      }
+      .state-note {
+        font-size: 9px;
+        color: #7b8c6b;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 12px;
+      }
+      .state-input {
+        padding: 12px 14px;
+        border: 1px solid #d9c2a1;
+        border-radius: 8px;
+        background: #f8e5ca;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .state-input span {
+        font: 11px var(--mono);
+        color: #916d41;
+      }
+      .state-input strong {
+        font:
+          27px Georgia,
+          serif;
+      }
+      .state-flow {
+        padding: 15px 2px 0;
+      }
+      .state-flow-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .state-flow-row span {
+        font-size: 10px;
+        color: #819170;
+      }
+      .state-flow-row strong {
+        font:
+          30px Georgia,
+          serif;
+      }
+      .state-flow-arrow {
+        padding: 5px 0;
+        color: #a2ae96;
+        text-align: right;
+        font-size: 23px;
+      }
+      .state-flow-row.after {
+        padding-top: 7px;
+        border-top: 1px solid #cdd8bd;
+      }
+      .state-flow-row.after strong {
+        font-size: 43px;
+        color: #456c3d;
+      }
+      .practice-frame {
+        background: var(--forest-dark);
+        color: #f4eddb;
+      }
+      .practice-frame .frame-topline {
+        color: #a6ba9f;
+      }
+      .practice-frame .frame-topline .tiny-pill {
+        background: #345244;
+        color: #d1dec3;
+      }
+      .practice-frame .frame-heading {
+        font-size: 35px;
+      }
+      .practice-frame .frame-heading em {
+        color: #e7b579;
+      }
+      .practice-body {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 1fr 0.8fr;
+        gap: 40px;
+        align-items: center;
+        padding: 27px 0 28px;
+      }
+      .practice-label {
+        color: #a4bb98;
+        font: 11px var(--mono);
+        margin-bottom: 16px;
+      }
+      .practice-inputs {
+        display: flex;
+        gap: 12px;
+      }
+      .practice-inputs span {
+        width: 69px;
+        height: 77px;
+        background: #304e3e;
+        border: 1px solid #58734f;
+        border-radius: 9px;
+        display: grid;
+        place-items: center;
+        font:
+          40px Georgia,
+          serif;
+        color: #f6d4a6;
+      }
+      .practice-prompt {
+        font-size: 11px;
+        line-height: 1.8;
+        color: #abbfa0;
+        margin-top: 17px;
+        max-width: 250px;
+      }
+      .practice-answer {
+        border-left: 1px solid #45603f;
+        padding-left: 43px;
+      }
+      .practice-answer .answer-label {
+        font: 11px var(--mono);
+        color: #b4c5a5;
+      }
+      .question-mark {
+        font:
+          123px/0.95 Georgia,
+          serif;
+        color: #ecc38b;
+        letter-spacing: -8px;
+        display: block;
+        margin-top: 9px;
+      }
+      .practice-frame .frame-caption {
+        border-color: #3a5540;
+        color: #a7b99a;
+      }
+      .practice-frame .frame-caption code {
+        color: #d1dfc0;
+      }
+      .answer-reveal {
+        font-size: 10px;
+        padding: 7px 9px;
+        border: 1px solid #627950;
+        border-radius: 5px;
+        color: #d0dfbf;
+        margin-top: 11px;
+      }
+      .playback-bar {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin: 15px 2px 19px;
+      }
+      .play-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        padding: 8px 11px;
+        border: 1px solid #cdd4bf;
+        border-radius: 7px;
+        background: #fffdf5;
+      }
+      .play-button svg {
+        width: 13px;
+        height: 13px;
+      }
+      .illustration-note {
+        font-size: 10px;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+      .playback-dots {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        margin-left: auto;
+      }
+      .playback-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #d1d7c7;
+      }
+      .playback-dot.active {
+        background: #bc8750;
+      }
+      .scene-strip-head {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin: 0 2px 11px;
+      }
+      .scene-strip-head h3 {
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .scene-strip-head p {
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .scene-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 11px;
+      }
+      .scene-button {
+        min-width: 0;
+        border: 1px solid #d8dccb;
+        background: #faf8ee;
+        border-radius: 9px;
+        padding: 6px;
+        text-align: left;
+      }
+      .scene-button[aria-current='true'] {
+        border-color: #cb9152;
+        background: #f5e4cc;
+        box-shadow: 0 0 0 1px #cb9152;
+      }
+      .scene-thumb {
+        height: 85px;
+        border: 1px solid #d6ddc7;
+        border-radius: 5px;
+        overflow: hidden;
+        background: #edf0e3;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .scene-thumb .thumb-corner {
+        position: absolute;
+        left: 7px;
+        top: 6px;
+        font-size: 6px;
+        letter-spacing: 0.06em;
+        color: #819172;
+      }
+      .thumb-zero {
+        font:
+          66px/0.9 Georgia,
+          serif;
+        color: #34583d;
+        margin: 10px 0 0 -24px;
+      }
+      .thumb-opening-numbers {
+        display: flex;
+        gap: 3px;
+        margin: 20px 0 0 18px;
+      }
+      .thumb-opening-numbers span {
+        font:
+          12px Georgia,
+          serif;
+        padding: 4px 5px;
+        border: 1px solid #bdceb2;
+        border-radius: 3px;
+      }
+      .thumb-chain {
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        margin-top: 12px;
+      }
+      .thumb-chain span {
+        font:
+          20px Georgia,
+          serif;
+        padding: 5px 7px;
+        border: 1px solid #c0ceb1;
+        border-radius: 4px;
+        background: #fafbef;
+      }
+      .thumb-chain span:last-child {
+        background: #f6d5a9;
+        border-color: #d5ad75;
+      }
+      .thumb-chain i {
+        font-size: 9px;
+        font-style: normal;
+        color: #a1b18e;
+      }
+      .thumb-code {
+        display: grid;
+        gap: 4px;
+        background: #fafbef;
+        padding: 10px 11px;
+        border: 1px solid #d1dbc3;
+        border-radius: 4px;
+        width: 70%;
+      }
+      .thumb-code span {
+        height: 3px;
+        border-radius: 2px;
+        background: #bdcaae;
+      }
+      .thumb-code span:nth-child(1) {
+        width: 73%;
+      }
+      .thumb-code span:nth-child(2) {
+        width: 45%;
+      }
+      .thumb-code span:nth-child(3) {
+        width: 88%;
+      }
+      .thumb-code span:nth-child(4) {
+        width: 75%;
+        margin-left: 10%;
+        background: #d4a568;
+      }
+      .thumb-python-value {
+        font:
+          29px Georgia,
+          serif;
+        margin-left: 10px;
+        color: #45653d;
+      }
+      .thumb-practice {
+        background: #244333;
+        border-color: #3e5d3f;
+        gap: 13px;
+        color: #f1c894;
+      }
+      .thumb-practice .thumb-corner {
+        color: #8ca981;
+      }
+      .thumb-practice span {
+        font:
+          19px Georgia,
+          serif;
+      }
+      .thumb-practice strong {
+        font:
+          46px Georgia,
+          serif;
+        margin-left: 7px;
+      }
+      .scene-label-row {
+        padding: 9px 3px 3px;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .scene-label-row .scene-number {
+        color: #a28c6b;
+        font-size: 9px;
+      }
+      .scene-label-row strong {
+        font-size: 10px;
+        font-weight: 500;
+      }
+      .review-mini {
+        margin-left: auto;
+        width: 13px;
+        height: 13px;
+        display: grid;
+        place-items: center;
+        border: 1px solid #c6ceba;
+        border-radius: 50%;
+        font-size: 8px;
+        color: transparent;
+        flex-shrink: 0;
+      }
+      .review-mini.reviewed {
+        background: #4b6b42;
+        border-color: #4b6b42;
+        color: #f8fbef;
+      }
+      .inspector {
+        border-left: 1px solid var(--line);
+        background: #faf8f0;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .inspector-head {
+        padding: 22px 22px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+      }
+      .inspector-head h2 {
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .review-badge {
+        font-size: 9px;
+        color: #8d826a;
+        padding: 5px 7px;
+        border-radius: 5px;
+        background: #eeeadd;
+      }
+      .review-badge.reviewed {
+        background: #e1e9d8;
+        color: #557344;
+      }
+      .panel-tabs {
+        display: flex;
+        padding: 0 16px;
+        gap: 3px;
+        border-bottom: 1px solid var(--line);
+      }
+      .panel-tab {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 12px 10px;
+        border-bottom: 2px solid transparent;
+        font-size: 11px;
+        color: #87917d;
+      }
+      .panel-tab svg {
+        width: 13px;
+        height: 13px;
+      }
+      .panel-tab[aria-pressed='true'] {
+        color: #6e542e;
+        border-color: #cc965b;
+      }
+      .panel-content {
+        padding: 22px;
+        flex: 1;
+        min-height: 380px;
+      }
+      .panel-eyebrow {
+        font-size: 9px;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        color: #9b967e;
+        margin-bottom: 9px;
+      }
+      .panel-content h3 {
+        font-size: 14px;
+        font-weight: 500;
+        line-height: 1.5;
+      }
+      .panel-description {
+        font-size: 11px;
+        color: #8a927d;
+        line-height: 1.8;
+        margin-top: 8px;
+      }
+      .narration-label {
+        display: block;
+        font-size: 10px;
+        color: #859078;
+        margin: 23px 0 9px;
+      }
+      .narration-editor {
+        display: block;
+        width: 100%;
+        min-height: 235px;
+        resize: vertical;
+        border: 1px solid #d9ddcc;
+        border-radius: 8px;
+        background: #fffdf5;
+        padding: 14px;
+        color: #3f573a;
+        font-size: 13px;
+        line-height: 1.9;
+      }
+      .editor-foot {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 9px;
+        line-height: 1.7;
+        color: #949b87;
+        margin-top: 10px;
+      }
+      .narration-aside {
+        margin-top: 25px;
+        padding-left: 12px;
+        border-left: 2px solid #e0c29a;
+        font-size: 11px;
+        line-height: 1.9;
+        color: #7d886f;
+      }
+      .inspector-code {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font: 11px/1.9 var(--mono);
+        background: #edf1e4;
+        border: 1px solid #d6dfc8;
+        border-radius: 8px;
+        padding: 15px 13px;
+        margin: 20px 0 0;
+        color: #42603b;
+      }
+      .code-legend {
+        display: grid;
+        gap: 11px;
+        margin-top: 21px;
+      }
+      .code-legend-row {
+        display: flex;
+        align-items: start;
+        gap: 10px;
+        font-size: 11px;
+        line-height: 1.8;
+        color: #7c8a6d;
+      }
+      .code-legend-row code {
+        font: 10px/1.8 var(--mono);
+        padding: 1px 5px;
+        background: #e8eedf;
+        border-radius: 3px;
+        flex-shrink: 0;
+        color: #5a774d;
+      }
+      .source-item {
+        border: 1px solid #d8ddcb;
+        border-radius: 8px;
+        margin-top: 13px;
+        background: #fffdf5;
+      }
+      .source-item.correction {
+        border-color: #dfc5a0;
+        background: #fbf0e0;
+      }
+      .source-item summary {
+        padding: 13px;
+        cursor: pointer;
+        font-size: 11px;
+        line-height: 1.7;
+        font-weight: 500;
+      }
+      .source-kind {
+        font-size: 8px;
+        color: #9d7f57;
+        display: block;
+        font-weight: 400;
+      }
+      .source-text {
+        border-top: 1px solid #e3e6d8;
+        padding: 12px 13px;
+        font-size: 11px;
+        line-height: 1.9;
+        color: #657958;
+        white-space: pre-wrap;
+      }
+      .source-item.correction .source-text {
+        border-color: #ead6b9;
+      }
+      .source-caption {
+        font-size: 9px;
+        color: #969d89;
+        line-height: 1.9;
+        margin-top: 15px;
+      }
+      .scene-review {
+        margin: 0 22px 22px;
+        padding: 16px 0 0;
+        border-top: 1px solid var(--line);
+      }
+      .review-check {
+        display: flex;
+        align-items: start;
+        gap: 9px;
+      }
+      input[type='checkbox'] {
+        width: 15px;
+        height: 15px;
+        accent-color: var(--forest);
+        margin: 2px 0 0;
+        flex-shrink: 0;
+        cursor: pointer;
+      }
+      .review-check label {
+        font-size: 11px;
+        line-height: 1.8;
+        cursor: pointer;
+      }
+      .review-check label small {
+        display: block;
+        color: #939b85;
+        font-size: 9px;
+        margin-top: 3px;
+      }
+      .script-footer {
+        padding: 18px 22px;
+        border-top: 1px solid var(--line);
+        background: #f0f0e6;
+      }
+      .script-count {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 10px;
+        color: #859174;
+        margin-bottom: 13px;
+      }
+      .script-count strong {
+        font-weight: 500;
+        color: #536d46;
+      }
+      .primary {
+        background: var(--forest);
+        border: 1px solid var(--forest);
+        border-radius: 7px;
+        color: #fbf7e9;
+        padding: 12px 15px;
+        font-size: 11px;
+        display: inline-flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: center;
+      }
+      .script-footer .primary {
+        width: 100%;
+      }
+      .primary svg {
+        width: 13px;
+        height: 13px;
+      }
+      .script-next {
+        font-size: 9px;
+        line-height: 1.8;
+        color: #9a9f8b;
+        margin-top: 10px;
+        text-align: center;
+      }
+      .secondary {
+        border: 1px solid #cfd7bf;
+        border-radius: 7px;
+        padding: 11px 14px;
+        font-size: 11px;
+      }
+      dialog {
+        border: 1px solid #d1d8c0;
+        background: #fdfaf0;
+        color: var(--ink);
+        padding: 28px;
+        border-radius: 16px;
+        width: min(520px, calc(100% - 34px));
+        box-shadow: 0 25px 100px #1b352c40;
+        max-height: calc(100vh - 40px);
+        overflow: auto;
+      }
+      dialog::backdrop {
+        background: #243b3066;
+        backdrop-filter: blur(3px);
+      }
+      .dialog-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 17px;
+        align-items: start;
+      }
+      .dialog-head h2 {
+        font:
+          29px/1.2 Georgia,
+          serif;
+        letter-spacing: -0.5px;
+      }
+      .close-button {
+        flex-shrink: 0;
+        width: 27px;
+        height: 27px;
+        border: 1px solid #d4dbc7;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+      }
+      .dialog-copy {
+        font-size: 12px;
+        line-height: 1.9;
+        color: #77866a;
+        margin-top: 17px;
+      }
+      .next-stage {
+        background: #edf0e4;
+        border: 1px solid #d6dec9;
+        border-radius: 9px;
+        padding: 17px;
+        margin-top: 20px;
+      }
+      .next-stage strong {
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .next-stage p {
+        font-size: 11px;
+        color: #819172;
+        line-height: 1.9;
+        margin-top: 7px;
+      }
+      .dialog-actions {
+        display: flex;
+        justify-content: end;
+        gap: 10px;
+        margin-top: 24px;
+        flex-wrap: wrap;
+      }
+      .dialog-list {
+        font-size: 12px;
+        line-height: 1.9;
+        color: #77866a;
+        padding-left: 17px;
+        margin-top: 17px;
+      }
+      .dialog-list li + li {
+        margin-top: 8px;
+      }
+      .screen-reader {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+      }
+      @media (min-width: 1510px) {
+        .studio-layout {
+          grid-template-columns: minmax(0, 1fr) 355px;
+        }
+        .editing-area {
+          padding-right: 44px;
+          padding-left: 44px;
+        }
+        .teaching-frame {
+          padding: 37px 54px 31px;
+        }
+        .canvas {
+          aspect-ratio: 16 / 9;
+        }
+        .frame-heading {
+          font-size: 40px;
+        }
+        .opening-body {
+          gap: 45px;
+        }
+        .zero {
+          font-size: 210px;
+        }
+        .waiting-number {
+          width: 70px;
+          height: 77px;
+          font-size: 40px;
+        }
+        .code-line {
+          font-size: 14px;
+        }
+        .scene-thumb {
+          height: 98px;
+        }
+        .equation {
+          font-size: 46px;
+        }
+      }
+      @media (max-width: 1180px) {
+        .studio-layout {
+          grid-template-columns: minmax(0, 1fr) 300px;
+        }
+        .editing-area {
+          padding-right: 22px;
+          padding-left: 22px;
+        }
+        .teaching-frame {
+          padding: 28px;
+        }
+        .canvas {
+          min-height: 445px;
+        }
+        .frame-heading {
+          font-size: 30px;
+        }
+        .opening-body {
+          gap: 19px;
+        }
+        .zero-figure {
+          padding-left: 0;
+          gap: 18px;
+        }
+        .zero {
+          font-size: 151px;
+        }
+        .zero-annotation {
+          padding-left: 12px;
+          font-size: 10px;
+        }
+        .waiting-numbers {
+          padding-left: 24px;
+        }
+        .waiting-row {
+          gap: 7px;
+        }
+        .waiting-number {
+          width: 47px;
+          height: 56px;
+          font-size: 29px;
+        }
+        .accumulator-chain {
+          grid-template-columns: 1fr 14px 1fr 14px 1fr;
+          gap: 5px;
+        }
+        .addition {
+          padding: 14px 10px;
+        }
+        .equation {
+          font-size: 31px;
+          gap: 5px;
+        }
+        .equation .operator {
+          font-size: 15px;
+        }
+        .chain-arrow svg {
+          width: 14px;
+          height: 19px;
+        }
+        .python-body {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 18px;
+        }
+        .python-frame .frame-heading {
+          font-size: 28px;
+        }
+        .python-body .state-diagram {
+          display: flex;
+          gap: 14px;
+          align-items: center;
+        }
+        .state-diagram .state-note {
+          margin-bottom: 0;
+          max-width: 70px;
+        }
+        .state-diagram .state-input {
+          padding: 8px 10px;
+          gap: 12px;
+        }
+        .state-diagram .state-flow {
+          display: flex;
+          gap: 13px;
+          align-items: center;
+          padding: 0;
+        }
+        .state-flow-row {
+          gap: 7px;
+        }
+        .state-flow-row span {
+          font-size: 9px;
+        }
+        .state-flow-arrow {
+          transform: rotate(-90deg);
+          padding: 0;
+        }
+        .state-flow-row.after {
+          border: 0;
+          padding: 0;
+        }
+        .state-flow-row.after strong {
+          font-size: 32px;
+        }
+        .teaching-code-head {
+          padding: 9px 12px;
+        }
+        .code-lines {
+          padding: 11px 0;
+        }
+        .code-line {
+          font-size: 12px;
+          padding-top: 3px;
+          padding-bottom: 3px;
+        }
+        .practice-body {
+          gap: 25px;
+        }
+        .practice-inputs {
+          gap: 8px;
+        }
+        .practice-inputs span {
+          width: 55px;
+          height: 65px;
+          font-size: 35px;
+        }
+        .practice-answer {
+          padding-left: 28px;
+        }
+        .practice-frame .frame-heading {
+          font-size: 31px;
+        }
+        .question-mark {
+          font-size: 105px;
+        }
+        .panel-content {
+          padding: 20px;
+        }
+        .inspector-head {
+          padding-right: 20px;
+          padding-left: 20px;
+        }
+        .panel-tabs {
+          padding: 0 13px;
+        }
+        .panel-tab {
+          padding: 12px 8px;
+        }
+        .scene-review {
+          margin-left: 20px;
+          margin-right: 20px;
+        }
+        .script-footer {
+          padding: 18px 20px;
+        }
+      }
+      @media (max-width: 990px) {
+        .studio-layout {
+          grid-template-columns: minmax(0, 1fr) 282px;
+        }
+        .editing-area {
+          padding-right: 16px;
+          padding-left: 16px;
+        }
+        .canvas {
+          min-height: 465px;
+        }
+        .teaching-frame {
+          padding: 25px 22px;
+        }
+        .frame-topline {
+          font-size: 8px;
+        }
+        .frame-heading {
+          font-size: 28px;
+          margin-top: 20px;
+        }
+        .opening-body {
+          grid-template-columns: 1fr;
+          gap: 8px;
+          padding: 15px 0 25px;
+        }
+        .zero-figure {
+          justify-content: center;
+        }
+        .zero {
+          font-size: 138px;
+        }
+        .waiting-numbers {
+          border-left: 0;
+          border-top: 1px solid #d9decb;
+          padding: 14px 0 0;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+        .waiting-numbers::before {
+          display: none;
+        }
+        .waiting-row {
+          margin: 0;
+        }
+        .waiting-number {
+          width: 39px;
+          height: 43px;
+          font-size: 24px;
+        }
+        .waiting-subtitle {
+          display: none;
+        }
+        .accumulator-chain {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        .addition {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          padding: 10px 14px;
+        }
+        .addition-index {
+          margin-bottom: 0;
+          max-width: 55px;
+          line-height: 1.6;
+          font-size: 8px;
+        }
+        .equation {
+          font-size: 31px;
+          gap: 9px;
+        }
+        .equation-result {
+          border: 0;
+          padding: 0;
+          margin: 0;
+          gap: 9px;
+        }
+        .equation-result strong {
+          font-size: 32px;
+        }
+        .chain-arrow {
+          display: none;
+        }
+        .sum-rail {
+          margin-top: 18px;
+        }
+        .sum-rail p {
+          font-size: 9px;
+        }
+        .accumulator-body {
+          padding: 22px 0;
+        }
+        .python-body .state-diagram {
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+        .state-diagram .state-note {
+          display: none;
+        }
+        .code-line {
+          font-size: 11px;
+          gap: 10px;
+          padding-left: 11px;
+          padding-right: 11px;
+        }
+        .code-line.current-line {
+          padding-left: 8px;
+        }
+        .practice-body {
+          grid-template-columns: 1fr;
+          gap: 20px;
+          padding: 24px 0;
+        }
+        .practice-inputs {
+          gap: 10px;
+        }
+        .practice-inputs span {
+          width: 51px;
+          height: 54px;
+          font-size: 31px;
+        }
+        .practice-answer {
+          display: flex;
+          align-items: center;
+          gap: 20px;
+          border-left: 0;
+          border-top: 1px solid #45603f;
+          padding: 15px 0 0;
+        }
+        .question-mark {
+          font-size: 69px;
+          margin-top: 0;
+          letter-spacing: -4px;
+        }
+        .answer-reveal {
+          margin-top: 0;
+          margin-left: auto;
+          max-width: 100px;
+          line-height: 1.5;
+        }
+        .practice-prompt {
+          margin-top: 11px;
+          max-width: none;
+          font-size: 10px;
+        }
+        .scene-strip {
+          display: flex;
+          overflow-x: auto;
+          padding: 2px 2px 7px;
+          gap: 10px;
+          scroll-snap-type: x proximity;
+        }
+        .scene-button {
+          width: 145px;
+          flex-shrink: 0;
+          scroll-snap-align: start;
+        }
+        .scene-thumb {
+          height: 80px;
+        }
+        .frame-caption {
+          font-size: 10px;
+          padding-top: 14px;
+        }
+        .frame-caption code {
+          font-size: 10px;
+        }
+        .playback-bar {
+          gap: 10px;
+        }
+        .illustration-note {
+          font-size: 9px;
+        }
+        .header-right {
+          gap: 14px;
+        }
+        .return-link {
+          font-size: 10px;
+        }
+      }
+      @media (max-width: 790px) {
+        .studio-header {
+          padding: 0 18px;
+          gap: 14px;
+          height: 65px;
+        }
+        .lesson-heading h1 {
+          font-size: 12px;
+        }
+        .return-link > span {
+          display: none;
+        }
+        .return-link {
+          padding: 8px;
+        }
+        .studio-layout {
+          grid-template-columns: 1fr;
+        }
+        .editing-area {
+          padding: 0 20px 25px;
+        }
+        .canvas {
+          min-height: 490px;
+          max-height: none;
+          aspect-ratio: 16 / 10;
+        }
+        .teaching-frame {
+          padding: 30px 38px;
+        }
+        .opening-body {
+          grid-template-columns: 1fr 1fr;
+          gap: 26px;
+        }
+        .zero-figure {
+          justify-content: start;
+          gap: 16px;
+        }
+        .zero {
+          font-size: 155px;
+        }
+        .waiting-numbers {
+          border-left: 1px solid #d9decb;
+          border-top: 0;
+          display: block;
+          padding: 15px 0 15px 25px;
+        }
+        .waiting-row {
+          margin-top: 18px;
+          gap: 8px;
+        }
+        .waiting-number {
+          width: 45px;
+          height: 54px;
+          font-size: 28px;
+        }
+        .waiting-subtitle {
+          display: block;
+        }
+        .accumulator-chain {
+          grid-template-columns: 1fr 18px 1fr 18px 1fr;
+          gap: 7px;
+        }
+        .addition {
+          display: block;
+          padding: 16px 12px;
+        }
+        .addition-index {
+          max-width: none;
+          margin-bottom: 18px;
+        }
+        .equation {
+          gap: 6px;
+          font-size: 34px;
+        }
+        .equation-result {
+          border-top: 1px solid #d9dfcd;
+          padding-top: 15px;
+          margin-top: 15px;
+        }
+        .chain-arrow {
+          display: block;
+        }
+        .chain-arrow svg {
+          width: 18px;
+        }
+        .python-body {
+          grid-template-columns: minmax(0, 1fr) 140px;
+        }
+        .python-body .state-diagram {
+          display: block;
+        }
+        .state-diagram .state-note {
+          display: block;
+          max-width: none;
+          margin-bottom: 12px;
+        }
+        .state-diagram .state-flow {
+          display: block;
+          padding-top: 15px;
+        }
+        .state-flow-arrow {
+          transform: none;
+          padding: 2px 0;
+        }
+        .state-flow-row.after {
+          border-top: 1px solid #cdd8bd;
+          padding-top: 7px;
+        }
+        .code-line {
+          font-size: 11px;
+        }
+        .practice-body {
+          grid-template-columns: 1fr 0.8fr;
+          gap: 36px;
+        }
+        .practice-inputs span {
+          width: 58px;
+          height: 68px;
+          font-size: 37px;
+        }
+        .practice-answer {
+          border-left: 1px solid #45603f;
+          border-top: 0;
+          padding: 0 0 0 34px;
+          display: block;
+        }
+        .question-mark {
+          font-size: 106px;
+          margin-top: 12px;
+        }
+        .answer-reveal {
+          margin-top: 13px;
+          max-width: none;
+        }
+        .scene-strip {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          overflow-x: visible;
+          padding: 0;
+        }
+        .scene-button {
+          width: auto;
+        }
+        .inspector {
+          border-left: 0;
+          border-top: 1px solid var(--line);
+        }
+        .panel-content {
+          min-height: auto;
+          padding: 23px;
+        }
+        .inspector-head {
+          padding: 20px 23px 13px;
+        }
+        .panel-tabs {
+          padding: 0 14px;
+        }
+        .panel-tab {
+          padding: 13px 15px;
+          font-size: 12px;
+        }
+        .narration-editor {
+          min-height: 150px;
+        }
+        .narration-aside {
+          margin-top: 19px;
+        }
+        .scene-review {
+          margin: 0 23px 23px;
+        }
+        .script-footer {
+          padding: 20px 23px;
+        }
+        .script-footer .primary {
+          width: auto;
+          min-width: 220px;
+        }
+        .script-next {
+          text-align: left;
+        }
+      }
+      @media (max-width: 560px) {
+        .studio-header {
+          padding: 0 15px;
+          gap: 11px;
+        }
+        .brand {
+          font-size: 25px;
+          gap: 7px;
+        }
+        .brand-mark {
+          width: 27px;
+          height: 27px;
+          border-radius: 8px;
+        }
+        .brand-word {
+          display: none;
+        }
+        .header-divider {
+          display: none;
+        }
+        .lesson-heading h1 {
+          font-size: 11px;
+        }
+        .lesson-heading p {
+          font-size: 9px;
+        }
+        .header-right {
+          gap: 5px;
+        }
+        .demo-button {
+          font-size: 9px;
+          padding: 6px 7px;
+        }
+        .demo-button span {
+          display: none;
+        }
+        .editing-area {
+          padding: 0 14px 22px;
+        }
+        .canvas-toolbar {
+          padding: 17px 1px 14px;
+        }
+        .scene-title {
+          gap: 8px;
+        }
+        .scene-index {
+          width: 25px;
+          height: 25px;
+          font-size: 10px;
+        }
+        .scene-title h2 {
+          font-size: 12px;
+        }
+        .scene-title p {
+          font-size: 9px;
+        }
+        .frame-badge {
+          font-size: 8px;
+          gap: 4px;
+        }
+        .canvas {
+          min-height: 510px;
+          aspect-ratio: auto;
+        }
+        .teaching-frame {
+          padding: 24px 23px;
+        }
+        .frame-topline {
+          font-size: 8px;
+          letter-spacing: 0.06em;
+        }
+        .frame-topline .tiny-pill {
+          font-size: 8px;
+        }
+        .frame-heading {
+          font-size: 29px;
+          margin-top: 24px;
+        }
+        .opening-body {
+          display: block;
+          padding-top: 23px;
+          padding-bottom: 24px;
+        }
+        .zero-figure {
+          justify-content: center;
+          gap: 24px;
+        }
+        .zero {
+          font-size: 142px;
+        }
+        .zero-annotation {
+          font-size: 11px;
+          padding-left: 16px;
+        }
+        .waiting-numbers {
+          padding: 20px 0 0;
+          margin-top: 22px;
+          border-left: 0;
+          border-top: 1px solid #d9decb;
+          display: flex;
+          align-items: center;
+          gap: 19px;
+        }
+        .waiting-row {
+          margin-top: 0;
+          gap: 7px;
+        }
+        .waiting-number {
+          width: 38px;
+          height: 45px;
+          font-size: 26px;
+        }
+        .waiting-subtitle {
+          display: none;
+        }
+        .waiting-label {
+          font-size: 11px;
+        }
+        .accumulator-chain {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 11px;
+        }
+        .addition {
+          display: flex;
+          gap: 13px;
+          align-items: center;
+          padding: 15px 13px;
+        }
+        .addition-index {
+          margin-bottom: 0;
+          max-width: 55px;
+          font-size: 9px;
+        }
+        .equation {
+          font-size: 32px;
+          gap: 8px;
+        }
+        .equation-result {
+          padding: 0;
+          margin: 0;
+          border: 0;
+        }
+        .equation-result span {
+          display: none;
+        }
+        .equation-result::before {
+          content: '=';
+          color: #8e9d7c;
+          font:
+            19px Georgia,
+            serif;
+        }
+        .equation-result strong {
+          font-size: 33px;
+        }
+        .chain-arrow {
+          display: none;
+        }
+        .sum-rail .rail-line {
+          display: none;
+        }
+        .sum-rail {
+          margin-top: 17px;
+          gap: 9px;
+          justify-content: center;
+        }
+        .sum-rail p {
+          font-size: 9px;
+        }
+        .sum-rail code {
+          font-size: 10px;
+        }
+        .accumulator-body {
+          padding: 27px 0;
+        }
+        .frame-caption {
+          display: block;
+          font-size: 10px;
+          line-height: 1.8;
+          padding-top: 16px;
+        }
+        .frame-caption code {
+          display: block;
+          margin-top: 6px;
+        }
+        .python-frame .frame-heading {
+          font-size: 27px;
+        }
+        .python-body {
+          grid-template-columns: 1fr;
+          gap: 22px;
+          padding-top: 25px;
+        }
+        .python-body .state-diagram {
+          display: flex;
+          align-items: center;
+          gap: 18px;
+        }
+        .state-diagram .state-note {
+          display: none;
+        }
+        .state-diagram .state-input {
+          gap: 11px;
+          padding: 10px;
+        }
+        .state-diagram .state-input span {
+          font-size: 10px;
+        }
+        .state-diagram .state-input strong {
+          font-size: 23px;
+        }
+        .state-diagram .state-flow {
+          padding: 0;
+          display: flex;
+          align-items: center;
+          gap: 9px;
+        }
+        .state-flow-row {
+          display: block;
+        }
+        .state-flow-row span {
+          font-size: 8px;
+          display: block;
+        }
+        .state-flow-row strong {
+          font-size: 24px;
+        }
+        .state-flow-arrow {
+          transform: rotate(-90deg);
+          font-size: 19px;
+        }
+        .state-flow-row.after {
+          border: 0;
+          padding: 0;
+        }
+        .state-flow-row.after strong {
+          font-size: 30px;
+        }
+        .code-line {
+          font-size: 11px;
+          padding-top: 5px;
+          padding-bottom: 5px;
+        }
+        .teaching-code-head {
+          font-size: 8px;
+        }
+        .practice-frame .frame-heading {
+          font-size: 30px;
+        }
+        .practice-body {
+          grid-template-columns: 1fr;
+          gap: 25px;
+          padding: 29px 0;
+        }
+        .practice-inputs {
+          gap: 11px;
+        }
+        .practice-inputs span {
+          width: 64px;
+          height: 68px;
+          font-size: 39px;
+        }
+        .practice-prompt {
+          margin-top: 16px;
+          font-size: 11px;
+        }
+        .practice-answer {
+          padding: 19px 0 0;
+          border-left: 0;
+          border-top: 1px solid #45603f;
+          display: flex;
+          align-items: center;
+          gap: 20px;
+        }
+        .question-mark {
+          font-size: 73px;
+          margin-top: 0;
+        }
+        .answer-reveal {
+          margin-top: 0;
+          margin-left: auto;
+          max-width: 102px;
+          font-size: 9px;
+        }
+        .playback-bar {
+          align-items: start;
+          flex-wrap: wrap;
+          gap: 8px 12px;
+          margin-bottom: 20px;
+        }
+        .illustration-note {
+          font-size: 9px;
+          max-width: 135px;
+          padding-top: 2px;
+        }
+        .playback-dots {
+          align-self: center;
+        }
+        .play-button {
+          font-size: 10px;
+          padding: 8px 9px;
+        }
+        .scene-strip {
+          display: flex;
+          gap: 10px;
+          padding: 2px 2px 8px;
+          overflow-x: auto;
+          margin: 0 -2px;
+        }
+        .scene-button {
+          width: 143px;
+        }
+        .scene-strip-head h3 {
+          font-size: 11px;
+        }
+        .scene-strip-head p {
+          font-size: 9px;
+        }
+        .scene-thumb {
+          height: 84px;
+        }
+        .inspector-head {
+          padding: 20px 20px 13px;
+        }
+        .panel-tabs {
+          padding: 0 10px;
+        }
+        .panel-tab {
+          padding: 13px 12px;
+          font-size: 11px;
+        }
+        .panel-content {
+          padding: 22px 20px;
+        }
+        .narration-editor {
+          font-size: 13px;
+          min-height: 180px;
+        }
+        .scene-review {
+          margin-right: 20px;
+          margin-left: 20px;
+        }
+        .script-footer {
+          padding: 19px 20px;
+        }
+        .script-footer .primary {
+          width: 100%;
+        }
+        .script-next {
+          text-align: center;
+        }
+        dialog {
+          padding: 24px;
+        }
+        .dialog-head h2 {
+          font-size: 26px;
+        }
+      }
+      /* Bound desktop regions to the window; keep all content reachable within them. */
+      @media (min-width: 791px) {
+        .studio-layout {
+          height: calc(100dvh - 69px);
+          min-height: 0;
+        }
+        .editing-area {
+          display: grid;
+          grid-template-rows: 58px minmax(0, 1fr) 55px 142px;
+          min-height: 0;
+          padding-bottom: 16px;
+        }
+        .canvas-toolbar {
+          padding: 14px 1px;
+        }
+        .canvas {
+          min-height: 0;
+          max-height: none;
+          aspect-ratio: auto;
+          overflow: auto;
+        }
+        .teaching-frame {
+          min-height: 410px;
+          height: 100%;
+          padding-top: 24px;
+          padding-bottom: 20px;
+        }
+        .frame-heading {
+          font-size: 30px;
+          margin-top: 18px;
+        }
+        .opening-body {
+          padding-top: 12px;
+          padding-bottom: 18px;
+        }
+        .zero {
+          font-size: 140px;
+        }
+        .accumulator-body {
+          padding-top: 20px;
+          padding-bottom: 20px;
+        }
+        .python-body {
+          padding-top: 18px;
+          padding-bottom: 18px;
+        }
+        .practice-body {
+          padding-top: 20px;
+          padding-bottom: 20px;
+        }
+        .playback-bar {
+          margin: 10px 2px 12px;
+        }
+        .scene-thumb {
+          height: 72px;
+        }
+        .scene-strip-head {
+          margin-bottom: 9px;
+        }
+        .inspector {
+          min-height: 0;
+          overflow: hidden;
+        }
+        .panel-content {
+          min-height: 0;
+          overflow: auto;
+        }
+        .narration-editor {
+          min-height: 180px;
+        }
+        .narration-aside {
+          margin-top: 18px;
+        }
+      }
+      /* Functional text remains readable; only miniature thumbnail art uses tiny type. */
+      .scene-label-row strong {
+        font-size: 12px;
+      }
+      .scene-label-row .scene-number {
+        font-size: 10px;
+        color: #78664e;
+      }
+      .scene-strip-head h3,
+      .scene-strip-head p {
+        font-size: 12px;
+      }
+      .scene-strip-head p {
+        color: #68745e;
+      }
+      .panel-tab {
+        font-size: 13px;
+        color: #65725a;
+      }
+      .panel-tab[aria-pressed='true'] {
+        color: #765327;
+      }
+      .inspector-head h2 {
+        font-size: 13px;
+      }
+      .review-badge {
+        font-size: 11px;
+        color: #746749;
+      }
+      .panel-content h3 {
+        font-size: 16px;
+      }
+      .panel-description {
+        font-size: 12px;
+        color: #68765d;
+      }
+      .panel-eyebrow {
+        font-size: 10px;
+        color: #776f54;
+      }
+      .narration-label {
+        font-size: 12px;
+        color: #647258;
+        margin-top: 17px;
+      }
+      .narration-editor {
+        font-size: 14px;
+        line-height: 1.8;
+      }
+      .editor-foot {
+        color: #68755d;
+        font-size: 11px;
+      }
+      .narration-aside {
+        font-size: 12px;
+        color: #68775b;
+        line-height: 1.8;
+      }
+      .inspector-code {
+        font-size: 12px;
+      }
+      .code-legend-row {
+        font-size: 12px;
+        color: #68775b;
+      }
+      .code-legend-row code {
+        font-size: 11px;
+      }
+      .source-item summary {
+        font-size: 13px;
+      }
+      .source-kind {
+        font-size: 10px;
+        color: #82643d;
+      }
+      .source-text {
+        font-size: 13px;
+        line-height: 1.8;
+        color: #526647;
+      }
+      .source-caption {
+        font-size: 11px;
+        color: #6c785f;
+      }
+      .review-check label {
+        font-size: 13px;
+      }
+      .review-check label small {
+        font-size: 11px;
+        color: #6d795f;
+      }
+      .review-check label small.missing {
+        color: #975c26;
+      }
+      .script-count {
+        font-size: 12px;
+        color: #6a765e;
+      }
+      .primary,
+      .secondary {
+        font-size: 13px;
+      }
+      .script-next {
+        font-size: 11px;
+        color: #6e795f;
+      }
+      .play-button {
+        font-size: 12px;
+      }
+      .illustration-note {
+        font-size: 11px;
+        color: #66745c;
+      }
+      .frame-caption,
+      .frame-caption code {
+        font-size: 12px;
+      }
+      .answer-reveal {
+        font-size: 12px;
+      }
+      @media (max-width: 560px) {
+        .playback-bar {
+          gap: 9px 12px;
+        }
+        .illustration-note {
+          max-width: 170px;
+        }
+        .scene-strip-head {
+          flex-wrap: wrap;
+          gap: 5px 12px;
+        }
+        .panel-tab {
+          padding-right: 13px;
+          padding-left: 13px;
+        }
+        .practice-answer {
+          gap: 14px;
+        }
+        .answer-reveal {
+          max-width: 113px;
+        }
+        .frame-caption code {
+          overflow-wrap: anywhere;
+          white-space: normal;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+          animation: none !important;
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="studio-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"
+          ><svg width="21" height="21" viewBox="0 0 24 24" fill="none">
+            <circle cx="8" cy="6" r="3" fill="currentColor" />
+            <circle cx="17" cy="8" r="2.5" fill="currentColor" />
+            <path
+              d="M3 12c3-1 6 0 9 3 3-2 6-3 9-2v7c-4-1-6 0-9 2-3-3-6-4-9-3v-7Z"
+              stroke="currentColor"
+              stroke-width="1.5"
+            />
+            <path d="M12 15v7" stroke="currentColor" stroke-width="1.5" /></svg></span
+        ><span class="brand-word">Tro.</span>
+      </div>
+      <span class="header-divider" aria-hidden="true"></span>
+      <div class="lesson-heading">
+        <h1>Biến tổng, từng bước</h1>
+        <p>Duyệt kịch bản · Python cơ bản</p>
+      </div>
+      <div class="header-right">
+        <a
+          class="return-link"
+          href="GuidedLessonCreationConcepts.html"
+          aria-label="Về phần chuẩn bị bài giảng"
+          ><svg
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            aria-hidden="true"
+          >
+            <path d="M16 10H4m5-5-5 5 5 5" /></svg
+          ><span>Về phần chuẩn bị</span></a
+        ><button
+          class="demo-button"
+          data-action="open-help"
+          aria-label="Bản thử: xem giới hạn và cách sử dụng"
+        >
+          Bản thử<span aria-hidden="true">ⓘ</span>
+        </button>
+      </div>
+    </header>
+    <div class="studio-layout">
+      <main class="editing-area">
+        <div class="canvas-toolbar">
+          <div class="scene-title">
+            <span class="scene-index" id="scene-index">01</span>
+            <div>
+              <h2 id="scene-title">Bắt đầu từ số không</h2>
+              <p id="scene-purpose">Mở đầu · Khởi tạo biến tổng</p>
+            </div>
+          </div>
+          <span class="frame-badge">Khung minh họa</span>
+        </div>
+        <div
+          class="canvas"
+          id="canvas"
+          role="region"
+          tabindex="0"
+          aria-label="Khung minh họa kiến thức của cảnh đang chọn"
+          aria-describedby="canvas-keyboard-help"
+        ></div>
+        <span class="screen-reader" id="canvas-keyboard-help"
+          >Vùng nội dung có thể cuộn. Khi khung được lấy tiêu điểm, dùng các phím mũi tên hoặc Page
+          Up, Page Down để xem phần còn lại.</span
+        >
+        <div class="playback-bar">
+          <button
+            class="play-button"
+            id="play-button"
+            data-action="toggle-play"
+            aria-pressed="false"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+              aria-hidden="true"
+            >
+              <path d="m6 3 6 5-6 5V3Z" /></svg
+            ><span>Chạy minh họa</span></button
+          ><span class="illustration-note" id="illustration-note"
+            >Hình minh họa cục bộ · không phải video</span
+          >
+          <div class="playback-dots" aria-hidden="true">
+            <span class="playback-dot active"></span><span class="playback-dot"></span
+            ><span class="playback-dot"></span>
+          </div>
+        </div>
+        <section aria-labelledby="scene-strip-title">
+          <div class="scene-strip-head">
+            <h3 id="scene-strip-title">Các cảnh trong bài</h3>
+            <p>Chọn một cảnh để xem và duyệt</p>
+          </div>
+          <div class="scene-strip" id="scene-strip"></div>
+        </section>
+      </main>
+      <aside class="inspector" aria-label="Nội dung và duyệt cảnh">
+        <div class="inspector-head">
+          <h2 id="inspector-title">Nội dung cảnh 01</h2>
+          <span class="review-badge" id="scene-review-badge">Chưa duyệt</span>
+        </div>
+        <nav class="panel-tabs" aria-label="Nội dung cần đối chiếu">
+          <button class="panel-tab" data-panel="narration" aria-pressed="true">
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.2"
+              aria-hidden="true"
+            >
+              <path d="M4 6h2l3-3v10l-3-3H4V6Z" />
+              <path d="M11 5c2 1 2 5 0 6" /></svg
+            >Lời dẫn
+          </button>
+          <button class="panel-tab" data-panel="python" aria-pressed="false">
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.2"
+              aria-hidden="true"
+            >
+              <path d="m5 4-4 4 4 4m6-8 4 4-4 4M9 2 7 14" /></svg
+            >Python
+          </button>
+          <button class="panel-tab" data-panel="sources" aria-pressed="false">
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.2"
+              aria-hidden="true"
+            >
+              <path d="M3 2h7l3 3v9H3V2Z" />
+              <path d="M10 2v4h3M5 8h6m-6 3h5" /></svg
+            >Nguồn
+          </button>
+        </nav>
+        <div class="panel-content" id="panel-content"></div>
+        <div class="scene-review">
+          <div class="review-check">
+            <input id="review-scene" type="checkbox" /><label for="review-scene"
+              >Tôi đã kiểm tra nội dung cảnh này.<small id="scene-review-note"
+                >Lời dẫn, mã Python và nguồn liên quan.</small
+              ></label
+            >
+          </div>
+        </div>
+        <footer class="script-footer">
+          <div class="script-count">
+            <span>Đã duyệt <strong id="review-count">0 / 4 cảnh</strong></span
+            ><span id="script-state">Cần duyệt từng cảnh</span>
+          </div>
+          <button class="primary" id="confirm-script" data-action="open-confirmation" disabled>
+            <span>Duyệt kịch bản</span
+            ><svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+              aria-hidden="true"
+            >
+              <path d="M2 8h11M9 4l4 4-4 4" />
+            </svg>
+          </button>
+          <p class="script-next">Bước tiếp theo thực tế: tạo và xem video riêng tư.</p>
+        </footer>
+      </aside>
+    </div>
+    <dialog id="help-dialog" aria-labelledby="help-title">
+      <div class="dialog-head">
+        <h2 id="help-title">Một phòng dựng để thử ý tưởng.</h2>
+        <button class="close-button" data-close="help-dialog" aria-label="Đóng thông tin bản thử">
+          ×
+        </button>
+      </div>
+      <p class="dialog-copy">
+        Đây là nguyên mẫu giao diện với bài Python và nguồn minh họa có sẵn. Mọi thay đổi chỉ tồn
+        tại khi trang đang mở.
+      </p>
+      <ul class="dialog-list">
+        <li>
+          Chọn cảnh, chỉnh lời dẫn, đọc mã và đối chiếu nguồn. Sửa lời dẫn sẽ bỏ xác nhận duyệt của
+          cảnh đó.
+        </li>
+        <li>
+          “Chạy minh họa” chỉ đổi các trạng thái số trong trang. Không phải video, không có âm thanh
+          và không chạy Python.
+        </li>
+        <li>
+          Không lưu lên máy chủ, gọi AI, tạo video hoặc phát hành. Tài liệu và đính chính ở đây đều
+          là dữ liệu tổng hợp để thử giao diện.
+        </li>
+      </ul>
+      <div class="dialog-actions">
+        <button class="secondary" data-close="help-dialog">Tiếp tục thử giao diện</button>
+      </div>
+    </dialog>
+    <dialog id="confirmation-dialog" aria-labelledby="confirmation-title">
+      <div class="dialog-head">
+        <h2 id="confirmation-title">Chốt kịch bản đã xem lại?</h2>
+        <button
+          class="close-button"
+          data-close="confirmation-dialog"
+          aria-label="Đóng xác nhận kịch bản"
+        >
+          ×
+        </button>
+      </div>
+      <p class="dialog-copy">
+        Bạn đã đánh dấu kiểm tra đủ 4 cảnh. Xác nhận bên dưới chỉ thay đổi trạng thái trong bản thử
+        này.
+      </p>
+      <div class="next-stage">
+        <strong>Kịch bản → video riêng tư → phát hành</strong>
+        <p>
+          Ở sản phẩm thực tế, duyệt kịch bản cho phép bắt đầu tạo bản video riêng tư. Giáo viên vẫn
+          cần xem, kiểm tra và duyệt video trước một bước phát hành riêng.
+        </p>
+      </div>
+      <p class="dialog-copy">
+        Bản thử không tạo video, không gửi nội dung và không phát hành cho học sinh.
+      </p>
+      <div class="dialog-actions">
+        <button class="secondary" data-close="confirmation-dialog">Xem lại</button
+        ><button class="primary" data-action="confirm-local-script">Xác nhận trong bản thử</button>
+      </div>
+    </dialog>
+    <div class="screen-reader" role="status" aria-live="polite" id="announcement"></div>
+    <script>
+      /** @typedef {'opening' | 'accumulation' | 'python' | 'practice'} SceneId */
+      /** @typedef {'narration' | 'python' | 'sources'} InspectorPanel */
+      /** @typedef {{ title: string, purpose: string, label: string, narration: string, sourceIds: string[] }} SceneDefinition */
+      /** @typedef {{ narration: string, reviewed: boolean }} SceneReview */
+      /** @typedef {{ title: string, kind: string, text: string, correction: boolean }} SourceDefinition */
+      /** @type {Record<SceneId, SceneDefinition>} */
+      const scenes = {
+        opening: {
+          title: 'Bắt đầu từ số không',
+          purpose: 'Mở đầu · Khởi tạo biến tổng',
+          label: 'Bắt đầu từ 0',
+          narration:
+            'Trước khi cộng bất kỳ số nào, chúng ta cần một nơi để giữ tổng. Đặt total bằng 0 trước vòng lặp. Khi chưa có phần tử nào được xử lý, tổng của chúng ta bằng 0.',
+          sourceIds: ['initialization', 'correction'],
+        },
+        accumulation: {
+          title: 'Tổng lớn lên qua từng bước',
+          purpose: 'Giải thích · Theo dõi ba lần cộng',
+          label: 'Cộng từng số',
+          narration:
+            'Lần lượt lấy các số 2, 4 và 6. Lần đầu, 0 cộng 2 bằng 2. Tiếp theo, 2 cộng 4 bằng 6. Cuối cùng, 6 cộng 6 bằng 12. Biến total giữ lại kết quả sau mỗi lần cộng.',
+          sourceIds: ['accumulation'],
+        },
+        python: {
+          title: 'Một dòng mã, một lần cập nhật',
+          purpose: 'Ví dụ · Đối chiếu mã và giá trị',
+          label: 'Nhìn vào mã',
+          narration:
+            'Trong mỗi lần lặp, number là số đang được lấy ra từ danh sách. Dòng total = total + number cộng số đó vào tổng đã có. Với số 6 ở lần lặp cuối, total thay đổi từ 6 thành 12. Lệnh print nằm sau vòng lặp để in tổng cuối cùng.',
+          sourceIds: ['accumulation', 'correction'],
+        },
+        practice: {
+          title: 'Cùng cách làm, dữ liệu mới',
+          purpose: 'Luyện tập · Dự đoán kết quả',
+          label: 'Thử với số mới',
+          narration:
+            'Bây giờ hãy thử với danh sách 1, 3 và 5. Bắt đầu từ total bằng 0, rồi cộng từng số theo cùng cách. Em dự đoán chương trình sẽ in ra số nào? Hãy theo dõi tổng sau mỗi lần lặp trước khi xem đáp án.',
+          sourceIds: ['practice', 'accumulation'],
+        },
+      };
+      /** @type {Record<string, SourceDefinition>} */
+      const sources = {
+        initialization: {
+          title: 'Khởi tạo biến tổng',
+          kind: 'Python cơ bản · Mục 4.1 · Đoạn 1',
+          text: 'Để tính tổng một danh sách số nguyên, hãy tạo biến total với giá trị ban đầu là 0 trước vòng lặp. Biến này lưu kết quả tích lũy qua từng lần lặp. Khi chưa xử lý phần tử nào, tổng bằng 0.\n\nVí dụ: total = 0',
+          correction: false,
+        },
+        accumulation: {
+          title: 'Cộng lần lượt từng phần tử',
+          kind: 'Python cơ bản · Mục 4.1 · Đoạn 2',
+          text: 'Danh sách numbers = [2, 4, 6] chứa ba số nguyên. Với mỗi number trong numbers, cập nhật total = total + number. Sau mỗi lần lặp, total lần lượt bằng 2, 6 và 12. Lệnh print(total) đặt sau vòng lặp in tổng cuối cùng.\n\nnumbers = [2, 4, 6]\ntotal = 0\nfor number in numbers:\n    total = total + number\nprint(total)',
+          correction: false,
+        },
+        correction: {
+          title: 'Giữ lại phần tổng đã có',
+          kind: 'Đính chính đã duyệt · Mục 4.1',
+          text: 'Đính chính: lệnh total = 0 phải nằm trước vòng lặp, không nằm trong thân vòng lặp. Nếu khởi tạo lại total trong mỗi lần lặp, chương trình sẽ mất phần tổng của các phần tử trước đó. Đoạn ghi chú này giải thích cách đặt lệnh khởi tạo trong ví dụ của mục 4.1.',
+          correction: true,
+        },
+        practice: {
+          title: 'Luyện tập với dữ liệu khác',
+          kind: 'Python cơ bản · Mục 4.1 · Đoạn 3',
+          text: 'Dùng cùng cấu trúc tính tổng với danh sách numbers = [1, 3, 5]. Khởi tạo total = 0 trước vòng lặp. Sau ba lần cập nhật, tổng lần lượt bằng 1, 4 và 9. Chương trình in 9 sau vòng lặp. Đây là ví dụ luyện tập riêng với dữ liệu khác.',
+          correction: false,
+        },
+      };
+      /** @type {SceneId[]} */
+      const sceneOrder = ['opening', 'accumulation', 'python', 'practice'];
+      /** @type {Record<SceneId, SceneReview>} */
+      const reviews = {
+        opening: { narration: scenes.opening.narration, reviewed: false },
+        accumulation: { narration: scenes.accumulation.narration, reviewed: false },
+        python: { narration: scenes.python.narration, reviewed: false },
+        practice: { narration: scenes.practice.narration, reviewed: false },
+      };
+      /** @type {SceneId} */
+      let activeScene = 'opening';
+      /** @type {InspectorPanel} */
+      let activePanel = 'narration';
+      let illustrationStep = 2;
+      let illustrationStarted = false;
+      let practiceAnswerVisible = false;
+      let scriptConfirmed = false;
+      /** @type {number | null} */
+      let illustrationTimer = null;
+      /** @type {Record<string, boolean>} */
+      const sourceDisclosures = {};
+      const reducedMotionQuery =
+        typeof window.matchMedia === 'function'
+          ? window.matchMedia('(prefers-reduced-motion: reduce)')
+          : null;
+      const exampleCode =
+        'numbers = [2, 4, 6]\ntotal = 0\nfor number in numbers:\n    total = total + number\nprint(total)';
+      const practiceCode =
+        'numbers = [1, 3, 5]\ntotal = 0\nfor number in numbers:\n    total = total + number\nprint(total)';
+      const arrow =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M3 12h17M15 7l5 5-5 5"/></svg>';
+      /** @param {string} value @returns {string} */
+      function escapeHtml(value) {
+        return value.replace(
+          /[&<>"']/g,
+          (character) =>
+            ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] ||
+            character,
+        );
+      }
+      /** @param {unknown} value @returns {value is SceneId} */
+      function isSceneId(value) {
+        return (
+          value === 'opening' ||
+          value === 'accumulation' ||
+          value === 'python' ||
+          value === 'practice'
+        );
+      }
+      /** @param {unknown} value @returns {value is InspectorPanel} */
+      function isInspectorPanel(value) {
+        return value === 'narration' || value === 'python' || value === 'sources';
+      }
+      /** @param {string} id @returns {HTMLElement} */
+      function readElement(id) {
+        const element = document.getElementById(id);
+        if (!(element instanceof HTMLElement)) {
+          throw new Error(`Missing prototype element: ${id}`);
+        }
+        return element;
+      }
+      /** @param {string} text */
+      function announce(text) {
+        readElement('announcement').textContent = text;
+      }
+      /** @param {SceneId} id @returns {boolean} */
+      function hasSceneNarration(id) {
+        return Boolean(reviews[id].narration.trim());
+      }
+      /** @returns {boolean} */
+      function canConfirmScript() {
+        return sceneOrder.every((id) => reviews[id].reviewed && hasSceneNarration(id));
+      }
+      /** @returns {boolean} */
+      function usesReducedMotion() {
+        return reducedMotionQuery?.matches ?? false;
+      }
+      /** @returns {string} */
+      function sceneNumber() {
+        return String(sceneOrder.indexOf(activeScene) + 1).padStart(2, '0');
+      }
+      /** @param {string} title @param {string} right @returns {string} */
+      function frameTopline(title, right) {
+        return `<div class="frame-topline"><span>${title}</span><span class="tiny-pill">${right}</span></div>`;
+      }
+      /** @param {string} text @param {string} code @returns {string} */
+      function frameCaption(text, code) {
+        return `<div class="frame-caption"><span>${text}</span><code>${escapeHtml(code)}</code></div>`;
+      }
+      /** @returns {string} */
+      function openingFrame() {
+        return `<article class="teaching-frame opening-frame">${frameTopline('01 / Khởi tạo', 'Trước vòng lặp')}<h3 class="frame-heading">Mọi tổng đều có<br />một <em>điểm bắt đầu.</em></h3><div class="opening-body"><div class="zero-figure"><span class="zero">0</span><div class="zero-annotation"><span class="variable-label">total</span><br />Chưa có số nào<br />được cộng.</div></div><div class="waiting-numbers"><span class="waiting-label">numbers</span><div class="waiting-row">${[2, 4, 6].map((number, index) => `<span class="waiting-number ${illustrationStarted && illustrationStep === index ? 'active' : ''}">${number}</span>`).join('')}</div><p class="waiting-subtitle">Các số đang chờ đến lượt.</p></div></div>${frameCaption('Khởi tạo biến tổng bên ngoài vòng lặp.', 'total = 0')}</article>`;
+      }
+      /** @returns {string} */
+      function accumulationFrame() {
+        const inputs = [2, 4, 6];
+        const before = [0, 2, 6];
+        const after = [2, 6, 12];
+        return `<article class="teaching-frame accumulator-frame">${frameTopline('02 / Từng lần cập nhật', 'Một tổng được giữ lại')}<h3 class="frame-heading">Lấy số tiếp theo.<br /><em>Thêm vào tổng đang có.</em></h3><div class="accumulator-body"><div class="accumulator-chain">${inputs.map((number, index) => `${index ? `<span class="chain-arrow">${arrow}</span>` : ''}<div class="addition ${illustrationStep === index ? 'active' : ''}"><span class="addition-index">Lần lặp ${index + 1}</span><div class="equation"><span>${before[index]}</span><span class="operator">+</span><span class="input-number">${number}</span></div><div class="equation-result"><span>total</span><strong>${after[index]}</strong></div></div>`).join('')}</div><div class="sum-rail"><code>total = 0</code><span class="rail-line"></span><p>Cùng một biến · Ba lần thay đổi</p><span class="rail-line"></span><code>total = 12</code></div></div>${frameCaption('Số đang lấy ra có màu cam. Tổng được giữ qua mỗi lần lặp.', 'total + number')}</article>`;
+      }
+      /** @returns {string} */
+      function pythonFrame() {
+        const number = [2, 4, 6][illustrationStep] || 6;
+        const before = [0, 2, 6][illustrationStep] ?? 6;
+        const after = [2, 6, 12][illustrationStep] || 12;
+        return `<article class="teaching-frame python-frame">${frameTopline('03 / Đọc mã, nhìn giá trị', `Lần lặp ${illustrationStep + 1} / 3`)}<h3 class="frame-heading">Một dòng mã.<br /><em>Một tổng mới.</em></h3><div class="python-body"><div class="teaching-code"><div class="teaching-code-head"><span>ViDu.py</span><span>PYTHON</span></div><div class="code-lines"><div class="code-line"><span class="line-number">1</span><span><span class="code-name">numbers</span> = [<span class="code-number">2, 4, 6</span>]</span></div><div class="code-line"><span class="line-number">2</span><span><span class="code-name">total</span> = <span class="code-number">0</span></span></div><div class="code-line"><span class="line-number">3</span><span><span class="keyword">for</span> number <span class="keyword">in</span> numbers:</span></div><div class="code-line current-line"><span class="line-number">4</span><span>    total = total + number</span></div><div class="code-line"><span class="line-number">5</span><span><span class="keyword">print</span>(total)</span></div></div></div><div class="state-diagram"><p class="state-note">Giá trị trong lần lặp</p><div class="state-input"><span>number</span><strong>${number}</strong></div><div class="state-flow"><div class="state-flow-row"><span>total trước</span><strong>${before}</strong></div><div class="state-flow-arrow" aria-hidden="true">↓</div><div class="state-flow-row after"><span>total sau</span><strong>${after}</strong></div></div></div></div>${frameCaption('Lệnh khởi tạo ở trước vòng lặp. Lệnh in ở sau vòng lặp.', 'total = total + number')}</article>`;
+      }
+      /** @returns {string} */
+      function practiceFrame() {
+        return `<article class="teaching-frame practice-frame">${frameTopline('04 / Đến lượt học sinh', 'Cùng cách làm, dữ liệu mới')}<h3 class="frame-heading">Nếu thay các số,<br /><em>tổng sẽ là bao nhiêu?</em></h3><div class="practice-body"><div><p class="practice-label">numbers =</p><div class="practice-inputs">${[1, 3, 5].map((number) => `<span>${number}</span>`).join('')}</div><p class="practice-prompt">Bắt đầu từ 0.<br />Cộng lần lượt, giữ lại tổng.</p></div><div class="practice-answer"><span class="answer-label">print(total)</span><strong class="question-mark">${practiceAnswerVisible ? '9' : '?'}</strong><button class="answer-reveal" data-action="toggle-answer" aria-pressed="${practiceAnswerVisible}">${practiceAnswerVisible ? 'Ẩn đáp án mẫu' : 'Hiện đáp án mẫu'}</button></div></div>${frameCaption(practiceAnswerVisible ? 'Đáp án mẫu cho giáo viên: 0 + 1 + 3 + 5 = 9.' : 'Giữ đáp án ẩn để kiểm tra phần câu hỏi trước.', 'total = 0')}</article>`;
+      }
+      function renderCanvas() {
+        readElement('canvas').innerHTML =
+          activeScene === 'opening'
+            ? openingFrame()
+            : activeScene === 'accumulation'
+              ? accumulationFrame()
+              : activeScene === 'python'
+                ? pythonFrame()
+                : practiceFrame();
+        document.querySelectorAll('.playback-dot').forEach((dot, index) => {
+          dot.classList.toggle('active', index === illustrationStep);
+        });
+      }
+      /** @param {SceneId} id @returns {string} */
+      function thumbnail(id) {
+        if (id === 'opening') {
+          return '<div class="scene-thumb"><span class="thumb-corner">KHỞI TẠO BIẾN TỔNG</span><span class="thumb-zero">0</span><span class="thumb-opening-numbers"><span>2</span><span>4</span><span>6</span></span></div>';
+        }
+        if (id === 'accumulation') {
+          return '<div class="scene-thumb"><span class="thumb-corner">TỔNG ĐƯỢC GIỮ LẠI</span><span class="thumb-chain"><span>2</span><i>→</i><span>6</span><i>→</i><span>12</span></span></div>';
+        }
+        if (id === 'python') {
+          return '<div class="scene-thumb"><span class="thumb-code"><span></span><span></span><span></span><span></span></span><strong class="thumb-python-value">12</strong></div>';
+        }
+        return '<div class="scene-thumb thumb-practice"><span class="thumb-corner">THỬ VỚI SỐ MỚI</span><span>1</span><span>3</span><span>5</span><strong>?</strong></div>';
+      }
+      function renderScenes() {
+        readElement('scene-strip').innerHTML = sceneOrder
+          .map(
+            (id, index) =>
+              `<button class="scene-button" data-scene="${id}" aria-current="${id === activeScene}" aria-label="Cảnh ${index + 1}: ${scenes[id].title}${reviews[id].reviewed ? ', đã duyệt' : ', chưa duyệt'}">${thumbnail(id)}<span class="scene-label-row"><span class="scene-number">0${index + 1}</span><strong>${scenes[id].label}</strong><span class="review-mini ${reviews[id].reviewed ? 'reviewed' : ''}" aria-hidden="true">✓</span></span></button>`,
+          )
+          .join('');
+      }
+      /** @returns {string} */
+      function narrationPanel() {
+        const scene = scenes[activeScene];
+        return `<p class="panel-eyebrow">Lời dẫn cho cảnh ${sceneNumber()}</p><h3>${scene.title}</h3><label class="narration-label" for="narration-editor">Chỉnh lời giải thích</label><textarea class="narration-editor" id="narration-editor" maxlength="3000" spellcheck="false" aria-invalid="${!hasSceneNarration(activeScene)}" aria-describedby="narration-count scene-review-note">${escapeHtml(reviews[activeScene].narration)}</textarea><div class="editor-foot"><span>Chỉnh trực tiếp trong bản thử</span><span id="narration-count">${reviews[activeScene].narration.length} ký tự</span></div><p class="narration-aside">${activeScene === 'opening' ? 'Giữ rõ một ý: khởi tạo total trước khi bắt đầu vòng lặp.' : activeScene === 'accumulation' ? 'Tách số đang cộng khỏi tổng được giữ lại, kể cả khi hai giá trị cùng bằng 6.' : activeScene === 'python' ? 'Đối chiếu dòng đang sáng với giá trị trước và sau lần cập nhật.' : 'Câu hỏi đi trước đáp án. Kiểm tra phần luyện tập riêng trước khi duyệt.'}</p>`;
+      }
+      /** @returns {string} */
+      function pythonPanel() {
+        return `<p class="panel-eyebrow">Ví dụ đã chọn · chỉ đọc</p><h3>${activeScene === 'practice' ? 'Cấu trúc quen thuộc, số mới.' : 'Mã để đối chiếu lời giải thích.'}</h3><p class="panel-description">${activeScene === 'practice' ? 'Dữ liệu luyện tập là [1, 3, 5]. Kết quả mẫu: 9.' : 'Dữ liệu ví dụ là [2, 4, 6]. Tổng cuối cùng: 12.'}</p><pre class="inspector-code">${escapeHtml(activeScene === 'practice' ? practiceCode : exampleCode)}</pre><div class="code-legend"><div class="code-legend-row"><code>total</code><span>Giữ phần tổng đã tính.</span></div><div class="code-legend-row"><code>number</code><span>Số đang được lấy ra ở lần lặp hiện tại.</span></div></div><p class="source-caption">Mã có sẵn cho bản thử. Không được thực thi tại đây.</p>`;
+      }
+      /** @returns {string} */
+      function sourcesPanel() {
+        return `<p class="panel-eyebrow">Đúng đoạn nguồn · cảnh ${sceneNumber()}</p><h3>Đọc lại phần làm căn cứ.</h3><p class="panel-description">Các đoạn mẫu được giữ nguyên văn, gồm đính chính liên quan.</p>${scenes[
+          activeScene
+        ].sourceIds
+          .map((id, index) => {
+            const source = sources[id];
+            if (!source) {
+              return '';
+            }
+            const key = `${activeScene}:${id}`;
+            const open = sourceDisclosures[key] ?? index === 0;
+            return `<details class="source-item ${source.correction ? 'correction' : ''}" data-source-key="${key}" ${open ? 'open' : ''}><summary><span class="source-kind">${source.kind}</span>${source.title}</summary><div class="source-text">${escapeHtml(source.text)}</div></details>`;
+          })
+          .join(
+            '',
+          )}<p class="source-caption">Nguồn tổng hợp để minh họa giao diện, không phải tài liệu thật của bạn.</p>`;
+      }
+      function renderInspector() {
+        readElement('inspector-title').textContent = `Nội dung cảnh ${sceneNumber()}`;
+        document.querySelectorAll('[data-panel]').forEach((button) => {
+          if (button instanceof HTMLButtonElement) {
+            button.setAttribute('aria-pressed', String(button.dataset.panel === activePanel));
+          }
+        });
+        readElement('panel-content').innerHTML =
+          activePanel === 'narration'
+            ? narrationPanel()
+            : activePanel === 'python'
+              ? pythonPanel()
+              : sourcesPanel();
+        updateReviews();
+      }
+      function updateReviews() {
+        const reviewedCount = sceneOrder.filter((id) => reviews[id].reviewed).length;
+        const badge = readElement('scene-review-badge');
+        badge.textContent = reviews[activeScene].reviewed ? 'Đã duyệt cảnh' : 'Chưa duyệt';
+        badge.classList.toggle('reviewed', reviews[activeScene].reviewed);
+        const checkbox = readElement('review-scene');
+        if (checkbox instanceof HTMLInputElement) {
+          checkbox.checked = reviews[activeScene].reviewed;
+          checkbox.disabled = !hasSceneNarration(activeScene);
+        }
+        const reviewNote = readElement('scene-review-note');
+        reviewNote.textContent = hasSceneNarration(activeScene)
+          ? 'Lời dẫn, mã Python và nguồn liên quan.'
+          : 'Thêm lời dẫn trước khi duyệt cảnh.';
+        reviewNote.classList.toggle('missing', !hasSceneNarration(activeScene));
+        readElement('review-count').textContent = `${reviewedCount} / 4 cảnh`;
+        readElement('script-state').textContent = scriptConfirmed
+          ? 'Đã xác nhận · bản thử'
+          : sceneOrder.some((id) => !hasSceneNarration(id))
+            ? 'Lời dẫn còn thiếu'
+            : canConfirmScript()
+              ? 'Sẵn sàng xác nhận'
+              : 'Cần duyệt từng cảnh';
+        const button = readElement('confirm-script');
+        if (button instanceof HTMLButtonElement) {
+          button.disabled = !canConfirmScript();
+          button.setAttribute(
+            'aria-label',
+            scriptConfirmed
+              ? 'Xem lại xác nhận kịch bản trong bản thử'
+              : 'Duyệt kịch bản sau khi kiểm tra đủ bốn cảnh',
+          );
+        }
+        renderScenes();
+      }
+      function renderPlaybackControls() {
+        const button = readElement('play-button');
+        button.hidden = activeScene === 'practice';
+        button.setAttribute('aria-pressed', String(illustrationTimer !== null));
+        button.innerHTML =
+          illustrationTimer !== null
+            ? '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M5 3v10M11 3v10"/></svg><span>Dừng minh họa</span>'
+            : `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="m6 3 6 5-6 5V3Z"/></svg><span>${usesReducedMotion() ? 'Bước minh họa tiếp' : 'Chạy minh họa'}</span>`;
+        readElement('illustration-note').textContent =
+          activeScene === 'practice'
+            ? 'Câu hỏi và đáp án mẫu · khung minh họa'
+            : illustrationTimer !== null
+              ? 'Đổi trạng thái số · không phải video'
+              : usesReducedMotion()
+                ? 'Đổi từng bước · giảm chuyển động'
+                : 'Minh họa cục bộ · không phải video';
+      }
+      function stopIllustration() {
+        if (illustrationTimer !== null) {
+          window.clearInterval(illustrationTimer);
+          illustrationTimer = null;
+        }
+        renderPlaybackControls();
+      }
+      function toggleIllustration() {
+        if (activeScene === 'practice') {
+          return;
+        }
+        if (illustrationTimer !== null) {
+          stopIllustration();
+          renderCanvas();
+          announce('Đã dừng minh họa cục bộ.');
+          return;
+        }
+        if (usesReducedMotion()) {
+          illustrationStarted = true;
+          illustrationStep = (illustrationStep + 1) % 3;
+          renderCanvas();
+          announce(
+            `Bước minh họa ${illustrationStep + 1} trong 3. Chế độ giảm chuyển động không tự chạy.`,
+          );
+          return;
+        }
+        illustrationStarted = true;
+        illustrationStep = 0;
+        illustrationTimer = window.setInterval(() => {
+          illustrationStep = (illustrationStep + 1) % 3;
+          renderCanvas();
+        }, 1700);
+        renderPlaybackControls();
+        renderCanvas();
+        announce(
+          'Đang minh họa các trạng thái số có sẵn trong trang. Không chạy Python hoặc phát video.',
+        );
+      }
+      /** @param {SceneId} id */
+      function selectScene(id) {
+        const previousFocus = document.activeElement;
+        const restoreSceneFocus =
+          previousFocus instanceof HTMLElement && Boolean(previousFocus.closest('[data-scene]'));
+        stopIllustration();
+        activeScene = id;
+        illustrationStep = 2;
+        illustrationStarted = false;
+        readElement('scene-index').textContent = sceneNumber();
+        readElement('scene-title').textContent = scenes[id].title;
+        readElement('scene-purpose').textContent = scenes[id].purpose;
+        renderPlaybackControls();
+        renderCanvas();
+        renderInspector();
+        if (restoreSceneFocus) {
+          const sceneButton = document.querySelector(`[data-scene="${id}"]`);
+          if (sceneButton instanceof HTMLButtonElement) {
+            sceneButton.focus({ preventScroll: true });
+          }
+        }
+        announce(
+          `Cảnh ${sceneNumber()}: ${scenes[id].title}. ${reviews[id].reviewed ? 'Đã được bạn duyệt.' : 'Chưa duyệt.'}`,
+        );
+      }
+      /** @param {string} id */
+      function openDialog(id) {
+        const dialog = document.getElementById(id);
+        if (dialog instanceof HTMLDialogElement) {
+          dialog.showModal();
+        }
+      }
+      /** @param {string} id */
+      function closeDialog(id) {
+        const dialog = document.getElementById(id);
+        if (dialog instanceof HTMLDialogElement) {
+          dialog.close();
+        }
+      }
+      document.addEventListener('input', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLTextAreaElement) || target.id !== 'narration-editor') {
+          return;
+        }
+        const wasReviewed = reviews[activeScene].reviewed || scriptConfirmed;
+        reviews[activeScene].narration = target.value;
+        reviews[activeScene].reviewed = false;
+        scriptConfirmed = false;
+        readElement('narration-count').textContent = `${target.value.length} ký tự`;
+        target.setAttribute('aria-invalid', String(!hasSceneNarration(activeScene)));
+        updateReviews();
+        if (wasReviewed) {
+          announce('Lời dẫn đã thay đổi. Cảnh này và kịch bản cần được bạn xác nhận lại.');
+        }
+      });
+      document.addEventListener('change', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement) || target.id !== 'review-scene') {
+          return;
+        }
+        reviews[activeScene].reviewed = target.checked && hasSceneNarration(activeScene);
+        scriptConfirmed = false;
+        updateReviews();
+        announce(
+          !hasSceneNarration(activeScene)
+            ? 'Thêm lời dẫn trước khi duyệt cảnh.'
+            : reviews[activeScene].reviewed
+              ? `Bạn đã duyệt cảnh ${sceneNumber()}.`
+              : `Bạn đã bỏ duyệt cảnh ${sceneNumber()}.`,
+        );
+      });
+      document.addEventListener(
+        'toggle',
+        (event) => {
+          const target = event.target;
+          if (target instanceof HTMLDetailsElement && target.dataset.sourceKey) {
+            sourceDisclosures[target.dataset.sourceKey] = target.open;
+          }
+        },
+        true,
+      );
+      document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+          return;
+        }
+        const button = target.closest('button');
+        if (!(button instanceof HTMLButtonElement) || button.disabled) {
+          return;
+        }
+        if (isSceneId(button.dataset.scene)) {
+          selectScene(button.dataset.scene);
+        }
+        if (isInspectorPanel(button.dataset.panel)) {
+          activePanel = button.dataset.panel;
+          renderInspector();
+          announce(
+            `Đang xem ${activePanel === 'narration' ? 'lời dẫn' : activePanel === 'python' ? 'mã Python' : 'nguồn và đính chính'} của cảnh ${sceneNumber()}.`,
+          );
+        }
+        if (button.dataset.action === 'toggle-play') {
+          toggleIllustration();
+        }
+        if (button.dataset.action === 'toggle-answer') {
+          const restoreAnswerFocus = document.activeElement === button;
+          practiceAnswerVisible = !practiceAnswerVisible;
+          renderCanvas();
+          if (restoreAnswerFocus) {
+            const answerButton = document.querySelector('[data-action="toggle-answer"]');
+            if (answerButton instanceof HTMLButtonElement) {
+              answerButton.focus({ preventScroll: true });
+            }
+          }
+          announce(practiceAnswerVisible ? 'Đáp án mẫu cho giáo viên là 9.' : 'Đã ẩn đáp án mẫu.');
+        }
+        if (button.dataset.action === 'open-help') {
+          openDialog('help-dialog');
+        }
+        if (button.dataset.action === 'open-confirmation' && canConfirmScript()) {
+          stopIllustration();
+          openDialog('confirmation-dialog');
+        }
+        if (button.dataset.action === 'confirm-local-script' && canConfirmScript()) {
+          scriptConfirmed = true;
+          updateReviews();
+          closeDialog('confirmation-dialog');
+          announce('Đã xác nhận kịch bản trong bản thử. Không tạo video hoặc phát hành nội dung.');
+        }
+        if (button.dataset.close) {
+          closeDialog(button.dataset.close);
+        }
+      });
+      document.addEventListener('keydown', (event) => {
+        const target = event.target;
+        if (
+          !(target instanceof HTMLButtonElement) ||
+          !target.dataset.scene ||
+          (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')
+        ) {
+          return;
+        }
+        event.preventDefault();
+        const index = sceneOrder.indexOf(activeScene);
+        const next = sceneOrder[(index + (event.key === 'ArrowRight' ? 1 : 3)) % 4];
+        if (!next) {
+          return;
+        }
+        selectScene(next);
+        const nextButton = document.querySelector(`[data-scene="${next}"]`);
+        if (nextButton instanceof HTMLButtonElement) {
+          nextButton.focus();
+        }
+      });
+      window.addEventListener('pagehide', stopIllustration);
+      reducedMotionQuery?.addEventListener('change', () => {
+        stopIllustration();
+        renderCanvas();
+      });
+      renderCanvas();
+      renderInspector();
+      renderPlaybackControls();
+    </script>
+  </body>
+</html>

@@ -7,6 +7,9 @@ const vietnamese: Readonly<Record<string, string>> = {
   'Choose a class': 'Chọn lớp học',
   Refresh: 'Cập nhật',
   'Loading guided lessons…': 'Đang tải bài giảng hướng dẫn…',
+  'Loading approved material…': 'Đang tải tài liệu đã duyệt…',
+  'Approved material could not be loaded.': 'Không thể tải tài liệu đã duyệt.',
+  'Try again': 'Thử lại',
   'Guided lessons could not be loaded. Try again.':
     'Không thể tải bài giảng hướng dẫn. Hãy thử lại.',
   'This view changed. Refresh before trying again.':
@@ -24,17 +27,23 @@ const vietnamese: Readonly<Record<string, string>> = {
   'Open lesson': 'Mở bài giảng',
   'Review draft': 'Xem bản nháp',
   'Back to library': 'Về thư viện',
+  Content: 'Nội dung',
+  Review: 'Xem lại',
+  'Lesson preparation': 'Chuẩn bị bài giảng',
+  Passage: 'Đoạn nguồn',
+  'Read exact text': 'Đọc nguyên văn',
+  Read: 'Đọc',
+  Options: 'Tùy chọn',
+  'Search passages': 'Tìm đoạn nguồn',
+  'Approved passages': 'Các đoạn nguồn đã duyệt',
+  'Required with selected source': 'Bắt buộc đi kèm nguồn đã chọn',
+  'No passages match your search.': 'Không có đoạn nguồn phù hợp với từ khóa.',
+  Optional: 'Không bắt buộc',
+  'Edit content': 'Sửa nội dung',
+  'Generation allowance': 'Hạn mức biên soạn',
+  Back: 'Quay lại',
   'Approved source': 'Nguồn đã duyệt',
   'Approved Python example': 'Ví dụ Python đã duyệt',
-  'Use the exact integer running-total example from these sources.':
-    'Dùng chính xác ví dụ tổng tích lũy số nguyên trong các nguồn này.',
-  'I checked this code against the selected source.':
-    'Tôi đã đối chiếu đoạn mã này với nguồn đã chọn.',
-  'Practice variant with a different input': 'Ví dụ luyện tập với dữ liệu đầu vào khác',
-  'Use the same mechanism with new numbers so students can try it independently.':
-    'Dùng cùng cơ chế với các số mới để học sinh tự thực hành.',
-  'I approve this practice variant and its source relationship.':
-    'Tôi duyệt ví dụ luyện tập này và mối liên hệ với nguồn.',
   'Choose approved material': 'Chọn tài liệu đã duyệt',
   'Concept or section': 'Khái niệm hoặc phần bài học',
   'Choose a section': 'Chọn phần bài học',
@@ -42,7 +51,6 @@ const vietnamese: Readonly<Record<string, string>> = {
   'What should students understand after this explanation?':
     'Học sinh cần hiểu điều gì sau phần giải thích này?',
   Audience: 'Đối tượng học',
-  'Beginning Python learner': 'Người mới học Python',
   Language: 'Ngôn ngữ',
   English: 'Tiếng Anh',
   Vietnamese: 'Tiếng Việt',
@@ -56,7 +64,6 @@ const vietnamese: Readonly<Record<string, string>> = {
   'Choose up to eight exact passages, including relevant corrections. Narrow the source selection if more are needed.':
     'Chọn tối đa tám đoạn nguồn chính xác, kể cả các đính chính liên quan. Hãy thu hẹp phạm vi nguồn nếu cần nhiều hơn.',
   'Select at least one approved passage.': 'Chọn ít nhất một đoạn nguồn đã duyệt.',
-  'Supported beta: integer running totals.': 'Bản thử nghiệm hỗ trợ tổng tích lũy số nguyên.',
   'Generation uses an allowance only after you confirm. Students cannot start generation.':
     'Chỉ sử dụng hạn mức tạo bài khi bạn xác nhận. Học sinh không thể tự tạo bài.',
   'Generate private draft': 'Tạo bản nháp riêng tư',
@@ -68,6 +75,43 @@ const vietnamese: Readonly<Record<string, string>> = {
   'Cancel run': 'Hủy biên soạn',
   'Retry with a new allowance': 'Thử lại với hạn mức mới',
   'Script and checkpoints': 'Lời giảng và câu hỏi',
+  'Private preview review': 'Kiểm tra video riêng tư',
+  'Preview identity could not be verified. Refresh this lesson.':
+    'Không thể xác minh bản xem trước. Hãy cập nhật bài giảng.',
+  'Review and approval': 'Kiểm tra và duyệt',
+  'Run details': 'Chi tiết lượt tạo',
+  'Scene title': 'Tiêu đề cảnh',
+  'Enter text before saving or approving.': 'Điền nội dung trước khi lưu hoặc duyệt.',
+  'This scene has no narration.': 'Cảnh này không có lời dẫn.',
+  'Reflection and teacher questions': 'Câu hỏi suy ngẫm và của giáo viên',
+  'This scene has no checkpoint.': 'Cảnh này không có câu hỏi luyện tập.',
+  'Load this scene': 'Tải cảnh này',
+  'Scenes in this lesson': 'Các cảnh trong bài',
+  'Scene reviewed': 'Đã duyệt cảnh',
+  'Scene not reviewed': 'Chưa duyệt cảnh',
+  'Scene content and review': 'Nội dung và duyệt cảnh',
+  'Scene content': 'Nội dung cảnh',
+  Checkpoints: 'Câu hỏi luyện tập',
+  'Key points': 'Ý chính',
+  'Read-only key points from the approved script.':
+    'Ý chính từ kịch bản đã duyệt, chỉ để đối chiếu.',
+  'Read-only code from the approved lesson input.': 'Mã từ đầu vào đã duyệt, chỉ để đối chiếu.',
+  'This scene has no Python example.': 'Cảnh này không có ví dụ Python.',
+  'Source passage': 'Đoạn nguồn',
+  'No source passages are attached to this scene.': 'Cảnh này chưa gắn đoạn nguồn nào.',
+  'Other lesson sources': 'Nguồn khác của bài giảng',
+  'Load the current preview before reviewing its evidence.':
+    'Tải bản xem trước hiện tại để kiểm tra bằng chứng.',
+  'I reviewed this script scene.': 'Tôi đã kiểm tra nội dung cảnh này.',
+  'Script scenes reviewed': 'cảnh kịch bản đã duyệt',
+  'Script illustration': 'Minh họa kịch bản',
+  'Last state in this scene': 'Giá trị cuối của cảnh này',
+  Step: 'Bước',
+  After: 'Sau đó',
+  'Let students predict before showing the worked answer.':
+    'Để học sinh dự đoán trước khi xem lời giải mẫu.',
+  'Based on the script and approved sources. This is not a rendered video.':
+    'Dựa trên kịch bản và nguồn đã duyệt. Đây là minh họa, chưa phải video đã dựng.',
   Scene: 'Cảnh',
   'Script scenes opened': 'Cảnh lời giảng đã mở',
   'Update Tro to play this lesson with its approved graphics and fonts.':
@@ -87,6 +131,7 @@ const vietnamese: Readonly<Record<string, string>> = {
     'Sửa đổi cần được duyệt và chấp thuận lại trước khi tạo nội dung nghe nhìn.',
   'I reviewed the script, sources, hints and worked explanations.':
     'Tôi đã xem lời giảng, nguồn, gợi ý và giải thích mẫu.',
+  'I reviewed the script and sources.': 'Tôi đã xem lời giảng và nguồn.',
   'Approve this script': 'Duyệt lời giảng này',
   'Script approved': 'Đã duyệt lời giảng',
   'Make private preview': 'Tạo bản xem trước riêng tư',
@@ -110,10 +155,6 @@ const vietnamese: Readonly<Record<string, string>> = {
   'Review findings': 'Kết quả duyệt',
   'Token usage': 'Lượng token đã dùng',
   'Actual reported token usage': 'Lượng token thực tế đã báo cáo',
-  'Estimated clean run: 20–40k text tokens. Image inputs are counted separately.':
-    'Ước tính lượt tạo thuận lợi: 20–40 nghìn token văn bản. Đầu vào hình ảnh được tính riêng.',
-  'Run limits: 90k input and 30k output tokens. Reviewing later edits uses a separate run allowance. These are limits, not actual usage.':
-    'Giới hạn mỗi lượt: 90 nghìn token đầu vào và 30 nghìn đầu ra. Duyệt sửa đổi sau đó dùng hạn mức lượt riêng. Đây là giới hạn, không phải lượng dùng thực tế.',
   'The latest six exchanges for this step stay here.':
     'Sáu lượt trao đổi gần nhất của bước này được giữ tại đây.',
   'Clear conversation': 'Xóa cuộc trao đổi',

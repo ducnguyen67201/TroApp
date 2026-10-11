@@ -13,6 +13,7 @@ import {
   type NarrationBeat,
   type ReviewIssue,
   type Scene,
+  type SourceExplanationScene,
   type SourceRef,
 } from '#contracts/GuidedLessons.js';
 import { usesLessonGlyphs } from './LessonGlyphs.js';
@@ -268,6 +269,14 @@ function checkNarration(
 ): void {
   const location = { sceneId: scene.sceneId, beatId: beat.beatId };
   checkSourceRefs(input, beat.sourceRefs, addIssue, location);
+  if (beat.text.trim().length === 0) {
+    addIssue(
+      ReviewCriterion.SOURCE_SUPPORT,
+      'A narration beat contains only whitespace.',
+      'Provide nonempty source-grounded narration.',
+      location,
+    );
+  }
   if ((beat.traceEventId === null) !== (beat.stateView === null)) {
     addIssue(
       ReviewCriterion.TIMELINE,
@@ -285,6 +294,32 @@ function checkNarration(
       'Narration names an absent trace event.',
       'Use an event from the pinned canonical trace.',
       location,
+    );
+  }
+}
+
+/** Scene citations also bound the source passages available to grounded learner help. */
+function checkExplanationSourceCoverage(scene: SourceExplanationScene, addIssue: AddIssue): void {
+  const references = [
+    ...scene.params.points.flatMap((point) => point.sourceRefs),
+    ...scene.narration.flatMap((beat) => beat.sourceRefs),
+  ];
+  if (
+    references.some(
+      (reference) =>
+        !scene.sourceRefs.some(
+          (sceneReference) =>
+            sceneReference.passageId === reference.passageId &&
+            sceneReference.startOffset <= reference.startOffset &&
+            sceneReference.endOffset >= reference.endOffset,
+        ),
+    )
+  ) {
+    addIssue(
+      ReviewCriterion.SOURCE_SUPPORT,
+      'An explanation point or narration citation falls outside its scene citations.',
+      'Cover every point and narration source range in the scene sourceRefs.',
+      { sceneId: scene.sceneId },
     );
   }
 }
@@ -498,6 +533,13 @@ export function validateLessonPlan(input: LessonInput, plan: LessonPlan): Review
       'Resolve missing information before script approval.',
     );
   }
+  if ((input.codeBlocks.length > 0 || input.traces.length > 0) && plan.checkpoints.length === 0) {
+    addIssue(
+      ReviewCriterion.CHECKPOINT,
+      'A code lesson omits its required checkpoint.',
+      'Include at least one grounded checkpoint for the approved code.',
+    );
+  }
   checkUniqueIds(
     plan.scenes.map((scene) => scene.sceneId),
     'Scenes',
@@ -511,6 +553,15 @@ export function validateLessonPlan(input: LessonInput, plan: LessonPlan): Review
   checkUniqueIds(
     plan.checkpoints.map((checkpoint) => checkpoint.sceneId),
     'Checkpoint scenes',
+    addIssue,
+  );
+  checkUniqueIds(
+    plan.scenes.flatMap((scene) =>
+      scene.kind === LessonTemplateKind.SOURCE_EXPLANATION
+        ? scene.params.points.map((point) => point.pointId)
+        : [],
+    ),
+    'Explanation points',
     addIssue,
   );
   const beats = [
@@ -527,6 +578,9 @@ export function validateLessonPlan(input: LessonInput, plan: LessonPlan): Review
       scene.title,
       ...(scene.kind === LessonTemplateKind.ANNOTATED_SOURCE
         ? scene.params.callouts.map((callout) => callout.label)
+        : []),
+      ...(scene.kind === LessonTemplateKind.SOURCE_EXPLANATION
+        ? scene.params.points.map((point) => point.text)
         : []),
     ]),
     ...beats.map((beat) => beat.text),
@@ -662,6 +716,35 @@ export function validateLessonPlan(input: LessonInput, plan: LessonPlan): Review
             location,
           );
         }
+      }
+    } else if (scene.kind === LessonTemplateKind.SOURCE_EXPLANATION) {
+      checkExplanationSourceCoverage(scene, addIssue);
+      if (scene.title.trim().length === 0 || scene.narration.length === 0) {
+        addIssue(
+          ReviewCriterion.SOURCE_SUPPORT,
+          'A source explanation has no readable title or narration.',
+          'Provide a nonempty title and at least one grounded narration beat.',
+          location,
+        );
+      }
+      for (const point of scene.params.points) {
+        checkSourceRefs(input, point.sourceRefs, addIssue, location);
+        if (point.pointId.trim().length === 0 || point.text.trim().length === 0) {
+          addIssue(
+            ReviewCriterion.SOURCE_SUPPORT,
+            'A source explanation point has a blank identifier or text.',
+            'Provide a unique nonempty identifier and source-grounded text.',
+            location,
+          );
+        }
+      }
+      if (scene.narration.some((beat) => beat.traceEventId !== null || beat.stateView !== null)) {
+        addIssue(
+          ReviewCriterion.TRACE_CORRECTNESS,
+          'A source explanation introduces code-trace metadata.',
+          'Keep traceEventId and stateView null for source explanations.',
+          location,
+        );
       }
     } else if (
       !plan.checkpoints.some(

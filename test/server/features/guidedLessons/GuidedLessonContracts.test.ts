@@ -5,11 +5,12 @@ import {
   GuidedLessonReadRequestSchema,
   LearnerProjectionSchema,
   LessonInputSchema,
+  SourceExplanationSceneSchema,
 } from '#contracts/GuidedLessons.js';
 import { buildLessonProjection } from '../../../../src/server/features/guidedLessons/domain/BuildLessonProjection.js';
 import { createLessonFixture } from './LessonFixture.js';
 
-it('rejects arbitrary action fields and requires explicit approved code inputs', () => {
+it('rejects arbitrary action fields and accepts explicit null code inputs for source lessons', () => {
   const command = {
     action: 'create',
     commandId: '67ef4bc4-7f79-41e6-952e-62e6584d2b48',
@@ -44,11 +45,53 @@ it('rejects arbitrary action fields and requires explicit approved code inputs',
   ).toBe(true);
 });
 
+it('bounds source explanation points and rejects executable or arbitrary scene fields', () => {
+  const sourceRefs = [{ passageId: 'source-1', startOffset: 0, endOffset: 12 }];
+  const scene = {
+    sceneId: 'explain-1',
+    title: 'Read the material',
+    templateVersion: '1.0.0',
+    layoutVariant: 'standard',
+    kind: 'sourceExplanation',
+    sourceRefs,
+    narration: [
+      {
+        beatId: 'beat-1',
+        text: 'Explain the selected material.',
+        sourceRefs,
+        traceEventId: null,
+        stateView: null,
+      },
+    ],
+    params: { points: [{ pointId: 'point-1', text: 'A grounded teaching point.', sourceRefs }] },
+  };
+  expect(SourceExplanationSceneSchema.safeParse(scene).success).toBe(true);
+  expect(
+    SourceExplanationSceneSchema.safeParse({ ...scene, params: { ...scene.params, code: 'run()' } })
+      .success,
+  ).toBe(false);
+  expect(SourceExplanationSceneSchema.safeParse({ ...scene, params: { points: [] } }).success).toBe(
+    false,
+  );
+  expect(
+    SourceExplanationSceneSchema.safeParse({
+      ...scene,
+      params: { points: [{ pointId: 'point-1', text: 'x'.repeat(181), sourceRefs }] },
+    }).success,
+  ).toBe(false);
+});
+
 it('rejects untrusted source metadata and raw trace events in learner projections', () => {
   const fixture = createLessonFixture();
   expect(LessonInputSchema.safeParse({ ...fixture.input, shell: 'python' }).success).toBe(false);
   const projection = buildLessonProjection({ ...fixture, sceneId: 'predict' });
   expect(LearnerProjectionSchema.safeParse(projection).success).toBe(true);
+  expect(LearnerProjectionSchema.safeParse({ ...projection, language: undefined }).success).toBe(
+    false,
+  );
+  expect(
+    LearnerProjectionSchema.safeParse({ ...projection, lessonPhases: undefined }).success,
+  ).toBe(false);
   expect(
     LearnerProjectionSchema.safeParse({ ...projection, visibleTraceStates: [fixture.held] })
       .success,

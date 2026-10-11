@@ -5,6 +5,7 @@ import {
   readWaveMetadata,
 } from '../../../../src/server/features/guidedLessons/infrastructure/OpenAiLessonSpeech.js';
 import { LessonProviderNotDispatchedError } from '../../../../src/server/features/guidedLessons/application/LessonPorts.js';
+import { LessonLanguage } from '#contracts/GuidedLessons.js';
 
 function writeTag(bytes: Uint8Array, offset: number, tag: string): void {
   bytes.set(
@@ -137,6 +138,39 @@ it('sends the exact approved text once and returns a measured artifact with no S
   expect(payload.response_format).toBe('wav');
   expect(payload.voice).toBe('marin');
 });
+
+it.each([
+  {
+    language: LessonLanguage.EN,
+    text: 'Analyze the calibration curve.',
+    instruction: 'in English',
+  },
+  {
+    language: LessonLanguage.VI,
+    text: 'Phan tich do thi hieu chuan.',
+    instruction: 'bằng tiếng Việt',
+  },
+])(
+  'reads the exact $language script without assuming a beginner audience or unavailable pronunciation data',
+  async ({ language, text, instruction }) => {
+    const wave = createWave();
+    const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(wave.buffer));
+    const speech = new OpenAiLessonSpeech('test-key', undefined, undefined, request);
+    await speech.synthesize({ ...SpeechRequest, language, text }, new AbortController().signal);
+    const body = request.mock.calls[0]?.[1]?.body;
+    if (typeof body !== 'string') {
+      throw new Error('Expected a JSON speech request.');
+    }
+    const payload = z
+      .object({ input: z.string(), instructions: z.string() })
+      .parse(JSON.parse(body));
+    expect(payload.input).toBe(text);
+    expect(payload.instructions).toContain(instruction);
+    expect(payload.instructions).not.toMatch(
+      /beginner|người mới học|aliases|đã được giáo viên duyệt/,
+    );
+  },
+);
 
 it('does not dispatch when the speech provider is unconfigured', async () => {
   const request = vi.fn<typeof fetch>();

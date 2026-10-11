@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
+import { ReviewCriterion } from '#contracts/GuidedLessons.js';
 import { OpenAiLessonModel } from '../../../../src/server/features/guidedLessons/infrastructure/OpenAiLessonModel.js';
 import {
   LessonModelStage,
   type LessonModelRequest,
 } from '../../../../src/server/features/guidedLessons/application/LessonPorts.js';
 import { createLessonFixture } from './LessonFixture.js';
+import { createSourceLessonFixture } from './SourceLessonFixture.js';
 import { buildLessonProjection } from '../../../../src/server/features/guidedLessons/domain/BuildLessonProjection.js';
 
 function readBody(init: RequestInit | undefined): string {
@@ -124,4 +127,60 @@ describe('structured lesson model adapter', () => {
       },
     });
   });
+
+  it.each([false, true])(
+    'sends only applicable review criteria (code lesson: %s)',
+    async (code) => {
+      const fixture = code ? createLessonFixture() : createSourceLessonFixture();
+      const captured: ReviewCriterion[][] = [];
+      const fetcher = vi.fn<typeof fetch>((_url, init) => {
+        const raw: unknown = JSON.parse(readBody(init));
+        const body = z
+          .object({
+            input: z.array(
+              z.object({
+                content: z.array(z.object({ type: z.string(), text: z.string().optional() })),
+              }),
+            ),
+          })
+          .parse(raw);
+        const text = body.input[0]?.content.find((part) => part.type === 'input_text')?.text;
+        if (!text) {
+          throw new Error('Expected a serialized stage input.');
+        }
+        const stageInput: unknown = JSON.parse(text);
+        captured.push(
+          z.object({ requiredCriteria: z.array(z.enum(ReviewCriterion)) }).parse(stageInput)
+            .requiredCriteria,
+        );
+        return Promise.resolve(Response.json({ input_tokens: 100 }));
+      });
+      const model = new OpenAiLessonModel('synthetic-test-key', 'gpt-5.4', fetcher);
+      const request: LessonModelRequest = {
+        ...readRequest(),
+        input: fixture.input,
+        plan: fixture.plan,
+        manifest: fixture.record.manifest,
+      };
+      await model.countInput({ ...request, stage: LessonModelStage.REVIEW });
+      await model.countInput({ ...request, stage: LessonModelStage.VISUAL_REVIEW });
+      const conditional = code
+        ? [ReviewCriterion.TRACE_CORRECTNESS, ReviewCriterion.CHECKPOINT]
+        : [];
+      expect(captured).toEqual([
+        [ReviewCriterion.SOURCE_SUPPORT, ...conditional],
+        [
+          ReviewCriterion.READABILITY,
+          ReviewCriterion.HIERARCHY,
+          ReviewCriterion.CONTINUITY,
+          ReviewCriterion.STYLE,
+          ReviewCriterion.TIMELINE,
+          ReviewCriterion.ASSETS,
+          ...conditional,
+          ReviewCriterion.PRONUNCIATION,
+          ReviewCriterion.MOTION,
+        ],
+      ]);
+    },
+  );
 });

@@ -1,3 +1,4 @@
+import type { LearnerProjection, LessonPhase, RenderManifest } from '#contracts/GuidedLessons.js';
 import { buildLessonProjection } from '../../../../src/server/features/guidedLessons/domain/BuildLessonProjection.js';
 import { createLessonFixture } from './LessonFixture.js';
 
@@ -10,4 +11,23 @@ export function createLessonPlaybackFixture(sceneId = 'predict') {
     progress: { ...fixture.progress, sceneId },
   });
   return { ...fixture, projection };
+}
+
+/** Teacher UI tests obtain real projections without importing backend implementation. */
+export function createTeacherLessonPreviewFixture(
+  sceneId: string,
+  phase: LessonPhase,
+  hashValue: (value: unknown) => string,
+  manifest?: RenderManifest,
+): LearnerProjection {
+  const fixture = createLessonFixture();
+  return buildLessonProjection({
+    ...fixture,
+    record: manifest ? { ...fixture.record, manifest } : fixture.record,
+    hashValue,
+    sceneId,
+    phase,
+    teacherPreview: true,
+    progress: { ...fixture.progress, sceneId },
+  });
 }

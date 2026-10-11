@@ -32,6 +32,7 @@ import { admitLessonRun, createLessonBudget, LessonPolicy } from './LessonBudget
 import {
   buildLessonInput,
   buildPublicationLessonPassages,
+  readPublicationSectionPassages,
   hashLessonValue,
 } from './BuildLessonInput.js';
 import {
@@ -219,27 +220,18 @@ export class GuidedLessonService {
           revisions: [
             {
               id: publication.courseId,
-              title: 'Approved course material',
-              sections: publication.draft.sections.map((section) => {
-                const originals = new Set(
-                  passages
-                    .filter(
-                      (passage) => passage.pageId && section.sourcePageIds.includes(passage.pageId),
-                    )
-                    .map((passage) => passage.passageId),
-                );
-                return {
-                  id: section.id,
-                  title: section.title,
-                  passageIds: passages
-                    .filter(
-                      (passage) =>
-                        originals.has(passage.passageId) ||
-                        passage.correctsPassageIds.some((id) => originals.has(id)),
-                    )
-                    .map((passage) => passage.passageId),
-                };
-              }),
+              title: (
+                publication.sources.map((source) => source.name).join(', ') ||
+                publication.draft.summary.trim() ||
+                publication.courseId
+              ).slice(0, 300),
+              sections: publication.draft.sections.map((section) => ({
+                id: section.id,
+                title: section.title,
+                passageIds: readPublicationSectionPassages(section, passages).map(
+                  (passage) => passage.passageId,
+                ),
+              })),
             },
           ],
           passages,

@@ -1,11 +1,26 @@
 import { expect, it } from 'vitest';
 import { buildLessonProjection } from '../../../../src/server/features/guidedLessons/domain/BuildLessonProjection.js';
 import { createLessonFixture } from './LessonFixture.js';
+import { createSourceLessonFixture } from './SourceLessonFixture.js';
+
+it('carries the explicitly selected language even when the source and scene titles use another language', () => {
+  const fixture = createSourceLessonFixture();
+  const input = { ...fixture.input, language: 'vi' as const };
+  const plan = { ...fixture.plan, language: 'vi' as const };
+  const projection = buildLessonProjection({
+    ...fixture,
+    record: { ...fixture.record, input, plan },
+  });
+  expect(projection.language).toBe('vi');
+  expect(projection.sceneTitle).toBe('Read the first idea');
+});
 
 it('projects only the held before state and pending audio until an authorized reveal', () => {
   const { record, progress, hashValue, held } = createLessonFixture();
   const projection = buildLessonProjection({ record, progress, hashValue, sceneId: 'predict' });
   expect(projection.phase).toBe('predict');
+  expect(projection.language).toBe(record.input.language);
+  expect(projection.lessonPhases).toEqual(['watch', 'predict', 'worked', 'reflect']);
   expect(projection.visibleTraceStates).toHaveLength(1);
   expect(projection.visibleTraceStates[0]).toEqual({
     eventId: held.eventId,
@@ -174,4 +189,55 @@ it('allows only the approved video for the current scene and phase', () => {
   expect(() => buildLessonProjection({ ...fixture, sceneId: 'predict' })).toThrow(
     'one exact approved video',
   );
+});
+
+it('projects exact approved source points and speech without inventing program state or figure access', () => {
+  const fixture = createSourceLessonFixture();
+  for (const scene of fixture.plan.scenes) {
+    if (scene.kind !== 'sourceExplanation') {
+      throw new Error('The source fixture must contain only source explanations.');
+    }
+    const projection = buildLessonProjection({ ...fixture, sceneId: scene.sceneId });
+    expect(projection.phase).toBe('watch');
+    expect(projection.lessonPhases).toEqual(['watch', 'reflect']);
+    expect(projection.language).toBe(fixture.input.language);
+    expect(projection.presentation).toEqual({
+      kind: 'sourceExplanation',
+      templateVersion: scene.templateVersion,
+      layoutVariant: scene.layoutVariant,
+      points: scene.params.points,
+    });
+    expect(projection.visibleTraceStates).toEqual([]);
+    expect(projection.visualCues).toEqual([]);
+    expect(projection.checkpoint).toBeNull();
+    expect(projection.narrationCues.map((cue) => cue.text)).toEqual(
+      scene.narration.map((beat) => beat.text),
+    );
+    expect(projection.allowedArtifactIds).toEqual(
+      scene.narration.map((beat) => `audio-${beat.beatId}`),
+    );
+    expect(projection.presentation).not.toHaveProperty('figure');
+    expect(projection.presentation).not.toHaveProperty('codeBlock');
+  }
+});
+
+it('supports a source-only reflection without speech or checkpoint and rejects worked-phase invention', () => {
+  const fixture = createSourceLessonFixture();
+  const scene = fixture.plan.scenes.at(-1);
+  if (!scene) {
+    throw new Error('The source fixture needs a final scene.');
+  }
+  const reflection = buildLessonProjection({
+    ...fixture,
+    sceneId: scene.sceneId,
+    phase: 'reflect',
+  });
+  expect(reflection.phase).toBe('reflect');
+  expect(reflection.presentation.kind).toBe('sourceExplanation');
+  expect(reflection.narrationCues).toEqual([]);
+  expect(reflection.allowedArtifactIds).toEqual([]);
+  expect(reflection.visibleTraceStates).toEqual([]);
+  expect(() =>
+    buildLessonProjection({ ...fixture, sceneId: scene.sceneId, phase: 'worked' }),
+  ).toThrow('requires a checkpoint');
 });

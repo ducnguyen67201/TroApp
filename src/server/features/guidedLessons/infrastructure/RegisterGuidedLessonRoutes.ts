@@ -12,6 +12,11 @@ import {
 } from '#contracts/GuidedLessons.js';
 import type { GuidedLessonService } from '../application/GuidedLessonService.js';
 import { LessonError, LessonFailure } from '../application/LessonFailure.js';
+import {
+  describeLessonRequestError,
+  readLessonRequestContext,
+  LessonRequestStage,
+} from './GuidedLessonRequestDiagnostics.js';
 
 function describeFailure(error: unknown): { status: number; reply: GuidedLessonReply } {
   const code =
@@ -91,14 +96,22 @@ export function registerGuidedLessonRoutes(
             message: 'Sign in to use guided lessons.',
           });
         }
+        const startedAt = performance.now();
+        let failureStage: LessonRequestStage = LessonRequestStage.REQUEST;
         try {
-          const result =
+          const parsed =
             action === 'read'
-              ? await service.read(userId, GuidedLessonReadSchema.parse(request.body))
-              : await service.execute(userId, GuidedLessonCommandSchema.parse(request.body));
+              ? { kind: 'read' as const, input: GuidedLessonReadSchema.parse(request.body) }
+              : { kind: 'command' as const, input: GuidedLessonCommandSchema.parse(request.body) };
+          failureStage = LessonRequestStage.SERVICE;
+          const result =
+            parsed.kind === 'read'
+              ? await service.read(userId, parsed.input)
+              : await service.execute(userId, parsed.input);
           if (action === 'command') {
             wake();
           }
+          failureStage = LessonRequestStage.RESPONSE;
           return GuidedLessonReplySchema.parse(result);
         } catch (error: unknown) {
           const failure = describeFailure(error);
@@ -106,6 +119,10 @@ export function registerGuidedLessonRoutes(
             {
               requestId: request.id,
               stage: action,
+              ...readLessonRequestContext(request.body, action),
+              failureStage,
+              elapsedMs: Math.round(performance.now() - startedAt),
+              ...describeLessonRequestError(error, failureStage),
               code:
                 failure.reply.kind === 'failed' ? failure.reply.code : GuidedLessonFailure.INTERNAL,
             },
@@ -129,18 +146,22 @@ export function registerGuidedLessonRoutes(
           message: 'Sign in to read lesson media.',
         });
       }
+      const startedAt = performance.now();
+      let failureStage: LessonRequestStage = LessonRequestStage.REQUEST;
+      let context = readLessonRequestContext(request.params, 'artifact');
       try {
         const params = z
           .strictObject({ classId: z.uuid(), lessonId: z.uuid(), artifactId: z.uuid() })
           .parse(request.params);
         const query = z.strictObject({ releaseId: z.uuid().optional() }).parse(request.query);
-        const artifact = await service.readArtifact(
-          userId,
-          GuidedLessonArtifactRequestSchema.parse({
-            ...params,
-            releaseId: query.releaseId ?? null,
-          }),
-        );
+        const input = GuidedLessonArtifactRequestSchema.parse({
+          ...params,
+          releaseId: query.releaseId ?? null,
+        });
+        context = readLessonRequestContext(input, 'artifact');
+        failureStage = LessonRequestStage.SERVICE;
+        const artifact = await service.readArtifact(userId, input);
+        failureStage = LessonRequestStage.RESPONSE;
         reply.header('content-type', artifact.mimeType);
         reply.header('content-length', artifact.bytes.byteLength);
         reply.header('x-artifact-digest', artifact.digest);
@@ -151,6 +172,10 @@ export function registerGuidedLessonRoutes(
           {
             requestId: request.id,
             stage: 'artifact',
+            ...context,
+            failureStage,
+            elapsedMs: Math.round(performance.now() - startedAt),
+            ...describeLessonRequestError(error, failureStage),
             code:
               failure.reply.kind === 'failed' ? failure.reply.code : GuidedLessonFailure.INTERNAL,
           },

@@ -4,7 +4,7 @@
   --guided-forest: #16362b;
   --guided-muted: #65776a;
   min-width: 0;
-  padding: 28px 32px 48px;
+  padding: 18px 24px 32px;
   color: var(--guided-forest);
   background: var(--guided-paper);
   min-height: 100%;
@@ -17,37 +17,38 @@
 
 .guided-page-heading {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 24px;
-  padding-bottom: 24px;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
   border-bottom: 1px solid var(--guided-line);
 }
 
-.guided-eyebrow {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--guided-muted);
-  margin-bottom: 12px;
+.guided-page-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
 }
 
 .guided-page-heading h1 {
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: clamp(28px, 3vw, 44px);
-  font-weight: 400;
-  line-height: 1.12;
-  max-width: 680px;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
-.guided-page-heading > .mantine-Group-root {
+.guided-page-controls {
   flex-shrink: 0;
 }
 
-.guided-back {
-  margin: 0 0 18px -12px;
+.guided-page-controls .mantine-Select-root {
+  width: 190px;
+}
+
+.guided-page-title > .mantine-Button-root {
+  flex-shrink: 0;
 }
 
 .guided-library-grid {
@@ -106,84 +107,9 @@
 }
 
 .guided-preparation {
-  max-width: 860px;
-  margin-top: 24px;
-  padding: 28px;
-  background: #fffef8;
-}
-
-.guided-preparation h2 {
-  font:
-    400 28px Georgia,
-    'Times New Roman',
-    serif;
-  margin-bottom: 10px;
-}
-
-.guided-preparation > p {
-  margin-bottom: 24px;
-}
-
-.guided-source-selection {
-  max-height: 300px;
-  overflow-y: auto;
-  border: 1px solid var(--guided-line);
-  padding: 16px;
-  border-radius: 8px;
-}
-
-.guided-source-selection .mantine-Checkbox-label {
-  font-size: 12px;
-  line-height: 1.65;
-  white-space: pre-wrap;
-}
-
-.guided-code-input textarea {
-  font-family: 'SFMono-Regular', Consolas, monospace;
-  tab-size: 4;
-}
-
-.guided-studio-grid {
-  display: grid;
-  grid-template-columns: minmax(290px, 0.75fr) minmax(0, 1.25fr);
-  align-items: start;
-  gap: 24px;
-}
-
-.guided-paper-panel,
-.guided-preview-panel {
+  max-width: 1100px;
+  margin: 16px auto 0;
   min-width: 0;
-  padding: 22px;
-  background: #fffef8;
-  border: 1px solid var(--guided-line);
-  border-radius: 12px;
-}
-
-.guided-checkpoint-review {
-  padding: 18px;
-  background: #f1f4e7;
-  border-radius: 8px;
-}
-
-.guided-source-details {
-  border-top: 1px solid var(--guided-line);
-  padding-top: 16px;
-  font-size: 12px;
-  line-height: 1.7;
-}
-
-.guided-source-details summary {
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.guided-source-details p {
-  white-space: pre-wrap;
-}
-
-.guided-usage {
-  padding-top: 16px;
-  border-top: 1px solid var(--guided-line);
 }
 
 .guided-learning-layout {
@@ -306,24 +232,9 @@
   margin-top: 16px;
 }
 
-@media (max-width: 1180px) {
-  .guided-studio-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .guided-preview-panel {
-    order: -1;
-  }
-
-  .guided-page-heading {
-    align-items: start;
-    flex-direction: column;
-  }
-}
-
 @media (max-width: 860px) {
   .guided-lessons-page {
-    padding: 22px 18px 32px;
+    padding: 16px 18px 28px;
   }
 
   .guided-learning-layout {
@@ -348,6 +259,29 @@
   .guided-lesson-rail > p,
   .guided-phase-list {
     flex-basis: 100%;
+  }
+}
+
+@media (max-width: 740px) {
+  .guided-page-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .guided-page-title {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .guided-page-heading h1 {
+    font-size: 18px;
+  }
+
+  .guided-page-controls .mantine-Select-root {
+    flex: 1;
+    width: auto;
+    min-width: 0;
   }
 }
 

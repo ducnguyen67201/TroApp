@@ -3,6 +3,7 @@ import { buildLessonTimeline } from '../../../../src/server/features/guidedLesso
 import type { LessonRenderer } from '../../../../src/server/features/guidedLessons/application/LessonPorts.js';
 import { hashLessonValue } from '../../../../src/server/features/guidedLessons/application/BuildLessonInput.js';
 import { createLessonFixture, hashText } from './LessonFixture.js';
+import { createSourceLessonFixture } from './SourceLessonFixture.js';
 
 function createTimelineRequest(): Parameters<LessonRenderer['render']>[0] {
   const fixture = createLessonFixture();
@@ -112,4 +113,36 @@ it('does not accumulate quantization drift across short measured beats', () => {
   }
   const timeline = buildLessonTimeline(request, Identity);
   expect(timeline.cues.at(-1)?.endFrame).toBe(Math.ceil((10 * 34 * 30) / 1000));
+});
+
+it('times narrated source-only scenes without requiring code or checkpoint phases', () => {
+  const fixture = createSourceLessonFixture();
+  const manifest = fixture.record.manifest;
+  if (!manifest) {
+    throw new Error('The source fixture needs a manifest.');
+  }
+  const timeline = buildLessonTimeline(
+    {
+      revisionId: fixture.record.revisionId,
+      input: fixture.input,
+      plan: fixture.plan,
+      contentHash: manifest.contentHash,
+      adjustments: null,
+      speechArtifacts: manifest.speechArtifacts.map((descriptor) => ({
+        descriptor: { ...descriptor, durationMs: 1134 },
+        bytes: new Uint8Array([1, 2, 3, 4]),
+      })),
+    },
+    Identity,
+  );
+  expect(
+    timeline.cues.map((cue) => [cue.sceneId, cue.phase, cue.startFrame, cue.endFrame]),
+  ).toEqual([
+    ['source-introduction', 'watch', 0, 35],
+    ['source-connection', 'watch', 35, 69],
+  ]);
+  expect(timeline.cues.every((cue) => cue.traceEventId === null && cue.stateView === null)).toBe(
+    true,
+  );
+  expect(timeline.sourceAssetDigests).toEqual([]);
 });

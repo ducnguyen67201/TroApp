@@ -2,7 +2,6 @@ import {
   Alert,
   Badge,
   Button,
-  Card,
   Checkbox,
   Group,
   Loader,
@@ -72,6 +71,10 @@ export function GuidedLessonsPage({
   const [selected, setSelected] = useState<GuidedLessonSummary | null>(null);
   const [detail, setDetail] = useState<GuidedLessonDetail | null>(null);
   const [teacherInput, setTeacherInput] = useState<TeacherInput | null>(null);
+  const [teacherInputLoading, setTeacherInputLoading] = useState(false);
+  const [teacherInputFailed, setTeacherInputFailed] = useState(false);
+  const teacherInputRequest = useRef(0);
+  const requestedRevision = useRef<string | undefined>(undefined);
   const [preview, setPreview] = useState<LearnerProjection | null>(null);
   const [playback, setPlayback] = useState<Playback | null>(null);
   const [requests, setRequests] = useState<StudentLessonRequest[]>([]);
@@ -85,6 +88,8 @@ export function GuidedLessonsPage({
   const { read, command, error } = useGuidedLessonBridge(`${userId}:${classId ?? 'library'}`);
   const selectedClass = classes.find((item) => item.id === classId);
   const teacher = selectedClass?.teacherId === userId;
+  const currentDetail = useRef(detail);
+  currentDetail.current = detail;
 
   const accept = useCallback((reply: GuidedLessonReply | null): void => {
     if (!reply || reply.kind === 'failed') {
@@ -128,6 +133,32 @@ export function GuidedLessonsPage({
     setLoading(false);
   }, [read, classId, accept, onChooseClass]);
 
+  const loadTeacherInput = useCallback(
+    async (courseRevisionId?: string): Promise<void> => {
+      if (!classId) {
+        return;
+      }
+      const requestId = ++teacherInputRequest.current;
+      requestedRevision.current = courseRevisionId;
+      setTeacherInputLoading(true);
+      setTeacherInputFailed(false);
+      const reply = await read(
+        {
+          action: GuidedLessonReadAction.TEACHER_INPUT,
+          classId,
+          ...(courseRevisionId ? { courseRevisionId } : {}),
+        },
+        'teacherInput',
+      );
+      if (teacherInputRequest.current === requestId) {
+        accept(reply);
+        setTeacherInputFailed(reply?.kind !== 'teacherInput');
+        setTeacherInputLoading(false);
+      }
+    },
+    [read, classId, accept],
+  );
+
   useEffect(() => {
     setClassId(initialClassId);
   }, [initialClassId]);
@@ -154,6 +185,10 @@ export function GuidedLessonsPage({
     setPlayback(null);
     setPreview(null);
     setTeacherInput(null);
+    teacherInputRequest.current += 1;
+    requestedRevision.current = undefined;
+    setTeacherInputLoading(false);
+    setTeacherInputFailed(false);
     setRequests([]);
     setCreating(false);
     setRequestOpen(false);
@@ -191,21 +226,19 @@ export function GuidedLessonsPage({
         },
         'preview',
       );
-      if (reply?.kind === 'projection') {
+      if (
+        reply?.kind === 'projection' &&
+        currentDetail.current?.id === detail.id &&
+        currentDetail.current.contentHash === detail.contentHash &&
+        JSON.stringify(currentDetail.current.manifest) === JSON.stringify(detail.manifest) &&
+        reply.projection.contentHash === detail.contentHash &&
+        reply.projection.revisionId === detail.manifest?.revisionId
+      ) {
         setPreview(reply.projection);
       }
     },
     [detail, read],
   );
-  useEffect(() => {
-    if (
-      detail?.manifest &&
-      detail.plan?.scenes[0] &&
-      (!preview || preview.contentHash !== detail.contentHash)
-    ) {
-      void previewScene(detail.plan.scenes[0].sceneId);
-    }
-  }, [detail?.manifest, detail?.contentHash, detail?.plan, preview, previewScene]);
 
   const send = useCallback(
     async (input: GuidedLessonCommand): Promise<GuidedLessonReply | null> => {
@@ -334,15 +367,38 @@ export function GuidedLessonsPage({
   };
 
   return (
-    <section className="guided-lessons-page">
+    <section
+      className="guided-lessons-page"
+      data-workspace={selected || creating ? 'true' : 'false'}
+    >
       <header className="guided-page-heading">
-        <div>
-          <Text className="guided-eyebrow">TRO / {translate('Guided Lessons (Beta)')}</Text>
+        <div className="guided-page-title">
+          {(selected || creating) && (
+            <Button
+              variant="subtle"
+              size="compact-sm"
+              disabled={busy}
+              onClick={() => {
+                setSelected(null);
+                setDetail(null);
+                setPlayback(null);
+                setPreview(null);
+                setCreating(false);
+                teacherInputRequest.current += 1;
+                setTeacherInputLoading(false);
+                setTeacherInputFailed(false);
+                void refresh();
+              }}
+            >
+              ← {translate('Back to library')}
+            </Button>
+          )}
           <Title order={1}>
-            {selected?.title ?? translate('One concept, explained step by step.')}
+            {selected?.title ??
+              translate(creating ? 'Create a guided lesson' : 'Guided Lessons (Beta)')}
           </Title>
         </div>
-        <Group>
+        <Group gap="sm" className="guided-page-controls">
           <Select
             aria-label={translate('Class')}
             placeholder={translate('Choose a class')}
@@ -356,8 +412,15 @@ export function GuidedLessonsPage({
           />
           <Button
             variant="outline"
-            onClick={() => void (selected ? openLesson(selected) : refresh())}
-            disabled={busy}
+            size="compact-sm"
+            onClick={() =>
+              void (selected
+                ? openLesson(selected)
+                : creating
+                  ? loadTeacherInput(requestedRevision.current)
+                  : refresh())
+            }
+            disabled={busy || teacherInputLoading}
           >
             {translate('Refresh')}
           </Button>
@@ -379,67 +442,59 @@ export function GuidedLessonsPage({
           <Text>{translate('No classes yet. Join or create a class in Classroom first.')}</Text>
         </div>
       )}
-      {selected && (
-        <Button
-          variant="subtle"
-          className="guided-back"
-          onClick={() => {
-            setSelected(null);
-            setDetail(null);
-            setPlayback(null);
-            setPreview(null);
-            void refresh();
-          }}
-        >
-          {translate('Back to library')}
-        </Button>
-      )}
       {!selected && selectedClass && (
         <>
-          <Group justify="space-between">
-            <Text fw={600}>{translate(teacher ? 'Teacher studio' : 'Your lesson library')}</Text>
-            {teacher ? (
-              <Button
-                disabled={busy}
-                onClick={() => {
-                  setCreating(true);
-                  void read(
-                    { action: GuidedLessonReadAction.TEACHER_INPUT, classId: selectedClass.id },
-                    'teacherInput',
-                  ).then(accept);
-                }}
-              >
-                {translate('Create a guided lesson')}
-              </Button>
-            ) : (
+          {!creating && (
+            <Group justify="space-between">
+              <Text fw={600}>{translate(teacher ? 'Teacher studio' : 'Your lesson library')}</Text>
+              {teacher ? (
+                <Button
+                  disabled={busy}
+                  onClick={() => {
+                    setCreating(true);
+                    setTeacherInput(null);
+                    void loadTeacherInput();
+                  }}
+                >
+                  {translate('Create a guided lesson')}
+                </Button>
+              ) : (
+                <Button
+                  variant="light"
+                  onClick={() => {
+                    setRequestOpen(true);
+                  }}
+                >
+                  {translate('Request another explanation')}
+                </Button>
+              )}
+            </Group>
+          )}
+          {creating && teacherInputLoading && (
+            <Group role="status" mt="md">
+              <Loader size="sm" />
+              <Text>{translate('Loading approved material…')}</Text>
+            </Group>
+          )}
+          {creating && teacherInputFailed && (
+            <Group mt="md">
+              <Text size="sm">{translate('Approved material could not be loaded.')}</Text>
               <Button
                 variant="light"
-                onClick={() => {
-                  setRequestOpen(true);
-                }}
+                size="compact-sm"
+                onClick={() => void loadTeacherInput(requestedRevision.current)}
               >
-                {translate('Request another explanation')}
+                {translate('Try again')}
               </Button>
-            )}
-          </Group>
+            </Group>
+          )}
           {creating && teacherInput && (
-            <Card className="guided-preparation" withBorder>
-              <Title order={2}>{translate('Create a guided lesson')}</Title>
-              <Text size="sm" c="dimmed">
-                {translate('Supported beta: integer running totals.')}
-              </Text>
+            <div className="guided-preparation">
               <GuidedLessonPreparation
                 input={teacherInput}
-                busy={busy}
+                busy={busy || teacherInputLoading || teacherInputFailed}
                 onChooseRevision={(courseRevisionId) => {
-                  void read(
-                    {
-                      action: GuidedLessonReadAction.TEACHER_INPUT,
-                      classId: selectedClass.id,
-                      courseRevisionId,
-                    },
-                    'teacherInput',
-                  ).then(accept);
+                  void loadTeacherInput(courseRevisionId);
                 }}
                 onCreate={async (input) => {
                   const created = await send(input);
@@ -455,27 +510,29 @@ export function GuidedLessonsPage({
                   }
                 }}
               />
-            </Card>
+            </div>
           )}
-          <div className="guided-library-grid">
-            {lessons
-              .filter((lesson) => lesson.classId === classId && (teacher || lesson.releaseId))
-              .map((lesson) => (
-                <button
-                  type="button"
-                  key={lesson.id}
-                  className="guided-library-card"
-                  onClick={() => void openLesson(lesson)}
-                >
-                  <span className="guided-library-mark" aria-hidden="true">
-                    ↗
-                  </span>
-                  <Badge variant="light">{translate(readLessonStatusLabel(lesson.status))}</Badge>
-                  <h2>{lesson.title}</h2>
-                  <p>{translate(teacher ? 'Review draft' : 'Open lesson')} →</p>
-                </button>
-              ))}
-          </div>
+          {!creating && (
+            <div className="guided-library-grid">
+              {lessons
+                .filter((lesson) => lesson.classId === classId && (teacher || lesson.releaseId))
+                .map((lesson) => (
+                  <button
+                    type="button"
+                    key={lesson.id}
+                    className="guided-library-card"
+                    onClick={() => void openLesson(lesson)}
+                  >
+                    <span className="guided-library-mark" aria-hidden="true">
+                      ↗
+                    </span>
+                    <Badge variant="light">{translate(readLessonStatusLabel(lesson.status))}</Badge>
+                    <h2>{lesson.title}</h2>
+                    <p>{translate(teacher ? 'Review draft' : 'Open lesson')} →</p>
+                  </button>
+                ))}
+            </div>
+          )}
           {!lessons.some((lesson) => lesson.classId === classId && (teacher || lesson.releaseId)) &&
             !creating && (
               <div className="guided-empty">
@@ -488,7 +545,7 @@ export function GuidedLessonsPage({
                 </Text>
               </div>
             )}
-          {teacher && (
+          {teacher && !creating && (
             <GuidedLessonRequests
               requests={requests}
               lessons={lessons}

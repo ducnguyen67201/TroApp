@@ -98,6 +98,18 @@ and microphone access when requested. The launcher preserves saved accounts and
 OS grants. Keep the same app instance open throughout browser OAuth. If a different
 checkout owns the callback, restart the intended launcher before signing in.
 
+If startup cannot verify a saved login, inspect `auth.session.verification.failed`
+in the desktop terminal. Its stage, HTTP status and timing distinguish a failed
+session check from an expired session; cookies and response bodies are excluded,
+and identical consecutive failures stay quiet. Verification failures preserve the
+saved account. Startup retries temporary connection/HTTP failures for up to one
+minute and restores the selected account when verification succeeds; explicit
+sign-in or account switching takes precedence. Check that the configured API's
+`/health/live` responds as Tro's API. If it remains unavailable past the retry
+window, reopen the desktop or choose the saved account to check again. A static
+lesson-file 404 means a renderer is answering on the API port, not that the login
+was forgotten.
+
 Choose **Show me** for student-controlled guidance and **Do it for me** for general
 execution. Show me uses model-supplied scribble strokes and requires the matching
 native build; old teaching drawing protocols are not supported. Joined classroom
@@ -153,12 +165,19 @@ implicitly. Backend collection and retention settings live in
 [Env.ts](src/server/Env.ts), with 180-day retention by default.
 
 Guided Lessons is available immediately in the navbar as **Guided lessons (Beta)**
-(**Bài giảng hướng dẫn (Thử nghiệm)**). Teachers select passages from an approved
-publication, confirm a supported Python integer running-total example, optionally
-confirm a separate practice input, and explicitly start generation. Review and
-approve the script, make a private narrated preview, inspect every scene/checkpoint
-phase and evidence item, then approve and release it. Enrolled students can study
-at home, answer formative questions, request help and keep private anchored notes.
+(**Bài giảng hướng dẫn (Thử nghiệm)**). Teachers select up to eight passages from an
+approved publication. Preparation uses **Content → Review**. The available sections
+and passages come from the selected approved publication; teachers supply the learning
+objective and audience and explicitly start generation from the final review step. The generated
+explanation follows that source material. In the scene studio,
+select a scene and review its script, sources and any applicable code or checkpoints.
+Explicitly review each scene and approve the script, make a private narrated preview,
+inspect each phase and its evidence, then approve and release it. Enrolled students
+watch source explanations and save private reflections. Existing lessons with
+approved Python examples retain their code walkthroughs and formative questions.
+Students can request help and keep private anchored notes.
+The player shows only phases present in the approved lesson and uses its selected
+language. Run details show reported token usage without a fixed estimate.
 Explicit student requests enter the teacher queue without generating media.
 
 Generation needs the backend `OPENAI_API_KEY`. After script approval, a Remotion
@@ -168,7 +187,8 @@ The desktop plays those clips with the separately approved narration. Generated
 source never executes in Electron or on the API host. Reflection uses the trusted
 static presentation. There is no feature flag or template fallback on agent failure.
 
-Build the isolated Linux render image before generation or the manual benchmark:
+Build the isolated Linux render image before generation or the manual benchmark.
+Rebuild it after changing lesson contracts or renderer code:
 
 ```sh
 docker build --platform linux/amd64 --target lesson-renderer -t tro-lesson-renderer:local .
@@ -211,6 +231,18 @@ remain owned by [LessonBudget.ts](src/server/features/guidedLessons/application/
 and the coding-agent/sandbox adapters. Automated validation uses synthetic providers
 and does not need credentials or open paid jobs. Build the render image before
 `pnpm test:integration` to exercise generated-code isolation and real MP4 rendering.
+
+For a Guided Lessons failure, reproduce it with the updated API running and find
+`guided-lessons.request.refused` in the API terminal (`guided-lessons.artifact.refused`
+for media reads). Match `requestId`, then inspect `action` and `failureStage`:
+`request` means incoming validation, `service` means the authorized operation, and
+`response` means outgoing validation or delivery. Validation failures include
+`validation.source` to identify a stored publication or other record, bounded
+schema paths and numeric limits. `issueCount` counts top-level issues; sampled
+nested union issues can also appear. Truncation is explicit. Unknown path keys,
+material text, raw errors and credentials are excluded. Successful reads stay quiet.
+The field selection is owned by
+[GuidedLessonRequestDiagnostics.ts](src/server/features/guidedLessons/infrastructure/GuidedLessonRequestDiagnostics.ts).
 
 ## Validation
 

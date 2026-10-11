@@ -12,6 +12,19 @@ import type { AgentCompletion } from '#contracts/TaskOutcome.js';
 
 export const MessageRole = { USER: 'user', AGENT: 'agent' } as const;
 
+const SessionRestorePolicy = {
+  DEADLINE_MS: 60_000,
+  FIRST_RETRY_DELAY_MS: 1000,
+  MAX_RETRY_DELAY_MS: 5000,
+} as const;
+
+function canRetrySessionCheck(message: string): boolean {
+  return (
+    message === 'Could not reach the sign-in service.' ||
+    message === 'Could not check your sign-in.'
+  );
+}
+
 interface TaskMessage {
   role: (typeof MessageRole)[keyof typeof MessageRole];
   text: string;
@@ -113,30 +126,56 @@ export function useComputerUse(): ComputerUseController {
 
   useEffect(() => {
     const effectState = { active: true };
-    void (async () => {
+    const generation = accountGeneration.current;
+    const deadline = Date.now() + SessionRestorePolicy.DEADLINE_MS;
+    let retryDelayMs: number = SessionRestorePolicy.FIRST_RETRY_DELAY_MS;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const isCurrentCheck = (): boolean =>
+      effectState.active && generation === accountGeneration.current;
+
+    /* The API can still be starting when Electron opens. Recheck transient
+       failures without trusting cached identity or blocking explicit sign-in. */
+    async function checkSession(): Promise<void> {
+      if (!isCurrentCheck() || Date.now() >= deadline) {
+        return;
+      }
+      let shouldRetry = false;
       try {
         const auth = await window.tro.readAuthSession();
-        if (!effectState.active) {
+        if (!isCurrentCheck()) {
           return;
         }
         if (auth.kind === 'signed-in') {
           setUser(auth.user);
+          setMessage(null);
         } else if (auth.kind === 'failed') {
           setMessage(resolveBridgeError(auth.message, 'errorCheckSignIn'));
+          shouldRetry = canRetrySessionCheck(auth.message);
+        } else {
+          setMessage(null);
         }
       } catch {
-        if (effectState.active) {
-          setMessage('errorCheckSignIn');
+        if (!isCurrentCheck()) {
+          return;
         }
-      } finally {
-        if (effectState.active) {
-          setIsLoading(false);
-          void refreshAccounts();
-        }
+        setMessage('errorCheckSignIn');
+        shouldRetry = true;
       }
-    })();
+      if (!isCurrentCheck()) {
+        return;
+      }
+      setIsLoading(false);
+      void refreshAccounts();
+      if (shouldRetry && Date.now() + retryDelayMs < deadline) {
+        timer = setTimeout(() => void checkSession(), retryDelayMs);
+        retryDelayMs = Math.min(retryDelayMs * 2, SessionRestorePolicy.MAX_RETRY_DELAY_MS);
+      }
+    }
+
+    void checkSession();
     return () => {
       effectState.active = false;
+      clearTimeout(timer);
     };
   }, []);
 

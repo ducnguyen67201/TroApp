@@ -7,6 +7,8 @@ import {
   ReviewResultSchema,
   RepairResultSchema,
   VisualRepairResultSchema,
+  LessonTemplateKind,
+  ReviewCriterion,
 } from '#contracts/GuidedLessons.js';
 import {
   LessonModelStage,
@@ -150,11 +152,23 @@ function buildStageInput(request: LessonModelRequest): unknown {
     return request.input;
   }
   const allowedIssueIds = request.review?.issues.map((issue) => issue.issueId) ?? [];
+  const hasTrace =
+    request.input.codeBlocks.length > 0 ||
+    request.input.traces.length > 0 ||
+    (request.plan?.scenes.some((scene) => scene.kind === LessonTemplateKind.CODE_TRACE) ?? false);
+  const hasCheckpoint =
+    (request.plan?.checkpoints.length ?? 0) > 0 ||
+    (request.plan?.scenes.some((scene) => scene.kind === LessonTemplateKind.CHECKPOINT) ?? false);
   if (request.stage === LessonModelStage.REVIEW) {
     return {
       candidateHash: request.contentHash,
       lessonInput: request.input,
       candidatePlan: request.plan,
+      requiredCriteria: [
+        ReviewCriterion.SOURCE_SUPPORT,
+        ...(hasTrace ? [ReviewCriterion.TRACE_CORRECTNESS] : []),
+        ...(hasCheckpoint ? [ReviewCriterion.CHECKPOINT] : []),
+      ],
       validationEvidence: [
         { evidenceId: 'source-packet', sourcePacketHash: request.input.sourcePacketHash },
       ],
@@ -199,16 +213,16 @@ function buildStageInput(request: LessonModelRequest): unknown {
     contentHash: request.contentHash,
     availableModalities: ['images', 'text'],
     requiredCriteria: [
-      'readability',
-      'hierarchy',
-      'continuity',
-      'style',
-      'timeline',
-      'assets',
-      'traceCorrectness',
-      'checkpoint',
-      'pronunciation',
-      'motion',
+      ReviewCriterion.READABILITY,
+      ReviewCriterion.HIERARCHY,
+      ReviewCriterion.CONTINUITY,
+      ReviewCriterion.STYLE,
+      ReviewCriterion.TIMELINE,
+      ReviewCriterion.ASSETS,
+      ...(hasTrace ? [ReviewCriterion.TRACE_CORRECTNESS] : []),
+      ...(hasCheckpoint ? [ReviewCriterion.CHECKPOINT] : []),
+      ReviewCriterion.PRONUNCIATION,
+      ReviewCriterion.MOTION,
     ],
     approvedPlan: request.plan,
     expectedFrameStates: request.input.traces,

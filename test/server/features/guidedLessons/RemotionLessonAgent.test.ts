@@ -11,6 +11,7 @@ import {
   type RemotionAgentMeasurement,
 } from '../../../../src/server/features/guidedLessons/infrastructure/RemotionLessonAgent.js';
 import { createLessonFixture } from './LessonFixture.js';
+import { createSourceLessonFixture } from './SourceLessonFixture.js';
 
 const Source = `import React from 'react';
 import {AbsoluteFill, useCurrentFrame} from 'remotion';
@@ -161,6 +162,56 @@ function basicSequence(): unknown[][] {
 }
 
 describe('Remotion coding agent', () => {
+  it('renders each source-only WATCH phase from approved points and speech without program or checkpoint assumptions', async () => {
+    const fixture = createSourceLessonFixture();
+    const manifest = fixture.record.manifest;
+    if (!manifest) {
+      throw new Error('The source fixture needs a manifest.');
+    }
+    const sandbox = createSandbox();
+    const bodies: z.infer<typeof RequestSchema>[] = [];
+    const agent = new RemotionLessonAgent('synthetic-test-key', 'gpt-5.4', sandbox, {
+      fetch: createSequence(basicSequence(), bodies),
+      identity: Identity,
+    });
+    const generated = await agent.render(
+      {
+        revisionId: fixture.record.revisionId,
+        input: fixture.input,
+        plan: fixture.plan,
+        contentHash: manifest.contentHash,
+        adjustments: null,
+        speechArtifacts: manifest.speechArtifacts.map((descriptor) => ({
+          descriptor,
+          bytes: new Uint8Array([1, 2, 3, 4]),
+        })),
+      },
+      new AbortController().signal,
+    );
+    expect(sandbox.renderVideo).toHaveBeenCalledTimes(2);
+    expect(generated.manifest.evidence.filter((item) => item.kind === 'clip')).toHaveLength(2);
+    expect(generated.manifest.cues.every((cue) => cue.phase === 'watch')).toBe(true);
+    expect(
+      new Set(sandbox.preview.mock.calls.map(([request]) => request.projection.sceneId)),
+    ).toEqual(new Set(fixture.plan.scenes.map((scene) => scene.sceneId)));
+    for (const [request] of sandbox.preview.mock.calls) {
+      const scene = fixture.plan.scenes.find((item) => item.sceneId === request.projection.sceneId);
+      if (scene?.kind !== 'sourceExplanation') {
+        throw new Error('An unrelated scene reached the source-only renderer.');
+      }
+      expect(request.projection.presentation).toMatchObject({
+        kind: 'sourceExplanation',
+        points: scene.params.points,
+      });
+      expect(request.projection.visibleTraceStates).toEqual([]);
+      expect(request.projection.checkpoint).toBeNull();
+      expect(request.projection.language).toBe(fixture.input.language);
+      expect(request.projection.lessonPhases).toEqual(['watch', 'reflect']);
+    }
+    expect(bodies[0]?.instructions).toContain('manufacture Python');
+    expect(bodies[0]?.instructions).toContain('Use projection.language');
+  });
+
   it('preserves injected transport and uses a unique client correlation ID for each SDK call', async () => {
     const fetcher = createSequence(basicSequence());
     await new RemotionLessonAgent('synthetic-test-key', 'gpt-5.4', createSandbox(), {

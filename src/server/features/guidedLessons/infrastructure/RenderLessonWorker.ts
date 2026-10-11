@@ -10,6 +10,7 @@ import { buildLessonProjection } from '../domain/BuildLessonProjection.js';
 import { hashLessonValue } from '../application/BuildLessonInput.js';
 import type { LessonMediaArtifact } from '../application/LessonPorts.js';
 import { buildLessonTimeline } from './BuildLessonTimeline.js';
+import { watchLessonRenderWorkerLifetime } from './LessonRenderWorkerLifetime.js';
 import {
   LessonRenderMessageSchema,
   LessonRenderFailureSchema,
@@ -25,25 +26,37 @@ let context: {
   geometry: unknown;
 } = { stage: 'startup', sceneId: null, frame: null, geometry: null };
 
+let activeBrowser: Awaited<ReturnType<typeof openBrowser>> | null = null;
+let openingBrowser: ReturnType<typeof openBrowser> | null = null;
+const lifetime = watchLessonRenderWorkerLifetime(async () => {
+  const browser = activeBrowser ?? (await openingBrowser);
+  await browser?.close({ silent: true });
+});
+
+function sendResult(result: object): void {
+  if (!process.connected || !process.send || lifetime.isStopping()) {
+    lifetime.finish();
+    return;
+  }
+  process.send(result, () => {
+    lifetime.finish();
+  });
+}
+
 /** The child receives only validated lesson data and media, without provider credentials. */
 process.once('message', (raw: unknown) => {
   void renderLesson(raw).then(
     (result) => {
-      process.send?.(result, () => {
-        process.disconnect();
-      });
+      sendResult(result);
     },
     () => {
       const geometry = LessonGeometrySchema.safeParse(context.geometry);
-      process.send?.(
+      sendResult(
         LessonRenderFailureSchema.parse({
           ...context,
           kind: 'failed',
           geometry: geometry.success ? geometry.data : null,
         }),
-        () => {
-          process.disconnect();
-        },
       );
     },
   );
@@ -213,16 +226,26 @@ async function withRenderBrowser<Result>(
   identity: LessonPresentationIdentity,
   work: (browser: Awaited<ReturnType<typeof openBrowser>>) => Promise<Result>,
 ): Promise<Result> {
+  if (lifetime.isStopping()) {
+    throw new Error('The lesson renderer is stopping.');
+  }
   context.stage = 'browser';
-  const browser = await openBrowser('chrome', {
+  openingBrowser = openBrowser('chrome', {
     browserExecutable: resolve(identity.browserPath),
     chromeMode: identity.browserMode,
     logLevel: 'error',
   });
+  const browser = await openingBrowser;
+  openingBrowser = null;
+  activeBrowser = browser;
   try {
+    if (lifetime.isStopping()) {
+      throw new Error('The lesson renderer is stopping.');
+    }
     return await work(browser);
   } finally {
     await browser.close({ silent: true });
+    activeBrowser = null;
   }
 }
 

@@ -9,7 +9,12 @@ import {
   useCurrentFrame,
   useDelayRender,
 } from 'remotion';
-import type { LearnerProjection, VisibleTraceState } from '../contracts/GuidedLessons.js';
+import {
+  LessonTemplateKind,
+  LessonLanguage,
+  type LearnerProjection,
+  type VisibleTraceState,
+} from '../contracts/GuidedLessons.js';
 import '@fontsource/noto-sans/latin-400.css';
 import '@fontsource/noto-sans/latin-700.css';
 import '@fontsource/noto-sans/vietnamese-400.css';
@@ -77,12 +82,33 @@ export function LessonComposition({
   }, [delayRender, continueRender, cancelRender, frame]);
   const state = readVisibleState(projection, frame);
   const presentation = projection.presentation;
-  const code = presentation.kind === 'annotatedSource' ? null : presentation.codeBlock;
-  const figure = presentation.kind === 'codeTrace' ? null : presentation.figure;
+  const code =
+    presentation.kind === LessonTemplateKind.CODE_TRACE ||
+    presentation.kind === LessonTemplateKind.CHECKPOINT
+      ? presentation.codeBlock
+      : null;
+  const figure =
+    presentation.kind === LessonTemplateKind.ANNOTATED_SOURCE ||
+    presentation.kind === LessonTemplateKind.CHECKPOINT
+      ? presentation.figure
+      : null;
+  const sourcePoints =
+    presentation.kind === LessonTemplateKind.SOURCE_EXPLANATION ? presentation.points : [];
+  /* The trusted fallback pages through approved points using the real scene duration. It does not infer facts or execution. */
+  const pointIndex = Math.min(
+    sourcePoints.length - 1,
+    Math.floor((Math.max(0, frame) * sourcePoints.length) / readLessonDurationFrames(projection)),
+  );
+  const sourcePoint = sourcePoints[pointIndex];
   const figureSource = figure ? sourceAssets[figure.assetId] : undefined;
-  const focusVariable = presentation.kind === 'annotatedSource' ? null : presentation.focusVariable;
+  const focusVariable =
+    presentation.kind === LessonTemplateKind.CODE_TRACE ||
+    presentation.kind === LessonTemplateKind.CHECKPOINT
+      ? presentation.focusVariable
+      : null;
   const wideCode = projection.sceneAdjustment.layoutVariant === 'wideCode';
-  const sideCaption = projection.sceneAdjustment.captionPlacement === 'reservedSide';
+  const sideCaption =
+    code !== null && projection.sceneAdjustment.captionPlacement === 'reservedSide';
   const caption =
     projection.narrationCues.find((cue) => frame >= cue.startFrame && frame < cue.endFrame)?.text ??
     '';
@@ -91,7 +117,7 @@ export function LessonComposition({
     code?.lines.findIndex((line) => line.lineId === state?.lineId) ?? 0,
   );
   const firstLine = Math.max(0, Math.min(activeIndex - 3, (code?.lines.length ?? 0) - 8));
-  const isVietnamese = /[ăâđêôơưạảấầệịọộớờự]/i.test(projection.sceneTitle + caption);
+  const isVietnamese = projection.language === LessonLanguage.VI;
   const video = projection.videoArtifactId ? sourceAssets[projection.videoArtifactId] : undefined;
   if (projection.videoArtifactId) {
     return (
@@ -192,6 +218,45 @@ export function LessonComposition({
                 <span>{line.text}</span>
               </div>
             ))
+          ) : sourcePoint ? (
+            <div
+              style={{
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                padding: '30px 60px',
+                gap: 32,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 42 }}>
+                <span
+                  data-lesson-essential
+                  style={{ fontSize: 80, color: '#9b6e35', flexShrink: 0, lineHeight: 1.4 }}
+                >
+                  {pointIndex + 1}
+                </span>
+                <div
+                  data-lesson-essential
+                  style={{ fontSize: 54, lineHeight: 1.5, overflowWrap: 'anywhere' }}
+                >
+                  {sourcePoint.text}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 14 }}>
+                {sourcePoints.map((point, index) => (
+                  <span
+                    key={point.pointId}
+                    style={{
+                      width: 46,
+                      height: 8,
+                      borderRadius: 4,
+                      background: index === pointIndex ? '#b47a35' : '#dce3d7',
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
           ) : figure && figureSource ? (
             <>
               <Img

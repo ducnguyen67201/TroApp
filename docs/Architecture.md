@@ -90,6 +90,18 @@ and generation guards; `EncryptedAccountVault` stores cookies using Electron
 unavailable. Cookies remain in main; only validated profile metadata crosses
 preload. Adding or switching an account does not change backend roles.
 
+Startup verifies the selected session with the backend before showing the signed-in
+workspace. Temporary transport and HTTP check failures receive serial startup
+retries with increasing delays, capped at five seconds, for up to one minute.
+The welcome screen and manual account controls remain available during recovery.
+Unmounting or starting an account change invalidates queued and in-flight startup
+results. Authoritative signed-out replies, storage failures and response-schema
+failures stop recovery. A failed check preserves the vault and selection; only an
+authoritative signed-out response marks the selected account for sign-in. Main emits
+bounded `auth.session.verification.failed` metadata without
+cookies, identities, response content or raw errors, suppressing repeated identical
+failures until the result changes.
+
 `AccountTransitionGate` excludes account changes from active task, voice,
 microphone-test and classroom/material operations. A switch verifies the target
 session before selection, detaches the old local classroom binding and clears task,
@@ -695,14 +707,15 @@ future scopes that require measured demand and their own validation. A real cent
 ## Guided lessons beta
 
 Guided Lessons is always available as **Guided lessons (Beta)** / **Bài giảng hướng
-dẫn (Thử nghiệm)**. No feature flag or class allowlist gates it. Teachers select
-approved passages and confirm a restricted Python integer running-total example,
-optionally a separate practice input. Students can study released lessons without
-a live classroom session. This scope does not support arbitrary lectures or code.
+dẫn (Thử nghiệm)**. No feature flag or class allowlist gates it. Teachers select up
+to eight approved passages to create a source-grounded explanation. New-lesson
+preparation uses the selected publication's sections and passages. Students can
+study released lessons without a live classroom session. Existing approved code
+lessons and the API retain restricted Python integer running-total examples.
 
 ```mermaid
 flowchart TD
-  Source[Approved publication and confirmed code] --> Draft[AI content author and review]
+  Source[Selected approved publication passages] --> Draft[AI content author and review]
   Draft --> Script[Teacher script approval]
   Script --> Speech[Persist exact narration]
   Speech --> Agent[Remotion coding agent]
@@ -724,10 +737,58 @@ releases, deterministic checkpoints and private notes. Prisma adapters persist
 validated aggregate JSON, immutable releases, artifacts and attempt ledgers with
 serializable authorization/state transactions. This remains one modular monolith.
 
+[GuidedLessonPreparation.tsx](../src/desktop/renderer/guidedLessons/GuidedLessonPreparation.tsx)
+uses **Content → Review** for source explanations. Its available sections and
+passages come from the selected approved publication returned by `teacherInput`.
+Publication labels use saved source names, falling back to the approved summary or
+publication ID when no names exist. Audience is supplied by the teacher rather
+than prefilled from an assumed learner profile. Run details display reported token
+usage; the UI does not invent estimates or duplicate backend token limits.
+Published material has no authoritative programming-language or executable-example
+classification, so the preparation form does not infer one from topics, example
+notes or keywords. Compact passage selectors disclose the exact approved text and
+required corrections. Creation commands carry null code approvals, accept optional
+teacher instructions and keep generation an explicit command from the final step.
+Existing approved code lessons retain their studio, trace validation, checkpoints
+and playback through their persisted input data. Source explanations use source-referenced teaching
+points without executable code, trace states or invented checkpoint answer keys.
+[TeacherLessonStudio.tsx](../src/desktop/renderer/guidedLessons/TeacherLessonStudio.tsx)
+owns scene navigation, contextual editing and explicit local scene-review checks.
+[LessonStoryboard.tsx](../src/desktop/renderer/guidedLessons/LessonStoryboard.tsx)
+draws script illustrations from the lesson's source references and trusted trace
+data before a rendered preview exists. These illustrations are not generated media
+or evidence. The existing `GuidedLessonMedia` and `GuidedLessonEvidence` surfaces
+retain verified playback and decoded-evidence review. Local edits block dependent
+actions; script approval, private rendering, exact-preview approval and release
+remain separate backend commands.
+[LessonValue.ts](../src/contracts/LessonValue.ts) owns the existing recursively
+sorted JSON representation used for lesson hashes. The backend and desktop share
+this serializer; the studio checks the exact manifest digest before allowing
+rendered-media or evidence acknowledgment.
+
+Guided-lesson refusal events distinguish incoming request validation, service work
+and outgoing reply validation. Persistence parsing attaches a record-source label
+to the original validation error without changing the thrown error or admission
+behavior. The route logs only allowlisted actions, validated UUID references,
+timing and bounded schema issue metadata. It excludes raw errors, material content
+and unknown path keys, and adds no successful polling events. Diagnostic fields
+belong to
+[GuidedLessonRequestDiagnostics.ts](../src/server/features/guidedLessons/infrastructure/GuidedLessonRequestDiagnostics.ts);
+the root README explains how to read the events.
+
 [BuildLessonInput.ts](../src/server/features/guidedLessons/application/BuildLessonInput.ts)
 selects immutable approved material. Published page/document corrections remain
 separate citable entries with their own UTF-16 ranges and digests; private notes
-never enter generation. [CompileAccumulator.ts](../src/server/features/guidedLessons/domain/CompileAccumulator.ts)
+never enter generation. New creation requires the command's class, publication and
+section IDs to match the approved publication and restricts chosen passages to that
+section, including relevant corrections. The same section-selection function owns
+the teacher-input choices and creation check. Existing saved lesson inputs remain
+immutable. Existing file digests are preserved. Linked materials
+without a file digest use the exact published source text; document corrections
+use a digest of ordered passage identities and text when both stored digests are
+empty. These text digests bind the approved snapshot, not remote page contents;
+link extraction does not fetch the destination. Published records are not rewritten.
+[CompileAccumulator.ts](../src/server/features/guidedLessons/domain/CompileAccumulator.ts)
 calculates canonical trace states without executing Python. Content validation
 checks citations, exact code/traces, checkpoints and approved practice variants.
 
@@ -737,6 +798,8 @@ advances content author/review/one repair, teacher script approval, speech, codi
 agent rendering, visual review/one repair and exact preview approval. Saving script
 edits invalidates dependent approvals and needs an explicit new review run. Speech
 is persisted per exact approved beat; decoded sample duration determines cue timing.
+Speech instructions read that exact text in the selected language without assuming
+a beginner audience or referring to pronunciation metadata that was not supplied.
 [LessonPrompts.ts](../src/server/features/guidedLessons/infrastructure/LessonPrompts.ts)
 owns content/review/help/narration prompts. These content stages return structured
 data; only the separate coding agent writes rendering source.
@@ -802,6 +865,9 @@ MP4 download; phase clips support interactive checkpoint gates. The old trusted
 remains for legacy tests/evidence, not new production generation. Reflection uses
 the trusted static composition without an additional generated clip. Playback still
 requires the packaged composition/font identity to match the approved manifest.
+Its detached worker owns an independent render deadline and stops its browser,
+descendants and local bundle server when its parent IPC connection closes. This
+also prevents abandoned test renderers from retaining the development API port.
 
 [LessonBudget.ts](../src/server/features/guidedLessons/application/LessonBudget.ts)
 records durable model/speech attempts. Every coding-agent provider call also has a
@@ -829,9 +895,13 @@ local measurement/artifact reports, and never creates a student release. Automat
 checks stay credentialless. Failed runs and repairs count in pricing evidence.
 
 [BuildLessonProjection.ts](../src/server/features/guidedLessons/domain/BuildLessonProjection.ts)
-is the only student projection. It withholds worked narration, state and video until
-the formative gate is resolved or explicitly revealed. Only the exact scene/phase
-clip is allowlisted. Duplicate phase clips fail closed. The desktop verifies media
+is the only student projection. Source explanations use **Watch → Reflect** without
+Python or quiz phases. The Python flow withholds worked narration, state and video
+until the formative gate is resolved or explicitly revealed. Only the exact scene/phase
+clip is allowlisted. Projection `language` comes from the pinned input, and
+`lessonPhases` comes from the approved plan's actual scenes and checkpoints. The
+player consumes those fields without guessing language from text or showing an
+absent practice phase. Duplicate phase clips fail closed. The desktop verifies media
 digests and revokes Blob URLs on account/revision changes; generated TSX never reaches
 the player. [LessonComposition.tsx](../src/lessonMedia/LessonComposition.tsx) is a
 trusted video/audio wrapper with a static reflection surface. Its legacy template

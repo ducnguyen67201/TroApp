@@ -25,6 +25,10 @@ import type {
   StoredLessonArtifact,
 } from '../features/guidedLessons/application/GuidedLessonStore.js';
 import { LessonError, LessonFailure } from '../features/guidedLessons/application/LessonFailure.js';
+import {
+  LessonDataSource,
+  parseLessonData,
+} from '../features/guidedLessons/application/LessonDataValidation.js';
 import { runClassroomTransactionWithRetries } from './RetryClassroomTransaction.js';
 import { z } from 'zod';
 
@@ -83,12 +87,16 @@ class PrismaGuidedLessonStore implements GuidedLessonStore {
       take: 100,
     });
     return rows.map((row) =>
-      ClassSchema.parse({
-        id: row.id,
-        teacherId: row.teacherId,
-        name: row.name,
-        courseRevisionId: row.courseRevisionId,
-      }),
+      parseLessonData(
+        ClassSchema,
+        {
+          id: row.id,
+          teacherId: row.teacherId,
+          name: row.name,
+          courseRevisionId: row.courseRevisionId,
+        },
+        LessonDataSource.CLASS,
+      ),
     );
   }
 
@@ -97,7 +105,11 @@ class PrismaGuidedLessonStore implements GuidedLessonStore {
     if (!row) {
       return null;
     }
-    const publication = MaterialPublicationSchema.parse(row.document);
+    const publication = parseLessonData(
+      MaterialPublicationSchema,
+      row.document,
+      LessonDataSource.PUBLICATION,
+    );
     return publication.classId === classId && publication.courseId === courseId
       ? publication
       : null;
@@ -109,12 +121,14 @@ class PrismaGuidedLessonStore implements GuidedLessonStore {
       orderBy: { updatedAt: 'desc' },
       take: 100,
     });
-    return rows.map((row) => LessonRecordSchema.parse(row.document));
+    return rows.map((row) =>
+      parseLessonData(LessonRecordSchema, row.document, LessonDataSource.LESSON),
+    );
   }
 
   async readLesson(id: string) {
     const row = await this.client.guidedLessonRecord.findUnique({ where: { id } });
-    return row ? LessonRecordSchema.parse(row.document) : null;
+    return row ? parseLessonData(LessonRecordSchema, row.document, LessonDataSource.LESSON) : null;
   }
 
   async saveLesson(record: LessonRecord, expectedVersion: number) {
@@ -148,10 +162,14 @@ class PrismaGuidedLessonStore implements GuidedLessonStore {
   async readRelease(id: string) {
     const row = await this.client.guidedLessonReleaseRecord.findUnique({ where: { id } });
     return row
-      ? LessonReleaseSchema.parse({
-          ...LessonReleaseSchema.parse(row.document),
-          available: row.available,
-        })
+      ? parseLessonData(
+          LessonReleaseSchema,
+          {
+            ...parseLessonData(LessonReleaseSchema, row.document, LessonDataSource.RELEASE),
+            available: row.available,
+          },
+          LessonDataSource.RELEASE,
+        )
       : null;
   }
 
@@ -183,7 +201,9 @@ class PrismaGuidedLessonStore implements GuidedLessonStore {
       orderBy: { updatedAt: 'asc' },
       take: 20,
     });
-    return rows.map((row) => LessonRecordSchema.parse(row.document));
+    return rows.map((row) =>
+      parseLessonData(LessonRecordSchema, row.document, LessonDataSource.LESSON),
+    );
   }
 
   async withdrawLessonReleases(lessonId: string) {
@@ -195,7 +215,7 @@ class PrismaGuidedLessonStore implements GuidedLessonStore {
 
   async readBudget(id: string) {
     const row = await this.client.guidedLessonBudgetRecord.findUnique({ where: { id } });
-    return row ? LessonBudgetSchema.parse(row.document) : null;
+    return row ? parseLessonData(LessonBudgetSchema, row.document, LessonDataSource.BUDGET) : null;
   }
 
   async saveBudget(budget: LessonBudget, expectedVersion: number) {
@@ -218,7 +238,9 @@ class PrismaGuidedLessonStore implements GuidedLessonStore {
     const row = await this.client.guidedLessonCommandRecord.findUnique({
       where: { userId_commandId: { userId, commandId } },
     });
-    return row ? LessonReceiptSchema.parse(row.document) : null;
+    return row
+      ? parseLessonData(LessonReceiptSchema, row.document, LessonDataSource.RECEIPT)
+      : null;
   }
 
   async saveReceipt(userId: string, classId: string, commandId: string, receipt: LessonReceipt) {
@@ -231,7 +253,9 @@ class PrismaGuidedLessonStore implements GuidedLessonStore {
     const row = await this.client.guidedLessonProgressRecord.findUnique({
       where: { studentId_releaseId: { studentId, releaseId } },
     });
-    return row ? LessonProgressSchema.parse(row.document) : null;
+    return row
+      ? parseLessonData(LessonProgressSchema, row.document, LessonDataSource.PROGRESS)
+      : null;
   }
 
   async saveProgress(progress: LessonProgress, expectedVersion: number) {
@@ -272,7 +296,9 @@ class PrismaGuidedLessonStore implements GuidedLessonStore {
       orderBy: { updatedAt: 'desc' },
       take: 200,
     });
-    return rows.map((row) => PrivateNoteSchema.parse(row.document));
+    return rows.map((row) =>
+      parseLessonData(PrivateNoteSchema, row.document, LessonDataSource.NOTE),
+    );
   }
 
   async saveNote(studentId: string, classId: string, note: LessonNote) {
@@ -317,7 +343,9 @@ class PrismaGuidedLessonStore implements GuidedLessonStore {
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    return rows.map((row) => LessonRequestSchema.parse(row.document));
+    return rows.map((row) =>
+      parseLessonData(LessonRequestSchema, row.document, LessonDataSource.REQUEST),
+    );
   }
 
   async saveRequest(request: LessonRequest) {
@@ -370,12 +398,12 @@ class PrismaGuidedLessonStore implements GuidedLessonStore {
           classId: row.classId,
           lessonId: row.lessonId,
           revisionId: row.revisionId,
-          kind: ArtifactKindSchema.parse(row.kind),
+          kind: parseLessonData(ArtifactKindSchema, row.kind, LessonDataSource.ARTIFACT),
           mimeType: row.mimeType,
           digest: row.digest,
           bytes: new Uint8Array(row.bytes),
           sceneId: row.sceneId,
-          phase: PhaseSchema.parse(row.phase),
+          phase: parseLessonData(PhaseSchema, row.phase, LessonDataSource.ARTIFACT),
         }
       : null;
   }

@@ -1,0 +1,2691 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Tro · Ba hướng giao diện soạn bài</title>
+    <style>
+      :root {
+        --paper: #f8f6ef;
+        --surface: #fffdf7;
+        --ink: #203c34;
+        --muted: #69756e;
+        --line: #dedfd3;
+        --soft: #eeeee4;
+        --forest: #244d3e;
+        --forest-soft: #e9eee5;
+        --orange: #e9a866;
+        --orange-soft: #fff0dc;
+        --white: #fff;
+        --radius: 18px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: var(--ink);
+        background: var(--paper);
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+      button,
+      a,
+      input,
+      select,
+      textarea,
+      summary {
+        -webkit-tap-highlight-color: transparent;
+      }
+      button {
+        color: inherit;
+        cursor: pointer;
+      }
+      a {
+        color: inherit;
+        text-underline-offset: 4px;
+      }
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.46;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible,
+      select:focus-visible,
+      textarea:focus-visible,
+      summary:focus-visible {
+        outline: 3px solid #b47731;
+        outline-offset: 4px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      button {
+        border: 0;
+        background: none;
+      }
+      svg {
+        display: block;
+        flex-shrink: 0;
+      }
+      .demo-strip {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 22px;
+        padding: 10px 28px;
+        background: #263d33;
+        color: #f9f7ec;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .demo-strip strong {
+        font-weight: 600;
+      }
+      .demo-strip span {
+        color: #c6d4c7;
+      }
+      .demo-strip a {
+        margin-left: auto;
+        white-space: nowrap;
+      }
+      .concept-bar {
+        padding: 18px 28px;
+        background: #eeeee4;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        gap: 28px;
+      }
+      .concept-label {
+        font-size: 10px;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--muted);
+        flex-shrink: 0;
+        line-height: 1.7;
+      }
+      .concepts {
+        display: flex;
+        gap: 8px;
+      }
+      .concept-button {
+        border: 1px solid transparent;
+        border-radius: 11px;
+        padding: 10px 16px;
+        text-align: left;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .concept-button[aria-pressed='true'] {
+        background: var(--surface);
+        border-color: #d5d6c8;
+        box-shadow: 0 2px 4px #253d3310;
+      }
+      .concept-letter {
+        width: 25px;
+        height: 25px;
+        display: grid;
+        place-items: center;
+        border: 1px solid #c7cbbd;
+        border-radius: 7px;
+        font:
+          15px Georgia,
+          serif;
+      }
+      .concept-button[aria-pressed='true'] .concept-letter {
+        color: var(--surface);
+        background: var(--forest);
+        border-color: var(--forest);
+      }
+      .concept-button strong {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .concept-button small {
+        display: block;
+        margin-top: 4px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .concept-note {
+        margin-left: auto;
+        max-width: 240px;
+        font-size: 12px;
+        line-height: 1.55;
+        color: var(--muted);
+      }
+      .app {
+        display: flex;
+        min-height: calc(100vh - 132px);
+      }
+      .sidebar {
+        width: 195px;
+        flex-shrink: 0;
+        border-right: 1px solid var(--line);
+        padding: 28px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 34px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 12px;
+        font:
+          30px Georgia,
+          serif;
+        letter-spacing: -1px;
+      }
+      .brand-mark {
+        width: 34px;
+        height: 34px;
+        background: var(--forest);
+        color: #f8e6c9;
+        display: grid;
+        place-items: center;
+        border-radius: 11px;
+      }
+      .nav {
+        display: grid;
+        gap: 7px;
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        font-size: 13px;
+        border-radius: 10px;
+        color: var(--muted);
+      }
+      .nav-item.active {
+        background: #e8ecdf;
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .nav-item svg {
+        width: 18px;
+        height: 18px;
+      }
+      .sidebar-note {
+        margin-top: auto;
+        border-top: 1px solid var(--line);
+        padding: 20px 12px 0;
+        font-size: 11px;
+        line-height: 1.8;
+        color: var(--muted);
+      }
+      .sidebar-note strong {
+        color: var(--ink);
+        display: block;
+        font-size: 12px;
+        font-weight: 500;
+      }
+      main {
+        min-width: 0;
+        flex: 1;
+        max-width: 1600px;
+        padding: 30px 44px 42px;
+      }
+      .breadcrumb {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .breadcrumb span:last-child {
+        color: var(--ink);
+      }
+      .page-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 24px;
+        margin: 27px 0 25px;
+      }
+      .eyebrow {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        font-weight: 600;
+        color: var(--muted);
+      }
+      h1 {
+        font:
+          38px/1.15 Georgia,
+          'Times New Roman',
+          serif;
+        letter-spacing: -1.1px;
+        margin-top: 10px;
+        max-width: 700px;
+      }
+      .subtitle {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.7;
+        margin-top: 12px;
+      }
+      .draft-badge {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 8px 11px;
+        border: 1px solid #ddd8c7;
+        border-radius: 99px;
+        font-size: 11px;
+        color: #80704f;
+      }
+      .dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #bc9560;
+      }
+      .lifecycle {
+        display: flex;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        padding: 15px 18px;
+        margin-bottom: 26px;
+        background: #f3f2e9;
+        gap: 14px;
+        align-items: center;
+      }
+      .lifecycle-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        white-space: nowrap;
+        color: #838b81;
+      }
+      .lifecycle-item.current {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .lifecycle-item svg {
+        width: 14px;
+        height: 14px;
+      }
+      .stage-dot {
+        width: 21px;
+        height: 21px;
+        display: grid;
+        place-items: center;
+        border: 1px solid #d6dacc;
+        border-radius: 50%;
+        color: #8c9489;
+        font-size: 10px;
+      }
+      .current .stage-dot {
+        color: white;
+        background: var(--forest);
+        border-color: var(--forest);
+      }
+      .stage-line {
+        height: 1px;
+        background: #d8ddcd;
+        flex: 1;
+        min-width: 12px;
+      }
+      .work-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 287px;
+        gap: 26px;
+        align-items: start;
+      }
+      .card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        min-width: 0;
+      }
+      .steps {
+        display: flex;
+        align-items: center;
+        padding: 21px 26px 19px;
+        gap: 24px;
+        border-bottom: 1px solid var(--line);
+      }
+      .step {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted);
+        padding: 0;
+      }
+      .step-number {
+        width: 24px;
+        height: 24px;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+      }
+      .step[aria-current='step'] {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .step[aria-current='step'] .step-number {
+        background: var(--forest);
+        border-color: var(--forest);
+        color: white;
+      }
+      .step.complete .step-number {
+        background: var(--forest-soft);
+        color: var(--forest);
+        border-color: #bac9b7;
+      }
+      .form-body {
+        padding: 27px 28px 29px;
+      }
+      .section-heading {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 23px;
+      }
+      h2 {
+        font-size: 20px;
+        letter-spacing: -0.5px;
+        font-weight: 600;
+        line-height: 1.35;
+      }
+      h3 {
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.45;
+      }
+      .section-heading p,
+      .section-description {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 7px;
+        line-height: 1.7;
+      }
+      .section-count {
+        background: var(--soft);
+        padding: 6px 9px;
+        border-radius: 6px;
+        color: var(--muted);
+        font-size: 10px;
+        white-space: nowrap;
+      }
+      .fields {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 19px 16px;
+      }
+      .field {
+        display: grid;
+        align-content: start;
+        gap: 7px;
+      }
+      .field.wide {
+        grid-column: 1 / -1;
+      }
+      .field label,
+      .field-label {
+        font-size: 11px;
+        font-weight: 600;
+      }
+      input[type='text'],
+      input[type='search'],
+      select,
+      textarea {
+        border: 1px solid #d8ddcf;
+        border-radius: 9px;
+        background: #fffef9;
+        color: var(--ink);
+        width: 100%;
+      }
+      input[type='text'],
+      input[type='search'],
+      select {
+        min-height: 41px;
+        padding: 10px 12px;
+        font-size: 12px;
+      }
+      select {
+        padding-right: 28px;
+      }
+      textarea {
+        resize: vertical;
+        padding: 12px;
+        line-height: 1.7;
+        font-size: 12px;
+      }
+      input::placeholder,
+      textarea::placeholder {
+        color: #92988c;
+      }
+      .help {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.6;
+      }
+      .source-section {
+        border-top: 1px solid var(--line);
+        margin-top: 25px;
+        padding-top: 23px;
+      }
+      .row-between {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .count {
+        display: inline-flex;
+        padding: 5px 8px;
+        background: var(--forest-soft);
+        color: var(--forest);
+        font-size: 10px;
+        border-radius: 6px;
+        white-space: nowrap;
+      }
+      .source-intro {
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.7;
+        margin-top: 7px;
+      }
+      .search-wrap {
+        position: relative;
+        margin-top: 15px;
+      }
+      .search-wrap svg {
+        position: absolute;
+        top: 13px;
+        left: 12px;
+        width: 15px;
+        height: 15px;
+        color: var(--muted);
+      }
+      .search-wrap input {
+        padding-left: 36px;
+        background: #f8f8f0;
+        min-height: 39px;
+      }
+      .sources {
+        display: grid;
+        gap: 9px;
+        margin-top: 13px;
+      }
+      .source-card {
+        position: relative;
+        border: 1px solid #dfe2d5;
+        border-radius: 10px;
+        padding: 16px 54px 16px 15px;
+        background: #fbfbf4;
+      }
+      .source-card.selected {
+        background: #f1f5ec;
+        border-color: #b8c8b1;
+      }
+      .source-card.correction {
+        border-color: #dbc7a7;
+        background: #fbf5e9;
+      }
+      .source-heading {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 20px;
+      }
+      input[type='checkbox'] {
+        accent-color: var(--forest);
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+        margin: 0;
+        cursor: pointer;
+      }
+      .source-heading label {
+        cursor: pointer;
+        flex: 1;
+        font-size: 13px;
+        font-weight: 500;
+        line-height: 1.5;
+      }
+      .source-meta {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        margin-bottom: 10px;
+      }
+      .source-kind {
+        font-size: 10px;
+        color: #8b6531;
+        background: #f2e4cd;
+        padding: 3px 6px;
+        border-radius: 4px;
+        white-space: nowrap;
+      }
+      .source-detail > summary {
+        position: absolute;
+        right: 8px;
+        top: 7px;
+        display: grid;
+        place-items: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 7px;
+        cursor: pointer;
+        list-style: none;
+        color: var(--muted);
+      }
+      .source-detail > summary:hover {
+        background: #244d3e0c;
+      }
+      .source-detail > summary::-webkit-details-marker {
+        display: none;
+      }
+      .source-detail > summary svg {
+        width: 17px;
+        height: 17px;
+      }
+      .source-detail[open] > summary svg {
+        transform: rotate(180deg);
+      }
+      .source-full {
+        color: var(--ink);
+        font-size: 13px;
+        line-height: 1.75;
+        margin: 15px -38px 0 28px;
+        padding: 14px 0 0;
+        border-top: 1px solid #244d3e18;
+      }
+      .source-full p {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      .empty-search {
+        padding: 20px 8px;
+        font-size: 12px;
+        line-height: 1.7;
+        color: var(--muted);
+      }
+      .form-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 18px;
+        border-top: 1px solid var(--line);
+        padding: 20px 28px;
+      }
+      .footer-note {
+        font-size: 11px;
+        line-height: 1.6;
+        color: var(--muted);
+        max-width: 270px;
+      }
+      .primary {
+        background: var(--forest);
+        color: #fffdf2;
+        border: 1px solid var(--forest);
+        border-radius: 9px;
+        padding: 12px 16px;
+        font-size: 12px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        white-space: nowrap;
+      }
+      .primary svg {
+        width: 15px;
+        height: 15px;
+      }
+      .secondary {
+        border: 1px solid #ccd2c3;
+        background: #fafaf2;
+        border-radius: 9px;
+        padding: 11px 14px;
+        font-size: 12px;
+      }
+      .text-button {
+        font-size: 11px;
+        color: var(--forest);
+        text-decoration: underline;
+        text-underline-offset: 4px;
+        padding: 4px 0;
+      }
+      .side-stack {
+        display: grid;
+        gap: 16px;
+      }
+      .preview-card {
+        padding: 20px;
+      }
+      .preview-card .eyebrow {
+        font-size: 9px;
+      }
+      .mini-board {
+        border-radius: 11px;
+        background: #e9ecdf;
+        padding: 21px 18px;
+        margin-top: 16px;
+        min-height: 202px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .board-label {
+        font-size: 9px;
+        color: #667562;
+        margin-bottom: 15px;
+      }
+      .board-title {
+        font:
+          23px/1.2 Georgia,
+          serif;
+        letter-spacing: -0.5px;
+        max-width: 200px;
+      }
+      .number-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 18px;
+      }
+      .number-cell {
+        display: grid;
+        place-items: center;
+        width: 29px;
+        height: 29px;
+        border: 1px solid #becbb7;
+        border-radius: 7px;
+        font-size: 12px;
+        background: #f8f8ee;
+      }
+      .number-cell.accent {
+        background: #f5cd91;
+        border-color: #e5b775;
+      }
+      .number-row .plus {
+        font-size: 11px;
+        color: #78856f;
+      }
+      .board-total {
+        font-size: 10px;
+        margin-top: 12px;
+        color: #526747;
+      }
+      .preview-caption {
+        font-size: 10px;
+        color: var(--muted);
+        line-height: 1.7;
+        margin-top: 12px;
+      }
+      .summary-list {
+        margin: 20px 0 0;
+        display: grid;
+        gap: 15px;
+      }
+      .summary-list div {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 15px;
+        font-size: 11px;
+      }
+      .summary-list dt {
+        color: var(--muted);
+      }
+      .summary-list dd {
+        margin: 0;
+        text-align: right;
+      }
+      .summary-objective {
+        font-size: 12px;
+        line-height: 1.7;
+        margin-top: 16px;
+      }
+      .source-reference {
+        border-color: #bdcdb5;
+      }
+      .source-reference details {
+        margin-top: 14px;
+        border-top: 1px solid var(--line);
+        padding-top: 12px;
+      }
+      .source-reference summary {
+        font-size: 11px;
+        line-height: 1.6;
+        cursor: pointer;
+        font-weight: 500;
+      }
+      .source-reference details p {
+        font-size: 10px;
+        line-height: 1.9;
+        margin-top: 10px;
+        white-space: pre-wrap;
+        color: #5b6e59;
+        overflow-wrap: anywhere;
+      }
+      .teacher-note {
+        padding: 19px 20px;
+        background: #f0ede0;
+        border-radius: 13px;
+      }
+      .teacher-note h3 {
+        font-size: 12px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .teacher-note svg {
+        width: 15px;
+        height: 15px;
+      }
+      .teacher-note p {
+        font-size: 11px;
+        color: #747565;
+        line-height: 1.8;
+        margin-top: 9px;
+      }
+      .subtle-label {
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .code-tabs {
+        display: flex;
+        gap: 4px;
+        padding: 4px;
+        border-radius: 9px;
+        background: #eeefe5;
+        margin-bottom: 18px;
+      }
+      .code-tab {
+        padding: 9px 12px;
+        border-radius: 6px;
+        flex: 1;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .code-tab[aria-pressed='true'] {
+        background: #fffef6;
+        color: var(--ink);
+        box-shadow: 0 1px 4px #203c3410;
+      }
+      .code-heading {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        align-items: center;
+        margin-bottom: 9px;
+      }
+      .code-heading strong {
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .file-type {
+        font-size: 9px;
+        letter-spacing: 0.04em;
+        padding: 4px 7px;
+        background: var(--forest-soft);
+        border-radius: 4px;
+      }
+      .code-shell {
+        background: #f1f4eb;
+        border: 1px solid #d3ddcb;
+        border-radius: 11px;
+        overflow: hidden;
+      }
+      .code-toolbar {
+        padding: 10px 14px;
+        font-size: 10px;
+        border-bottom: 1px solid #d6dece;
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+      }
+      .code-editor {
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        min-height: 195px;
+        padding: 18px;
+        font:
+          12px/1.9 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Consolas,
+          monospace;
+        color: #314b38;
+        tab-size: 4;
+      }
+      .confirmation {
+        padding: 14px 15px;
+        margin-top: 14px;
+        border: 1px solid #dce0d1;
+        border-radius: 10px;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        background: #fafaf2;
+      }
+      .confirmation.confirmed {
+        background: var(--forest-soft);
+        border-color: #c4d2bd;
+      }
+      .confirmation label {
+        font-size: 11px;
+        line-height: 1.7;
+        cursor: pointer;
+      }
+      .confirmation small {
+        display: block;
+        color: var(--muted);
+        font-size: 10px;
+        margin-top: 3px;
+      }
+      .code-note {
+        margin-top: 12px;
+        font-size: 10px;
+        line-height: 1.8;
+        color: var(--muted);
+      }
+      .practice-skip {
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font-size: 12px;
+        line-height: 1.8;
+        background: #f7f7ef;
+      }
+      .extra-instructions {
+        margin-top: 22px;
+      }
+      .extra-instructions summary {
+        font-size: 11px;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .extra-instructions .field {
+        margin-top: 15px;
+      }
+      .review-intro {
+        padding: 18px;
+        border: 1px solid #d3dccb;
+        border-radius: 11px;
+        background: #f0f4e9;
+        font-size: 12px;
+        line-height: 1.8;
+        margin-bottom: 22px;
+      }
+      .review-block {
+        padding: 17px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .review-block:first-of-type {
+        padding-top: 0;
+      }
+      .review-block:last-child {
+        border-bottom: 0;
+      }
+      .review-block h3 {
+        margin-bottom: 7px;
+        font-size: 12px;
+      }
+      .review-block p {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.8;
+      }
+      .review-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 12px;
+      }
+      .tag {
+        font-size: 10px;
+        background: #eff0e6;
+        padding: 6px 8px;
+        border-radius: 5px;
+      }
+      .review-source {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding-top: 9px;
+        font-size: 11px;
+        color: #5c6c5b;
+      }
+      .review-source svg {
+        width: 14px;
+        height: 14px;
+      }
+      .review-code {
+        white-space: pre-wrap;
+        font:
+          11px/1.8 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        padding: 13px;
+        border-radius: 8px;
+        background: #f2f4eb;
+        margin: 10px 0 0;
+        overflow-wrap: anywhere;
+      }
+      .validation-message {
+        font-size: 11px;
+        color: #8e512f;
+        line-height: 1.7;
+        padding: 12px 14px;
+        border: 1px solid #ead3b6;
+        background: var(--orange-soft);
+        border-radius: 8px;
+        margin-bottom: 18px;
+      }
+      .bottom-caption {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        font-size: 10px;
+        color: #7d877a;
+        line-height: 1.8;
+        margin-top: 20px;
+      }
+      .workspace-layout {
+        display: grid;
+        grid-template-columns: 240px minmax(310px, 1fr) 245px;
+        gap: 18px;
+        align-items: start;
+      }
+      .workspace-layout .form-body {
+        padding: 22px;
+      }
+      .workspace-sources {
+        padding: 20px 16px;
+      }
+      .workspace-sources .source-heading label {
+        font-size: 11px;
+      }
+      .workspace-sources .source-card {
+        padding: 12px;
+      }
+      .workspace-sources .source-excerpt,
+      .workspace-sources .source-card details {
+        margin-left: 0;
+      }
+      .workspace-sources .source-kind {
+        display: none;
+      }
+      .workspace-sources .source-section {
+        margin: 20px 0 0;
+        padding-top: 18px;
+      }
+      .workspace-center {
+        display: grid;
+        gap: 18px;
+      }
+      .workspace-center .fields {
+        gap: 16px 12px;
+      }
+      .workspace-center h2 {
+        font-size: 17px;
+      }
+      .workspace-center .code-editor {
+        font-size: 11px;
+        min-height: 175px;
+      }
+      .workspace-layout .preview-card {
+        padding: 17px;
+      }
+      .workspace-layout .preview-card .mini-board {
+        padding: 18px 13px;
+      }
+      .workspace-layout .board-title {
+        font-size: 22px;
+      }
+      .workspace-layout .form-footer {
+        padding: 16px 20px;
+        flex-wrap: wrap;
+      }
+      .workspace-layout .footer-note {
+        max-width: none;
+      }
+      .brief-layout {
+        max-width: 1070px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 278px;
+        gap: 26px;
+        align-items: start;
+      }
+      .accordion {
+        display: grid;
+        gap: 12px;
+      }
+      .brief-section {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface);
+      }
+      .brief-section > summary {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        padding: 20px 23px;
+        cursor: pointer;
+        list-style: none;
+      }
+      .brief-section > summary::-webkit-details-marker {
+        display: none;
+      }
+      .brief-index {
+        border: 1px solid #d3dac9;
+        color: #66805e;
+        border-radius: 50%;
+        width: 25px;
+        height: 25px;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        font-size: 11px;
+      }
+      .brief-title {
+        flex: 1;
+      }
+      .brief-title strong {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .brief-title small {
+        display: block;
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.5;
+        margin-top: 5px;
+      }
+      .brief-section > summary svg {
+        width: 15px;
+        height: 15px;
+        transition: transform 0.15s;
+      }
+      .brief-section[open] > summary svg {
+        transform: rotate(180deg);
+      }
+      .brief-content {
+        padding: 2px 23px 24px;
+      }
+      .brief-layout .source-section {
+        border: 0;
+        padding-top: 0;
+        margin-top: 0;
+      }
+      .brief-bottom {
+        margin-top: 17px;
+        padding: 20px;
+      }
+      .brief-bottom p {
+        margin: 9px 0 17px;
+        font-size: 11px;
+        line-height: 1.8;
+        color: var(--muted);
+      }
+      .brief-bottom .primary {
+        width: 100%;
+      }
+      dialog {
+        border: 1px solid #d2d8c6;
+        border-radius: 22px;
+        background: var(--surface);
+        padding: 0;
+        color: var(--ink);
+        max-width: 820px;
+        width: calc(100% - 36px);
+        max-height: calc(100vh - 48px);
+        box-shadow: 0 24px 100px #1c362e35;
+      }
+      dialog::backdrop {
+        background: #18342865;
+        backdrop-filter: blur(3px);
+      }
+      .modal-head {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 28px 30px 22px;
+        border-bottom: 1px solid var(--line);
+      }
+      .modal-head h2 {
+        font:
+          30px/1.2 Georgia,
+          serif;
+        margin-top: 8px;
+      }
+      .close {
+        display: grid;
+        place-items: center;
+        width: 31px;
+        height: 31px;
+        border-radius: 50%;
+        border: 1px solid #d8ddce;
+      }
+      .modal-body {
+        padding: 24px 30px 30px;
+      }
+      .demo-notice {
+        font-size: 11px;
+        line-height: 1.8;
+        background: var(--orange-soft);
+        border: 1px solid #ead5b8;
+        border-radius: 10px;
+        padding: 13px 15px;
+        margin-bottom: 23px;
+        color: #89633d;
+      }
+      .storyboard {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 13px;
+      }
+      .scene {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .scene-visual {
+        min-height: 125px;
+        display: grid;
+        align-content: center;
+        gap: 12px;
+        padding: 20px;
+        background: #edf0e4;
+      }
+      .scene-visual strong {
+        font:
+          24px Georgia,
+          serif;
+      }
+      .scene-visual span {
+        font:
+          11px ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+      }
+      .scene-visual.orange {
+        background: #f5e5ca;
+      }
+      .scene-text {
+        padding: 15px;
+      }
+      .scene-text small {
+        color: var(--muted);
+        font-size: 9px;
+        display: block;
+        margin-bottom: 8px;
+      }
+      .scene-text h3 {
+        font-size: 12px;
+      }
+      .scene-text p {
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.8;
+        margin-top: 8px;
+      }
+      .modal-next {
+        margin-top: 22px;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        padding: 16px;
+        font-size: 11px;
+        line-height: 1.8;
+        background: #f6f6ed;
+      }
+      .modal-next strong {
+        font-size: 12px;
+        display: block;
+        margin-bottom: 4px;
+      }
+      .modal-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: end;
+        margin-top: 20px;
+      }
+      .screen-reader {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+      }
+      @media (min-width: 1550px) {
+        main {
+          padding-left: 58px;
+          padding-right: 58px;
+        }
+        .workspace-layout {
+          grid-template-columns: 260px minmax(390px, 1fr) 287px;
+          gap: 24px;
+        }
+      }
+      @media (max-width: 1240px) {
+        .sidebar {
+          width: 165px;
+          padding: 28px 12px;
+        }
+        main {
+          padding: 28px;
+        }
+        .work-layout,
+        .brief-layout {
+          grid-template-columns: minmax(0, 1fr) 252px;
+          gap: 20px;
+        }
+        .workspace-layout {
+          grid-template-columns: 220px minmax(300px, 1fr);
+        }
+        .workspace-layout > .side-stack {
+          grid-column: 1 / -1;
+          grid-template-columns: 1fr 1fr;
+        }
+        .workspace-layout > .side-stack .teacher-note {
+          grid-column: 1 / -1;
+        }
+        .workspace-layout > .side-stack .mini-board {
+          min-height: 170px;
+        }
+        .concept-note {
+          display: none;
+        }
+        .lifecycle {
+          gap: 9px;
+          padding: 14px;
+        }
+      }
+      @media (max-width: 1010px) {
+        .sidebar {
+          width: 76px;
+          padding: 27px 10px;
+        }
+        .brand {
+          padding: 0 10px;
+        }
+        .brand > span:last-child,
+        .nav-item > span,
+        .sidebar-note {
+          display: none;
+        }
+        .nav-item {
+          justify-content: center;
+          padding: 15px;
+        }
+        h1 {
+          font-size: 32px;
+        }
+        .work-layout,
+        .brief-layout {
+          grid-template-columns: minmax(0, 1fr) 235px;
+          gap: 17px;
+        }
+        .form-body {
+          padding: 23px;
+        }
+        .steps {
+          padding: 19px 23px;
+          gap: 18px;
+        }
+        .step {
+          font-size: 11px;
+        }
+        .form-footer {
+          padding: 18px 23px;
+          flex-wrap: wrap;
+        }
+        .footer-note {
+          max-width: none;
+        }
+        .preview-card {
+          padding: 17px;
+        }
+        .board-title {
+          font-size: 22px;
+        }
+        .lifecycle-item {
+          font-size: 10px;
+        }
+      }
+      @media (max-width: 850px) {
+        .work-layout,
+        .brief-layout {
+          grid-template-columns: 1fr;
+        }
+        .side-stack {
+          grid-template-columns: 1fr 1fr;
+        }
+        .side-stack .teacher-note {
+          grid-column: 1 / -1;
+        }
+        .concept-bar {
+          padding: 14px 18px;
+          gap: 16px;
+        }
+        .concept-label {
+          display: none;
+        }
+        .concepts {
+          flex: 1;
+        }
+        .concept-button {
+          flex: 1;
+          padding: 10px 12px;
+          gap: 9px;
+        }
+        .concept-button strong {
+          font-size: 12px;
+        }
+        .concept-button small {
+          font-size: 10px;
+        }
+        .lifecycle {
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+        .stage-line {
+          display: none;
+        }
+        .lifecycle-item {
+          flex: 1;
+          min-width: 135px;
+        }
+        .workspace-layout {
+          grid-template-columns: 220px minmax(0, 1fr);
+          gap: 14px;
+        }
+        .workspace-center .fields {
+          grid-template-columns: 1fr;
+        }
+        .workspace-center .field.wide {
+          grid-column: auto;
+        }
+        .bottom-caption {
+          flex-direction: column;
+          gap: 4px;
+        }
+      }
+      @media (max-width: 650px) {
+        .demo-strip {
+          padding: 9px 16px;
+          font-size: 10px;
+          gap: 4px 12px;
+        }
+        .demo-strip span {
+          display: none;
+        }
+        .concept-bar {
+          padding: 12px;
+        }
+        .concepts {
+          gap: 5px;
+        }
+        .concept-button {
+          gap: 7px;
+          padding: 9px 8px;
+        }
+        .concept-letter {
+          width: 21px;
+          height: 21px;
+          font-size: 12px;
+        }
+        .concept-button strong {
+          font-size: 10px;
+          line-height: 1.5;
+        }
+        .concept-button small {
+          display: none;
+        }
+        .app {
+          display: block;
+        }
+        .sidebar {
+          width: 100%;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+          padding: 12px 18px;
+          flex-direction: row;
+          align-items: center;
+          gap: 18px;
+        }
+        .brand {
+          padding: 0;
+        }
+        .brand > span:last-child {
+          display: block;
+          font-size: 24px;
+        }
+        .brand-mark {
+          width: 28px;
+          height: 28px;
+          border-radius: 9px;
+        }
+        .nav {
+          display: flex;
+          margin-left: auto;
+          gap: 5px;
+        }
+        .nav-item {
+          padding: 9px;
+        }
+        .nav-item > span {
+          display: none;
+        }
+        .nav-item:not(.active) {
+          display: none;
+        }
+        .nav-item.active > span {
+          display: block;
+          font-size: 11px;
+        }
+        main {
+          padding: 21px 18px 30px;
+        }
+        .breadcrumb {
+          font-size: 10px;
+        }
+        .page-heading {
+          align-items: start;
+          margin: 24px 0 20px;
+          gap: 12px;
+        }
+        h1 {
+          font-size: 30px;
+          line-height: 1.2;
+        }
+        .eyebrow {
+          font-size: 9px;
+        }
+        .subtitle {
+          font-size: 12px;
+        }
+        .draft-badge {
+          display: none;
+        }
+        .lifecycle {
+          margin-bottom: 20px;
+          padding: 12px;
+          gap: 12px 8px;
+        }
+        .lifecycle-item {
+          min-width: 125px;
+          font-size: 9px;
+        }
+        .stage-dot {
+          width: 18px;
+          height: 18px;
+          font-size: 9px;
+        }
+        .steps {
+          padding: 17px 18px;
+          justify-content: space-between;
+          gap: 10px;
+        }
+        .step {
+          font-size: 10px;
+          gap: 6px;
+        }
+        .step-number {
+          width: 21px;
+          height: 21px;
+        }
+        .form-body {
+          padding: 22px 18px;
+        }
+        h2 {
+          font-size: 19px;
+        }
+        .section-heading {
+          margin-bottom: 21px;
+        }
+        .fields {
+          grid-template-columns: 1fr;
+          gap: 17px;
+        }
+        .field.wide {
+          grid-column: auto;
+        }
+        .form-footer {
+          padding: 18px;
+          gap: 14px;
+        }
+        .form-footer .primary {
+          margin-left: auto;
+        }
+        .footer-note {
+          font-size: 10px;
+        }
+        .side-stack {
+          grid-template-columns: 1fr;
+        }
+        .side-stack .teacher-note {
+          grid-column: auto;
+        }
+        .preview-card {
+          padding: 20px;
+        }
+        .mini-board {
+          min-height: 180px;
+        }
+        .workspace-layout {
+          grid-template-columns: 1fr;
+        }
+        .workspace-layout > .side-stack {
+          grid-column: auto;
+          grid-template-columns: 1fr;
+        }
+        .workspace-layout > .side-stack .teacher-note {
+          grid-column: auto;
+        }
+        .workspace-sources {
+          padding: 22px 18px;
+        }
+        .workspace-center .form-body {
+          padding: 22px 18px;
+        }
+        .brief-section > summary {
+          padding: 18px;
+        }
+        .brief-content {
+          padding: 0 18px 20px;
+        }
+        .storyboard {
+          grid-template-columns: 1fr;
+        }
+        .scene {
+          display: grid;
+          grid-template-columns: 110px 1fr;
+        }
+        .scene-visual {
+          padding: 14px;
+          min-height: 135px;
+        }
+        .scene-visual strong {
+          font-size: 21px;
+        }
+        .scene-visual span {
+          font-size: 10px;
+          line-height: 1.7;
+        }
+        .modal-head {
+          padding: 24px 20px 18px;
+        }
+        .modal-head h2 {
+          font-size: 26px;
+        }
+        .modal-body {
+          padding: 20px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          scroll-behavior: auto !important;
+          transition: none !important;
+        }
+      }
+      .demo-strip {
+        font-size: 11px;
+        padding-block: 8px;
+      }
+      .concept-bar {
+        padding-block: 10px;
+      }
+      .concept-button {
+        padding: 8px 14px;
+      }
+      h1 {
+        font-size: 32px;
+        margin: 0;
+      }
+      .page-heading {
+        align-items: center;
+        margin: 0 auto 22px;
+        max-width: 1100px;
+      }
+      .work-layout {
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+      .focused-layout {
+        grid-template-columns: minmax(0, 1fr);
+        max-width: 740px;
+      }
+      .steps {
+        justify-content: space-between;
+        padding-block: 18px;
+      }
+      .form-body {
+        padding-block: 24px;
+      }
+      .section-heading {
+        margin-bottom: 18px;
+        align-items: center;
+      }
+      .section-heading h2 {
+        font-size: 18px;
+      }
+      .fields {
+        gap: 16px;
+      }
+      .field label {
+        font-size: 12px;
+      }
+      input[type='text'],
+      input[type='search'],
+      select,
+      textarea {
+        font-size: 14px;
+      }
+      textarea {
+        line-height: 1.5;
+      }
+      .material-options {
+        margin-bottom: 20px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #f7f7ef;
+      }
+      .material-options > summary {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 7px 14px;
+        padding: 13px 14px;
+        cursor: pointer;
+        font-size: 13px;
+        list-style: none;
+      }
+      .material-options > summary strong {
+        font-weight: 500;
+      }
+      .material-options > summary span {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .material-options > summary svg,
+      .lesson-options > summary svg,
+      .workflow-info > summary svg,
+      .review-practice > summary svg {
+        width: 16px;
+        height: 16px;
+      }
+      .material-options > .fields {
+        padding: 0 14px 16px;
+      }
+      .lesson-options {
+        margin-top: 15px;
+      }
+      .lesson-options > summary {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        font-size: 12px;
+        cursor: pointer;
+        list-style: none;
+      }
+      .lesson-options > summary [data-options-summary] {
+        margin-left: auto;
+        color: var(--muted);
+      }
+      .lesson-options > .fields {
+        padding: 12px 0 2px;
+      }
+      .material-options > summary::-webkit-details-marker,
+      .lesson-options > summary::-webkit-details-marker,
+      .workflow-info > summary::-webkit-details-marker,
+      .review-source-detail > summary::-webkit-details-marker,
+      .review-practice > summary::-webkit-details-marker {
+        display: none;
+      }
+      .material-options[open] > summary svg,
+      .lesson-options[open] > summary svg,
+      .workflow-info[open] > summary svg,
+      .review-source-detail[open] > summary svg:last-child,
+      .review-practice[open] > summary svg {
+        transform: rotate(180deg);
+      }
+      .source-section {
+        margin-top: 16px;
+        padding-top: 20px;
+      }
+      .search-wrap {
+        margin-top: 12px;
+      }
+      .source-required {
+        margin-top: 10px;
+        color: #8e512f;
+      }
+      .form-footer {
+        padding-block: 18px;
+      }
+      .form-footer .primary {
+        margin-left: auto;
+        font-size: 13px;
+      }
+      .summary-list {
+        margin-top: 16px;
+        gap: 14px;
+      }
+      .summary-list div {
+        font-size: 12px;
+      }
+      .source-reference summary,
+      .source-reference details p {
+        font-size: 13px;
+      }
+      .code-editor {
+        font-size: 14px;
+      }
+      .confirmation label {
+        font-size: 13px;
+      }
+      .extra-instructions {
+        margin-top: 18px;
+      }
+      .extra-instructions > summary {
+        font-size: 12px;
+      }
+      .extra-instructions > summary span {
+        margin-left: 10px;
+        color: #8c9387;
+        font-size: 11px;
+      }
+      .practice-hint {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 0 0 16px;
+        line-height: 1.6;
+      }
+      .workflow-info {
+        position: relative;
+      }
+      .workflow-info > summary {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        list-style: none;
+        font-size: 12px;
+        color: var(--muted);
+        padding: 10px 0 10px 10px;
+      }
+      .workflow-stages {
+        position: absolute;
+        right: 0;
+        top: 44px;
+        z-index: 2;
+        min-width: 230px;
+        padding: 18px;
+        display: grid;
+        gap: 16px;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        background: var(--surface);
+        box-shadow: 0 8px 24px #203c3410;
+        font-size: 13px;
+      }
+      .workspace-layout {
+        grid-template-columns: minmax(240px, 0.8fr) minmax(0, 1.5fr);
+        max-width: 1100px;
+        margin-inline: auto;
+      }
+      .workspace-sources .source-section {
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+      .workspace-sources .source-card {
+        padding: 16px 44px 16px 12px;
+      }
+      .workspace-sources .source-heading {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .workspace-sources .source-heading label {
+        font-size: 13px;
+        flex-basis: calc(100% - 26px);
+      }
+      .workspace-sources .source-kind {
+        display: inline;
+        margin-left: 26px;
+      }
+      .workspace-sources .source-detail > summary {
+        right: 4px;
+      }
+      .workspace-sources .source-full {
+        margin-right: -28px;
+      }
+      .workspace-center .code-editor {
+        font-size: 13px;
+      }
+      .brief-layout {
+        display: block;
+        max-width: 740px;
+      }
+      .brief-title {
+        min-width: 0;
+      }
+      .brief-section > summary {
+        padding-block: 18px;
+      }
+      .brief-actions {
+        padding: 8px 0;
+        border: 0;
+      }
+      .review-source-detail > summary {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 10px 0;
+        font-size: 13px;
+        cursor: pointer;
+        list-style: none;
+      }
+      .review-source-detail > summary svg {
+        width: 15px;
+        height: 15px;
+      }
+      .review-source-detail > summary span {
+        flex: 1;
+      }
+      .review-source-detail > p {
+        padding: 8px 0 12px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      .review-practice {
+        margin-top: 17px;
+      }
+      .review-practice > summary {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        list-style: none;
+        cursor: pointer;
+        font-size: 13px;
+      }
+      .review-practice > summary svg {
+        margin-left: auto;
+      }
+      .approval-state {
+        font-weight: 400;
+        font-size: 11px;
+        color: var(--muted);
+        margin-left: 7px;
+      }
+      @media (max-width: 850px) {
+        .work-layout {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .side-stack {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .workspace-layout {
+          grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.3fr);
+        }
+      }
+      @media (max-width: 650px) {
+        .workspace-layout {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .page-heading {
+          margin-bottom: 18px;
+        }
+        .source-heading {
+          flex-wrap: wrap;
+        }
+        .source-kind {
+          margin-left: 28px;
+        }
+        .source-heading label {
+          flex-basis: calc(100% - 28px);
+        }
+        .concept-button strong {
+          font-size: 12px;
+        }
+        .brief-section > summary {
+          gap: 10px;
+        }
+        .brief-section .count {
+          font-size: 10px;
+        }
+      }
+      /* Keep comparison controls compact so the active form begins near the top. */
+      .prototype-toolbar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        padding: 6px 24px;
+        background: #eeeee4;
+        border-bottom: 1px solid var(--line);
+      }
+      .prototype-label {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .prototype-toolbar .concepts {
+        flex: initial;
+        gap: 5px;
+      }
+      .prototype-toolbar .concept-button {
+        flex: none;
+        min-height: 36px;
+        padding: 6px 10px;
+        gap: 8px;
+        border-radius: 8px;
+      }
+      .prototype-toolbar .concept-letter {
+        width: 20px;
+        height: 20px;
+        font-size: 12px;
+        border-radius: 5px;
+      }
+      .prototype-toolbar .concept-button strong {
+        font-size: 12px;
+      }
+      .prototype-toolbar .workflow-info {
+        margin-left: auto;
+      }
+      .prototype-toolbar .workflow-info > summary {
+        display: grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border-radius: 8px;
+      }
+      .prototype-toolbar .workflow-info > summary:hover {
+        background: #244d3e0c;
+      }
+      .prototype-toolbar .workflow-info > summary svg {
+        width: 19px;
+        height: 19px;
+      }
+      .prototype-toolbar .workflow-info[open] > summary svg {
+        transform: none;
+      }
+      .prototype-toolbar .workflow-stages {
+        top: 42px;
+        width: min(290px, calc(100vw - 32px));
+        min-width: 0;
+      }
+      .prototype-toolbar .workflow-stages p {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--line);
+      }
+      .prototype-toolbar .workflow-stages a {
+        padding-top: 4px;
+        font-size: 12px;
+      }
+      .app {
+        min-height: calc(100vh - 50px);
+      }
+      main {
+        padding-top: 12px;
+      }
+      .steps {
+        padding-block: 15px;
+      }
+      .work-layout > .card > .form-body {
+        padding-top: 20px;
+      }
+      @media (max-width: 650px) {
+        .prototype-toolbar {
+          padding: 4px 12px;
+          gap: 6px;
+        }
+        .prototype-toolbar .concepts {
+          gap: 3px;
+        }
+        .prototype-toolbar .concept-button {
+          min-height: 44px;
+          padding-inline: 8px;
+        }
+        .prototype-toolbar .concept-letter {
+          display: none;
+        }
+        .prototype-toolbar .concept-button strong {
+          font-size: 11px;
+        }
+        .prototype-toolbar .workflow-info > summary {
+          width: 40px;
+          height: 44px;
+        }
+        .prototype-toolbar .workflow-stages {
+          top: 48px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="prototype-toolbar" aria-label="Tuỳ chọn bản thử">
+      <strong class="prototype-label">Bản thử</strong>
+      <div class="concepts" role="group" aria-label="So sánh ba cách soạn bài">
+        <button class="concept-button" data-concept="steps" aria-pressed="true">
+          <span class="concept-letter">A</span><strong>Từng bước</strong>
+        </button>
+        <button class="concept-button" data-concept="workspace" aria-pressed="false">
+          <span class="concept-letter">B</span><strong>Cạnh nhau</strong>
+        </button>
+        <button class="concept-button" data-concept="brief" aria-pressed="false">
+          <span class="concept-letter">C</span><strong>Thu gọn</strong>
+        </button>
+      </div>
+      <details class="workflow-info">
+        <summary aria-label="Thông tin bản thử và quy trình" title="Thông tin bản thử và quy trình">
+          <svg
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.4"
+            aria-hidden="true"
+          >
+            <circle cx="10" cy="10" r="7.5" />
+            <path d="M10 9v5M10 5.5v1" />
+          </svg>
+        </summary>
+        <div class="workflow-stages">
+          <p>Dữ liệu mẫu. Không lưu, gọi AI hoặc tạo video.</p>
+          <span>1 · Soạn bài</span><span>2 · Duyệt kịch bản</span>
+          <span>3 · Duyệt video riêng tư</span><span>4 · Phát hành</span>
+          <a href="GuidedLessonSceneStudio.html">Studio cảnh · mẫu ↗</a>
+          <a href="../../research/GuidedLessonUiResearch.md">Xem nghiên cứu ↗</a>
+        </div>
+      </details>
+    </header>
+    <div class="app">
+      <aside class="sidebar" aria-label="Điều hướng minh họa">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"
+            ><svg width="23" height="23" viewBox="0 0 24 24" fill="none">
+              <circle cx="8" cy="6" r="3" fill="currentColor" />
+              <circle cx="17" cy="8" r="2.5" fill="currentColor" />
+              <path
+                d="M3 12c3-1 6 0 9 3 3-2 6-3 9-2v7c-4-1-6 0-9 2-3-3-6-4-9-3v-7Z"
+                stroke="currentColor"
+                stroke-width="1.5"
+              />
+              <path d="M12 15v7" stroke="currentColor" stroke-width="1.5" /></svg></span
+          ><span>Tro.</span>
+        </div>
+        <nav class="nav">
+          <span class="nav-item"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="4" y="4" width="16" height="16" rx="3" />
+              <path d="M10 4v16" /></svg
+            ><span>Không gian của tôi</span></span
+          >
+          <span class="nav-item"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="m3 8 9-5 9 5-9 5-9-5Z" />
+              <path d="M6 10v6c4 3 8 3 12 0v-6M21 8v8" /></svg
+            ><span>Lớp học</span></span
+          >
+          <span class="nav-item active" aria-current="page"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="3" y="5" width="18" height="14" rx="3" />
+              <path d="m10 9 5 3-5 3V9Z" /></svg
+            ><span>Bài giảng hướng dẫn</span></span
+          >
+          <span class="nav-item"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M5 20v-8h4v8M10 20V7h4v13M15 20V3h4v17" /></svg
+            ><span>Tiến độ học tập</span></span
+          >
+        </nav>
+      </aside>
+      <main id="main">
+        <h1 class="screen-reader" id="page-title">Soạn bài</h1>
+        <div id="content"></div>
+      </main>
+    </div>
+    <dialog id="story-dialog" aria-labelledby="story-title">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Minh họa tĩnh</p>
+          <h2 id="story-title">Kịch bản mẫu</h2>
+        </div>
+        <button class="close" data-action="close-dialog" aria-label="Đóng kịch bản minh họa">
+          ×
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="demo-notice">Mẫu viết sẵn, không cập nhật theo bài bạn sửa.</div>
+        <div class="storyboard">
+          <article class="scene">
+            <div class="scene-visual"><strong>Bắt đầu từ 0</strong><span>total = 0</span></div>
+            <div class="scene-text">
+              <small>01 · GIẢI THÍCH</small>
+              <h3>Một nơi để giữ tổng</h3>
+              <p>Khởi tạo biến tổng trước vòng lặp. Liên kết nguồn: đoạn 1 và đính chính.</p>
+            </div>
+          </article>
+          <article class="scene">
+            <div class="scene-visual orange">
+              <strong>2 → 6 → 12</strong><span>total + number</span>
+            </div>
+            <div class="scene-text">
+              <small>02 · VÍ DỤ CÓ HƯỚNG DẪN</small>
+              <h3>Thêm từng số vào tổng</h3>
+              <p>Minh họa tĩnh ba lần cập nhật với các số 2, 4 và 6. Liên kết nguồn: đoạn 2.</p>
+            </div>
+          </article>
+          <article class="scene">
+            <div class="scene-visual">
+              <strong>Đến lượt em</strong><span>numbers = [1, 3, 5]</span>
+            </div>
+            <div class="scene-text">
+              <small>03 · LUYỆN TẬP</small>
+              <h3>Thử với dữ liệu mới</h3>
+              <p>Giáo viên kiểm tra câu hỏi và đáp án trước khi duyệt kịch bản.</p>
+            </div>
+          </article>
+        </div>
+        <div class="modal-next">
+          <strong>Tiếp theo: giáo viên duyệt kịch bản</strong>Sau đó mới tạo và duyệt video riêng tư
+          trước khi phát hành.
+        </div>
+        <div class="modal-actions">
+          <a class="primary" href="GuidedLessonSceneStudio.html" style="text-decoration: none"
+            >Mở studio mẫu →</a
+          >
+          <button class="secondary" data-action="close-dialog">Quay lại soạn bài</button>
+        </div>
+      </div>
+    </dialog>
+    <div id="announcement" class="screen-reader" role="status" aria-live="polite"></div>
+    <script>
+      /** @typedef {'steps' | 'workspace' | 'brief'} Concept */
+      /** @typedef {'example' | 'practice'} CodeTab */
+      /** @typedef {{ id: string, title: string, meta: string, text: string, correction: boolean }} SourcePassage */
+      /** @typedef {{ concept: Concept, step: number, codeTab: CodeTab, objective: string, audience: string, language: 'vi' | 'en', duration: '60' | '180' | '300', code: string, practiceCode: string, confirmed: boolean, practiceConfirmed: boolean, instructions: string, expandedDetails: Set<string>, selected: Set<string>, query: string, message: string }} Draft */
+      /** @type {SourcePassage[]} */
+      const passages = [
+        {
+          id: 'start',
+          title: 'Khởi tạo tổng',
+          meta: 'Python cơ bản · Mục 4.1 · Đoạn 1',
+          text: 'Để tính tổng một danh sách số nguyên, hãy tạo biến total với giá trị ban đầu là 0 trước vòng lặp. Biến này lưu kết quả tích lũy qua từng lần lặp. Khi chưa xử lý phần tử nào, tổng bằng 0.\n\nVí dụ: total = 0',
+          correction: false,
+        },
+        {
+          id: 'loop',
+          title: 'Cộng từng số',
+          meta: 'Python cơ bản · Mục 4.1 · Đoạn 2',
+          text: 'Danh sách numbers = [2, 4, 6] chứa ba số nguyên. Với mỗi number trong numbers, cập nhật total = total + number. Sau mỗi lần lặp, total lần lượt bằng 2, 6 và 12. Lệnh print(total) đặt sau vòng lặp in tổng cuối cùng.\n\nnumbers = [2, 4, 6]\ntotal = 0\nfor number in numbers:\n    total = total + number\nprint(total)',
+          correction: false,
+        },
+        {
+          id: 'correction',
+          title: 'Giữ tổng qua mỗi lần lặp',
+          meta: 'Ghi chú đã duyệt · Áp dụng cho mục 4.1',
+          text: 'Đính chính: lệnh total = 0 phải nằm trước vòng lặp, không nằm trong thân vòng lặp. Nếu khởi tạo lại total trong mỗi lần lặp, chương trình sẽ mất phần tổng của các phần tử trước đó. Đoạn ghi chú này giải thích cách đặt lệnh khởi tạo trong ví dụ của mục 4.1.',
+          correction: true,
+        },
+      ];
+      /** @type {Draft} */
+      const draft = {
+        concept: 'steps',
+        step: 1,
+        codeTab: 'example',
+        objective: 'Hiểu cách biến total giữ tổng qua từng lần lặp.',
+        audience: 'Học sinh mới bắt đầu học Python',
+        language: 'vi',
+        duration: '180',
+        code: 'numbers = [2, 4, 6]\ntotal = 0\nfor number in numbers:\n    total = total + number\nprint(total)',
+        practiceCode:
+          'numbers = [1, 3, 5]\ntotal = 0\nfor number in numbers:\n    total = total + number\nprint(total)',
+        confirmed: false,
+        practiceConfirmed: false,
+        instructions: '',
+        expandedDetails: new Set(['brief-content']),
+        selected: new Set(['start', 'loop', 'correction']),
+        query: '',
+        message: '',
+      };
+      const arrow =
+        '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 10h13M11 5l5 5-5 5"/></svg>';
+      const check =
+        '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m3 8 3 3 7-7"/></svg>';
+      const chevron =
+        '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>';
+      const search =
+        '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/></svg>';
+      /** @param {string} value @returns {string} */
+      function escapeHtml(value) {
+        return value.replace(
+          /[&<>"']/g,
+          (character) =>
+            ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] ||
+            character,
+        );
+      }
+      /** @returns {boolean} */
+      function needsPractice() {
+        return draft.duration !== '60';
+      }
+      /** @returns {boolean} */
+      function isBriefReady() {
+        return Boolean(
+          draft.objective.trim() &&
+          draft.audience.trim() &&
+          draft.selected.size > 0 &&
+          draft.selected.size <= 8,
+        );
+      }
+      /** @returns {boolean} */
+      function isCodeReady() {
+        return Boolean(
+          draft.code.trim() &&
+          draft.confirmed &&
+          (!needsPractice() || (draft.practiceCode.trim() && draft.practiceConfirmed)),
+        );
+      }
+      /** @returns {string} */
+      function durationLabel() {
+        return draft.duration === '60' ? '1 phút' : draft.duration === '180' ? '3 phút' : '5 phút';
+      }
+      /** @returns {string} */
+      function briefFields() {
+        return `<details class="material-options" data-disclosure="material" ${draft.expandedDetails.has('material') ? 'open' : ''}><summary><strong>Python cơ bản</strong><span>4.1 · Tính tổng ${chevron}</span></summary><div class="fields">
+          <div class="field"><label for="source-publication">Tài liệu đã duyệt</label><select id="source-publication" name="publication"><option>Python cơ bản · Bản đã duyệt 01</option></select></div>
+          <div class="field"><label for="section">Phần kiến thức</label><select id="section" name="section"><option>4.1 · Tính tổng bằng vòng lặp</option></select></div>
+        </div></details><div class="fields">
+          <div class="field wide"><label for="objective">Mục tiêu bài học</label><textarea id="objective" name="objective" rows="2" maxlength="500" placeholder="Học sinh sẽ hiểu điều gì?">${escapeHtml(draft.objective)}</textarea></div>
+          <div class="field wide"><label for="audience">Học sinh</label><input id="audience" name="audience" type="text" value="${escapeHtml(draft.audience)}" maxlength="400" /></div>
+        </div><details class="lesson-options" data-disclosure="options" ${draft.expandedDetails.has('options') ? 'open' : ''}><summary><span>Tuỳ chọn</span><span data-options-summary>${durationLabel()} · ${draft.language === 'vi' ? 'Tiếng Việt' : 'English'}</span>${chevron}</summary><div class="fields">
+          <div class="field"><label for="language">Ngôn ngữ</label><select id="language" name="language"><option value="vi" ${draft.language === 'vi' ? 'selected' : ''}>Tiếng Việt</option><option value="en" ${draft.language === 'en' ? 'selected' : ''}>English</option></select></div>
+          <div class="field"><label for="duration">Độ dài video</label><select id="duration" name="duration"><option value="60" ${draft.duration === '60' ? 'selected' : ''}>1 phút</option><option value="180" ${draft.duration === '180' ? 'selected' : ''}>3 phút</option><option value="300" ${draft.duration === '300' ? 'selected' : ''}>5 phút</option></select></div>
+        </div></details>`;
+      }
+      /** @returns {string} */
+      function sourceCards() {
+        const query = draft.query.toLocaleLowerCase('vi').trim();
+        const filtered = passages.filter((passage) =>
+          `${passage.title} ${passage.text}`.toLocaleLowerCase('vi').includes(query),
+        );
+        if (!filtered.length) {
+          return '<p class="empty-search">Không tìm thấy đoạn nguồn.</p>';
+        }
+        return filtered
+          .map(
+            (
+              passage,
+            ) => `<article class="source-card ${draft.selected.has(passage.id) ? 'selected' : ''} ${passage.correction ? 'correction' : ''}">
+          <div class="source-heading"><input type="checkbox" id="source-${passage.id}" data-source="${passage.id}" ${draft.selected.has(passage.id) ? 'checked' : ''} /><label for="source-${passage.id}">${escapeHtml(passage.title)}</label>${passage.correction ? '<span class="source-kind">Đính chính</span>' : ''}</div>
+          <details class="source-detail" data-disclosure="source-${passage.id}" ${draft.expandedDetails.has(`source-${passage.id}`) ? 'open' : ''}><summary aria-label="Đọc đoạn: ${escapeHtml(passage.title)}" title="Xem đoạn nguồn">${chevron}</summary><div class="source-full"><span class="source-meta">${escapeHtml(passage.meta)}</span><p>${escapeHtml(passage.text)}</p></div></details>
+        </article>`,
+          )
+          .join('');
+      }
+      /** @returns {string} */
+      function sourcesPanel() {
+        return `<section class="source-section"><div class="row-between"><h3>Đoạn nguồn</h3><span class="count" data-selected-count>${draft.selected.size} / 8 đã chọn</span></div><div class="search-wrap">${search}<label class="screen-reader" for="source-search">Tìm đoạn nguồn</label><input id="source-search" type="search" name="query" placeholder="Tìm đoạn…" value="${escapeHtml(draft.query)}" /></div><div class="sources" id="sources">${sourceCards()}</div><p class="help source-required" data-source-required ${draft.selected.size > 0 ? 'hidden' : ''}>Chọn ít nhất một đoạn để tiếp tục.</p></section>`;
+      }
+      /** @returns {string} */
+      function codePanel() {
+        const practice = draft.codeTab === 'practice' && needsPractice();
+        const confirmed = practice ? draft.practiceConfirmed : draft.confirmed;
+        const code = practice ? draft.practiceCode : draft.code;
+        const codeName = practice ? 'practiceCode' : 'code';
+        const confirmName = practice ? 'practiceConfirmed' : 'confirmed';
+        return `<div class="code-tabs" aria-label="Chọn ví dụ Python"><button class="code-tab" data-code-tab="example" aria-pressed="${!practice}">Giải thích ${draft.confirmed ? '✓' : ''}</button>${needsPractice() ? `<button class="code-tab" data-code-tab="practice" aria-pressed="${practice}">Luyện tập ${draft.practiceConfirmed ? '✓' : ''}</button>` : ''}</div>
+          ${practice ? '<p class="practice-hint">Cùng cách tính tổng, thay dữ liệu đầu vào.</p>' : ''}
+          <div class="code-shell"><div class="code-toolbar"><span>${practice ? 'LuyenTap.py' : 'ViDu.py'}</span><span>Chưa chạy</span></div><label class="screen-reader" for="code-editor">${practice ? 'Mã Python cho bài luyện tập' : 'Mã Python cho ví dụ giải thích'}</label><textarea class="code-editor" id="code-editor" name="${codeName}" spellcheck="false" rows="6" maxlength="4000">${escapeHtml(code)}</textarea></div>
+          <div class="confirmation ${confirmed ? 'confirmed' : ''}" id="code-confirmation"><input id="confirm-code" name="${confirmName}" type="checkbox" ${confirmed ? 'checked' : ''} ${!code.trim() ? 'disabled' : ''} /><label for="confirm-code">${practice ? 'Tôi đã kiểm tra ví dụ luyện tập.' : 'Tôi đã đối chiếu mã với nguồn.'}</label></div>
+          <details class="extra-instructions" data-disclosure="instructions" ${draft.expandedDetails.has('instructions') ? 'open' : ''}><summary>Lưu ý cho Tro <span>Tuỳ chọn</span></summary><div class="field"><label class="screen-reader" for="instructions">Lưu ý của giáo viên</label><textarea id="instructions" name="instructions" rows="3" placeholder="Ví dụ: giải thích chậm ở lần cộng thứ hai…">${escapeHtml(draft.instructions)}</textarea></div></details>`;
+      }
+      /** @returns {string} */
+      function sourceReferencePanel() {
+        return `<section class="card preview-card source-reference"><div class="row-between"><h3>Nguồn đối chiếu</h3><button class="text-button" data-go-step="1">Đổi</button></div>${passages
+          .filter((passage) => draft.selected.has(passage.id))
+          .map(
+            (passage) =>
+              `<details data-disclosure="reference-${passage.id}" ${draft.expandedDetails.has(`reference-${passage.id}`) ? 'open' : ''}><summary>${escapeHtml(passage.title)}${passage.correction ? ' · Đính chính' : ''}</summary><p>${escapeHtml(passage.text)}</p></details>`,
+          )
+          .join('')}</section>`;
+      }
+      /** @returns {string} */
+      function previewPanel() {
+        return `<aside class="side-stack">${draft.concept === 'steps' && draft.step === 2 ? sourceReferencePanel() : ''}<section class="card preview-card compact-status"><h3>Bản soạn</h3><dl class="summary-list"><div><dt>Nguồn</dt><dd data-summary-sources>${draft.selected.size} đoạn</dd></div><div><dt>Ví dụ đã xác nhận</dt><dd data-summary-confirmations>${confirmationLabel()}</dd></div><div><dt>Video</dt><dd data-options-summary>${durationLabel()} · ${draft.language === 'vi' ? 'Tiếng Việt' : 'English'}</dd></div></dl></section></aside>`;
+      }
+      /** @returns {string} */
+      function confirmationLabel() {
+        return `${Number(draft.confirmed) + Number(needsPractice() && draft.practiceConfirmed)} / ${needsPractice() ? 2 : 1}`;
+      }
+      /** @returns {string} */
+      function reviewPanel() {
+        const selected = passages.filter((passage) => draft.selected.has(passage.id));
+        return `<section class="review-block"><div class="row-between"><h3>Mục tiêu</h3><button class="text-button" data-go-step="1">Sửa</button></div><p>${escapeHtml(draft.objective || 'Chưa nhập mục tiêu.')}</p><div class="review-tags"><span class="tag">${escapeHtml(draft.audience || 'Chưa chọn học sinh')}</span><span class="tag">${durationLabel()}</span><span class="tag">${draft.language === 'vi' ? 'Tiếng Việt' : 'English'}</span></div></section>
+          <section class="review-block"><h3>${draft.selected.size} đoạn nguồn</h3>${selected.map((passage) => `<details class="review-source-detail" data-disclosure="review-${passage.id}" ${draft.expandedDetails.has(`review-${passage.id}`) ? 'open' : ''}><summary>${check}<span>${escapeHtml(passage.title)}${passage.correction ? ' · Đính chính' : ''}</span>${chevron}</summary><p>${escapeHtml(passage.text)}</p></details>`).join('') || '<p>Chọn ít nhất một đoạn nguồn.</p>'}</section>
+          <section class="review-block"><div class="row-between"><h3>Python <span class="approval-state">${draft.confirmed ? '✓ Đã xác nhận' : 'Chưa xác nhận'}</span></h3><button class="text-button" data-go-step="2">Sửa</button></div><pre class="review-code">${escapeHtml(draft.code)}</pre>${needsPractice() ? `<details class="review-practice" data-disclosure="review-practice" ${draft.expandedDetails.has('review-practice') ? 'open' : ''}><summary>Luyện tập <span class="approval-state">${draft.practiceConfirmed ? '✓ Đã xác nhận' : 'Chưa xác nhận'}</span>${chevron}</summary><pre class="review-code">${escapeHtml(draft.practiceCode)}</pre></details>` : ''}</section>
+          ${draft.instructions.trim() ? `<section class="review-block"><h3>Lưu ý</h3><p>${escapeHtml(draft.instructions)}</p></section>` : ''}`;
+      }
+      /** @returns {string} */
+      function renderSteps() {
+        const heading =
+          ['Nội dung bài học', 'Ví dụ Python', 'Xem lại bài soạn'][draft.step - 1] ||
+          'Nội dung bài học';
+        const body =
+          draft.step === 1
+            ? briefFields() + sourcesPanel()
+            : draft.step === 2
+              ? codePanel()
+              : reviewPanel();
+        const ready =
+          draft.step === 1
+            ? isBriefReady()
+            : draft.step === 2
+              ? isCodeReady()
+              : isBriefReady() && isCodeReady();
+        return `<div class="work-layout ${draft.step !== 2 ? 'focused-layout' : ''}"><section class="card"><nav class="steps" aria-label="Các bước chuẩn bị">${['Nội dung', 'Ví dụ', 'Xem lại'].map((label, index) => `<button class="step ${index + 1 < draft.step ? 'complete' : ''}" data-go-step="${index + 1}" ${draft.step === index + 1 ? 'aria-current="step"' : ''}><span class="step-number">${index + 1 < draft.step ? '✓' : index + 1}</span>${label}</button>`).join('')}</nav><div class="form-body"><h2 class="screen-reader" id="step-heading">${heading}</h2>${draft.message ? `<p class="validation-message" role="alert">${escapeHtml(draft.message)}</p>` : ''}${body}</div><footer class="form-footer">${draft.step > 1 ? '<button class="secondary" data-action="previous">Quay lại</button>' : ''}<button class="primary" data-action="${draft.step === 3 ? 'simulate' : 'next'}" data-next-button ${!ready ? 'disabled' : ''}>${draft.step === 3 ? 'Xem kịch bản mẫu' : 'Tiếp tục'}${arrow}</button></footer></section>${draft.step === 2 ? previewPanel() : ''}</div>`;
+      }
+      /** @returns {string} */
+      function renderWorkspace() {
+        return `<div class="workspace-layout"><section class="card workspace-sources">${sourcesPanel()}</section><div class="workspace-center"><section class="card"><div class="form-body"><div class="section-heading"><h2>Nội dung</h2></div>${briefFields()}</div></section><section class="card"><div class="form-body"><div class="section-heading"><h2>Ví dụ Python</h2><span class="count" data-summary-confirmations>${confirmationLabel()}</span></div>${codePanel()}</div><div class="form-footer"><button class="primary" data-action="simulate" data-create-button ${!isBriefReady() || !isCodeReady() ? 'disabled' : ''}>Xem kịch bản mẫu${arrow}</button></div></section></div></div>`;
+      }
+      /** @returns {string} */
+      function renderBrief() {
+        return `<div class="brief-layout"><div class="accordion"><details class="brief-section" data-disclosure="brief-content" ${draft.expandedDetails.has('brief-content') ? 'open' : ''}><summary><span class="brief-index">1</span><span class="brief-title"><strong>Nội dung</strong></span>${chevron}</summary><div class="brief-content">${briefFields()}</div></details><details class="brief-section" data-disclosure="brief-sources" ${draft.expandedDetails.has('brief-sources') ? 'open' : ''}><summary><span class="brief-index">2</span><span class="brief-title"><strong>Đoạn nguồn</strong></span><span class="count" data-brief-source-summary>${draft.selected.size} đã chọn</span>${chevron}</summary><div class="brief-content">${sourcesPanel()}</div></details><details class="brief-section" data-disclosure="brief-code" ${draft.expandedDetails.has('brief-code') ? 'open' : ''}><summary><span class="brief-index">3</span><span class="brief-title"><strong>Ví dụ Python</strong></span><span class="count" data-brief-code-summary>${confirmationLabel()} đã xác nhận</span>${chevron}</summary><div class="brief-content">${codePanel()}</div></details><details class="brief-section" data-disclosure="brief-review" ${draft.expandedDetails.has('brief-review') ? 'open' : ''}><summary><span class="brief-index">4</span><span class="brief-title"><strong>Xem lại</strong></span>${chevron}</summary><div class="brief-content" id="brief-review">${reviewPanel()}</div></details><footer class="form-footer brief-actions"><button class="primary" data-action="simulate" data-create-button ${!isBriefReady() || !isCodeReady() ? 'disabled' : ''}>Xem kịch bản mẫu${arrow}</button></footer></div></div>`;
+      }
+      /** Keep the active task and opened source text visible when controls rerender. */
+      function rememberDisclosures() {
+        document.querySelectorAll('[data-disclosure]').forEach((element) => {
+          if (!(element instanceof HTMLDetailsElement) || !element.dataset.disclosure) {
+            return;
+          }
+          if (element.open) {
+            draft.expandedDetails.add(element.dataset.disclosure);
+          } else {
+            draft.expandedDetails.delete(element.dataset.disclosure);
+          }
+        });
+      }
+      function render() {
+        rememberDisclosures();
+        const content = document.getElementById('content');
+        if (!content) {
+          return;
+        }
+        content.innerHTML =
+          draft.concept === 'workspace'
+            ? renderWorkspace()
+            : draft.concept === 'brief'
+              ? renderBrief()
+              : renderSteps();
+        document.querySelectorAll('[data-concept]').forEach((button) => {
+          if (button instanceof HTMLButtonElement) {
+            button.setAttribute('aria-pressed', String(button.dataset.concept === draft.concept));
+          }
+        });
+        updateSummaries();
+      }
+      /** @param {string} message */
+      function announce(message) {
+        const target = document.getElementById('announcement');
+        if (target) {
+          target.textContent = message;
+        }
+      }
+      function updateSummaries() {
+        rememberDisclosures();
+        const updates = [
+          [
+            '[data-options-summary]',
+            `${durationLabel()} · ${draft.language === 'vi' ? 'Tiếng Việt' : 'English'}`,
+          ],
+          ['[data-summary-sources]', `${draft.selected.size} đoạn`],
+          ['[data-summary-confirmations]', confirmationLabel()],
+          ['[data-selected-count]', `${draft.selected.size} / 8 đã chọn`],
+          ['[data-brief-source-summary]', `${draft.selected.size} đã chọn`],
+          ['[data-brief-code-summary]', `${confirmationLabel()} đã xác nhận`],
+        ];
+        updates.forEach(([selector, value]) => {
+          if (selector && value) {
+            document.querySelectorAll(selector).forEach((element) => {
+              element.textContent = value;
+            });
+          }
+        });
+        document.querySelectorAll('[data-source-required]').forEach((element) => {
+          if (element instanceof HTMLElement) {
+            element.hidden = draft.selected.size > 0;
+          }
+        });
+        const briefReview = document.getElementById('brief-review');
+        if (briefReview) {
+          briefReview.innerHTML = reviewPanel();
+        }
+        document.querySelectorAll('[data-code-tab="example"]').forEach((button) => {
+          button.textContent = `Giải thích ${draft.confirmed ? '✓' : ''}`;
+        });
+        document.querySelectorAll('[data-code-tab="practice"]').forEach((button) => {
+          button.textContent = `Luyện tập ${draft.practiceConfirmed ? '✓' : ''}`;
+        });
+        document.querySelectorAll('[data-create-button]').forEach((button) => {
+          if (button instanceof HTMLButtonElement) {
+            button.disabled = !isBriefReady() || !isCodeReady();
+          }
+        });
+        document.querySelectorAll('[data-next-button]').forEach((button) => {
+          if (button instanceof HTMLButtonElement) {
+            button.disabled =
+              draft.step === 1
+                ? !isBriefReady()
+                : draft.step === 2
+                  ? !isCodeReady()
+                  : !isBriefReady() || !isCodeReady();
+          }
+        });
+      }
+      /** @param {number} step */
+      function goToStep(step) {
+        if (step > 1 && !isBriefReady()) {
+          draft.message = 'Nhập mục tiêu, đối tượng và chọn ít nhất một đoạn nguồn để tiếp tục.';
+          draft.step = 1;
+        } else if (step > 2 && !isCodeReady()) {
+          draft.message = 'Đối chiếu và xác nhận từng ví dụ Python trước khi xem lại.';
+          draft.step = 2;
+        } else {
+          draft.message = '';
+          draft.step = step;
+        }
+        if (draft.concept !== 'steps') {
+          draft.concept = 'steps';
+        }
+        render();
+        const heading = document.getElementById('step-heading');
+        if (heading instanceof HTMLElement) {
+          heading.tabIndex = -1;
+          heading.focus({ preventScroll: true });
+        }
+        announce(`Bước ${draft.step} trong 3 bước chuẩn bị.`);
+      }
+      document.addEventListener('input', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
+          return;
+        }
+        if (
+          target.name === 'objective' ||
+          target.name === 'audience' ||
+          target.name === 'instructions'
+        ) {
+          draft[target.name] = target.value;
+          updateSummaries();
+        }
+        if (target.name === 'query') {
+          rememberDisclosures();
+          draft.query = target.value;
+          const list = document.getElementById('sources');
+          if (list) {
+            list.innerHTML = sourceCards();
+          }
+        }
+        if (target.name === 'code' || target.name === 'practiceCode') {
+          draft[target.name] = target.value;
+          if (target.name === 'code') {
+            draft.confirmed = false;
+          } else {
+            draft.practiceConfirmed = false;
+          }
+          const confirmation = document.getElementById('confirm-code');
+          if (confirmation instanceof HTMLInputElement) {
+            confirmation.checked = false;
+            confirmation.disabled = !target.value.trim();
+          }
+          document.getElementById('code-confirmation')?.classList.remove('confirmed');
+          updateSummaries();
+        }
+      });
+      document.addEventListener('change', (event) => {
+        const target = event.target;
+        if (target instanceof HTMLSelectElement) {
+          if (target.name === 'language' && (target.value === 'vi' || target.value === 'en')) {
+            draft.language = target.value;
+            updateSummaries();
+          }
+          if (
+            target.name === 'duration' &&
+            (target.value === '60' || target.value === '180' || target.value === '300')
+          ) {
+            draft.duration = target.value;
+            draft.codeTab = 'example';
+            render();
+            announce(
+              `Độ dài mục tiêu: ${durationLabel()}. ${needsPractice() ? 'Cần hai ví dụ được xác nhận.' : 'Cần một ví dụ được xác nhận.'}`,
+            );
+          }
+        }
+        if (!(target instanceof HTMLInputElement)) {
+          return;
+        }
+        if (target.dataset.source) {
+          const id = target.dataset.source;
+          if (target.checked && draft.selected.size < 8) {
+            draft.selected.add(id);
+          } else {
+            draft.selected.delete(id);
+          }
+          draft.confirmed = false;
+          draft.practiceConfirmed = false;
+          target.closest('.source-card')?.classList.toggle('selected', target.checked);
+          if (draft.concept !== 'steps' || draft.step !== 1) {
+            render();
+          } else {
+            updateSummaries();
+          }
+          announce(
+            `${draft.selected.size} đoạn đã chọn. Cần xác nhận lại các ví dụ khi đổi nguồn.`,
+          );
+        }
+        if (target.name === 'confirmed' || target.name === 'practiceConfirmed') {
+          draft[target.name] = target.checked;
+          document
+            .getElementById('code-confirmation')
+            ?.classList.toggle('confirmed', target.checked);
+          updateSummaries();
+          announce(
+            `${confirmationLabel()} ví dụ được giáo viên xác nhận. Chưa có kiểm tra mã tự động.`,
+          );
+        }
+      });
+      document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+          return;
+        }
+        const button = target.closest('button');
+        if (!(button instanceof HTMLButtonElement)) {
+          return;
+        }
+        const concept = button.dataset.concept;
+        if (concept === 'steps' || concept === 'workspace' || concept === 'brief') {
+          draft.concept = concept;
+          draft.message = '';
+          render();
+          announce(
+            `Đã mở hướng giao diện ${concept === 'steps' ? 'Từng bước' : concept === 'workspace' ? 'Không gian soạn bài' : 'Bản soạn gọn'}. Các lựa chọn đang mở được giữ.`,
+          );
+        }
+        const tab = button.dataset.codeTab;
+        if (tab === 'example' || tab === 'practice') {
+          draft.codeTab = tab;
+          render();
+        }
+        if (button.dataset.goStep) {
+          const step = Number(button.dataset.goStep);
+          if (step >= 1 && step <= 3) {
+            goToStep(step);
+          }
+        }
+        if (button.dataset.action === 'next') {
+          goToStep(Math.min(3, draft.step + 1));
+        }
+        if (button.dataset.action === 'previous') {
+          goToStep(Math.max(1, draft.step - 1));
+        }
+        if (button.dataset.action === 'simulate' && isBriefReady() && isCodeReady()) {
+          const dialog = document.getElementById('story-dialog');
+          if (dialog instanceof HTMLDialogElement) {
+            dialog.showModal();
+          }
+        }
+        if (button.dataset.action === 'close-dialog') {
+          const dialog = document.getElementById('story-dialog');
+          if (dialog instanceof HTMLDialogElement) {
+            dialog.close();
+          }
+        }
+      });
+      render();
+    </script>
+  </body>
+</html>

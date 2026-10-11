@@ -1791,8 +1791,12 @@ it('switches from the avatar menu, clears the previous task and draft, and keeps
 it('adds an account through Google and allows cancellation back to the original account', async () => {
   const fixture = createSavedAccountBridge();
   renderDesktop();
-  fireEvent.click(await screen.findByRole('button', { name: 'Switch account' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Add account' }));
+  const accountButton = await screen.findByRole('button', { name: 'Switch account' });
+  await waitFor(() => {
+    expect(accountButton).toHaveProperty('disabled', false);
+  });
+  fireEvent.click(accountButton);
+  fireEvent.click(await screen.findByRole('button', { name: 'Add account' }));
   const dialog = await screen.findByRole('dialog', { name: 'Add an account' });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Continue with Google' }));
   await within(dialog).findByText('Finish signing in in your browser.');

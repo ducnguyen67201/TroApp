@@ -1,14 +1,23 @@
-import { Button, Checkbox, Group, Select, Stack, Text, Textarea, TextInput } from '@mantine/core';
-import { useEffect, useState, type ReactElement } from 'react';
+import { useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import {
+  GuidedLessonAction,
+  LessonLanguage,
   SourcePassageKind,
   type GuidedLessonCommand,
   type GuidedLessonReply,
+  type SourcePassage,
 } from '#contracts/GuidedLessons.js';
 import { useLocale } from '../localization/UseLocale.js';
+import './GuidedLessonPreparation.css';
 
 type TeacherInput = Extract<GuidedLessonReply, { kind: 'teacherInput' }>;
 type CreateLesson = Extract<GuidedLessonCommand, { action: 'create' }>;
+
+const PreparationStep = {
+  CONTENT: 'content',
+  REVIEW: 'review',
+} as const;
+type PreparationStep = (typeof PreparationStep)[keyof typeof PreparationStep];
 
 interface GuidedLessonPreparationProps {
   input: TeacherInput;
@@ -17,7 +26,19 @@ interface GuidedLessonPreparationProps {
   onCreate: (command: CreateLesson) => Promise<void>;
 }
 
-/** A teacher chooses the exact approved passages and confirms code before any generation. */
+/** Match the input builder's inclusion of published corrections for each chosen source. */
+function readIncludedPassages(
+  passages: readonly SourcePassage[],
+  chosenPassageIds: readonly string[],
+): SourcePassage[] {
+  return passages.filter(
+    (passage) =>
+      chosenPassageIds.includes(passage.passageId) ||
+      passage.correctsPassageIds.some((passageId) => chosenPassageIds.includes(passageId)),
+  );
+}
+
+/** Prepares a source explanation from the selected approved material and its exact passages. */
 export function GuidedLessonPreparation({
   input,
   busy,
@@ -26,54 +47,198 @@ export function GuidedLessonPreparation({
 }: GuidedLessonPreparationProps): ReactElement {
   const { messages, locale } = useLocale();
   const translate = messages.translateGuidedLesson;
+  const id = useId();
+  const heading = useRef<HTMLHeadingElement>(null);
+  const [step, setStep] = useState<PreparationStep>(PreparationStep.CONTENT);
   const [revisionId, setRevisionId] = useState(input.revisions[0]?.id ?? '');
   const [sectionId, setSectionId] = useState('');
-  const [passageIds, setPassageIds] = useState<string[]>([]);
+  const [chosenPassageIds, setChosenPassageIds] = useState<string[]>([]);
+  const [query, setQuery] = useState('');
   const [objective, setObjective] = useState('');
-  const [audience, setAudience] = useState(translate('Beginning Python learner'));
-  const [language, setLanguage] = useState<'en' | 'vi'>(locale);
+  const [audience, setAudience] = useState('');
+  const [language, setLanguage] = useState<LessonLanguage>(locale);
   const [duration, setDuration] = useState('180');
   const [instructions, setInstructions] = useState('');
-  const [code, setCode] = useState('');
-  const [approvedCode, setApprovedCode] = useState(false);
-  const [practiceCode, setPracticeCode] = useState('');
-  const [approvedPractice, setApprovedPractice] = useState(false);
   const revision = input.revisions.find((item) => item.id === revisionId);
   const section = revision?.sections.find((item) => item.id === sectionId);
-
+  const sectionPassages = readIncludedPassages(input.passages, section?.passageIds ?? []);
+  const selectedPassages = readIncludedPassages(input.passages, chosenPassageIds);
+  const matchingPassages = sectionPassages.filter((passage) =>
+    passage.text.toLocaleLowerCase(locale).includes(query.trim().toLocaleLowerCase(locale)),
+  );
   useEffect(() => {
     if (!input.revisions.some((item) => item.id === revisionId)) {
       setRevisionId(input.revisions[0]?.id ?? '');
       setSectionId('');
-      setPassageIds([]);
+      setChosenPassageIds([]);
+      setStep(PreparationStep.CONTENT);
     }
   }, [input, revisionId]);
 
-  const selectedPassages = input.passages.filter((passage) =>
-    passageIds.includes(passage.passageId),
-  );
-  const needsPractice = Number(duration) > 60;
-  const canSubmit = Boolean(
-    revisionId &&
-    sectionId &&
+  const canContinueContent = Boolean(
+    revision &&
+    section &&
     objective.trim() &&
+    objective.length <= 500 &&
     audience.trim() &&
-    selectedPassages.length &&
-    code.trim() &&
-    approvedCode &&
-    (!needsPractice || (practiceCode.trim() && approvedPractice)) &&
-    !busy,
+    audience.length <= 400 &&
+    instructions.length <= 2000 &&
+    selectedPassages.length > 0 &&
+    selectedPassages.length <= 8 &&
+    chosenPassageIds.every((passageId) =>
+      sectionPassages.some((passage) => passage.passageId === passageId),
+    ),
   );
+  const canSubmit = canContinueContent && !busy;
+  const durationLabel = translate(
+    duration === '60' ? '1 minute' : duration === '180' ? '3 minutes' : '5 minutes',
+  );
+  const languageLabel = translate(language === LessonLanguage.EN ? 'English' : 'Vietnamese');
+  const steps = [
+    { value: PreparationStep.CONTENT, label: translate('Content') },
+    { value: PreparationStep.REVIEW, label: translate('Review') },
+  ];
+
+  function chooseStep(next: PreparationStep): void {
+    if (busy || (next === PreparationStep.REVIEW && !canContinueContent)) {
+      return;
+    }
+    setStep(next);
+    /* Focus follows the newly mounted heading, without forcing the page to scroll. */
+    window.requestAnimationFrame(() => heading.current?.focus({ preventScroll: true }));
+  }
+
+  function advanceStep(form: HTMLFormElement): void {
+    if (!form.reportValidity()) {
+      return;
+    }
+    chooseStep(PreparationStep.REVIEW);
+  }
+
+  function renderInstructions(): ReactElement {
+    return (
+      <details className="preparation-instructions">
+        <summary>
+          {translate('Teacher instructions')} <span>{translate('Optional')}</span>
+        </summary>
+        <div className="preparation-field">
+          <label className="preparation-screen-reader" htmlFor={`${id}-instructions`}>
+            {translate('Teacher instructions')}
+          </label>
+          <textarea
+            id={`${id}-instructions`}
+            value={instructions}
+            onChange={(event) => {
+              setInstructions(event.currentTarget.value);
+            }}
+            maxLength={2000}
+            rows={3}
+            placeholder={translate('Optional guidance for this explanation')}
+          />
+        </div>
+      </details>
+    );
+  }
+
+  function renderPassage(passage: SourcePassage, index: number, selectable: boolean): ReactElement {
+    const correction = passage.kind !== SourcePassageKind.SOURCE_TEXT;
+    const label = `${translate(correction ? 'Correction' : 'Passage')} ${String(index + 1)}`;
+    const excerpt = passage.text.replace(/\s+/g, ' ');
+    const selected = selectedPassages.some((item) => item.passageId === passage.passageId);
+    const requiredWithSource = passage.correctsPassageIds.some((passageId) =>
+      chosenPassageIds.includes(passageId),
+    );
+    const exceedsLimit =
+      !selected &&
+      readIncludedPassages(input.passages, [...chosenPassageIds, passage.passageId]).length > 8;
+    return (
+      <article
+        className={`preparation-source ${correction ? 'preparation-correction' : ''}`}
+        key={passage.passageId}
+      >
+        <div className="preparation-source-heading">
+          {selectable ? (
+            <>
+              <input
+                id={`${id}-source-${passage.passageId}`}
+                type="checkbox"
+                checked={selected}
+                aria-describedby={[
+                  `${id}-excerpt-${passage.passageId}`,
+                  ...(requiredWithSource ? [`${id}-required-${passage.passageId}`] : []),
+                ].join(' ')}
+                disabled={busy || requiredWithSource || exceedsLimit}
+                onChange={(event) => {
+                  if (requiredWithSource) {
+                    return;
+                  }
+                  const checked = event.currentTarget.checked;
+                  setChosenPassageIds((current) => {
+                    const next = checked
+                      ? [...current, passage.passageId]
+                      : current.filter((value) => value !== passage.passageId);
+                    return readIncludedPassages(input.passages, next).length <= 8 ? next : current;
+                  });
+                }}
+              />
+              <label htmlFor={`${id}-source-${passage.passageId}`}>{label}</label>
+            </>
+          ) : (
+            <strong>{label}</strong>
+          )}
+        </div>
+        {requiredWithSource && (
+          <p
+            id={`${id}-required-${passage.passageId}`}
+            className="preparation-help preparation-required"
+          >
+            {translate('Required with selected source')}
+          </p>
+        )}
+        <p id={`${id}-excerpt-${passage.passageId}`} className="preparation-source-excerpt">
+          {excerpt.length > 120 ? `${excerpt.slice(0, 120)}…` : excerpt}
+        </p>
+        <details className="preparation-source-text">
+          <summary aria-label={`${translate('Read exact text')}: ${label}`}>
+            {translate('Read')}
+          </summary>
+          <dl className="preparation-source-metadata">
+            <div>
+              <dt>{translate('Approved source')}</dt>
+              <dd>{revision?.title}</dd>
+            </div>
+          </dl>
+          <p>{passage.text}</p>
+        </details>
+      </article>
+    );
+  }
 
   return (
     <form
+      className="guided-preparation-form"
+      onKeyDown={(event) => {
+        if (
+          event.key === 'Enter' &&
+          step !== PreparationStep.REVIEW &&
+          event.target instanceof HTMLInputElement &&
+          event.target.type !== 'checkbox'
+        ) {
+          event.preventDefault();
+          advanceStep(event.currentTarget);
+        }
+      }}
       onSubmit={(event) => {
         event.preventDefault();
-        if (!canSubmit) {
+        if (step !== PreparationStep.REVIEW) {
+          advanceStep(event.currentTarget);
+          return;
+        }
+        if (!canSubmit || !event.currentTarget.reportValidity()) {
           return;
         }
         void onCreate({
-          action: 'create',
+          action: GuidedLessonAction.CREATE,
           commandId: crypto.randomUUID(),
           classId: input.classId,
           courseRevisionId: revisionId,
@@ -82,240 +247,299 @@ export function GuidedLessonPreparation({
           audience: audience.trim(),
           language,
           targetDurationSeconds: Number(duration),
-          passageIds,
+          passageIds: selectedPassages.map((passage) => passage.passageId),
           teacherInstructions: instructions.trim(),
-          codeApproval: {
-            code,
-            sourceRefs: selectedPassages.map((passage) => ({
-              passageId: passage.passageId,
-              startOffset: 0,
-              endOffset: passage.text.length,
-            })),
-            variantOfCodeBlockId: null,
-          },
-          practiceCodeApproval: needsPractice
-            ? {
-                code: practiceCode,
-                sourceRefs: selectedPassages.map((passage) => ({
-                  passageId: passage.passageId,
-                  startOffset: 0,
-                  endOffset: passage.text.length,
-                })),
-                variantOfCodeBlockId: null,
-              }
-            : null,
+          codeApproval: null,
+          practiceCodeApproval: null,
         });
       }}
     >
-      <Stack gap="md">
-        <Select
-          label={translate('Approved source')}
-          placeholder={translate('Choose approved material')}
-          value={revisionId || null}
-          data={input.revisions.map((item) => ({ value: item.id, label: item.title }))}
-          onChange={(value) => {
-            setRevisionId(value ?? '');
-            setSectionId('');
-            setPassageIds([]);
-            setApprovedCode(false);
-            setApprovedPractice(false);
-            if (value) {
-              onChooseRevision(value);
-            }
-          }}
-          disabled={busy}
-          required
-        />
-        <Select
-          label={translate('Concept or section')}
-          placeholder={translate('Choose a section')}
-          value={sectionId || null}
-          data={revision?.sections.map((item) => ({ value: item.id, label: item.title })) ?? []}
-          onChange={(value) => {
-            setSectionId(value ?? '');
-            const selected = revision?.sections.find((item) => item.id === value);
-            setPassageIds(selected && selected.passageIds.length <= 8 ? selected.passageIds : []);
-            setApprovedCode(false);
-            setApprovedPractice(false);
-          }}
-          disabled={busy || !revisionId}
-          required
-        />
-        <TextInput
-          label={translate('Learning objective')}
-          placeholder={translate('What should students understand after this explanation?')}
-          value={objective}
-          onChange={(event) => {
-            setObjective(event.currentTarget.value);
-          }}
-          maxLength={500}
-          required
-          disabled={busy}
-        />
-        <TextInput
-          label={translate('Audience')}
-          value={audience}
-          onChange={(event) => {
-            setAudience(event.currentTarget.value);
-          }}
-          maxLength={400}
-          required
-          disabled={busy}
-        />
-        <Group grow align="start">
-          <Select
-            label={translate('Language')}
-            value={language}
-            data={[
-              { value: 'en', label: translate('English') },
-              { value: 'vi', label: translate('Vietnamese') },
-            ]}
-            onChange={(value) => {
-              if (value === 'en' || value === 'vi') {
-                setLanguage(value);
-              }
+      <nav className="preparation-steps" aria-label={translate('Lesson preparation')}>
+        {steps.map((item, index) => (
+          <button
+            key={item.value}
+            type="button"
+            aria-current={step === item.value ? 'step' : undefined}
+            disabled={busy || (item.value === PreparationStep.REVIEW && !canContinueContent)}
+            onClick={() => {
+              chooseStep(item.value);
             }}
-            disabled={busy}
-          />
-          <Select
-            label={translate('Length')}
-            value={duration}
-            data={[
-              { value: '60', label: translate('1 minute') },
-              { value: '180', label: translate('3 minutes') },
-              { value: '300', label: translate('5 minutes') },
-            ]}
-            onChange={(value) => {
-              setDuration(value ?? '180');
-            }}
-            disabled={busy}
-          />
-        </Group>
-        {section && (
-          <Stack gap="xs" className="guided-source-selection">
-            <Text fw={600} size="sm">
-              {translate('Exact passages used')}
-            </Text>
-            <Text size="xs" c="dimmed">
-              {translate(
-                'Choose up to eight exact passages, including relevant corrections. Narrow the source selection if more are needed.',
-              )}
-            </Text>
-            {input.passages
-              .filter((passage) => section.passageIds.includes(passage.passageId))
-              .map((passage) => (
-                <Checkbox
-                  key={passage.passageId}
-                  label={
-                    <span>
-                      {passage.kind !== SourcePassageKind.SOURCE_TEXT && (
-                        <strong>{translate('Correction')}: </strong>
-                      )}
-                      {passage.text}
-                    </span>
-                  }
-                  checked={passageIds.includes(passage.passageId)}
-                  disabled={
-                    busy || (passageIds.length >= 8 && !passageIds.includes(passage.passageId))
-                  }
-                  onChange={(event) => {
-                    const checked = event.currentTarget.checked;
-                    setPassageIds((current) =>
-                      checked && current.length < 8
-                        ? [...current, passage.passageId]
-                        : current.filter((id) => id !== passage.passageId),
-                    );
-                    setApprovedCode(false);
-                    setApprovedPractice(false);
-                  }}
-                />
-              ))}
-            {!selectedPassages.length && (
-              <Text size="xs" c="dimmed">
-                {translate('Select at least one approved passage.')}
-              </Text>
-            )}
-          </Stack>
-        )}
-        <Textarea
-          label={translate('Approved Python example')}
-          description={translate('Use the exact integer running-total example from these sources.')}
-          value={code}
-          onChange={(event) => {
-            setCode(event.currentTarget.value);
-            setApprovedCode(false);
-          }}
-          minRows={6}
-          maxLength={4000}
-          className="guided-code-input"
-          disabled={busy}
-          required
-        />
-        <Checkbox
-          label={translate('I checked this code against the selected source.')}
-          checked={approvedCode}
-          onChange={(event) => {
-            setApprovedCode(event.currentTarget.checked);
-          }}
-          disabled={busy || !code.trim()}
-        />
-        {needsPractice && (
+          >
+            <span aria-hidden="true">{index + 1}</span>
+            {item.label}
+          </button>
+        ))}
+      </nav>
+      <h2 ref={heading} className="preparation-screen-reader" tabIndex={-1}>
+        {steps.find((item) => item.value === step)?.label}
+      </h2>
+      <fieldset disabled={busy} className="preparation-body">
+        {step === PreparationStep.CONTENT && (
           <>
-            <Textarea
-              label={translate('Practice variant with a different input')}
-              description={translate(
-                'Use the same mechanism with new numbers so students can try it independently.',
-              )}
-              value={practiceCode}
-              onChange={(event) => {
-                setPracticeCode(event.currentTarget.value);
-                setApprovedPractice(false);
-              }}
-              minRows={6}
-              maxLength={4000}
-              className="guided-code-input"
-              disabled={busy}
-              required
-            />
-            <Checkbox
-              label={translate('I approve this practice variant and its source relationship.')}
-              checked={approvedPractice}
-              onChange={(event) => {
-                setApprovedPractice(event.currentTarget.checked);
-              }}
-              disabled={busy || !practiceCode.trim()}
-            />
+            <div className="preparation-fields">
+              <div className="preparation-field">
+                <label htmlFor={`${id}-revision`}>{translate('Approved source')}</label>
+                <select
+                  id={`${id}-revision`}
+                  value={revisionId}
+                  required
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    setRevisionId(value);
+                    setSectionId('');
+                    setChosenPassageIds([]);
+                    setQuery('');
+                    if (value) {
+                      onChooseRevision(value);
+                    }
+                  }}
+                >
+                  <option value="">{translate('Choose approved material')}</option>
+                  {input.revisions.map((item) => (
+                    <option value={item.id} key={item.id}>
+                      {item.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="preparation-field">
+                <label htmlFor={`${id}-section`}>{translate('Concept or section')}</label>
+                <select
+                  id={`${id}-section`}
+                  value={sectionId}
+                  required
+                  disabled={!revision}
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    const chosen = revision?.sections.find((item) => item.id === value);
+                    const available = readIncludedPassages(
+                      input.passages,
+                      chosen?.passageIds ?? [],
+                    );
+                    setSectionId(value);
+                    setChosenPassageIds(
+                      available.length <= 8 ? available.map((passage) => passage.passageId) : [],
+                    );
+                    setQuery('');
+                  }}
+                >
+                  <option value="">{translate('Choose a section')}</option>
+                  {revision?.sections.map((item) => (
+                    <option value={item.id} key={item.id}>
+                      {item.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="preparation-field preparation-wide">
+                <label htmlFor={`${id}-objective`}>{translate('Learning objective')}</label>
+                <input
+                  id={`${id}-objective`}
+                  value={objective}
+                  onChange={(event) => {
+                    setObjective(event.currentTarget.value);
+                  }}
+                  maxLength={500}
+                  required
+                  placeholder={translate('What should students understand after this explanation?')}
+                />
+              </div>
+              <div className="preparation-field preparation-wide">
+                <label htmlFor={`${id}-audience`}>{translate('Audience')}</label>
+                <input
+                  id={`${id}-audience`}
+                  value={audience}
+                  onChange={(event) => {
+                    setAudience(event.currentTarget.value);
+                  }}
+                  maxLength={400}
+                  required
+                />
+              </div>
+            </div>
+            <details className="preparation-options">
+              <summary>
+                <strong>{translate('Options')}</strong>
+                <span>
+                  {durationLabel} · {languageLabel}
+                </span>
+              </summary>
+              <div className="preparation-fields">
+                <div className="preparation-field">
+                  <label htmlFor={`${id}-language`}>{translate('Language')}</label>
+                  <select
+                    id={`${id}-language`}
+                    value={language}
+                    onChange={(event) => {
+                      if (
+                        event.currentTarget.value === LessonLanguage.EN ||
+                        event.currentTarget.value === LessonLanguage.VI
+                      ) {
+                        setLanguage(event.currentTarget.value);
+                      }
+                    }}
+                  >
+                    <option value={LessonLanguage.EN}>{translate('English')}</option>
+                    <option value={LessonLanguage.VI}>{translate('Vietnamese')}</option>
+                  </select>
+                </div>
+                <div className="preparation-field">
+                  <label htmlFor={`${id}-duration`}>{translate('Length')}</label>
+                  <select
+                    id={`${id}-duration`}
+                    value={duration}
+                    onChange={(event) => {
+                      const value = event.currentTarget.value;
+                      if (value === '60' || value === '180' || value === '300') {
+                        setDuration(value);
+                      }
+                    }}
+                  >
+                    <option value="60">{translate('1 minute')}</option>
+                    <option value="180">{translate('3 minutes')}</option>
+                    <option value="300">{translate('5 minutes')}</option>
+                  </select>
+                </div>
+              </div>
+            </details>
+            {section && (
+              <section
+                className="preparation-sources"
+                aria-label={translate('Exact passages used')}
+              >
+                <div className="preparation-section-heading">
+                  <h3>{translate('Exact passages used')}</h3>
+                  <span aria-live="polite">{selectedPassages.length} / 8</span>
+                </div>
+                <div className="preparation-field preparation-search">
+                  <label className="preparation-screen-reader" htmlFor={`${id}-search`}>
+                    {translate('Search passages')}
+                  </label>
+                  <input
+                    id={`${id}-search`}
+                    type="search"
+                    value={query}
+                    onChange={(event) => {
+                      setQuery(event.currentTarget.value);
+                    }}
+                    placeholder={translate('Search passages')}
+                  />
+                </div>
+                <div
+                  className="preparation-source-list"
+                  role="region"
+                  tabIndex={0}
+                  aria-label={translate('Approved passages')}
+                >
+                  {matchingPassages.map((passage) =>
+                    renderPassage(passage, sectionPassages.indexOf(passage), true),
+                  )}
+                  {!matchingPassages.length && (
+                    <p className="preparation-help">
+                      {translate('No passages match your search.')}
+                    </p>
+                  )}
+                </div>
+                {!selectedPassages.length && (
+                  <p className="preparation-help">
+                    {translate('Select at least one approved passage.')}
+                  </p>
+                )}
+                {(sectionPassages.length > 8 || selectedPassages.length > 8) && (
+                  <p className="preparation-help">
+                    {translate(
+                      'Choose up to eight exact passages, including relevant corrections. Narrow the source selection if more are needed.',
+                    )}
+                  </p>
+                )}
+              </section>
+            )}
+            {renderInstructions()}
           </>
         )}
-        <Textarea
-          label={translate('Teacher instructions')}
-          placeholder={translate('Optional guidance for this explanation')}
-          value={instructions}
-          onChange={(event) => {
-            setInstructions(event.currentTarget.value);
-          }}
-          maxLength={2000}
-          disabled={busy}
-        />
-        <Text size="xs" c="dimmed">
-          {translate(
-            'Generation uses an allowance only after you confirm. Students cannot start generation.',
-          )}
-        </Text>
-        <Text size="sm">
-          {translate(
-            'Estimated clean run: 20–40k text tokens. Image inputs are counted separately.',
-          )}
-        </Text>
-        <Text size="xs" c="dimmed">
-          {translate(
-            'Run limits: 90k input and 30k output tokens. Reviewing later edits uses a separate run allowance. These are limits, not actual usage.',
-          )}
-        </Text>
-        <Button type="submit" loading={busy} disabled={!canSubmit}>
-          {translate('Create and generate')}
-        </Button>
-      </Stack>
+        {step === PreparationStep.REVIEW && (
+          <div className="preparation-review">
+            <section>
+              <div className="preparation-section-heading">
+                <h3>{translate('Content')}</h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    chooseStep(PreparationStep.CONTENT);
+                  }}
+                >
+                  {translate('Edit content')}
+                </button>
+              </div>
+              <p className="preparation-objective">{objective}</p>
+              <dl className="preparation-review-fields">
+                <div>
+                  <dt>{translate('Approved source')}</dt>
+                  <dd>{revision?.title}</dd>
+                </div>
+                <div>
+                  <dt>{translate('Concept or section')}</dt>
+                  <dd>{section?.title}</dd>
+                </div>
+                <div>
+                  <dt>{translate('Audience')}</dt>
+                  <dd>{audience}</dd>
+                </div>
+                <div>
+                  <dt>{translate('Language')}</dt>
+                  <dd>{languageLabel}</dd>
+                </div>
+                <div>
+                  <dt>{translate('Length')}</dt>
+                  <dd>{durationLabel}</dd>
+                </div>
+              </dl>
+            </section>
+            <section>
+              <h3>{translate('Exact passages used')}</h3>
+              {selectedPassages.map((passage) =>
+                renderPassage(passage, sectionPassages.indexOf(passage), false),
+              )}
+            </section>
+            {instructions.trim() && (
+              <section>
+                <h3>{translate('Teacher instructions')}</h3>
+                <p className="preparation-exact-text">{instructions}</p>
+              </section>
+            )}
+            <details className="preparation-allowance">
+              <summary>{translate('Generation allowance')}</summary>
+              <p>
+                {translate(
+                  'Generation uses an allowance only after you confirm. Students cannot start generation.',
+                )}
+              </p>
+            </details>
+          </div>
+        )}
+      </fieldset>
+      <footer className="preparation-footer">
+        {step !== PreparationStep.CONTENT && (
+          <button
+            type="button"
+            className="preparation-back"
+            disabled={busy}
+            onClick={() => {
+              chooseStep(PreparationStep.CONTENT);
+            }}
+          >
+            {translate('Back')}
+          </button>
+        )}
+        <button
+          className="preparation-primary"
+          type="submit"
+          disabled={!canSubmit}
+          aria-busy={busy}
+        >
+          {translate(step === PreparationStep.REVIEW ? 'Create and generate' : 'Continue')}
+        </button>
+      </footer>
     </form>
   );
 }

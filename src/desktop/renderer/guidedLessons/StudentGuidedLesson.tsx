@@ -75,7 +75,7 @@ export function StudentGuidedLesson({
   const receiveReady = useCallback((value: boolean): void => {
     setMediaReady(value);
   }, []);
-  const reachedEnd = frame >= readLessonDurationFrames(projection) - 2;
+  const reachedEnd = frame >= readLessonDurationFrames(projection) - 1;
   const checkpoint = projection.checkpoint;
   const pending =
     checkpoint?.state === LearnerCheckpointState.PENDING ||
@@ -218,7 +218,7 @@ export function StudentGuidedLesson({
           {translate('One concept, explained step by step.')}
         </Text>
         <ol className="guided-phase-list">
-          {Object.values(LessonPhase).map((phase, index) => (
+          {projection.lessonPhases.map((phase, index) => (
             <li key={phase} aria-current={projection.phase === phase ? 'step' : undefined}>
               <span>{String(index + 1).padStart(2, '0')}</span>
               <strong>{translate(phaseLabels[phase])}</strong>

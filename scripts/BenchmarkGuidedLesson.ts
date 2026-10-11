@@ -497,6 +497,10 @@ async function runBenchmark(
     throw new Error('Benchmark exceeded its stage limit.');
   };
   try {
+    const section = publication.draft.sections[0];
+    if (!section) {
+      throw new Error('The synthetic publication needs a section.');
+    }
     const passages = buildPublicationLessonPassages(publication);
     const sourceRefs = passages.map((passage) => ({
       passageId: passage.passageId,
@@ -509,7 +513,7 @@ async function runBenchmark(
         commandId: randomUUID(),
         classId: publication.classId,
         courseRevisionId: publication.courseId,
-        conceptId: 'accumulator',
+        conceptId: section.id,
         objective:
           options.language === LessonLanguage.VI
             ? 'Giải thích từng bước thay đổi của tổng cộng dồn.'

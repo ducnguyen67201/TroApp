@@ -185,7 +185,7 @@ export const vietnamese = {
   send: 'Gửi',
   taskDisclosure:
     'Tro có thể xem màn hình và sử dụng chuột hoặc bàn phím của bạn. Nội dung màn hình gửi đến OpenAI sẽ rời khỏi máy tính của bạn. Mỗi tin nhắn là một tác vụ mới; cuộc trò chuyện này sẽ được xóa khi bạn đóng ứng dụng.',
-  errorCheckSignIn: 'Không thể kiểm tra đăng nhập. Vui lòng thử đăng nhập lại.',
+  errorCheckSignIn: 'Không thể kiểm tra đăng nhập. Vui lòng thử lại.',
   errorSignInTimeout: 'Đăng nhập Google chưa hoàn tất. Vui lòng thử lại.',
   errorSignInCallback:
     'Tro không thể nhận kết quả đăng nhập. Đóng các ứng dụng Tro khác và khởi động lại trình chạy này, rồi thử lại.',

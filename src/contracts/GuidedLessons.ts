@@ -29,6 +29,7 @@ export type LessonAssetKind = (typeof LessonAssetKind)[keyof typeof LessonAssetK
 export const LessonTemplateKind = {
   CODE_TRACE: 'codeTrace',
   ANNOTATED_SOURCE: 'annotatedSource',
+  SOURCE_EXPLANATION: 'sourceExplanation',
   CHECKPOINT: 'checkpoint',
 } as const;
 
@@ -352,6 +353,30 @@ export const AnnotatedSourceSceneSchema = z.strictObject({
 
 export type AnnotatedSourceScene = z.infer<typeof AnnotatedSourceSceneSchema>;
 
+export const SourceExplanationPointSchema = z.strictObject({
+  pointId: z.string().min(1).max(100),
+  text: z.string().min(1).max(180),
+  sourceRefs: z.array(SourceRefSchema).min(1).max(8),
+});
+
+export type SourceExplanationPoint = z.infer<typeof SourceExplanationPointSchema>;
+
+/** Grounded text explanation without an executable program, source figure, or invented answer key. */
+export const SourceExplanationSceneSchema = z.strictObject({
+  sceneId: z.string().min(1).max(100),
+  title: z.string().min(1).max(120),
+  templateVersion: z.string().min(1).max(100),
+  layoutVariant: z.string().min(1).max(100),
+  sourceRefs: z.array(SourceRefSchema).min(1).max(8),
+  narration: z.array(NarrationBeatSchema).min(0).max(8),
+  kind: z.literal(LessonTemplateKind.SOURCE_EXPLANATION),
+  params: z.strictObject({
+    points: z.array(SourceExplanationPointSchema).min(1).max(5),
+  }),
+});
+
+export type SourceExplanationScene = z.infer<typeof SourceExplanationSceneSchema>;
+
 export const CheckpointSceneSchema = z.strictObject({
   sceneId: z.string().min(1).max(100),
   title: z.string().min(1).max(120),
@@ -373,6 +398,7 @@ export type CheckpointScene = z.infer<typeof CheckpointSceneSchema>;
 export const SceneSchema = z.union([
   CodeTraceSceneSchema,
   AnnotatedSourceSceneSchema,
+  SourceExplanationSceneSchema,
   CheckpointSceneSchema,
 ]);
 
@@ -435,7 +461,7 @@ export const LessonPlanSchema = z.strictObject({
   courseRevisionId: z.string().min(1).max(100),
   sourcePacketHash: z.string().regex(new RegExp('^[a-f0-9]{64}$')),
   scenes: z.array(SceneSchema).min(2).max(6),
-  checkpoints: z.array(CheckpointSchema).min(1).max(3),
+  checkpoints: z.array(CheckpointSchema).min(0).max(3),
   reflectionPrompt: z.string().min(1).max(500),
   teacherQuestions: z.array(z.string().min(1).max(500)).min(0).max(8),
 });
@@ -646,6 +672,12 @@ export const LearnerPresentationSchema = z.union([
   z.strictObject({
     templateVersion: z.string().min(1).max(100),
     layoutVariant: z.string().min(1).max(100),
+    kind: z.literal(LessonTemplateKind.SOURCE_EXPLANATION),
+    points: z.array(SourceExplanationPointSchema).min(1).max(5),
+  }),
+  z.strictObject({
+    templateVersion: z.string().min(1).max(100),
+    layoutVariant: z.string().min(1).max(100),
     kind: z.literal('codeTrace'),
     codeBlock: CodeBlockSchema,
     focusVariable: z.string().min(1).max(100),
@@ -686,6 +718,10 @@ export const LearnerProjectionSchema = z.strictObject({
   frame: z.number().int().min(0).max(9000),
   sceneId: z.string().min(1).max(100),
   sceneTitle: z.string().min(1).max(120),
+  /** Pinned lesson language, never inferred from captions or source text. */
+  language: z.enum(LessonLanguage),
+  /** Applicable phases from the approved plan; phase names reveal no questions or answers. */
+  lessonPhases: z.array(z.enum(LessonPhase)).min(1).max(Object.values(LessonPhase).length),
   presentation: LearnerPresentationSchema,
   compositionBundleHash: z.string().regex(new RegExp('^[a-f0-9]{64}$')),
   fontBundleHash: z.string().regex(new RegExp('^[a-f0-9]{64}$')),

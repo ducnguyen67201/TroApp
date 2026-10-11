@@ -12,6 +12,7 @@ import {
 } from '../../../../src/server/features/guidedLessons/infrastructure/LessonRenderProtocol.js';
 import { buildLessonProjection } from '../../../../src/server/features/guidedLessons/domain/BuildLessonProjection.js';
 import { createLessonFixture } from './LessonFixture.js';
+import { createSourceLessonFixture } from './SourceLessonFixture.js';
 
 /** Synthetic evidence is retained outside the repository for manual graphic review after integration runs. */
 export const LessonRenderEvidenceDirectory = join(tmpdir(), 'tro-guided-lesson-render-evidence');
@@ -181,4 +182,76 @@ it('renders actual trusted pixels and geometry for pending and worked phases usi
       2,
     ),
   );
+}, 180000);
+
+it('renders trusted source-only teaching points into distinct actual pixels with no code or checkpoints', async () => {
+  const fixture = createSourceLessonFixture();
+  const sourceManifest = fixture.record.manifest;
+  if (!sourceManifest) {
+    throw new Error('The source fixture needs a manifest.');
+  }
+  const wave = createSilentWave();
+  const audioDigest = createHash('sha256').update(wave).digest('hex');
+  const renderer = new RemotionLessonRenderer(undefined, (event) => {
+    console.info('lesson-render-diagnostic', JSON.stringify(event));
+  });
+  const controller = new AbortController();
+  const deadline = setTimeout(() => {
+    controller.abort();
+  }, 150000);
+  const rendered = await renderer
+    .render(
+      {
+        revisionId: fixture.record.revisionId,
+        input: fixture.input,
+        plan: fixture.plan,
+        contentHash: sourceManifest.contentHash,
+        adjustments: null,
+        speechArtifacts: sourceManifest.speechArtifacts.map((descriptor) => ({
+          descriptor: {
+            ...descriptor,
+            audioDigest,
+            byteLength: wave.byteLength,
+            durationMs: 1000,
+            sampleRateHz: 24000,
+          },
+          bytes: wave,
+        })),
+      },
+      controller.signal,
+    )
+    .finally(() => {
+      clearTimeout(deadline);
+      controller.abort();
+    });
+  const manifest = RenderManifestSchema.parse(rendered.manifest);
+  expect(manifest.cues.every((cue) => cue.phase === 'watch')).toBe(true);
+  expect(manifest.sourceAssetDigests).toEqual([]);
+  const frames = rendered.artifacts.filter((artifact) => artifact.kind === 'frame');
+  expect(frames).toHaveLength(fixture.plan.scenes.length);
+  expect(new Set(frames.map((artifact) => artifact.digest)).size).toBe(frames.length);
+  await mkdir(LessonRenderEvidenceDirectory, { recursive: true });
+  for (const artifact of rendered.artifacts) {
+    expect(createHash('sha256').update(artifact.bytes).digest('hex')).toBe(artifact.digest);
+    if (artifact.kind === 'frame') {
+      expect([...artifact.bytes.slice(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+      await writeFile(
+        join(LessonRenderEvidenceDirectory, `${artifact.sceneId ?? 'source'}-watch.png`),
+        artifact.bytes,
+      );
+    } else if (artifact.mimeType === 'application/json') {
+      const raw: unknown = JSON.parse(new TextDecoder().decode(artifact.bytes));
+      const evidence = GeometryEvidenceSchema.parse(raw);
+      for (const measurement of evidence.measurements) {
+        expect(validateLessonGeometry(measurement.geometry)).toHaveLength(
+          measurement.geometry.length,
+        );
+        expect(measurement.geometry.length).toBeGreaterThanOrEqual(4);
+      }
+    }
+  }
+  const projection = buildLessonProjection({ ...fixture, record: { ...fixture.record, manifest } });
+  expect(projection.presentation.kind).toBe('sourceExplanation');
+  expect(projection.visibleTraceStates).toEqual([]);
+  expect(projection.checkpoint).toBeNull();
 }, 180000);

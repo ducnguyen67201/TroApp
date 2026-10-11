@@ -338,6 +338,11 @@ it('completes approved source → generated script → real preview → released
       classId: publication.classId,
     });
     expect(teacherInput.kind).toBe('teacherInput');
+    const section =
+      teacherInput.kind === 'teacherInput' ? teacherInput.revisions[0]?.sections[0] : undefined;
+    if (!section) {
+      throw new Error('The publication fixture needs an approved section.');
+    }
     const passages = buildPublicationLessonPassages(publication);
     const sourceRefs = passages.map((passage) => ({
       passageId: passage.passageId,
@@ -350,7 +355,7 @@ it('completes approved source → generated script → real preview → released
         commandId: randomUUID(),
         classId: publication.classId,
         courseRevisionId: publication.courseId,
-        conceptId: 'accumulator',
+        conceptId: section.id,
         objective: 'Explain how the running total changes.',
         audience: 'Beginning Python learners',
         language: LessonLanguage.EN,

@@ -182,7 +182,7 @@ export const english = {
   send: 'Send',
   taskDisclosure:
     'Tro may view your screen and use your mouse or keyboard. Screen observations sent to OpenAI leave your computer. Each message is a fresh task; this display clears when you close the app.',
-  errorCheckSignIn: 'Could not check sign-in. Please try signing in again.',
+  errorCheckSignIn: 'Could not check sign-in. Please try again.',
   errorSignInTimeout: 'Google sign-in did not finish. Please try again.',
   errorSignInCallback:
     'Tro could not receive the sign-in callback. Close other Tro apps and restart this desktop launcher, then try again.',

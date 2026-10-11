@@ -7,6 +7,7 @@ import {
   ReviewCriterion,
   ReviewCheckStatus,
   LessonEvidenceKind,
+  LessonTemplateKind,
   AuthorResultSchema,
   RepairResultSchema,
   ReviewResultSchema,
@@ -14,6 +15,7 @@ import {
   RenderManifestSchema,
   SpeechArtifactSchema,
   type LessonPlan,
+  type LessonInput,
   type ReviewResult,
 } from '#contracts/GuidedLessons.js';
 import type { GuidedLessonStore, StoredLessonArtifact } from './GuidedLessonStore.js';
@@ -83,27 +85,41 @@ function hasBlockingReview(review: ReviewResult): boolean {
   );
 }
 
-function validateReview(review: ReviewResult, expectedHash: string, visual: boolean): void {
+function validateReview(
+  review: ReviewResult,
+  expectedHash: string,
+  visual: boolean,
+  input: LessonInput,
+  plan: LessonPlan | null,
+): void {
   if (
     review.reviewedHash !== expectedHash ||
     (review.verdict === ReviewVerdict.PASS && hasBlockingReview(review))
   ) {
     throw new LessonError(LessonFailure.INVALID);
   }
-  const required = visual
+  const hasTrace =
+    input.codeBlocks.length > 0 ||
+    input.traces.length > 0 ||
+    (plan?.scenes.some((scene) => scene.kind === LessonTemplateKind.CODE_TRACE) ?? false);
+  const hasCheckpoint =
+    (plan?.checkpoints.length ?? 0) > 0 ||
+    (plan?.scenes.some((scene) => scene.kind === LessonTemplateKind.CHECKPOINT) ?? false);
+  const required: ReviewCriterion[] = visual
     ? [
         ReviewCriterion.READABILITY,
         ReviewCriterion.HIERARCHY,
         ReviewCriterion.CONTINUITY,
         ReviewCriterion.TIMELINE,
         ReviewCriterion.ASSETS,
-        ReviewCriterion.CHECKPOINT,
       ]
-    : [
-        ReviewCriterion.SOURCE_SUPPORT,
-        ReviewCriterion.TRACE_CORRECTNESS,
-        ReviewCriterion.CHECKPOINT,
-      ];
+    : [ReviewCriterion.SOURCE_SUPPORT];
+  if (!visual && hasTrace) {
+    required.push(ReviewCriterion.TRACE_CORRECTNESS);
+  }
+  if (hasCheckpoint) {
+    required.push(ReviewCriterion.CHECKPOINT);
+  }
   if (
     review.verdict === ReviewVerdict.PASS ||
     (visual && review.verdict === ReviewVerdict.NEEDS_HUMAN_REVIEW && !hasBlockingReview(review))
@@ -903,6 +919,8 @@ export class LessonGeneration {
         review,
         visual ? hashLessonValue(current.manifest) : (current.contentHash ?? ''),
         visual,
+        current.input,
+        current.plan,
       );
       if (visual) {
         if (

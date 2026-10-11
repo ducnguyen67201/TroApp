@@ -4,6 +4,7 @@ import { resolve, join } from 'node:path';
 import { setTimeout as waitForProcessExit } from 'node:timers/promises';
 import type { LessonRenderer } from '../application/LessonPorts.js';
 import { inspectLessonProcesses, type LessonProcess } from './LessonRenderResources.js';
+import { LessonRenderWorkerDeadlineMs } from './LessonRenderWorkerLifetime.js';
 import {
   LessonPresentationIdentitySchema,
   LessonRenderInputSchema,
@@ -100,7 +101,7 @@ export class RemotionLessonRenderer implements LessonRenderer {
             const cancel = (): void => {
               reject(new Error('Lesson rendering was cancelled.'));
             };
-            const deadline = setTimeout(cancel, 600_000);
+            const deadline = setTimeout(cancel, LessonRenderWorkerDeadlineMs);
             let inspecting = false;
             const memoryGuard = setInterval(() => {
               if (inspecting || !child.pid) {
