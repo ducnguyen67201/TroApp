@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Prisma, PrismaClient } from '../src/server/generated/prisma/client.js';
 import { readServerEnv } from '../src/server/Env.js';
+import { readClassroomInsightConfig } from '../src/server/config/Index.js';
 import { createPrismaClassroomInsightStore } from '../src/server/persistence/PrismaClassroomInsightStore.js';
 import {
   importClassroomLearning,
@@ -13,6 +14,7 @@ async function backfillClassroomInsights() {
   const classId = z.uuid().parse(process.argv[2]);
   const apply = process.argv[3] === '--apply';
   const environment = readServerEnv(process.env);
+  const insightConfig = readClassroomInsightConfig();
   const client = new PrismaClient({
     adapter: new PrismaPg({ connectionString: environment.DATABASE_URL }),
   });
@@ -22,26 +24,15 @@ async function backfillClassroomInsights() {
       console.info({ operation: 'classroom-insights-import', classId, apply, ...result });
       return;
     }
-    if (
-      !environment.CLASSROOM_INSIGHT_COLLECTION_POLICY ||
-      environment.CLASSROOM_INSIGHT_RETENTION_DAYS === undefined
-    ) {
-      throw new Error('Apply requires collection and retention policies.');
-    }
     const policyStore = createPrismaClassroomInsightStore(environment.DATABASE_URL, {
       captureClassIds: [classId],
-      collectionPolicy: environment.CLASSROOM_INSIGHT_COLLECTION_POLICY,
-      retentionDays: environment.CLASSROOM_INSIGHT_RETENTION_DAYS,
+      ...insightConfig,
     });
     try {
       let more: boolean;
       do {
-        more = (
-          await policyStore.purgeExpiredSources(
-            new Date(),
-            environment.CLASSROOM_INSIGHT_RETENTION_DAYS,
-          )
-        ).more;
+        more = (await policyStore.purgeExpiredSources(new Date(), insightConfig.retentionDays))
+          .more;
       } while (more);
     } finally {
       await policyStore.close();

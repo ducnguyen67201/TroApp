@@ -5,13 +5,6 @@ import type {
   OnboardingRestart,
   OnboardingReply,
 } from './Onboarding.js';
-import type {
-  GuidedLessonReadRequest,
-  GuidedLessonCommand,
-  GuidedLessonReply,
-  GuidedLessonArtifactRequest,
-  GuidedLessonArtifactReply,
-} from './GuidedLessons.js';
 import type { PracticeCaptureCommand, PracticeCaptureReply } from './PracticeCapture.js';
 import type { PetCommand, PetReply, PetSnapshot } from './Pet.js';
 import type { PetWorldCommand, PetWorldReply } from './PetWorld.js';
@@ -55,11 +48,6 @@ export interface DesktopBridge {
   restartOnboarding?: (request: OnboardingRestart) => Promise<OnboardingReply>;
   executePetWorld?: (command: PetWorldCommand) => Promise<PetWorldReply>;
   readPetWorldPending?: () => Promise<PetWorldCommand[]>;
-  readGuidedLessons?: (request: GuidedLessonReadRequest) => Promise<GuidedLessonReply>;
-  commandGuidedLesson?: (command: GuidedLessonCommand) => Promise<GuidedLessonReply>;
-  readGuidedLessonArtifact?: (
-    request: GuidedLessonArtifactRequest,
-  ) => Promise<GuidedLessonArtifactReply>;
   readPets?: () => Promise<PetReply>;
   controlPet?: (command: PetCommand) => Promise<PetReply>;
   subscribePet?: (listener: (snapshot: PetSnapshot) => void) => () => void;

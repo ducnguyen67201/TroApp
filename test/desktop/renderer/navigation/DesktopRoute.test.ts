@@ -41,18 +41,6 @@ it('opens the insights page with or without an authorized class selection', () =
   expect(parseDesktopRoute('#/insights/not-a-class').classId).toBeNull();
 });
 
-it('opens guided lessons with a validated optional class selection', () => {
-  expect(parseDesktopRoute('#/guided-lessons')).toMatchObject({
-    page: DesktopPage.GUIDED_LESSONS,
-    classId: null,
-  });
-  expect(parseDesktopRoute(`#/guided-lessons/${classId}`)).toMatchObject({
-    page: DesktopPage.GUIDED_LESSONS,
-    classId,
-  });
-  expect(parseDesktopRoute('#/guided-lessons/not-a-class').classId).toBeNull();
-});
-
 it('opens pet world with a validated optional class selection', () => {
   expect(parseDesktopRoute('#/pet-world')).toMatchObject({
     page: DesktopPage.PET_WORLD,
@@ -63,4 +51,12 @@ it('opens pet world with a validated optional class selection', () => {
     classId,
   });
   expect(parseDesktopRoute('#/pet-world/not-a-class').classId).toBeNull();
+});
+
+it('returns retired lesson links to the workspace', () => {
+  expect(parseDesktopRoute(`#/guided-lessons/${classId}`)).toEqual({
+    page: DesktopPage.WORKSPACE,
+    classId: null,
+    classView: ClassView.OVERVIEW,
+  });
 });

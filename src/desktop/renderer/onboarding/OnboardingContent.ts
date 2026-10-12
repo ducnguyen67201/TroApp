@@ -143,14 +143,13 @@ const content: Readonly<Record<OnboardingStep, RoleContent>> = {
         title: 'Xem, thử, rồi tự mình hiểu.',
         description:
           'Học theo nhịp riêng từ bài giảng giáo viên đã phát hành. Trả lời câu hỏi, nhờ trợ giúp và lưu ghi chú riêng theo bài.',
-        takeaway:
-          'Bạn có thể học ở nhà mà không cần buổi học trực tiếp. Tính năng đang thử nghiệm.',
+        takeaway: 'Sắp ra mắt. Đây là bản giới thiệu; bài giảng chưa khả dụng trong phiên bản này.',
       },
       en: {
         title: 'Watch, try, then make it yours.',
         description:
           'Study lessons released by your teacher at your own pace. Answer questions, ask for help and keep private notes.',
-        takeaway: 'Study at home without a live classroom session. This feature is in beta.',
+        takeaway: 'Coming soon. This is a preview; lessons are not available in this version.',
       },
     }),
     [AccountRole.TEACHER]: addMedia('TeacherGuidedLessons', {
@@ -159,14 +158,14 @@ const content: Readonly<Record<OnboardingStep, RoleContent>> = {
         description:
           'Chọn nội dung đã duyệt, xác nhận ví dụ được hỗ trợ và bắt đầu tạo bài giảng. Duyệt kịch bản, xem bản xem trước riêng rồi phát hành.',
         takeaway:
-          'Tạo bài giảng có thể phát sinh chi phí; chỉ bắt đầu khi bạn chọn. Tính năng đang thử nghiệm.',
+          'Sắp ra mắt. Đây là bản giới thiệu; tạo bài giảng chưa khả dụng trong phiên bản này.',
       },
       en: {
         title: 'Prepare lessons for independent study.',
         description:
           'Choose approved material, confirm a supported example and start generation. Approve the script, review a private preview, then release.',
         takeaway:
-          'Generation may incur charges and starts only when you choose. This feature is in beta.',
+          'Coming soon. This is a preview; lesson creation is not available in this version.',
       },
     }),
   },

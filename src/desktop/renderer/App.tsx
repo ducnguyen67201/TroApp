@@ -33,7 +33,6 @@ import {
   IconLayoutSidebar,
   IconLogout,
   IconSettings,
-  IconPlayerPlay,
   IconPaw,
 } from '@tabler/icons-react';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
@@ -48,7 +47,6 @@ import { DesktopWindowAppearance } from '../DesktopAppearance.js';
 import { TroIcon } from './TroIcon.js';
 import { AppUpdateButton } from './updates/AppUpdateButton.js';
 import { ClassroomPage } from './classroom/ClassroomPage.js';
-import { GuidedLessonsPage } from './guidedLessons/GuidedLessonsPage.js';
 import { AccountRole } from '#contracts/AccountRole.js';
 import { PetWorldPage } from './petWorld/PetWorldPage.js';
 
@@ -106,6 +104,7 @@ export function App(): ReactElement {
   const workspaceAnchor = useRef<HTMLButtonElement>(null);
   const classesAnchor = useRef<HTMLButtonElement>(null);
   const insightsAnchor = useRef<HTMLButtonElement>(null);
+  // The upcoming lesson preview stays in the tour without an active navigation target.
   const lessonsAnchor = useRef<HTMLButtonElement>(null);
   const microphoneAnchor = useRef<HTMLButtonElement>(null);
   const settingsAnchor = useRef<HTMLButtonElement>(null);
@@ -323,7 +322,6 @@ export function App(): ReactElement {
                 <span>{locale === 'vi' ? 'Tiến độ học tập' : 'Insights'}</span>
               </UnstyledButton>
               <UnstyledButton
-                ref={lessonsAnchor}
                 className="sidebar-link"
                 disabled={accountTransition}
                 data-active={
@@ -337,21 +335,6 @@ export function App(): ReactElement {
               >
                 <IconPaw size={19} stroke={1.6} />
                 <span>{locale === 'vi' ? 'Thế giới thú cưng' : 'Pet world'}</span>
-              </UnstyledButton>
-              <UnstyledButton
-                className="sidebar-link"
-                disabled={accountTransition}
-                data-active={
-                  (!dialogs.state.settings && page === DesktopPage.GUIDED_LESSONS) || undefined
-                }
-                aria-current={page === DesktopPage.GUIDED_LESSONS ? 'page' : undefined}
-                onClick={() => {
-                  closeDialog(DesktopDialog.SETTINGS);
-                  navigation.openGuidedLessons();
-                }}
-              >
-                <IconPlayerPlay size={19} stroke={1.6} />
-                <span>{messages.guidedLessonsNavigation}</span>
               </UnstyledButton>
             </nav>
             <div className="sidebar-bottom">
@@ -553,15 +536,6 @@ export function App(): ReactElement {
                     }
                   }}
                   active={page === DesktopPage.CLASSROOM || page === DesktopPage.INSIGHTS}
-                  onRoleChange={setAccountRole}
-                />
-              )}
-              {user && !accountTransition && page === DesktopPage.GUIDED_LESSONS && (
-                <GuidedLessonsPage
-                  key={user.id}
-                  userId={user.id}
-                  initialClassId={navigation.route.classId}
-                  onChooseClass={navigation.openGuidedLessons}
                   onRoleChange={setAccountRole}
                 />
               )}

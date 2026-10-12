@@ -99,8 +99,8 @@ model ClassroomGroup {
   petHomeShares PetHomeShare[]
 }
 
-// Guided lesson drafts use validated aggregate documents. Immutable revisions,
-// releases, command receipts, allowances and private learner records stay separate.
+// Retired guided lesson storage is retained to preserve existing data and migration history.
+// No application runtime reads or writes these records.
 model GuidedLessonRecord {
   id String @id @db.Uuid
   classId String @db.Uuid
@@ -115,6 +115,26 @@ model GuidedLessonRecord {
   artifacts GuidedLessonArtifactRecord[]
   @@index([classId, updatedAt])
   @@index([status, leaseUntil])
+}
+
+// Retired render execution records are retained with their applied migration.
+model LessonRenderOperationRecord {
+  id String @id @db.Uuid
+  lessonId String? @db.Uuid
+  cleanupPending Boolean
+  document Json
+  updatedAt DateTime
+  @@index([cleanupPending, updatedAt])
+  @@index([lessonId])
+}
+
+model LessonRenderSceneRecord {
+  id String @id
+  lessonId String @db.Uuid
+  result String
+  updatedAt DateTime @updatedAt
+  @@index([lessonId])
+  @@index([updatedAt])
 }
 
 model GuidedLessonRevisionRecord {

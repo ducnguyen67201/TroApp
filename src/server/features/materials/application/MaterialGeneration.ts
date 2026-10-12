@@ -1,3 +1,4 @@
+import { MaterialConfig } from '../../../config/Index.js';
 import type {
   MaterialPreparationDiagnostic,
   MaterialProviderOperation,
@@ -117,16 +118,8 @@ export interface MaterialGenerationPolicy {
   deadlineMs: number;
 }
 
-export const defaultMaterialGenerationPolicy: MaterialGenerationPolicy = {
-  calls: 24,
-  inputTokens: 150_000,
-  outputTokens: 160_000,
-  stageInputTokens: 100_000,
-  stageOutputTokens: 2000,
-  compositionOutputTokens: 60_000,
-  compositionTimeoutMs: 240_000,
-  deadlineMs: 540_000,
-};
+/** Compatibility entry point for application consumers; settings have one owner. */
+export const defaultMaterialGenerationPolicy: MaterialGenerationPolicy = MaterialConfig.generation;
 
 /** Briefs stay compact; lesson JSON and model reasoning have a separate composition allowance. */
 export function readMaterialStageOutputTokens(

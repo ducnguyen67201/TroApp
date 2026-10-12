@@ -1,4 +1,4 @@
-import { IconBook, IconChartBar, IconCheck } from '@tabler/icons-react';
+import { IconBook, IconChartBar } from '@tabler/icons-react';
 import type { ReactElement } from 'react';
 import { ReleaseIllustration as Illustration } from '../../updates/ReleaseNotes.js';
 import { useLocale } from '../localization/UseLocale.js';
@@ -10,34 +10,6 @@ export function ReleaseIllustration({ kind }: { kind: Illustration }): ReactElem
   const text = whatsNewMessages[locale];
   return (
     <div className="whats-new-illustration" aria-hidden="true">
-      {kind === Illustration.LESSON && (
-        <>
-          <div className="whats-new-mini-window">
-            <div className="whats-new-mini-toolbar">
-              <span>
-                {text.lesson} &nbsp; / &nbsp; {text.scene}
-              </span>
-              <span className="whats-new-mini-status">{text.approved}</span>
-            </div>
-            <div className="whats-new-mini-editor">
-              <div>
-                <div className="whats-new-mini-heading">{text.lessonHeading}</div>
-                <div className="whats-new-mini-line">1 &nbsp; {text.boolean}</div>
-                <div className="whats-new-mini-line">2 &nbsp; {text.behavior}</div>
-              </div>
-              <div className="whats-new-mini-side">
-                {text.narration}
-                <div />
-                <div />
-              </div>
-            </div>
-          </div>
-          <div className="whats-new-floating-note">
-            <IconCheck size={15} stroke={1.6} />
-            {text.lessonNote}
-          </div>
-        </>
-      )}
       {kind === Illustration.PRACTICE && (
         <>
           <div className="whats-new-mini-window">

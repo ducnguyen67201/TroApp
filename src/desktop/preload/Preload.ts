@@ -13,14 +13,6 @@ import {
   type WhatsNewReply,
 } from '#contracts/WhatsNew.js';
 import {
-  GuidedLessonReadRequestSchema,
-  GuidedLessonCommandSchema,
-  GuidedLessonReplySchema,
-  GuidedLessonArtifactRequestSchema,
-  GuidedLessonArtifactReplySchema,
-  GuidedLessonFailure,
-} from '#contracts/GuidedLessons.js';
-import {
   PracticeCaptureCommandSchema,
   PracticeCaptureReplySchema,
 } from '#contracts/PracticeCapture.js';
@@ -168,51 +160,6 @@ const bridge: DesktopBridge = {
         .filter(isPetWorldMutationCommand);
     } catch {
       return [];
-    }
-  },
-  async readGuidedLessons(request) {
-    try {
-      const raw: unknown = await ipcRenderer.invoke(
-        'tro:guided-lesson-read',
-        GuidedLessonReadRequestSchema.parse(request),
-      );
-      return GuidedLessonReplySchema.parse(raw);
-    } catch {
-      return {
-        kind: 'failed',
-        code: GuidedLessonFailure.UNAVAILABLE,
-        message: 'Guided lessons are unavailable.',
-      };
-    }
-  },
-  async commandGuidedLesson(command) {
-    try {
-      const raw: unknown = await ipcRenderer.invoke(
-        'tro:guided-lesson-command',
-        GuidedLessonCommandSchema.parse(command),
-      );
-      return GuidedLessonReplySchema.parse(raw);
-    } catch {
-      return {
-        kind: 'failed',
-        code: GuidedLessonFailure.UNAVAILABLE,
-        message: 'Guided lessons are unavailable.',
-      };
-    }
-  },
-  async readGuidedLessonArtifact(request) {
-    try {
-      const raw: unknown = await ipcRenderer.invoke(
-        'tro:guided-lesson-artifact',
-        GuidedLessonArtifactRequestSchema.parse(request),
-      );
-      return GuidedLessonArtifactReplySchema.parse(raw);
-    } catch {
-      return {
-        kind: 'failed',
-        code: GuidedLessonFailure.UNAVAILABLE,
-        message: 'Guided lessons are unavailable.',
-      };
     }
   },
   async controlClassroomInsights(command) {

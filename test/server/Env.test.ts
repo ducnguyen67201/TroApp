@@ -75,59 +75,26 @@ it('validates backend speech configuration without requiring it for ordinary sta
   ).toBe('synthetic-openai-key-for-tests');
 });
 
-it('uses separate brief and composition budgets and allows configured larger compositions', () => {
-  const base = { DATABASE_URL: databaseUrl, AUTH_SECRET: authSecret };
-  const environment = readServerEnv(base);
-  expect(environment.MATERIAL_STAGE_OUTPUT_TOKENS).toBe(2000);
-  expect(environment.MATERIAL_COMPOSITION_OUTPUT_TOKENS).toBe(60000);
-  expect(environment.MATERIAL_STAGE_INPUT_TOKENS).toBe(100000);
-  expect(environment.MATERIAL_JOB_OUTPUT_TOKENS).toBe(160000);
-  expect(environment.MATERIAL_COMPOSITION_TIMEOUT_MS).toBe(240000);
-  const configured = readServerEnv({
-    ...base,
-    MATERIAL_COMPOSITION_OUTPUT_TOKENS: '100000',
-    MATERIAL_JOB_OUTPUT_TOKENS: '160000',
+it('excludes feature settings from the environment contract', () => {
+  const environment = readServerEnv({
+    DATABASE_URL: databaseUrl,
+    AUTH_SECRET: authSecret,
+    PRACTICE_CHECK_MODEL: 'legacy-override',
+    MATERIAL_JOB_CALLS: '0',
+    VOICEOVER_GLOBAL_STREAMS: 'legacy-invalid-override',
+    CLASSROOM_INSIGHT_COLLECTION_POLICY: 'legacy-override',
+    CLASSROOM_INSIGHT_RETENTION_DAYS: '0',
   });
-  expect(configured.MATERIAL_COMPOSITION_OUTPUT_TOKENS).toBe(100000);
-  expect(configured.MATERIAL_JOB_OUTPUT_TOKENS).toBe(160000);
-  expect(() => readServerEnv({ ...base, MATERIAL_COMPOSITION_OUTPUT_TOKENS: '100001' })).toThrow(
-    'Backend configuration is invalid.',
-  );
-});
-
-it('validates configurable composition timeouts independently of the overall job deadline', () => {
-  const base = { DATABASE_URL: databaseUrl, AUTH_SECRET: authSecret };
+  const featurePrefixes = [
+    'PRACTICE_CHECK_',
+    'MATERIAL_',
+    'VOICEOVER_',
+    'GUIDED_LESSON_',
+    'CLASSROOM_INSIGHT_',
+  ];
   expect(
-    readServerEnv({ ...base, MATERIAL_COMPOSITION_TIMEOUT_MS: '300000' })
-      .MATERIAL_COMPOSITION_TIMEOUT_MS,
-  ).toBe(300000);
-  expect(() => readServerEnv({ ...base, MATERIAL_COMPOSITION_TIMEOUT_MS: '540001' })).toThrow(
-    'Backend configuration is invalid.',
-  );
-});
-
-it('provides classroom learning collection and retention defaults and validates overrides', () => {
-  const base = { DATABASE_URL: databaseUrl, AUTH_SECRET: authSecret };
-  expect(readServerEnv(base)).toMatchObject({
-    CLASSROOM_INSIGHT_COLLECTION_POLICY: 'classroom-learning-v1',
-    CLASSROOM_INSIGHT_RETENTION_DAYS: 180,
-  });
-  expect(
-    readServerEnv({
-      ...base,
-      CLASSROOM_INSIGHT_COLLECTION_POLICY: 'pilot-v1',
-      CLASSROOM_INSIGHT_RETENTION_DAYS: '30',
-    }),
-  ).toMatchObject({
-    CLASSROOM_INSIGHT_COLLECTION_POLICY: 'pilot-v1',
-    CLASSROOM_INSIGHT_RETENTION_DAYS: 30,
-  });
-  for (const value of ['0', '3651', '1.5', '']) {
-    expect(() => readServerEnv({ ...base, CLASSROOM_INSIGHT_RETENTION_DAYS: value })).toThrow(
-      'Backend configuration is invalid.',
-    );
-  }
-  expect(() => readServerEnv({ ...base, CLASSROOM_INSIGHT_COLLECTION_POLICY: '   ' })).toThrow(
-    'Backend configuration is invalid.',
-  );
+    Object.keys(environment).filter((key) =>
+      featurePrefixes.some((prefix) => key.startsWith(prefix)),
+    ),
+  ).toEqual([]);
 });

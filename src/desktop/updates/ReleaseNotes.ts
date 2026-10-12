@@ -1,7 +1,6 @@
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
 
 export const ReleaseIllustration = {
-  LESSON: 'lesson',
   PRACTICE: 'practice',
   INSIGHTS: 'insights',
 } as const;
@@ -34,24 +33,6 @@ export const appReleaseNotes: readonly AppReleaseNotes[] = [
     id: '0.1.0',
     version: '0.1.0',
     highlights: [
-      {
-        id: 'guided-lessons',
-        illustration: ReleaseIllustration.LESSON,
-        text: {
-          vi: {
-            label: 'Bài giảng hướng dẫn · Thử nghiệm',
-            title: 'Bài giảng sống động hơn.',
-            description:
-              'Từ tài liệu quen thuộc đến bài giảng có lời dẫn và minh họa. Xem lại từng cảnh, duyệt nội dung rồi chia sẻ với lớp.',
-          },
-          en: {
-            label: 'Guided lessons · Beta',
-            title: 'Bring lessons to life.',
-            description:
-              'Turn familiar materials into narrated, illustrated lessons. Review each scene, approve the content, then share it with your class.',
-          },
-        },
-      },
       {
         id: 'practice-feedback',
         illustration: ReleaseIllustration.PRACTICE,

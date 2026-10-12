@@ -9,7 +9,7 @@ import type {
 } from '../../../../src/server/features/voiceover/VoiceoverPorts.js';
 import { TeachingMessageKind } from '#contracts/TeachingStep.js';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
-import { VoiceoverConfig } from '../../../../src/server/features/voiceover/VoiceoverConfig.js';
+import { VoiceoverConfig } from '../../../../src/server/config/Index.js';
 import type { VoiceoverRequest } from '#contracts/Voiceover.js';
 
 function createRequest(): VoiceoverRequest {

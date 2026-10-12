@@ -1,11 +1,3 @@
-import { createPrismaGuidedLessonStore } from './persistence/PrismaGuidedLessonStore.js';
-import { GuidedLessonService } from './features/guidedLessons/application/GuidedLessonService.js';
-import { GuidedLessonRunner } from './features/guidedLessons/application/GuidedLessonRunner.js';
-import { registerGuidedLessonRoutes } from './features/guidedLessons/infrastructure/RegisterGuidedLessonRoutes.js';
-import { OpenAiLessonModel } from './features/guidedLessons/infrastructure/OpenAiLessonModel.js';
-import { OpenAiLessonSpeech } from './features/guidedLessons/infrastructure/OpenAiLessonSpeech.js';
-import { RemotionLessonAgent } from './features/guidedLessons/infrastructure/RemotionLessonAgent.js';
-import { DockerLessonCodeSandbox } from './features/guidedLessons/infrastructure/DockerLessonCodeSandbox.js';
 import { ClassroomInsightService } from './features/classroom/application/ClassroomInsightService.js';
 import { registerClassroomInsightRoutes } from './features/classroom/infrastructure/RegisterClassroomInsightRoutes.js';
 import { ClassroomInsightRetentionRunner } from './features/classroom/infrastructure/ClassroomInsightRetentionRunner.js';
@@ -28,7 +20,13 @@ import { MaterialExtractorWorker } from './features/materials/infrastructure/Mat
 import { OpenAiMaterialPreparation } from './features/materials/infrastructure/OpenAiMaterialPreparation.js';
 import { registerMaterialRoutes } from './features/materials/infrastructure/RegisterMaterialRoutes.js';
 import { OpenAiSpeechProvider } from './features/voiceover/OpenAiSpeechProvider.js';
-import { VoiceoverConfig } from './features/voiceover/VoiceoverConfig.js';
+import {
+  VoiceoverConfig,
+  readVoiceoverAllowanceConfig,
+  readClassroomInsightConfig,
+  readPracticeCheckConfig,
+  readMaterialConfig,
+} from './config/Index.js';
 import { registerVoiceoverRoutes } from './features/voiceover/RegisterVoiceoverRoutes.js';
 import { createPrismaVoiceoverAllowance } from './persistence/PrismaVoiceoverAllowance.js';
 import { TranscriptionConfig } from './features/transcription/TranscriptionConfig.js';
@@ -51,15 +49,18 @@ import { createPrismaPetWorldStore } from './persistence/PrismaPetWorldStore.js'
 
 async function startApi(): Promise<void> {
   const environment = readServerEnv(process.env);
+  const insightConfig = readClassroomInsightConfig();
+  const practiceConfig = readPracticeCheckConfig();
+  const materialConfig = readMaterialConfig();
+  const voiceoverConfig = readVoiceoverAllowanceConfig();
   const logger = createServerLogger(environment.APP_ENV);
   const database = createPrismaDatabaseStatus(environment.DATABASE_URL, logger);
   const authentication = createAuthDatabase(environment);
   const api = createApi(database);
-  const voiceoverAllowance = createPrismaVoiceoverAllowance(environment.DATABASE_URL, {
-    dailyCharacters: environment.VOICEOVER_DAILY_CHARACTERS,
-    globalDailyCharacters: environment.VOICEOVER_GLOBAL_DAILY_CHARACTERS,
-    globalStreams: environment.VOICEOVER_GLOBAL_STREAMS,
-  });
+  const voiceoverAllowance = createPrismaVoiceoverAllowance(
+    environment.DATABASE_URL,
+    voiceoverConfig,
+  );
   registerVoiceoverRoutes(
     api,
     authentication.readSignedInUserId,
@@ -74,8 +75,7 @@ async function startApi(): Promise<void> {
   const capturePolicy = {
     captureClassIds: [],
     captureAllClasses: true,
-    collectionPolicy: environment.CLASSROOM_INSIGHT_COLLECTION_POLICY ?? 'classroom-learning-v1',
-    retentionDays: environment.CLASSROOM_INSIGHT_RETENTION_DAYS ?? 180,
+    ...insightConfig,
   };
   const classroom = createPrismaClassroomStore(environment.DATABASE_URL, capturePolicy);
   const insights = createPrismaClassroomInsightStore(environment.DATABASE_URL, capturePolicy, {
@@ -89,7 +89,7 @@ async function startApi(): Promise<void> {
   );
   const retentionRunner = new ClassroomInsightRetentionRunner(
     insights,
-    environment.CLASSROOM_INSIGHT_RETENTION_DAYS,
+    insightConfig.retentionDays,
     () => {
       logger.warn({ operation: 'purge-expired-insights' }, 'classroom.insights.retention.failed');
     },
@@ -123,20 +123,14 @@ async function startApi(): Promise<void> {
       new PracticeAssessmentService(
         [
           new LlmCriterionEvaluator(
-            new OpenAiPracticeCheckEvaluator(
-              environment.OPENAI_API_KEY,
-              environment.PRACTICE_CHECK_MODEL ?? 'gpt-5.4',
-            ),
+            new OpenAiPracticeCheckEvaluator(environment.OPENAI_API_KEY, practiceConfig.model),
           ),
           new ExactOutputEvaluator(),
           new ScratchStructureEvaluator(),
         ],
         new PreparePracticeEvidence(new ExtractPracticeArtifact(new MaterialExtractorWorker())),
       ),
-      {
-        dailyChecks: environment.PRACTICE_CHECK_DAILY_LIMIT ?? 30,
-        minuteChecks: environment.PRACTICE_CHECK_MINUTE_LIMIT ?? 5,
-      },
+      practiceConfig.policy,
       () => new Date(),
       (event) => {
         logger.info(event, 'classroom.practice.lifecycle');
@@ -152,9 +146,9 @@ async function startApi(): Promise<void> {
       new OpenAiMaterialPreparation(
         environment.OPENAI_API_KEY,
         {
-          stageOutputTokens: environment.MATERIAL_STAGE_OUTPUT_TOKENS,
-          compositionOutputTokens: environment.MATERIAL_COMPOSITION_OUTPUT_TOKENS,
-          compositionTimeoutMs: environment.MATERIAL_COMPOSITION_TIMEOUT_MS,
+          stageOutputTokens: materialConfig.generation.stageOutputTokens,
+          compositionOutputTokens: materialConfig.generation.compositionOutputTokens,
+          compositionTimeoutMs: materialConfig.generation.compositionTimeoutMs,
         },
         (event) => {
           if (event.state === MaterialProviderRequestState.FAILED) {
@@ -164,16 +158,7 @@ async function startApi(): Promise<void> {
           }
         },
       ),
-      {
-        calls: environment.MATERIAL_JOB_CALLS,
-        inputTokens: environment.MATERIAL_JOB_INPUT_TOKENS,
-        outputTokens: environment.MATERIAL_JOB_OUTPUT_TOKENS,
-        stageInputTokens: environment.MATERIAL_STAGE_INPUT_TOKENS,
-        stageOutputTokens: environment.MATERIAL_STAGE_OUTPUT_TOKENS,
-        compositionOutputTokens: environment.MATERIAL_COMPOSITION_OUTPUT_TOKENS,
-        compositionTimeoutMs: environment.MATERIAL_COMPOSITION_TIMEOUT_MS,
-        deadlineMs: environment.MATERIAL_JOB_DEADLINE_MS,
-      },
+      materialConfig.generation,
       (event) => {
         if (event.rejected) {
           logger.warn(event, 'classroom.materials.stage.rejected');
@@ -192,38 +177,6 @@ async function startApi(): Promise<void> {
     logger.warn({ event: 'material.runner.failed' }, 'Material preparation runner failed.');
   });
   materialRunner.start();
-  const guidedLessons = createPrismaGuidedLessonStore(environment.DATABASE_URL);
-  const guidedLessonService = new GuidedLessonService(
-    guidedLessons.store,
-    new OpenAiLessonModel(environment.OPENAI_API_KEY, environment.GUIDED_LESSON_MODEL),
-    new OpenAiLessonSpeech(
-      environment.OPENAI_API_KEY,
-      environment.GUIDED_LESSON_SPEECH_MODEL,
-      environment.GUIDED_LESSON_SPEECH_VOICE,
-    ),
-    new RemotionLessonAgent(
-      environment.OPENAI_API_KEY,
-      environment.GUIDED_LESSON_CODING_MODEL,
-      new DockerLessonCodeSandbox(environment.GUIDED_LESSON_RENDER_IMAGE),
-    ),
-    () => new Date(),
-    (event) => {
-      logger.warn(event, 'guided.lesson.stage.failed');
-    },
-  );
-  const guidedLessonRunner = new GuidedLessonRunner(guidedLessonService, () => {
-    logger.warn({ operation: 'guided-lesson-runner' }, 'guided.lesson.runner.failed');
-  });
-  registerGuidedLessonRoutes(
-    api,
-    authentication.readSignedInUserId,
-    guidedLessonService,
-    logger,
-    () => {
-      guidedLessonRunner.wake();
-    },
-  );
-  guidedLessonRunner.start();
   const transcriptionAllowance = createPrismaTranscriptionAllowance(environment.DATABASE_URL);
   await registerTranscriptionRoutes(
     api,
@@ -251,8 +204,6 @@ async function startApi(): Promise<void> {
     await retentionRunner.close();
     await petRetentionRunner.close();
     await materialRunner.close();
-    await guidedLessonRunner.close();
-    await guidedLessons.close();
     await database.close();
     await authentication.close();
     await transcriptionAllowance.close();

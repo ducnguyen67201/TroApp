@@ -380,16 +380,15 @@ describe('desktop scaffold', () => {
       'page',
     );
     expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Guided Lessons (Beta)' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Guided Lessons (Beta)' })).toBeNull();
     expect(await screen.findByRole('heading', { name: 'Welcome back, Alex' })).toBeTruthy();
   });
 
-  it('always shows localized guided lesson navigation for Vietnamese accounts', async () => {
+  it('does not offer retired lesson navigation for Vietnamese accounts', async () => {
     window.localStorage.setItem(localeStorageKey, DesktopLocale.VIETNAMESE);
     renderDesktop();
-    expect(
-      await screen.findByRole('button', { name: 'Bài giảng hướng dẫn (Thử nghiệm)' }),
-    ).toBeTruthy();
+    await screen.findByRole('button', { name: 'Lớp học' });
+    expect(screen.queryByRole('button', { name: 'Bài giảng hướng dẫn (Thử nghiệm)' })).toBeNull();
   });
 
   it('preserves the draft, messages and session when switching to Settings and back', async () => {
@@ -2126,6 +2125,10 @@ it('runs the navbar introduction without navigating and restarts it from Setting
   await screen.findByRole('heading', { name: 'See how far you’ve come.' });
   fireEvent.click(screen.getByRole('button', { name: 'Next' }));
   await screen.findByRole('heading', { name: 'Watch, try, then make it yours.' });
+  expect(
+    screen.getByText('Coming soon. This is a preview; lessons are not available in this version.'),
+  ).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Guided Lessons (Beta)' })).toBeNull();
   expect(screen.getByLabelText('Video introduction').getAttribute('src')).toMatch(
     /StudentGuidedLessons\.mp4$/,
   );
@@ -2192,13 +2195,11 @@ describe('what’s new', () => {
     expect(screen.queryByRole('dialog', { name: 'What’s new' })).toBeNull();
     fireEvent.click(open);
     let dialog = await screen.findByRole('dialog', { name: 'What’s new' });
-    expect(within(dialog).getByRole('heading', { name: 'Bring lessons to life.' })).toBeTruthy();
+    expect(within(dialog).getByRole('heading', { name: 'A hint when it matters.' })).toBeTruthy();
     await waitFor(() => {
       expect(bridge.markWhatsNewSeen).toHaveBeenCalledOnce();
     });
     expect(screen.queryByRole('img', { name: 'New release highlights' })).toBeNull();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Next' }));
-    expect(within(dialog).getByRole('heading', { name: 'A hint when it matters.' })).toBeTruthy();
     fireEvent.keyDown(within(dialog).getByRole('button', { name: 'Next' }), {
       key: 'ArrowRight',
     });
@@ -2211,7 +2212,7 @@ describe('what’s new', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'What’s new' }));
     dialog = await screen.findByRole('dialog', { name: 'What’s new' });
-    expect(within(dialog).getByRole('heading', { name: 'Bring lessons to life.' })).toBeTruthy();
+    expect(within(dialog).getByRole('heading', { name: 'A hint when it matters.' })).toBeTruthy();
     expect(bridge.markWhatsNewSeen).toHaveBeenCalledOnce();
   });
 
@@ -2263,7 +2264,7 @@ describe('what’s new', () => {
     expect(screen.queryByRole('dialog', { name: 'Có gì mới' })).toBeNull();
     fireEvent.click(open);
     const dialog = await screen.findByRole('dialog', { name: 'Có gì mới' });
-    expect(within(dialog).getByRole('heading', { name: 'Bài giảng sống động hơn.' })).toBeTruthy();
+    expect(within(dialog).getByRole('heading', { name: 'Một gợi ý, đúng lúc cần.' })).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Đóng phần giới thiệu' }));
     await waitFor(() => {
       expect(bridge.markWhatsNewSeen).toHaveBeenCalledOnce();
@@ -2282,8 +2283,6 @@ describe('what’s new', () => {
         'Could not save that you viewed this release. It may appear again after restarting.',
       ),
     ).toBeTruthy();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Next' }));
-    expect(within(dialog).getByRole('heading', { name: 'A hint when it matters.' })).toBeTruthy();
   });
 });
 

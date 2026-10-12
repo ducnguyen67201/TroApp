@@ -29,7 +29,8 @@ it('uses distinct teacher and student instructions for classroom preparation and
     AccountRole.STUDENT,
   );
   expect(teacher.copy.description).toContain('Approve the script');
-  expect(teacher.copy.takeaway).toContain('charges');
+  expect(teacher.copy.takeaway).toContain('Coming soon.');
+  expect(student.copy.takeaway).toContain('Coming soon.');
   expect(student.copy.description).toContain('released by your teacher');
 });
 

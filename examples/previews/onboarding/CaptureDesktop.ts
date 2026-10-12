@@ -5,7 +5,6 @@ import { createOnboardingProgress } from '../../../src/desktop/onboarding/domain
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
 import type { ClassroomHome } from '#contracts/Classroom.js';
 import type { InsightStudentProgress } from '#contracts/ClassroomInsights.js';
-import type { GuidedLessonSummary } from '#contracts/GuidedLessons.js';
 import { PetAction, createPetPreferences, type PetSnapshot } from '#contracts/Pet.js';
 
 /* Only the authoring capture page loads this in-memory bridge. No API, account,
@@ -99,19 +98,6 @@ const progress: InsightStudentProgress = {
   comparisons: [],
   delayedChecks: [],
 };
-const lessons: GuidedLessonSummary[] = [
-  {
-    id: 'lesson-demo-one',
-    classId,
-    title: 'Vòng lặp và tổng tích lũy',
-    status: 'released',
-    version: 1,
-    language: 'vi',
-    releaseId: 'release-demo-one',
-    updatedAt: '2026-10-08T09:00:00.000Z',
-    error: null,
-  },
-];
 let pet: PetSnapshot = {
   revision: 0,
   preferences: createPetPreferences(),
@@ -206,12 +192,6 @@ window.tro = {
           ? { kind: 'student-progress', progress }
           : { kind: 'failed', code: 'forbidden' },
     ),
-  readGuidedLessons: () =>
-    Promise.resolve({
-      kind: 'list',
-      classes: home.classes.map((entry) => entry.schoolClass),
-      lessons,
-    }),
   readPets: () => Promise.resolve({ kind: 'ok', snapshot: pet }),
   subscribePet: () => () => {},
   controlPet: (command) => {

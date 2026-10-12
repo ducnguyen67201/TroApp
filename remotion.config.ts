@@ -1,6 +1,6 @@
 import { Config } from '@remotion/cli/config';
 
-/* Authoring-only CLI configuration. API lesson rendering supplies its own bundle config. */
+/* Authoring-only configuration for the bundled onboarding walkthroughs. */
 Config.overrideWebpackConfig((configuration) => ({
   ...configuration,
   resolve: {

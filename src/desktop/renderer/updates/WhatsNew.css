@@ -80,48 +80,6 @@
   text-transform: uppercase;
   text-align: center;
 }
-.whats-new-mini-editor {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 89px;
-  gap: 14px;
-  padding: 18px;
-}
-.whats-new-mini-heading {
-  font:
-    400 20px/1.2 Georgia,
-    'Times New Roman',
-    serif;
-  white-space: pre-line;
-  margin-bottom: 16px;
-}
-.whats-new-mini-line {
-  border: 1px solid #e5c499;
-  padding: 9px;
-  border-radius: 4px;
-  font-size: 8px;
-  line-height: 1.5;
-  background: #fae9cf;
-}
-.whats-new-mini-line + .whats-new-mini-line {
-  background: #f1f4e7;
-  border-color: var(--whats-new-line);
-  margin-top: 7px;
-}
-.whats-new-mini-side {
-  border-left: 1px solid var(--whats-new-line);
-  padding-left: 12px;
-  font-size: 8px;
-  line-height: 1.7;
-}
-.whats-new-mini-side > div {
-  height: 25px;
-  background: #efeee6;
-  margin-top: 9px;
-  border-radius: 4px;
-}
-.whats-new-mini-side > div:last-child {
-  height: 45px;
-}
 .whats-new-floating-note {
   position: absolute;
   bottom: 22px;
@@ -368,22 +326,8 @@
     height: 220px;
     padding: 20px 15px;
   }
-  .whats-new-mini-editor {
-    grid-template-columns: minmax(0, 1fr) 63px;
-    padding: 14px;
-    gap: 9px;
-  }
-  .whats-new-mini-heading {
-    font-size: 17px;
-  }
   .whats-new-mini-toolbar {
     padding-inline: 10px;
-  }
-  .whats-new-mini-line {
-    font-size: 7px;
-  }
-  .whats-new-mini-side {
-    padding-left: 8px;
   }
   .whats-new-floating-note {
     font-size: 9px;
