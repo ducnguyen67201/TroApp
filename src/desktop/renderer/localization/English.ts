@@ -142,7 +142,7 @@ export const english = {
   account: 'Account',
   name: 'Name',
   email: 'Email',
-  signOutHint: 'You can sign out from the sidebar.',
+  signOutHint: 'Click your account icon in the sidebar to sign out.',
   accountSignInHint: 'Sign in to see your account.',
   appearance: 'Appearance',
   appearanceDescription: 'A simple, warm light theme.',

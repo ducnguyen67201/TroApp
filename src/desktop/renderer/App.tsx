@@ -31,7 +31,6 @@ import {
   IconChartBar,
   IconMicrophone,
   IconLayoutSidebar,
-  IconLogout,
   IconSettings,
   IconPaw,
 } from '@tabler/icons-react';
@@ -412,24 +411,6 @@ export function App(): ReactElement {
                     microphoneTests.activeDeviceId !== null
                   }
                 />
-                <Button
-                  variant="subtle"
-                  fullWidth
-                  justify="flex-start"
-                  leftSection={<IconLogout size={16} />}
-                  loading={controller.isSigningOut}
-                  disabled={
-                    accountTransition ||
-                    controller.isSending ||
-                    controller.isResetting ||
-                    voice.isStarting ||
-                    microphoneTests.activeDeviceId !== null
-                  }
-                  onClick={() => void controller.signOut()}
-                  className="logout-button"
-                >
-                  {messages.signOut}
-                </Button>
               </section>
             </div>
           </AppShell.Navbar>
