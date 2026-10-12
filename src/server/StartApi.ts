@@ -1,3 +1,15 @@
+import { randomUUID, createHash } from 'node:crypto';
+import { readLessonVideoConfig } from './config/Index.js';
+import { createPrismaLessonVideoStore } from './persistence/PrismaLessonVideoStore.js';
+import { LessonVideoService } from './features/lessonVideos/application/LessonVideoService.js';
+import { LessonVideoRunner } from './features/lessonVideos/application/LessonVideoRunner.js';
+import { RunLessonVideoStage } from './features/lessonVideos/application/RunLessonVideoStage.js';
+import { ClassroomLessonSources } from './features/lessonVideos/infrastructure/ClassroomLessonSources.js';
+import { OpenAiLessonContent } from './features/lessonVideos/infrastructure/OpenAiLessonContent.js';
+import { OpenAiLessonSpeech } from './features/lessonVideos/infrastructure/OpenAiLessonSpeech.js';
+import { HttpLessonRenderer } from './features/lessonVideos/infrastructure/HttpLessonRenderer.js';
+import { registerLessonVideoRoutes } from './features/lessonVideos/infrastructure/RegisterLessonVideoRoutes.js';
+import type { LessonDiagnostics } from './features/lessonVideos/application/LessonVideoPorts.js';
 import { ClassroomInsightService } from './features/classroom/application/ClassroomInsightService.js';
 import { registerClassroomInsightRoutes } from './features/classroom/infrastructure/RegisterClassroomInsightRoutes.js';
 import { ClassroomInsightRetentionRunner } from './features/classroom/infrastructure/ClassroomInsightRetentionRunner.js';
@@ -52,6 +64,7 @@ async function startApi(): Promise<void> {
   const insightConfig = readClassroomInsightConfig();
   const practiceConfig = readPracticeCheckConfig();
   const materialConfig = readMaterialConfig();
+  const lessonConfig = readLessonVideoConfig();
   const voiceoverConfig = readVoiceoverAllowanceConfig();
   const logger = createServerLogger(environment.APP_ENV);
   const database = createPrismaDatabaseStatus(environment.DATABASE_URL, logger);
@@ -78,6 +91,43 @@ async function startApi(): Promise<void> {
     ...insightConfig,
   };
   const classroom = createPrismaClassroomStore(environment.DATABASE_URL, capturePolicy);
+  const lessonStore = createPrismaLessonVideoStore(environment.DATABASE_URL);
+  const lessonContent = new OpenAiLessonContent(environment.OPENAI_API_KEY);
+  const lessonSpeech = new OpenAiLessonSpeech(environment.OPENAI_API_KEY);
+  const lessonRenderer = new HttpLessonRenderer(
+    environment.LESSON_RENDER_URL,
+    environment.LESSON_RENDER_SECRET,
+  );
+  const lessonDiagnostics: LessonDiagnostics = (event) => {
+    logger.info(event, 'lesson.video.stage');
+  };
+  const lessonStages = new RunLessonVideoStage(
+    lessonStore,
+    lessonContent,
+    lessonSpeech,
+    lessonRenderer,
+    randomUUID,
+    lessonDiagnostics,
+  );
+  const lessonRunner = new LessonVideoRunner(
+    lessonStore,
+    lessonStages,
+    randomUUID,
+    lessonDiagnostics,
+  );
+  const lessons = new LessonVideoService(
+    lessonStore,
+    new ClassroomLessonSources(classroom.store),
+    lessonContent,
+    lessonRenderer,
+    lessonConfig,
+    randomUUID,
+    (value) => createHash('sha256').update(value).digest('hex'),
+  );
+  registerLessonVideoRoutes(api, authentication.readSignedInUserId, lessons, () => {
+    lessonRunner.wake();
+  });
+  lessonRunner.start(lessonConfig.jobs.pollMs);
   const insights = createPrismaClassroomInsightStore(environment.DATABASE_URL, capturePolicy, {
     resumeStoredRetentionPolicies: true,
   });
@@ -201,6 +251,8 @@ async function startApi(): Promise<void> {
   registerModelGateway(api, authentication.readSignedInUserId, environment, logger);
 
   api.addHook('onClose', async () => {
+    await lessonRunner.close();
+    await lessonStore.close();
     await retentionRunner.close();
     await petRetentionRunner.close();
     await materialRunner.close();

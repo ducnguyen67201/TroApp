@@ -948,11 +948,53 @@ versioned migrations. `/health/live` reports the process, while `/health/ready`
 requires database readiness. Deployment is not implied by local tests. AWS and
 try-on generation remain future work; there is no implemented try-on job pipeline.
 
-The Guided Lessons runtime has been removed, including navigation, API, generation,
-rendering. The upcoming feature’s onboarding preview remains. Historical lesson and render records remain in
-the Prisma schema with their applied migrations to preserve data. No runtime worker
-reads, resumes or deletes those records. Old desktop lesson routes fall back to the
-workspace.
+Lesson videos are a new teacher-only feature. Retired Guided Lesson records and
+applied migrations remain untouched; no runner reads or resumes them. The retained
+onboarding preview remains available. New ownership is under
+`server/features/lessonVideos`, with public `contracts/LessonVideos.ts` and private
+`contracts/LessonRenderProtocol.ts`. React uses validated preload methods and an
+account-gated main-process API client. Only main attaches cookies; media is fetched
+by authorized artifact IDs with a byte ceiling and downloaded through a native
+save dialog. Navigating away does not cancel the API job.
+
+`LessonVideoService` authorizes teacher/class access, snapshots selected prepared
+material, counts the immutable structured request and admits it atomically with
+teacher/deployment daily reservations. `LessonVideoConfig.ts` owns reviewed model,
+speech, budget and timeout policy through the existing `config/Index.ts` pattern.
+`server/Env.ts` validates `LESSON_RENDER_URL` and `LESSON_RENDER_SECRET`.
+The address is deployment configuration and is not saved in lesson policy
+snapshots. The shared credential authenticates API requests at the renderer boundary.
+`LessonVideoRunner` claims durable rows with a lease; `RunLessonVideoStage` owns
+explicit content, speech, clip and combination steps. One bounded content-model
+request supplies all screens. There are no model tools, generated code, layout
+checker, AI reviewer or approval gates. OpenAI SDK retries share the reserved
+content ceiling; gaxios retries share the persisted media ceiling. A lost content
+response is not silently regenerated after restart. Uncertain attempts conservatively
+retain their reservations, even after lesson deletion.
+
+`PrismaLessonVideoStore` owns new `LessonVideo`, `LessonVideoScreen`,
+`LessonVideoArtifact` and `LessonVideoAllowance` records. Artifact bytes/reference
+writes are atomic, and record versions fence cancelled or superseded workers.
+Saved screens precede audio/clips/final MP4. Edits retain unchanged media and an older
+finished video is labelled while a newer revision runs. Fresh content generation
+creates an independent lesson, retaining the original. Media remains bounded in
+PostgreSQL for this beta; memory/container files are not checkpoints. Speech usage
+is bounded separately by text submissions and output/byte/deadline ceilings.
+
+`lessonVideoPresentation` contains maintained React/Remotion layouts, font assets
+and deterministic animations shared by content preview and Docker rendering.
+`lessonRenderer` runs Chromium/FFmpeg against a prebuilt bundle, sequentially, with
+bounded authenticated HTTP requests and temporary files. It receives no model keys,
+database credentials or executable user content. Bundle identity changes invalidate
+clip reuse on continuation. A speech outage can finish with paginated narration
+text; a render failure leaves screens and transcript usable. Only a committed full
+MP4 marks the job ready. API and Electron stay native in local development; Railway
+runs the renderer as one private Docker service. README owns commands and deployment.
+
+Safe `lesson.video.stage` diagnostics report lesson/revision/stage, state, timing
+and provider usage when available. They exclude material text, narration, secrets
+and hidden reasoning. A stopped content job with uncertain usage requires a new
+explicit content request; repeated navigation/Continue never grants model attempts.
 
 Reviewed feature settings for classroom insights, practice, materials and HUD
 voiceover belong to `src/server/config/`, exported through `Index.ts`. Startup

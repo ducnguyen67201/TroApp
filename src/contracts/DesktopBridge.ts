@@ -1,3 +1,9 @@
+import type {
+  LessonVideoCommand,
+  LessonVideoReply,
+  LessonMediaRequest,
+  LessonMediaReply,
+} from './LessonVideos.js';
 import type { WhatsNewReply } from './WhatsNew.js';
 import type {
   OnboardingRead,
@@ -43,6 +49,8 @@ import type { ClassroomCommand, ClassroomReply } from './Classroom.js';
  * turns and controls the worker lifecycle.
  */
 export interface DesktopBridge {
+  controlLessonVideos?: (command: LessonVideoCommand) => Promise<LessonVideoReply>;
+  readLessonMedia?: (request: LessonMediaRequest) => Promise<LessonMediaReply>;
   readOnboardingProgress?: (request: OnboardingRead) => Promise<OnboardingReply>;
   updateOnboardingProgress?: (request: OnboardingUpdate) => Promise<OnboardingReply>;
   restartOnboarding?: (request: OnboardingRestart) => Promise<OnboardingReply>;

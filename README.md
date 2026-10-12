@@ -44,6 +44,52 @@ containing real data. `pnpm db:migrate` authors a new reviewed migration;
 `pnpm db:deploy` applies existing ones. Integration tests use their own disposable
 container, not the development database.
 
+## Lesson video development
+
+`pnpm dev` (or `doppler run -- pnpm dev`) starts the fixed-template lesson renderer
+through Docker Compose, then launches the API and desktop natively. Keep your
+existing development database running; use `pnpm db:start` on a fresh setup.
+The launcher does not recreate or replace an existing database container.
+The first renderer image build installs Chromium and FFmpeg and can take several
+minutes. The development launcher creates a local renderer credential in ignored
+`.tro-development/LessonRendererSecret`; only the API and renderer receive it.
+Desktop children receive OS settings without backend Doppler credentials.
+A renderer startup failure does not prevent the native app from starting; check
+Docker output when video creation is unavailable. Ctrl-C stops the native children;
+use `docker compose stop lesson-renderer` to stop the local renderer.
+
+- `pnpm dev:renderer`: rebuild/start only the local renderer after template edits.
+- `pnpm build:renderer`: build the production renderer image without starting it.
+- `pnpm check:lesson-renderer`: render synthetic Vietnamese fixtures and combine
+  them using the local renderer; no paid model or speech calls.
+
+For separate API startup, set `LESSON_RENDER_URL=http://127.0.0.1:3010` and supply
+`LESSON_RENDER_SECRET` from the local credential file through your shell or secret
+manager. The API and renderer must share this credential to authenticate render
+requests. Do not commit it. The development launcher supplies both automatically.
+All model choices, allowances and retry limits live in
+[LessonVideoConfig.ts](src/server/config/LessonVideoConfig.ts), exported by the
+existing config index. Normal tests do not require provider credentials.
+
+On Railway, deploy the existing API Dockerfile and a separate private service using
+`Dockerfile.renderer`. Set the API's `LESSON_RENDER_URL` to the renderer's private
+HTTP address on port 3010. Set the same generated `LESSON_RENDER_SECRET` on both
+services and use `APP_ENV=stage` or `APP_ENV=prod` on the API. Keep the renderer
+private, supply no model/database keys to it, and apply
+reviewed migrations with `pnpm db:deploy` before updating the API. Start with one
+renderer instance and at least the locally tested memory allocation; benchmark
+before increasing concurrency. Renderer containers store temporary files only;
+PostgreSQL owns saved content and media. Deploy matching builds together.
+
+The teacher selects prepared/published class material, describes the desired
+explanation and creates a video. Saved screens/transcript are available before
+media finishes. A speech failure produces text on that screen. Continue rendering
+uses saved content and does not call the content model. New content requests use
+fresh daily allowance. Editing narration preserves the script and may initially
+render as text; Add missing narration uses only the existing remaining allowance.
+Confirmed provider quality, real cost and hosted throughput still require a
+separately authorized paid benchmark; offline fixtures do not establish those.
+
 ## Configuration
 
 | Process                                     | Settings                                                                                                                                                                                                       |

@@ -1,3 +1,10 @@
+import { LessonVideoApiClient } from './lessonVideos/LessonVideoApiClient.js';
+import {
+  LessonVideoCommandSchema,
+  LessonMediaRequestSchema,
+  LessonVideoFailure,
+  type LessonMediaReply,
+} from '#contracts/LessonVideos.js';
 import { OnboardingService } from '../onboarding/application/OnboardingService.js';
 import { OnboardingPreferences } from './onboarding/OnboardingPreferences.js';
 import { registerOnboardingHandlers } from './onboarding/RegisterOnboarding.js';
@@ -682,6 +689,50 @@ async function startDesktop(): Promise<void> {
   agentWorker.setClassroomToolHandler((command, context) =>
     classroomController.executeTool(command, context),
   );
+  const lessonApi = new LessonVideoApiClient(environment.API_BASE_URL, () => auth.readCookie());
+  ipcMain.handle('tro:lesson-videos', async (event, raw: unknown) => {
+    const command = LessonVideoCommandSchema.safeParse(raw);
+    if (!isTrustedSender(event) || !command.success) {
+      return { kind: 'failed', code: LessonVideoFailure.FORBIDDEN };
+    }
+    return accountGate.runRequest(() => lessonApi.execute(command.data), {
+      kind: 'failed',
+      code: LessonVideoFailure.UNAVAILABLE,
+    });
+  });
+  ipcMain.handle('tro:lesson-media', async (event, raw: unknown): Promise<LessonMediaReply> => {
+    const request = LessonMediaRequestSchema.safeParse(raw);
+    if (!isTrustedSender(event) || !request.success) {
+      return { kind: 'failed' };
+    }
+    return accountGate.runRequest(
+      async (): Promise<LessonMediaReply> => {
+        const cookie = auth.readCookie();
+        const bytes = await lessonApi.readMedia(request.data.id, request.data.artifactId);
+        if (!bytes || !isTrustedSender(event) || auth.readCookie() !== cookie) {
+          return { kind: 'failed' };
+        }
+        if (!request.data.download) {
+          return { kind: 'media', bytes: Uint8Array.from(bytes) };
+        }
+        const destination = await dialog.showSaveDialog({
+          defaultPath: 'Lesson.mp4',
+          filters: [{ name: 'MP4 video', extensions: ['mp4'] }],
+        });
+        if (
+          destination.canceled ||
+          !destination.filePath ||
+          !isTrustedSender(event) ||
+          auth.readCookie() !== cookie
+        ) {
+          return { kind: 'failed' };
+        }
+        await writeFile(destination.filePath, bytes);
+        return { kind: 'saved' };
+      },
+      { kind: 'failed' },
+    );
+  });
   const materialApi = new MaterialApiClient(
     environment.API_BASE_URL,
     () => auth.readCookie(),

@@ -14,5 +14,20 @@ services:
       interval: 2s
       timeout: 2s
       retries: 15
+  lesson-renderer:
+    build:
+      context: .
+      dockerfile: Dockerfile.renderer
+    image: tro-lesson-renderer:local
+    ports:
+      - '127.0.0.1:3010:3010'
+    environment:
+      LESSON_RENDER_SECRET: ${LESSON_RENDER_SECRET:-}
+    shm_size: 256mb
+    mem_limit: 2g
+    cpus: 2
+    init: true
+    tmpfs:
+      - /tmp:size=512m
 volumes:
   tro-postgres:

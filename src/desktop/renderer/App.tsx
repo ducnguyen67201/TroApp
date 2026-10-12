@@ -1,3 +1,4 @@
+import { LessonVideosPage } from './lessonVideos/LessonVideosPage.js';
 import { OnboardingStep } from '#contracts/OnboardingValues.js';
 import { useOnboarding } from './onboarding/UseOnboarding.js';
 import { OnboardingFlow, type OnboardingAnchors } from './onboarding/OnboardingFlow.js';
@@ -33,6 +34,7 @@ import {
   IconLayoutSidebar,
   IconSettings,
   IconPaw,
+  IconPlayerPlay,
 } from '@tabler/icons-react';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { ComputerUsePage } from './ComputerUsePage.js';
@@ -103,7 +105,7 @@ export function App(): ReactElement {
   const workspaceAnchor = useRef<HTMLButtonElement>(null);
   const classesAnchor = useRef<HTMLButtonElement>(null);
   const insightsAnchor = useRef<HTMLButtonElement>(null);
-  // The upcoming lesson preview stays in the tour without an active navigation target.
+  // The retained tour points to the rebuilt teacher lesson workspace.
   const lessonsAnchor = useRef<HTMLButtonElement>(null);
   const microphoneAnchor = useRef<HTMLButtonElement>(null);
   const settingsAnchor = useRef<HTMLButtonElement>(null);
@@ -320,6 +322,21 @@ export function App(): ReactElement {
                 <IconChartBar size={19} stroke={1.6} />
                 <span>{locale === 'vi' ? 'Tiến độ học tập' : 'Insights'}</span>
               </UnstyledButton>
+              {accountRole === AccountRole.TEACHER && (
+                <UnstyledButton
+                  ref={lessonsAnchor}
+                  className="sidebar-link"
+                  disabled={accountTransition}
+                  data-active={page === DesktopPage.LESSON_VIDEOS || undefined}
+                  aria-current={page === DesktopPage.LESSON_VIDEOS ? 'page' : undefined}
+                  onClick={() => {
+                    window.location.hash = '#/lesson-videos';
+                  }}
+                >
+                  <IconPlayerPlay size={19} stroke={1.6} />
+                  <span>{locale === 'vi' ? 'Video bài giảng' : 'Lesson videos'}</span>
+                </UnstyledButton>
+              )}
               <UnstyledButton
                 className="sidebar-link"
                 disabled={accountTransition}
@@ -519,6 +536,9 @@ export function App(): ReactElement {
                   active={page === DesktopPage.CLASSROOM || page === DesktopPage.INSIGHTS}
                   onRoleChange={setAccountRole}
                 />
+              )}
+              {user && !accountTransition && page === DesktopPage.LESSON_VIDEOS && (
+                <LessonVideosPage key={user.id} locale={locale} />
               )}
               {user && !accountTransition && page === DesktopPage.PET_WORLD && (
                 <PetWorldPage

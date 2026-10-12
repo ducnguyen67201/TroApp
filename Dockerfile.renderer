@@ -1,0 +1,20 @@
+FROM node:24-bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends chromium ffmpeg ca-certificates openssl && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
+COPY prisma ./prisma
+COPY prisma.config.ts tsconfig.json tsconfig.server.json ./
+RUN ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install --frozen-lockfile
+COPY src/contracts ./src/contracts
+COPY src/lessonRenderer ./src/lessonRenderer
+COPY src/lessonVideoPresentation ./src/lessonVideoPresentation
+COPY scripts/BuildLessonRenderer.ts ./scripts/BuildLessonRenderer.ts
+RUN pnpm exec tsx scripts/BuildLessonRenderer.ts
+ENV HOST=0.0.0.0
+ENV PORT=3010
+ENV CHROME_PATH=/usr/bin/chromium
+USER node
+EXPOSE 3010
+CMD ["node", "--import", "tsx", "src/lessonRenderer/StartRenderer.ts"]

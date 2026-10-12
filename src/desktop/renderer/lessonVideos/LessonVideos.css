@@ -1,0 +1,148 @@
+.lesson-workspace {
+  height: 100%;
+  overflow: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.lesson-create {
+  max-width: 820px;
+  display: grid;
+  gap: 16px;
+  border: 1px solid #d3dcc8;
+  border-radius: 16px;
+  padding: 22px;
+  background: #fffdf5;
+}
+.lesson-library {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+}
+.lesson-library article {
+  border: 1px solid #d3dcc8;
+  border-radius: 14px;
+  padding: 20px;
+  background: #fffdf5;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.lesson-library h3 {
+  overflow-wrap: anywhere;
+}
+.lesson-studio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: start;
+  gap: 20px;
+}
+.lesson-studio aside {
+  background: #fffdf5;
+  border: 1px solid #d3dcc8;
+  border-radius: 16px;
+  padding: 18px;
+}
+.lesson-actions {
+  border-top: 1px solid #d3dcc8;
+  padding-top: 16px;
+  margin-top: 16px;
+}
+.lesson-empty {
+  min-height: 260px;
+  display: grid;
+  place-content: center;
+  gap: 20px;
+  padding: 30px;
+  background: #fffdf5;
+  border: 1px solid #d3dcc8;
+  border-radius: 16px;
+}
+.lesson-screen-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.lesson-screen-list button {
+  padding: 10px;
+  border: 1px solid #d3dcc8;
+  border-radius: 8px;
+  background: #fffdf5;
+  color: #17372f;
+  cursor: pointer;
+}
+.lesson-screen-list button[aria-pressed='true'] {
+  background: #f9e6c7;
+  border-color: #b78136;
+}
+.lesson-details {
+  margin: 16px 0;
+}
+.lesson-details summary {
+  cursor: pointer;
+}
+.lesson-player {
+  position: relative;
+  background: #17372f;
+  border-radius: 14px;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+}
+.lesson-player video {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.lesson-player-controls {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 25px 14px 12px;
+  background: linear-gradient(transparent, #000c);
+  color: white;
+  opacity: 0;
+  transition: opacity 150ms;
+}
+.lesson-player:hover .lesson-player-controls,
+.lesson-player:focus-within .lesson-player-controls {
+  opacity: 1;
+}
+.lesson-player-controls > input {
+  width: 100%;
+}
+.lesson-player-controls > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lesson-player-controls button {
+  color: white;
+  background: transparent;
+  border: 1px solid #fff6;
+  border-radius: 6px;
+  padding: 5px;
+  cursor: pointer;
+}
+.lesson-player-controls input[aria-label='Volume'],
+.lesson-player-controls input[aria-label='Âm lượng'] {
+  width: 70px;
+}
+@media (hover: none) {
+  .lesson-player-controls {
+    opacity: 1;
+  }
+}
+@media (max-width: 1000px) {
+  .lesson-studio {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lesson-workspace {
+    padding: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lesson-player-controls {
+    transition: none;
+  }
+}

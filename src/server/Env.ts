@@ -12,6 +12,8 @@ export interface ServerEnv {
   GOOGLE_CLIENT_ID?: string | undefined;
   GOOGLE_CLIENT_SECRET?: string | undefined;
   OPENAI_API_KEY?: string | undefined;
+  LESSON_RENDER_URL?: string | undefined;
+  LESSON_RENDER_SECRET?: string | undefined;
 }
 
 /** Startup owns loading .env; this module only validates supplied values. */
@@ -27,6 +29,9 @@ export function readServerEnv(environment: NodeJS.ProcessEnv): ServerEnv {
       GOOGLE_CLIENT_ID: z.string().min(1).optional(),
       GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
       OPENAI_API_KEY: z.string().min(20).optional(),
+
+      LESSON_RENDER_URL: z.url({ protocol: /^https?$/ }).optional(),
+      LESSON_RENDER_SECRET: z.string().min(32).optional(),
     },
     runtimeEnv: environment,
     onValidationError: () => {

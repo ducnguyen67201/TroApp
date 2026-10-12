@@ -18,3 +18,9 @@ export {
   readVoiceoverAllowanceConfig,
   type VoiceoverAllowanceSettings,
 } from './VoiceoverConfig.js';
+
+export {
+  LessonVideoConfig,
+  readLessonVideoConfig,
+  type LessonVideoSettings,
+} from './LessonVideoConfig.js';

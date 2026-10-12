@@ -747,3 +747,52 @@ model PetWorldReceipt {
   createdAt DateTime @default(now())
   @@id([actorId, requestId])
 }
+
+// New lesson videos deliberately do not reinterpret retired GuidedLesson records.
+model LessonVideo {
+  id String @id @db.Uuid
+  ownerId String
+  requestId String @db.Uuid
+  status String
+  revision Int
+  recordVersion Int @default(0)
+  claimId String? @db.Uuid
+  leaseUntil DateTime?
+  state Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  screens LessonVideoScreen[]
+  artifacts LessonVideoArtifact[]
+  @@unique([ownerId, requestId])
+  @@index([status, leaseUntil, createdAt])
+  @@index([ownerId, createdAt])
+}
+
+model LessonVideoScreen {
+  id String @id @db.Uuid
+  lessonId String @db.Uuid
+  lesson LessonVideo @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  position Int
+  state Json
+  @@unique([lessonId, position])
+}
+
+model LessonVideoArtifact {
+  id String @id @db.Uuid
+  lessonId String @db.Uuid
+  lesson LessonVideo @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  kind String
+  bytes Bytes
+  byteLength Int
+  createdAt DateTime @default(now())
+  @@index([lessonId])
+}
+
+// No lesson foreign key: deleting media never refunds already reserved provider work.
+model LessonVideoAllowance {
+  scope String
+  day String
+  reservedMicroUsd Int
+  characters Int
+  @@id([scope, day])
+}
