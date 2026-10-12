@@ -1,5 +1,28 @@
-import { describe, expect, it } from 'vitest';
-import { readModelConnectionEnv } from '../../scripts/Env.js';
+import { describe, expect, it, vi } from 'vitest';
+import { readModelConnectionEnv, readOnboardingSpeechEnv } from '../../scripts/Env.js';
+
+describe('authoring speech environment', () => {
+  it('requires the injected key with a safe error and no configuration log', () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect(() => readOnboardingSpeechEnv({ PRIVATE_SETTING: 'private-value' })).toThrow(
+        'Onboarding narration requires OPENAI_API_KEY through Doppler.',
+      );
+      expect(errorLog).not.toHaveBeenCalled();
+    } finally {
+      errorLog.mockRestore();
+    }
+  });
+
+  it('returns only the validated key without mutating the supplied environment', () => {
+    const environment = {
+      OPENAI_API_KEY: ' synthetic-test-key ',
+      PRIVATE_SETTING: 'private-value',
+    };
+    expect(readOnboardingSpeechEnv(environment)).toEqual({ apiKey: 'synthetic-test-key' });
+    expect(environment.OPENAI_API_KEY).toBe(' synthetic-test-key ');
+  });
+});
 
 describe('safe model connection environment evidence', () => {
   it('distinguishes missing settings without changing the process environment', () => {

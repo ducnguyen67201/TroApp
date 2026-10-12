@@ -1,0 +1,9 @@
+{
+  "inputHash": "1841766279fea671127d4354e585ef94d3fc150a10a06753433c03f5a3c22e0c",
+  "audioHash": "4cc9fd67188fc897a83d25cf8b9b77327148776d6d94a7fa17b08ec4d90d3fcf",
+  "durationSeconds": 7.789833,
+  "sourceDurationSeconds": 7.824,
+  "tempoFactor": 1,
+  "provider": "openai",
+  "voice": "marin"
+}

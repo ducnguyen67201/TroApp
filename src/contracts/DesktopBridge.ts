@@ -1,5 +1,11 @@
 import type { WhatsNewReply } from './WhatsNew.js';
 import type {
+  OnboardingRead,
+  OnboardingUpdate,
+  OnboardingRestart,
+  OnboardingReply,
+} from './Onboarding.js';
+import type {
   GuidedLessonReadRequest,
   GuidedLessonCommand,
   GuidedLessonReply,
@@ -44,6 +50,9 @@ import type { ClassroomCommand, ClassroomReply } from './Classroom.js';
  * turns and controls the worker lifecycle.
  */
 export interface DesktopBridge {
+  readOnboardingProgress?: (request: OnboardingRead) => Promise<OnboardingReply>;
+  updateOnboardingProgress?: (request: OnboardingUpdate) => Promise<OnboardingReply>;
+  restartOnboarding?: (request: OnboardingRestart) => Promise<OnboardingReply>;
   executePetWorld?: (command: PetWorldCommand) => Promise<PetWorldReply>;
   readPetWorldPending?: () => Promise<PetWorldCommand[]>;
   readGuidedLessons?: (request: GuidedLessonReadRequest) => Promise<GuidedLessonReply>;

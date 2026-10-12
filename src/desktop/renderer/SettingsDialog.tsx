@@ -1,3 +1,5 @@
+import type { OnboardingView } from './onboarding/UseOnboarding.js';
+import { onboardingMessages } from './onboarding/OnboardingMessages.js';
 import { PetGallery } from './pets/PetGallery.js';
 import { petMessages } from './pets/PetMessages.js';
 import { Badge, Button, Modal, NativeSelect, Switch, Tabs, Text, Title } from '@mantine/core';
@@ -30,6 +32,7 @@ interface SettingsDialogProps {
   voiceStatus: VoiceStatus;
   voiceover?: VoiceoverView;
   onChooseMicrophone: () => void;
+  onboarding?: OnboardingView;
 }
 
 interface SettingsRowProps {
@@ -65,9 +68,11 @@ export function SettingsDialog({
   voiceStatus,
   voiceover,
   onChooseMicrophone,
+  onboarding,
 }: SettingsDialogProps): ReactElement {
   const { locale, messages, changeLocale, isLocaleSaved } = useLocale();
   const languageDescriptionId = useId();
+  const onboardingCopy = onboardingMessages[locale];
   const selectedMicrophone = microphones.microphones.find(
     (microphone) => microphone.deviceId === microphones.selectedDeviceId,
   );
@@ -221,6 +226,44 @@ export function SettingsDialog({
                   {messages.voiceoverStop}
                 </Button>
               </SettingsRow>
+            )}
+            {onboarding && (
+              <SettingsRow
+                label={onboardingCopy.settingsTitle}
+                description={user ? onboardingCopy.settingsDescription : onboardingCopy.unavailable}
+              >
+                <Button
+                  variant="default"
+                  loading={onboarding.isSaving}
+                  disabled={
+                    !user || !onboarding.isAvailable || !onboarding.progress || onboarding.isLoading
+                  }
+                  onClick={() => {
+                    void onboarding.restart().then((didRestart) => {
+                      if (didRestart) {
+                        onClose();
+                      }
+                    });
+                  }}
+                >
+                  {onboardingCopy.restart}
+                </Button>
+              </SettingsRow>
+            )}
+            {onboarding?.hasError && (
+              <div role="alert">
+                <Text size="sm">{onboardingCopy.error}</Text>
+                <Button
+                  variant="subtle"
+                  loading={onboarding.isLoading}
+                  disabled={onboarding.isSaving}
+                  onClick={() => {
+                    void onboarding.refresh();
+                  }}
+                >
+                  {onboardingCopy.retry}
+                </Button>
+              </div>
             )}
             <SettingsRow label={messages.appearance} description={messages.appearanceDescription}>
               <Text size="sm">{messages.light}</Text>

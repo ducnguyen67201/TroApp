@@ -5,6 +5,7 @@ import { LocaleProvider } from './localization/LocaleProvider.js';
 import { desktopTheme, resolveDesktopCssVariables } from './Theme.js';
 import '@mantine/core/styles.css';
 import './App.css';
+import './onboarding/Onboarding.css';
 
 const rootElement = document.getElementById('root');
 

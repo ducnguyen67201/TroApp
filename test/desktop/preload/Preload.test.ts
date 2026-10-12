@@ -226,6 +226,44 @@ it('validates narrow practice capture requests and rejects native window IDs in 
   expect(await bridge.controlPracticeCapture({ kind: 'discard' })).toEqual({ kind: 'discarded' });
 });
 
+it('exposes validated onboarding methods without arbitrary account paths, media URLs or reset actions', async () => {
+  const { createOnboardingProgress } =
+    await import('../../../src/desktop/onboarding/domain/OnboardingProgress.js');
+  const { OnboardingAction } = await import('#contracts/OnboardingValues.js');
+  await import('../../../src/desktop/preload/Preload.js');
+  const bridge = electron.expose.mock.calls[0]?.[1];
+  if (
+    !bridge?.readOnboardingProgress ||
+    !bridge.updateOnboardingProgress ||
+    !bridge.restartOnboarding
+  ) {
+    throw new Error('Missing onboarding bridge');
+  }
+  electron.invoke.mockClear();
+  const progress = createOnboardingProgress();
+  electron.invoke.mockResolvedValue({ kind: 'ok', progress });
+  const identity = { expectedAccountId: 'student', expectedRevision: 0 };
+  expect(await bridge.readOnboardingProgress({ expectedAccountId: 'student' })).toEqual({
+    kind: 'ok',
+    progress,
+  });
+  await bridge.updateOnboardingProgress({ ...identity, action: OnboardingAction.START });
+  expect(electron.invoke).toHaveBeenLastCalledWith('tro:onboarding-update', {
+    ...identity,
+    action: OnboardingAction.START,
+  });
+  await bridge.restartOnboarding(identity);
+  expect(electron.invoke).toHaveBeenLastCalledWith('tro:onboarding-restart', identity);
+  const count = electron.invoke.mock.calls.length;
+  await bridge.restartOnboarding({ ...identity, expectedRevision: -1 });
+  expect(electron.invoke).toHaveBeenCalledTimes(count);
+  electron.invoke.mockResolvedValue({ kind: 'ok', progress: { ...progress, path: '/private' } });
+  expect(await bridge.readOnboardingProgress({ expectedAccountId: 'student' })).toEqual({
+    kind: 'failed',
+    reason: 'unavailable',
+  });
+});
+
 it('exposes narrow release presentation operations and rejects malformed replies', async () => {
   await import('../../../src/desktop/preload/Preload.js');
   electron.invoke.mockClear();

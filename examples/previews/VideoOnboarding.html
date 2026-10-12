@@ -1,0 +1,1983 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tro · Video onboarding prototype</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #252d36;
+        --muted: #6d746f;
+        --paper: #fffef9;
+        --cream: #f8f9f3;
+        --line: #e3e5dc;
+        --orange: #e3a776;
+        --green: #294b3d;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      body {
+        margin: 0;
+        background: #e9ebe5;
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 14px;
+      }
+      button,
+      select {
+        font: inherit;
+        color: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:disabled {
+        cursor: default;
+        opacity: 0.4;
+      }
+      button:focus-visible,
+      select:focus-visible,
+      summary:focus-visible {
+        outline: 3px solid #bc6a31;
+        outline-offset: 4px;
+      }
+      button {
+        border: 0;
+      }
+      .preview-bar {
+        min-height: 76px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 16px 28px;
+      }
+      .preview-name {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+      }
+      .preview-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #ca8554;
+      }
+      .eyebrow {
+        margin: 0 0 5px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .preview-name strong {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .preview-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .quiet-button {
+        background: transparent;
+        padding: 9px 10px;
+        border-radius: 8px;
+        color: var(--muted);
+      }
+      .quiet-button:hover {
+        background: #00000006;
+        color: var(--ink);
+      }
+      .outline-button,
+      .primary-button {
+        min-height: 40px;
+        padding: 10px 16px;
+        border-radius: 9px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .outline-button {
+        border: 1px solid var(--line);
+        background: var(--paper);
+      }
+      .primary-button {
+        color: white;
+        background: var(--green);
+      }
+      .primary-button:hover {
+        background: #1b392d;
+      }
+      select {
+        border: 1px solid #d5d9ce;
+        background: transparent;
+        padding: 8px;
+        border-radius: 8px;
+        font-size: 12px;
+      }
+      .app-frame {
+        position: relative;
+        isolation: isolate;
+        margin: 0 24px;
+        height: calc(100svh - 126px);
+        min-height: 650px;
+        overflow: hidden;
+        border: 1px solid #c8cec3;
+        border-radius: 15px;
+        background: var(--cream);
+        box-shadow: 0 16px 40px #28352d12;
+      }
+      .titlebar {
+        height: 35px;
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        background: #242d37;
+        color: #c2c8cc;
+      }
+      .traffic {
+        display: flex;
+        gap: 7px;
+      }
+      .traffic i {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #ee8176;
+      }
+      .traffic i:nth-child(2) {
+        background: #e6bf6a;
+      }
+      .traffic i:nth-child(3) {
+        background: #8bb28a;
+      }
+      .window-label {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 11px;
+      }
+      .app-layout {
+        display: flex;
+        height: calc(100% - 35px);
+      }
+      .sidebar {
+        flex: 0 0 96px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        padding: 16px 10px;
+        background: #242d37;
+        color: #bac2cc;
+      }
+      .brand {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 5px;
+      }
+      .brand img {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+      }
+      .nav-items {
+        display: grid;
+        gap: 8px;
+      }
+      .nav-button {
+        width: 76px;
+        min-height: 77px;
+        padding: 10px 5px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-radius: 14px;
+        color: inherit;
+        background: transparent;
+        font-size: 10px;
+        line-height: 1.4;
+      }
+      .nav-button svg {
+        width: 21px;
+        height: 21px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex-shrink: 0;
+      }
+      .nav-button[aria-current='page'] {
+        background: #35404b;
+        color: #fff5df;
+      }
+      .nav-button:hover {
+        background: #35404b;
+      }
+      .sidebar-bottom {
+        margin-top: auto;
+        display: grid;
+        gap: 8px;
+      }
+      .avatar {
+        display: grid;
+        place-items: center;
+        width: 29px;
+        height: 29px;
+        border: 1px solid #5d6a70;
+        border-radius: 50%;
+        font-size: 11px;
+        background: #46574d;
+        color: #e4eadc;
+      }
+      .page {
+        flex: 1;
+        min-width: 0;
+        overflow: auto;
+      }
+      .page-header {
+        height: 70px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        padding: 0 38px;
+        background: #fffefb;
+      }
+      .breadcrumb {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .user-pill {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+        font-size: 12px;
+      }
+      .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #7c9d84;
+      }
+      .page-content {
+        max-width: 1050px;
+        margin: 0 auto;
+        padding: 40px;
+      }
+      .page-content h1 {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 34px;
+        font-weight: 400;
+        letter-spacing: -0.035em;
+        color: var(--green);
+        margin: 11px 0 12px;
+      }
+      .page-content p {
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .page-intro {
+        margin-bottom: 30px;
+      }
+      .page-intro .eyebrow {
+        color: #897550;
+      }
+      .workspace-center {
+        max-width: 680px;
+        padding-top: 65px;
+        margin: auto;
+      }
+      .workspace-center .page-intro {
+        text-align: center;
+      }
+      .prompt-box {
+        border: 1px solid #ced5c8;
+        border-radius: 17px;
+        padding: 23px;
+        background: #fffefb;
+        box-shadow: 0 7px 18px #2a453609;
+      }
+      .prompt-box p {
+        margin: 0 0 42px;
+      }
+      .prompt-bottom {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #7a8375;
+        font-size: 12px;
+      }
+      .mode-chip {
+        border: 1px solid #dfdfd0;
+        border-radius: 8px;
+        padding: 8px 12px;
+        color: #435744;
+        background: #f5f4e9;
+      }
+      .send-chip {
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: var(--green);
+        color: white;
+        font-size: 18px;
+      }
+      .suggestions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+        justify-content: center;
+      }
+      .suggestions span {
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #ffffff66;
+        font-size: 12px;
+        color: #6a7568;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+      .sample-card {
+        border: 1px solid #dce1d5;
+        border-radius: 15px;
+        overflow: hidden;
+        background: #fffefb;
+      }
+      .card-art {
+        height: 125px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #687e6c;
+        background: #e7eddf;
+        font-family: Georgia, serif;
+        font-size: 43px;
+      }
+      .sample-card:nth-child(2) .card-art {
+        background: #f1e8d5;
+        color: #93794b;
+      }
+      .card-copy {
+        padding: 21px;
+      }
+      .card-copy h3 {
+        margin: 0 0 9px;
+        font-size: 16px;
+        font-weight: 550;
+      }
+      .card-copy p {
+        margin: 0;
+        font-size: 12px;
+      }
+      .tag {
+        display: inline-block;
+        border-radius: 5px;
+        padding: 5px 7px;
+        background: #edf1e8;
+        color: #557252;
+        font-size: 10px;
+        margin-top: 18px;
+      }
+      .insight-summary {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 22px;
+      }
+      .metric {
+        padding: 23px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fffefb;
+      }
+      .metric strong {
+        display: block;
+        font-family: Georgia, serif;
+        font-size: 32px;
+        font-weight: 400;
+        color: var(--green);
+        margin-bottom: 8px;
+      }
+      .metric span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .chart {
+        display: flex;
+        height: 190px;
+        gap: 20px;
+        align-items: flex-end;
+        padding: 20px 30px;
+        border-bottom: 1px solid var(--line);
+      }
+      .chart i {
+        flex: 1;
+        background: #acc1a8;
+        border-radius: 6px 6px 0 0;
+        height: 35%;
+      }
+      .chart i:nth-child(2) {
+        height: 48%;
+      }
+      .chart i:nth-child(3) {
+        height: 42%;
+      }
+      .chart i:nth-child(4) {
+        height: 68%;
+      }
+      .chart i:nth-child(5) {
+        height: 78%;
+      }
+      .chart i:nth-child(6) {
+        height: 88%;
+        background: #d5b18a;
+      }
+      .lesson-art {
+        padding: 26px;
+        min-height: 188px;
+        background: #e7ecd9;
+        color: #425e45;
+      }
+      .lesson-art p {
+        color: #6e7e5b;
+        font-size: 12px;
+        margin: 0 0 25px;
+      }
+      .lesson-art h2 {
+        font-family: Georgia, serif;
+        font-size: 32px;
+        font-weight: 400;
+        margin: 0;
+      }
+      .lesson-art span {
+        display: block;
+        font-family: monospace;
+        font-size: 16px;
+        margin-top: 20px;
+      }
+      .spotlight {
+        position: absolute;
+        pointer-events: none;
+        z-index: 10;
+        border: 2px solid #efc59b;
+        border-radius: 16px;
+        box-shadow: 0 0 0 3000px #1c292853;
+      }
+      .tour-panel {
+        position: absolute;
+        z-index: 20;
+        left: 112px;
+        width: 438px;
+        max-height: calc(100% - 52px);
+        overflow: auto;
+        border: 1px solid #dcded2;
+        border-radius: 17px;
+        background: var(--paper);
+        box-shadow: 0 24px 60px #172e332b;
+      }
+      .tour-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 17px 21px 14px;
+      }
+      .tour-kicker {
+        color: #7a816f;
+        font-size: 10px;
+        letter-spacing: 0.09em;
+        font-weight: 700;
+        text-transform: uppercase;
+        display: flex;
+        gap: 7px;
+        align-items: center;
+      }
+      .tour-kicker i {
+        width: 6px;
+        height: 6px;
+        background: #ca8d55;
+        border-radius: 50%;
+      }
+      .close-button {
+        border-radius: 7px;
+        background: transparent;
+        color: #83897f;
+        font-size: 22px;
+        line-height: 24px;
+        width: 30px;
+        height: 30px;
+      }
+      .close-button:hover {
+        background: #eeeee5;
+      }
+      .video-slate {
+        margin: 0 17px;
+        height: 214px;
+        border-radius: 10px;
+        position: relative;
+        overflow: hidden;
+        background: #e5e4d6;
+      }
+      .studio-board {
+        position: absolute;
+        left: 17px;
+        top: 19px;
+        width: 49%;
+        height: 135px;
+        border-radius: 7px;
+        background: #334e43;
+        color: #eeeee1;
+        padding: 17px;
+        box-shadow: 0 2px 0 #182d27;
+      }
+      .studio-board .board-brand {
+        font-family: Georgia, serif;
+        font-style: italic;
+        font-size: 27px;
+        opacity: 0.75;
+      }
+      .board-label {
+        margin: 17px 0 0;
+        font-size: 12px;
+        line-height: 1.5;
+        max-width: 130px;
+        color: #d9e3d4;
+      }
+      .board-line {
+        width: 40px;
+        height: 2px;
+        background: #c9a575;
+        margin-top: 13px;
+      }
+      .presenter {
+        position: absolute;
+        right: 26px;
+        bottom: 0;
+        width: 145px;
+        height: 175px;
+      }
+      .presenter-head {
+        position: absolute;
+        top: 7px;
+        left: 40px;
+        width: 66px;
+        height: 76px;
+        border-radius: 46% 46% 44% 44%;
+        background: #cfbaa0;
+      }
+      .presenter-head::before {
+        content: '';
+        position: absolute;
+        top: -5px;
+        left: -2px;
+        width: 70px;
+        height: 28px;
+        background: #716953;
+        border-radius: 40px 40px 12px 8px;
+      }
+      .presenter-head::after {
+        content: '';
+        position: absolute;
+        left: 23px;
+        top: 46px;
+        width: 22px;
+        height: 8px;
+        border-bottom: 2px solid #967d63;
+        border-radius: 50%;
+      }
+      .presenter-body {
+        position: absolute;
+        bottom: -22px;
+        width: 145px;
+        height: 120px;
+        background: #b5a384;
+        border-radius: 60px 60px 0 0;
+      }
+      .recording-label {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: #fffdf0c9;
+        color: #6b6d59;
+        font-size: 8px;
+        letter-spacing: 0.07em;
+        padding: 5px 6px;
+        border-radius: 4px;
+        text-transform: uppercase;
+      }
+      .play-button {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: grid;
+        place-items: center;
+        width: 52px;
+        height: 52px;
+        border: 1px solid #ffffffae;
+        border-radius: 50%;
+        background: #fffdf4eb;
+        box-shadow: 0 3px 15px #132f3920;
+        color: #364d40;
+        font-size: 22px;
+      }
+      .captions {
+        position: absolute;
+        bottom: 37px;
+        left: 10px;
+        right: 10px;
+        text-align: center;
+        font-size: 11px;
+        line-height: 1.5;
+        color: white;
+      }
+      .captions span {
+        background: #17251fdd;
+        padding: 4px 7px;
+        border-radius: 4px;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+      }
+      .video-controls {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 30px;
+        display: flex;
+        gap: 9px;
+        align-items: center;
+        padding: 0 11px;
+        background: #21372deb;
+        color: #f5f4e6;
+        font-size: 9px;
+      }
+      .video-controls button {
+        color: inherit;
+        padding: 3px 4px;
+        background: transparent;
+        font-size: 10px;
+      }
+      .progress-track {
+        flex: 1;
+        height: 3px;
+        border-radius: 3px;
+        background: #ffffff36;
+        overflow: hidden;
+      }
+      .progress-fill {
+        width: 0;
+        height: 100%;
+        background: #e6b687;
+      }
+      .cc-button[aria-pressed='true'] {
+        border-bottom: 1px solid #e5b486;
+      }
+      .tour-copy {
+        padding: 20px 24px 12px;
+      }
+      .step-label {
+        margin: 0 0 9px;
+        color: #8b775e;
+        font-size: 10px;
+        font-weight: 650;
+      }
+      .tour-copy h2 {
+        margin: 0 0 10px;
+        font-size: 23px;
+        font-weight: 550;
+        line-height: 1.22;
+        letter-spacing: -0.035em;
+        color: #2d493c;
+      }
+      .tour-copy > p {
+        margin: 0;
+        color: #737a6d;
+        font-size: 12px;
+        line-height: 1.65;
+      }
+      .takeaway {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+        padding: 11px 12px;
+        background: #f1f2e8;
+        border-radius: 8px;
+        font-size: 11px;
+        line-height: 1.5;
+        color: #5c6f55;
+      }
+      .takeaway b {
+        font-size: 14px;
+        color: #899e76;
+        font-weight: 400;
+      }
+      details {
+        margin: 13px 0 0;
+        color: #737a6d;
+        font-size: 11px;
+        line-height: 1.6;
+      }
+      summary {
+        cursor: pointer;
+        width: fit-content;
+      }
+      details p {
+        margin: 8px 0 0;
+      }
+      .tour-footer {
+        border-top: 1px solid #e9eadf;
+        padding: 15px 21px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 9px;
+      }
+      .tour-footer-actions {
+        display: flex;
+        gap: 7px;
+      }
+      .dots {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .dots i {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #d7dccd;
+      }
+      .dots i.active {
+        width: 19px;
+        border-radius: 6px;
+        background: #9bb18c;
+      }
+      .preview-footer {
+        min-height: 50px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 28px;
+        color: #7c8377;
+        font-size: 10px;
+      }
+      .preview-footer span:first-child {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .preview-footer i {
+        width: 5px;
+        height: 5px;
+        background: #7d9272;
+        border-radius: 50%;
+      }
+      dialog {
+        width: min(680px, calc(100% - 32px));
+        max-height: calc(100svh - 40px);
+        padding: 0;
+        border: 1px solid #d8dace;
+        border-radius: 17px;
+        background: var(--paper);
+        color: var(--ink);
+        box-shadow: 0 24px 100px #172a3533;
+      }
+      dialog::backdrop {
+        background: #24312966;
+      }
+      .dialog-header {
+        padding: 24px 28px 18px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .dialog-header h2 {
+        font-size: 20px;
+        font-weight: 550;
+        margin: 0;
+        letter-spacing: -0.025em;
+      }
+      .dialog-body {
+        padding: 27px 28px;
+      }
+      .dialog-body h3 {
+        font-weight: 550;
+        font-size: 16px;
+        margin: 0 0 9px;
+      }
+      .dialog-body p {
+        color: var(--muted);
+        line-height: 1.7;
+        font-size: 13px;
+      }
+      .settings-layout {
+        display: grid;
+        grid-template-columns: 155px minmax(0, 1fr);
+      }
+      .settings-nav {
+        padding: 24px 15px;
+        background: #f1f2e9;
+        border-right: 1px solid var(--line);
+      }
+      .settings-nav strong {
+        display: block;
+        padding: 10px;
+        border-radius: 8px;
+        font-size: 12px;
+        background: #e2e7d9;
+        color: #4b5e45;
+      }
+      .settings-section {
+        padding: 27px;
+      }
+      .settings-row {
+        display: flex;
+        gap: 20px;
+        justify-content: space-between;
+        align-items: center;
+        padding: 19px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .settings-row:first-child {
+        padding-top: 0;
+      }
+      .settings-row h3 {
+        font-size: 13px;
+        font-weight: 550;
+        margin: 0 0 6px;
+      }
+      .settings-row p {
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.6;
+        margin: 0;
+      }
+      .settings-row button {
+        flex-shrink: 0;
+      }
+      .settings-tour {
+        padding-top: 22px;
+      }
+      .settings-tour h3 {
+        font-size: 14px;
+        font-weight: 550;
+        margin: 0 0 8px;
+      }
+      .settings-tour p {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.7;
+      }
+      .settings-tour .primary-button {
+        margin-top: 8px;
+      }
+      .settings-tour small {
+        display: block;
+        font-size: 10px;
+        line-height: 1.6;
+        color: #818677;
+        margin-top: 15px;
+      }
+      .welcome-icon {
+        display: grid;
+        place-items: center;
+        width: 52px;
+        height: 52px;
+        background: #edf0e3;
+        color: #5b7850;
+        border-radius: 15px;
+        font-size: 25px;
+        margin-bottom: 20px;
+      }
+      .welcome-title {
+        font-family: Georgia, serif;
+        font-size: 31px !important;
+        color: var(--green);
+      }
+      .dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 18px 28px;
+        border-top: 1px solid var(--line);
+      }
+      .note-section + .note-section {
+        border-top: 1px solid var(--line);
+        padding-top: 20px;
+        margin-top: 20px;
+      }
+      .note-section ol {
+        padding-left: 20px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.9;
+      }
+      .note-section code {
+        font-size: 11px;
+        color: #47613e;
+        background: #edf0e5;
+        padding: 2px 4px;
+        border-radius: 4px;
+      }
+      .notice {
+        position: fixed;
+        z-index: 40;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: calc(100% - 30px);
+        padding: 13px 20px;
+        background: #294b3d;
+        color: #fffdf4;
+        border-radius: 10px;
+        box-shadow: 0 6px 20px #16282022;
+        font-size: 12px;
+      }
+      @media (min-width: 1500px) {
+        .app-frame {
+          margin-inline: auto;
+          max-width: 1440px;
+        }
+        .preview-bar,
+        .preview-footer {
+          max-width: 1490px;
+          margin: auto;
+        }
+      }
+      @media (max-width: 760px) {
+        .preview-bar {
+          padding: 12px 14px;
+          flex-wrap: wrap;
+        }
+        .preview-name strong {
+          font-size: 12px;
+        }
+        .preview-actions {
+          gap: 3px;
+        }
+        .preview-actions button {
+          font-size: 11px;
+          padding: 8px;
+        }
+        .app-frame {
+          margin: 0 8px;
+          height: calc(100svh - 142px);
+          min-height: 620px;
+        }
+        .page-header {
+          padding: 0 20px;
+        }
+        .page-content {
+          padding: 25px;
+        }
+        .tour-panel {
+          left: 98px;
+          width: calc(100% - 108px);
+          max-height: calc(100% - 45px);
+        }
+        .tour-heading {
+          padding: 13px 14px 10px;
+        }
+        .tour-copy {
+          padding: 15px;
+        }
+        .tour-copy h2 {
+          font-size: 21px;
+        }
+        .video-slate {
+          margin: 0 10px;
+          height: 180px;
+        }
+        .presenter {
+          right: 5px;
+          transform: scale(0.8);
+          transform-origin: bottom;
+        }
+        .studio-board {
+          left: 12px;
+          width: 52%;
+          padding: 12px;
+        }
+        .tour-footer {
+          padding: 12px;
+          flex-wrap: wrap;
+        }
+        .tour-footer-actions {
+          margin-left: auto;
+        }
+        .tour-footer .primary-button,
+        .tour-footer .outline-button {
+          padding: 9px 11px;
+        }
+        .dots {
+          display: none;
+        }
+        .preview-footer {
+          padding: 12px;
+        }
+        .preview-footer span:last-child {
+          display: none;
+        }
+        .cards {
+          grid-template-columns: 1fr;
+        }
+        .settings-layout {
+          grid-template-columns: 1fr;
+        }
+        .settings-nav {
+          border-right: 0;
+          padding: 12px;
+        }
+        .settings-section {
+          padding: 22px;
+        }
+      }
+      @media (max-width: 420px) {
+        .preview-bar {
+          min-height: 103px;
+        }
+        .app-frame {
+          height: calc(100svh - 150px);
+        }
+        .sidebar {
+          flex-basis: 80px;
+          padding-inline: 5px;
+        }
+        .nav-button {
+          width: 70px;
+        }
+        .tour-panel {
+          left: 83px;
+          width: calc(100% - 90px);
+        }
+        .video-slate {
+          height: 155px;
+        }
+        .studio-board {
+          height: 115px;
+          top: 12px;
+        }
+        .studio-board .board-brand {
+          font-size: 22px;
+        }
+        .board-label {
+          font-size: 10px;
+          margin-top: 10px;
+        }
+        .presenter {
+          right: -12px;
+          transform: scale(0.65);
+        }
+        .tour-copy h2 {
+          font-size: 19px;
+        }
+        .takeaway {
+          padding: 9px;
+          font-size: 10px;
+        }
+        .tour-footer .quiet-button {
+          font-size: 11px;
+          padding: 7px 3px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="preview-bar">
+      <div class="preview-name">
+        <i class="preview-dot"></i>
+        <div>
+          <p class="eyebrow">TRO · DESIGN PREVIEW / 01</p>
+          <strong data-copy="previewTitle"></strong>
+        </div>
+      </div>
+      <div class="preview-actions">
+        <select id="locale" aria-label="Prototype language">
+          <option value="vi">Tiếng Việt</option>
+          <option value="en">English · copy preview</option>
+        </select>
+        <button class="quiet-button" id="notes-button" data-copy="notes"></button>
+        <button class="outline-button" id="first-visit-button" data-copy="firstVisit"></button>
+      </div>
+    </header>
+    <div class="app-frame" id="app-frame">
+      <div class="titlebar">
+        <div class="traffic"><i></i><i></i><i></i></div>
+        <span class="window-label">Tro</span>
+      </div>
+      <div class="app-layout">
+        <aside class="sidebar" id="sidebar">
+          <div class="brand"><img src="../../src/desktop/assets/TroIcon.png" alt="Tro" /></div>
+          <nav class="nav-items" aria-label="Tro">
+            <button class="nav-button" id="nav-workspace" data-step="0">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="4" y="3" width="16" height="18" rx="2" />
+                <path d="M9 3v18" /></svg
+              ><span data-copy="workspace"></span>
+            </button>
+            <button class="nav-button" id="nav-classes" data-step="1">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m2 9 10-5 10 5-10 5zM6 11v6c4 3 8 3 12 0v-6M22 9v7" /></svg
+              ><span data-copy="classes"></span>
+            </button>
+            <button class="nav-button" id="nav-insights" data-step="2">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 21V11h5v10M9 21V4h5v17M14 21V8h5v13M3 21h18" /></svg
+              ><span data-copy="insights"></span>
+            </button>
+            <button class="nav-button" id="nav-lessons" data-step="3">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 3 14 9-14 9z" /></svg
+              ><span data-copy="lessons"></span>
+            </button>
+          </nav>
+          <div class="sidebar-bottom">
+            <button class="nav-button" id="settings-button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="m9 3 1 3h4l1-3 3 2-1 3 2 3 3 1v3l-3 1-2 3 1 3-3 2-1-3h-4l-1 3-3-2 1-3-2-3-3-1v-3l3-1 2-3-1-3z"
+                  transform="translate(0 -2) scale(.96)"
+                />
+                <circle cx="12" cy="11" r="3" /></svg
+              ><span data-copy="settings"></span>
+            </button>
+            <div class="brand">
+              <span class="avatar" aria-label="Sample student account">AL</span>
+            </div>
+          </div>
+        </aside>
+        <main class="page" id="page">
+          <div class="page-header">
+            <span class="breadcrumb" id="breadcrumb"></span
+            ><span class="user-pill"
+              ><i class="status-dot"></i><span data-copy="student"></span
+            ></span>
+          </div>
+          <div class="page-content" id="page-content"></div>
+        </main>
+      </div>
+      <div class="spotlight" id="spotlight" hidden></div>
+      <section
+        class="tour-panel"
+        id="tour-panel"
+        role="dialog"
+        aria-label="Video onboarding"
+        aria-describedby="tour-description"
+        hidden
+      >
+        <div class="tour-heading">
+          <span class="tour-kicker"><i></i><span data-copy="tourKicker"></span></span
+          ><button class="close-button" id="close-tour" aria-label="Close onboarding">×</button>
+        </div>
+        <div class="video-slate">
+          <div class="studio-board">
+            <span class="board-brand">tro.</span>
+            <p class="board-label" id="board-label"></p>
+            <div class="board-line"></div>
+          </div>
+          <div class="presenter" aria-hidden="true">
+            <div class="presenter-body"></div>
+            <div class="presenter-head"></div>
+          </div>
+          <span class="recording-label" data-copy="recordingPlaceholder"></span>
+          <button class="play-button" id="play-button" aria-label="Play sample animation">▶</button>
+          <div class="captions" id="captions" hidden><span id="caption-text"></span></div>
+          <div class="video-controls">
+            <span id="playback-kind" data-copy="sample"></span>
+            <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+            <span id="video-time">0:00 / 0:30</span
+            ><button class="cc-button" id="cc-button" aria-pressed="true" aria-label="Captions">
+              CC
+            </button>
+          </div>
+        </div>
+        <div class="tour-copy">
+          <p class="step-label" id="step-label"></p>
+          <h2 id="tour-title"></h2>
+          <p id="tour-description"></p>
+          <div class="takeaway"><b aria-hidden="true">↳</b><span id="takeaway-text"></span></div>
+          <details id="transcript">
+            <summary data-copy="transcript"></summary>
+            <p id="transcript-text"></p>
+          </details>
+        </div>
+        <footer class="tour-footer">
+          <button class="quiet-button" id="skip-button" data-copy="skip"></button>
+          <div class="dots" id="dots" aria-hidden="true"></div>
+          <div class="tour-footer-actions">
+            <button class="outline-button" id="back-button" data-copy="back"></button
+            ><button class="primary-button" id="next-button"></button>
+          </div>
+        </footer>
+      </section>
+    </div>
+    <footer class="preview-footer">
+      <span><i></i><span data-copy="prototypeDisclaimer"></span></span
+      ><span data-copy="footerHint"></span>
+    </footer>
+    <dialog id="welcome-dialog" aria-labelledby="welcome-title">
+      <div class="dialog-header">
+        <span class="eyebrow" data-copy="tourKicker"></span
+        ><button class="close-button" data-close="welcome-dialog" aria-label="Close">×</button>
+      </div>
+      <div class="dialog-body">
+        <div class="welcome-icon" aria-hidden="true">✳</div>
+        <h3 class="welcome-title" id="welcome-title" data-copy="welcomeTitle"></h3>
+        <p data-copy="welcomeBody"></p>
+        <p data-copy="welcomeHint"></p>
+      </div>
+      <div class="dialog-actions">
+        <button class="quiet-button" id="welcome-skip" data-copy="later"></button
+        ><button class="primary-button" id="start-button" data-copy="start"></button>
+      </div>
+    </dialog>
+    <dialog id="settings-dialog" aria-labelledby="settings-title">
+      <div class="dialog-header">
+        <h2 id="settings-title" data-copy="settings"></h2>
+        <button class="close-button" data-close="settings-dialog" aria-label="Close">×</button>
+      </div>
+      <div class="settings-layout">
+        <div class="settings-nav"><strong data-copy="general"></strong></div>
+        <div class="settings-section">
+          <div class="settings-row">
+            <div>
+              <h3 data-copy="language"></h3>
+              <p data-copy="languageHint"></p>
+            </div>
+            <span id="settings-language"></span>
+          </div>
+          <div class="settings-row">
+            <div>
+              <h3 data-copy="shortcut"></h3>
+              <p data-copy="shortcutHint"></p>
+            </div>
+            <kbd>⌘ ⌃</kbd>
+          </div>
+          <div class="settings-tour">
+            <p class="eyebrow" data-copy="gettingStarted"></p>
+            <h3 data-copy="videoGuide"></h3>
+            <p id="saved-progress"></p>
+            <button class="primary-button" id="restart-button" data-copy="restart"></button
+            ><small data-copy="resetHint"></small>
+          </div>
+        </div>
+      </div>
+    </dialog>
+    <dialog id="finish-dialog" aria-labelledby="finish-title">
+      <div class="dialog-header">
+        <span class="eyebrow" data-copy="complete"></span
+        ><button class="close-button" data-close="finish-dialog" aria-label="Close">×</button>
+      </div>
+      <div class="dialog-body">
+        <div class="welcome-icon" aria-hidden="true">✓</div>
+        <h3 class="welcome-title" id="finish-title" data-copy="finishTitle"></h3>
+        <p data-copy="finishBody"></p>
+      </div>
+      <div class="dialog-actions">
+        <button class="outline-button" id="finish-settings" data-copy="openSettings"></button
+        ><button class="primary-button" id="finish-button" data-copy="explore"></button>
+      </div>
+    </dialog>
+    <dialog id="notes-dialog" aria-labelledby="notes-title">
+      <div class="dialog-header">
+        <h2 id="notes-title" data-copy="notes"></h2>
+        <button class="close-button" data-close="notes-dialog" aria-label="Close">×</button>
+      </div>
+      <div class="dialog-body" id="notes-content"></div>
+    </dialog>
+    <div class="notice" id="notice" role="status" hidden></div>
+    <script type="module">
+      // This isolated reference prototype simulates playback; it does not call Tro or a media provider.
+      /** @typedef {'vi' | 'en'} Locale */
+      /** @typedef {{id:string, anchor:string, durationSeconds:number, content:Record<Locale,{nav:string,title:string,description:string,takeaway:string,transcript:string}>}} TourStep */
+      /** @typedef {{version:number,status:'in-progress'|'completed'|'dismissed',stepIndex:number}} TourProgress */
+      const content = {
+        vi: {
+          previewTitle: 'Hướng dẫn đầu tiên · Video từ bạn',
+          notes: 'Thiết kế & kế hoạch',
+          firstVisit: 'Lần đầu mở Tro',
+          workspace: 'Không gian làm việc',
+          classes: 'Lớp học',
+          insights: 'Tiến độ học tập',
+          lessons: 'Bài giảng hướng dẫn (Thử nghiệm)',
+          settings: 'Cài đặt',
+          student: 'Học sinh · Tài khoản mẫu',
+          tourKicker: 'Làm quen với Tro',
+          recordingPlaceholder: 'Vị trí video của bạn',
+          sample: 'Mô phỏng',
+          transcript: 'Đọc nội dung hướng dẫn',
+          skip: 'Bỏ qua',
+          back: 'Quay lại',
+          next: 'Tiếp theo →',
+          finish: 'Hoàn tất ✓',
+          prototypeDisclaimer: 'Bản mẫu tương tác · Chưa tích hợp vào Tro · Video minh họa',
+          footerHint: 'Thử các bước, rồi vào Cài đặt để bắt đầu lại.',
+          welcomeTitle: 'Chào bạn, cùng làm quen nhé.',
+          welcomeBody:
+            'Bốn video ngắn, do chính mình hướng dẫn. Mình sẽ giới thiệu từng mục trên thanh điều hướng và cách bạn bắt đầu.',
+          welcomeHint: 'Khoảng 2 phút · Bạn có thể bỏ qua hoặc xem lại bất cứ lúc nào.',
+          later: 'Để sau',
+          start: 'Bắt đầu hướng dẫn →',
+          general: 'Chung',
+          language: 'Ngôn ngữ',
+          languageHint: 'Giao diện và nội dung hướng dẫn.',
+          shortcut: 'Phím tắt giọng nói',
+          shortcutHint: 'Nhấn giữ để nói yêu cầu với Tro.',
+          gettingStarted: 'Bắt đầu sử dụng',
+          videoGuide: 'Hướng dẫn sử dụng Tro',
+          restart: 'Bắt đầu lại hướng dẫn',
+          resetHint:
+            'Chỉ đặt lại tiến trình hướng dẫn của tài khoản này trên thiết bị này. Bài học, lớp học, quyền truy cập và dữ liệu vẫn được giữ nguyên.',
+          complete: '4 / 4 · Hoàn tất',
+          finishTitle: 'Sẵn sàng khám phá Tro.',
+          finishBody:
+            'Bạn đã đi qua bốn mục chính. Khi cần xem lại, vào Cài đặt → Chung → Bắt đầu lại hướng dẫn.',
+          openSettings: 'Mở Cài đặt',
+          explore: 'Khám phá Tro →',
+          step: 'Bước',
+          of: '/',
+          ready: 'Sẵn sàng học cùng bạn',
+          workspaceTitle: 'Hôm nay bạn muốn học gì?',
+          workspaceDescription: 'Bắt đầu bằng một câu hỏi, hoặc nói điều bạn muốn làm.',
+          prompt: 'Ví dụ: Hướng dẫn mình viết vòng lặp Python…',
+          showMe: 'Hướng dẫn tôi',
+          voiceHint: '⌘ ⌃ · Nhấn giữ để nói',
+          suggestionOne: 'Giải thích đoạn code',
+          suggestionTwo: 'Hướng dẫn từng bước',
+          suggestionThree: 'Luyện tập cùng Tro',
+          classesTitle: 'Lớp học của bạn',
+          classesDescription: 'Tài liệu, hoạt động và buổi học ở cùng một nơi.',
+          courseOne: 'Python cơ bản',
+          courseTwo: 'Tư duy lập trình',
+          courseDetail: 'Tài khoản mẫu · Nội dung minh họa',
+          classTag: 'Đã tham gia',
+          insightsTitle: 'Mỗi bước nhỏ đều có ý nghĩa.',
+          insightsDescription: 'Theo dõi quá trình học qua các hoạt động trong lớp.',
+          metricOne: 'Hoạt động đã nộp',
+          metricTwo: 'Tuần học liên tiếp',
+          metricThree: 'Bài đang luyện tập',
+          chartTitle: 'Nhịp học của bạn',
+          chartHint: 'Dữ liệu minh họa · Không phải kết quả thực tế',
+          lessonsTitle: 'Học theo nhịp của bạn.',
+          lessonsDescription: 'Xem bài giảng đã phát hành, trả lời câu hỏi và ghi chú riêng.',
+          lessonEyebrow: 'PYTHON CƠ BẢN · BÀI GIẢNG MẪU',
+          lessonTitle: 'Hiểu vòng lặp, từng bước một.',
+          lessonOne: 'Vòng lặp và biến tổng',
+          lessonTwo: 'Thử một đầu vào mới',
+          lessonDetail: 'Bài giảng đã phát hành · Nội dung minh họa',
+          dismissed: 'Đã tạm dừng. Bạn có thể bắt đầu lại trong Cài đặt.',
+          storageWarning:
+            'Trình duyệt không lưu được tiến trình. Bản mẫu vẫn hoạt động trong phiên này.',
+          progress: 'Vị trí đã lưu',
+          completed: 'Bạn đã hoàn tất hướng dẫn.',
+          notStarted: 'Bạn có thể xem lại toàn bộ bốn bước.',
+          closeLabel: 'Đóng',
+          playLabel: 'Phát minh họa',
+          pauseLabel: 'Tạm dừng minh họa',
+          captionsLabel: 'Phụ đề',
+        },
+        en: {
+          previewTitle: 'First-run walkthrough · Your video',
+          notes: 'Design & plan',
+          firstVisit: 'First visit',
+          workspace: 'Workspace',
+          classes: 'Classes',
+          insights: 'Insights',
+          lessons: 'Guided lessons (Beta)',
+          settings: 'Settings',
+          student: 'Student · Sample account',
+          tourKicker: 'A little tour of Tro',
+          recordingPlaceholder: 'Your recording goes here',
+          sample: 'Simulation',
+          transcript: 'Read the walkthrough',
+          skip: 'Skip tour',
+          back: 'Back',
+          next: 'Next →',
+          finish: 'Finish ✓',
+          prototypeDisclaimer:
+            'Interactive prototype · Not integrated into Tro · Placeholder video',
+          footerHint: 'Try each step, then restart from Settings.',
+          welcomeTitle: 'A familiar face to help you start.',
+          welcomeBody:
+            'Four short videos, explained by me. Let’s walk through the navigation and see how to get started.',
+          welcomeHint: 'About 2 minutes · Skip or replay whenever you like.',
+          later: 'Maybe later',
+          start: 'Show me around →',
+          general: 'General',
+          language: 'Language',
+          languageHint: 'Interface and walkthrough content.',
+          shortcut: 'Voice shortcut',
+          shortcutHint: 'Hold to tell Tro what you need.',
+          gettingStarted: 'Getting started',
+          videoGuide: 'Your guide to Tro',
+          restart: 'Restart onboarding',
+          resetHint:
+            'Resets only this account’s tour progress on this device. Lessons, classes, permissions and saved work stay as they are.',
+          complete: '4 / 4 · All done',
+          finishTitle: 'Make yourself at home.',
+          finishBody:
+            'You’ve explored the four main areas. To watch again, go to Settings → General → Restart onboarding.',
+          openSettings: 'Open Settings',
+          explore: 'Explore Tro →',
+          step: 'Step',
+          of: 'of',
+          ready: 'Ready when you are',
+          workspaceTitle: 'What would you like to learn?',
+          workspaceDescription: 'Start with a question, or tell Tro what you want to do.',
+          prompt: 'For example: Help me write a Python loop…',
+          showMe: 'Show me',
+          voiceHint: '⌘ ⌃ · Hold to speak',
+          suggestionOne: 'Explain this code',
+          suggestionTwo: 'Guide me step by step',
+          suggestionThree: 'Practice with Tro',
+          classesTitle: 'Your classes',
+          classesDescription: 'Materials, activities and class sessions, all together.',
+          courseOne: 'Python foundations',
+          courseTwo: 'Computational thinking',
+          courseDetail: 'Sample account · Illustrative content',
+          classTag: 'Enrolled',
+          insightsTitle: 'Every small step counts.',
+          insightsDescription: 'Follow your learning through your classroom activities.',
+          metricOne: 'Activities submitted',
+          metricTwo: 'Learning streak · weeks',
+          metricThree: 'Activities in practice',
+          chartTitle: 'Your learning rhythm',
+          chartHint: 'Illustrative data · Not real learning results',
+          lessonsTitle: 'Learn at your own pace.',
+          lessonsDescription: 'Watch released lessons, answer questions and keep private notes.',
+          lessonEyebrow: 'PYTHON FOUNDATIONS · SAMPLE LESSON',
+          lessonTitle: 'Understand loops, one step at a time.',
+          lessonOne: 'Loops and running totals',
+          lessonTwo: 'Try a new input',
+          lessonDetail: 'Released lesson · Illustrative content',
+          dismissed: 'Tour paused. Restart whenever you like in Settings.',
+          storageWarning:
+            'This browser cannot save progress. The prototype still works for this session.',
+          progress: 'Saved position',
+          completed: 'You’ve completed the walkthrough.',
+          notStarted: 'Replay all four steps whenever you like.',
+          closeLabel: 'Close',
+          playLabel: 'Play sample animation',
+          pauseLabel: 'Pause sample animation',
+          captionsLabel: 'Captions',
+        },
+      };
+      /** @type {TourStep[]} */
+      const steps = [
+        {
+          id: 'workspace',
+          anchor: 'nav-workspace',
+          durationSeconds: 30,
+          content: {
+            vi: {
+              nav: 'Không gian làm việc',
+              title: 'Bắt đầu từ điều bạn muốn học.',
+              description:
+                'Đây là nơi bạn trò chuyện với Tro. Gõ một yêu cầu hoặc nhấn giữ phím tắt để nói, rồi chọn cách Tro hỗ trợ.',
+              takeaway: 'Chọn “Hướng dẫn tôi” để tự làm từng bước cùng Tro.',
+              transcript:
+                'Chào bạn! Đây là Không gian làm việc. Bạn có thể gõ điều mình muốn học, hoặc nhấn giữ Command và Control trên Mac để nói. Chọn Hướng dẫn tôi khi bạn muốn tự thao tác và được Tro hướng dẫn từng bước. Bạn luôn là người quyết định khi nào bắt đầu.',
+            },
+            en: {
+              nav: 'Workspace',
+              title: 'Start with what you want to learn.',
+              description:
+                'This is where you talk to Tro. Type a request or hold the voice shortcut, then choose how Tro can help.',
+              takeaway: 'Choose “Show me” to do each step yourself, with guidance.',
+              transcript:
+                'Welcome! This is your Workspace. Type what you want to learn, or hold Command and Control on Mac to speak. Choose Show me when you want to take each step yourself with Tro’s guidance. You decide when to start.',
+            },
+          },
+        },
+        {
+          id: 'classes',
+          anchor: 'nav-classes',
+          durationSeconds: 30,
+          content: {
+            vi: {
+              nav: 'Lớp học',
+              title: 'Lớp học, tài liệu và hoạt động.',
+              description:
+                'Mở lớp đã tham gia để xem tài liệu và các hoạt động. Khi giáo viên bắt đầu buổi học, bạn có thể chủ động tham gia.',
+              takeaway: 'Chưa có lớp? Dùng mã mời do giáo viên cung cấp.',
+              transcript:
+                'Trong Lớp học, bạn sẽ tìm thấy các lớp đã tham gia, tài liệu và hoạt động do giáo viên chuẩn bị. Dùng mã mời để tham gia một lớp mới. Khi có buổi học trực tiếp, hãy chọn tham gia. Tro chỉ bắt đầu hướng dẫn khi bạn yêu cầu.',
+            },
+            en: {
+              nav: 'Classes',
+              title: 'Your class, materials and activities.',
+              description:
+                'Open an enrolled class to find materials and activities. When your teacher starts a session, you can choose to join.',
+              takeaway: 'No class yet? Join using an invitation code from your teacher.',
+              transcript:
+                'Classes holds your enrolled classes, materials and teacher-prepared activities. Use an invitation code to join a new class. When a live session is available, choose to join. Tro starts guiding only when you ask.',
+            },
+          },
+        },
+        {
+          id: 'insights',
+          anchor: 'nav-insights',
+          durationSeconds: 25,
+          content: {
+            vi: {
+              nav: 'Tiến độ học tập',
+              title: 'Nhìn lại hành trình của bạn.',
+              description:
+                'Chọn một lớp để xem quá trình học từ các hoạt động đã thực hiện. Dùng thông tin này để biết mình muốn luyện thêm điều gì.',
+              takeaway: 'Tiến độ được ghi nhận từ hoạt động trong lớp bạn đã tham gia.',
+              transcript:
+                'Tiến độ học tập giúp bạn nhìn lại quá trình học của mình. Chọn một lớp để xem những hoạt động đã thực hiện và thông tin tiến bộ. Đây là điểm bắt đầu để trao đổi với giáo viên về phần bạn cần luyện thêm.',
+            },
+            en: {
+              nav: 'Insights',
+              title: 'See how far you’ve come.',
+              description:
+                'Choose a class to review your learning through completed activities. Use it to decide what you want to practice next.',
+              takeaway: 'Insights come from activities in your enrolled classes.',
+              transcript:
+                'Insights helps you look back on your learning. Choose a class to review your activities and progress. Use this as a starting point to talk to your teacher about where you would like more practice.',
+            },
+          },
+        },
+        {
+          id: 'lessons',
+          anchor: 'nav-lessons',
+          durationSeconds: 35,
+          content: {
+            vi: {
+              nav: 'Bài giảng hướng dẫn',
+              title: 'Xem, thử, rồi tự mình hiểu.',
+              description:
+                'Học lại với bài giảng giáo viên đã phát hành. Dừng để trả lời câu hỏi, nhờ trợ giúp và lưu ghi chú riêng theo bài.',
+              takeaway: 'Bạn có thể học ở nhà mà không cần buổi học trực tiếp.',
+              transcript:
+                'Bài giảng hướng dẫn cho phép bạn học theo nhịp riêng từ những bài giáo viên đã phát hành. Xem từng phần, trả lời câu hỏi và thử thực hành. Khi cần, bạn có thể nhờ trợ giúp hoặc lưu ghi chú riêng ngay tại vị trí đang học. Mục này hiện đang trong giai đoạn thử nghiệm.',
+            },
+            en: {
+              nav: 'Guided lessons',
+              title: 'Watch, try, then make it yours.',
+              description:
+                'Study lessons released by your teacher. Pause for questions, ask for help and keep private notes anchored to the lesson.',
+              takeaway: 'Study at home without a live classroom session.',
+              transcript:
+                'Guided lessons lets you study at your own pace using lessons your teacher has released. Watch each part, answer questions and try the practice. Ask for help or keep private notes at the point you are studying. This feature is currently in beta.',
+            },
+          },
+        },
+      ];
+      /** @type {Locale} */
+      let locale = 'vi';
+      let stepIndex = 0;
+      let selectedPage = 0;
+      let isTourOpen = false;
+      let isPlaying = false;
+      let hasCaptions = true;
+      let elapsedSeconds = 0;
+      /** @type {ReturnType<typeof setInterval> | undefined} */
+      let playbackTimer;
+      /** @type {ReturnType<typeof setTimeout> | undefined} */
+      let noticeTimer;
+      /** @type {TourProgress | null} */
+      let progress = null;
+      const storageKey = 'tro-video-onboarding-prototype-v1';
+
+      /** @param {string} id @returns {HTMLElement} */
+      function getElement(id) {
+        const element = document.getElementById(id);
+        if (!element) {
+          throw new Error(`Missing prototype element: ${id}`);
+        }
+        return element;
+      }
+
+      /** @param {string} id @returns {HTMLDialogElement} */
+      function getDialog(id) {
+        const element = getElement(id);
+        if (!(element instanceof HTMLDialogElement)) {
+          throw new Error(`Expected dialog: ${id}`);
+        }
+        return element;
+      }
+
+      /** @param {string} message */
+      function showNotice(message) {
+        clearTimeout(noticeTimer);
+        getElement('notice').textContent = message;
+        getElement('notice').hidden = false;
+        noticeTimer = setTimeout(() => {
+          getElement('notice').hidden = true;
+        }, 5000);
+      }
+
+      /** Only prototype progress is persisted. Parsed browser storage is treated as untrusted. */
+      function readProgress() {
+        try {
+          /** @type {unknown} */
+          const value = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
+          if (
+            typeof value === 'object' &&
+            value !== null &&
+            'version' in value &&
+            value.version === 1 &&
+            'status' in value &&
+            (value.status === 'in-progress' ||
+              value.status === 'completed' ||
+              value.status === 'dismissed') &&
+            'stepIndex' in value &&
+            typeof value.stepIndex === 'number' &&
+            Number.isInteger(value.stepIndex) &&
+            value.stepIndex >= 0 &&
+            value.stepIndex < steps.length
+          ) {
+            progress = { version: 1, status: value.status, stepIndex: value.stepIndex };
+          }
+        } catch {
+          showNotice(content[locale].storageWarning);
+        }
+      }
+
+      /** @param {TourProgress['status']} status */
+      function saveProgress(status) {
+        progress = { version: 1, status, stepIndex };
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(progress));
+        } catch {
+          showNotice(content[locale].storageWarning);
+        }
+      }
+
+      function pausePlayback() {
+        clearInterval(playbackTimer);
+        isPlaying = false;
+        getElement('play-button').textContent = '▶';
+        getElement('play-button').setAttribute('aria-label', content[locale].playLabel);
+      }
+
+      function updatePlayback() {
+        const step = steps[stepIndex];
+        if (!step) {
+          return;
+        }
+        getElement('progress-fill').style.width =
+          `${(elapsedSeconds / step.durationSeconds) * 100}%`;
+        getElement('video-time').textContent =
+          `0:${String(elapsedSeconds).padStart(2, '0')} / 0:${step.durationSeconds}`;
+        getElement('captions').hidden = !hasCaptions || elapsedSeconds === 0;
+        const phrases = step.content[locale].transcript.match(/[^.!?。]+[.!?。]?/gu) ?? [
+          step.content[locale].transcript,
+        ];
+        const phraseIndex = Math.min(
+          phrases.length - 1,
+          Math.floor((elapsedSeconds / step.durationSeconds) * phrases.length),
+        );
+        getElement('caption-text').textContent = phrases[phraseIndex] ?? '';
+      }
+
+      function togglePlayback() {
+        if (isPlaying) {
+          pausePlayback();
+          return;
+        }
+        const step = steps[stepIndex];
+        if (!step) {
+          return;
+        }
+        if (elapsedSeconds >= step.durationSeconds) {
+          elapsedSeconds = 0;
+        }
+        isPlaying = true;
+        getElement('play-button').textContent = 'Ⅱ';
+        getElement('play-button').setAttribute('aria-label', content[locale].pauseLabel);
+        playbackTimer = setInterval(() => {
+          elapsedSeconds += 1;
+          updatePlayback();
+          if (elapsedSeconds >= step.durationSeconds) {
+            pausePlayback();
+          }
+        }, 1000);
+      }
+
+      /** @param {number} pageIndex */
+      function renderPage(pageIndex) {
+        selectedPage = pageIndex;
+        const text = content[locale];
+        const navLabels = [text.workspace, text.classes, text.insights, text.lessons];
+        getElement('breadcrumb').textContent = navLabels[pageIndex] ?? text.workspace;
+        steps.forEach((step, index) => {
+          if (index === pageIndex) {
+            getElement(step.anchor).setAttribute('aria-current', 'page');
+          } else {
+            getElement(step.anchor).removeAttribute('aria-current');
+          }
+        });
+        /** @param {string} title @param {string} art @param {string} detail @returns {string} */
+        const card = (title, art, detail) =>
+          `<article class="sample-card"><div class="card-art">${art}</div><div class="card-copy"><h3>${title}</h3><p>${detail}</p><span class="tag">${text.classTag}</span></div></article>`;
+        /** @param {string} title @param {string} description @param {string} eyebrow @returns {string} */
+        const intro = (title, description, eyebrow) =>
+          `<div class="page-intro"><p class="eyebrow">${eyebrow}</p><h1>${title}</h1><p>${description}</p></div>`;
+        let markup = '';
+        if (pageIndex === 0) {
+          markup = `<div class="workspace-center">${intro(text.workspaceTitle, text.workspaceDescription, text.ready)}<div class="prompt-box"><p>${text.prompt}</p><div class="prompt-bottom"><span class="mode-chip">${text.showMe} ⌄</span><span>${text.voiceHint}</span><span class="send-chip">↑</span></div></div><div class="suggestions"><span>${text.suggestionOne}</span><span>${text.suggestionTwo}</span><span>${text.suggestionThree}</span></div></div>`;
+        } else if (pageIndex === 1) {
+          markup = `${intro(text.classesTitle, text.classesDescription, text.classes)}<div class="cards">${card(text.courseOne, '{ py }', text.courseDetail)}${card(text.courseTwo, 'a → b', text.courseDetail)}</div>`;
+        } else if (pageIndex === 2) {
+          markup = `${intro(text.insightsTitle, text.insightsDescription, text.insights)}<div class="insight-summary"><div class="metric"><strong>12</strong><span>${text.metricOne}</span></div><div class="metric"><strong>3</strong><span>${text.metricTwo}</span></div><div class="metric"><strong>2</strong><span>${text.metricThree}</span></div></div><article class="sample-card"><div class="card-copy"><h3>${text.chartTitle}</h3><p>${text.chartHint}</p></div><div class="chart" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div></article>`;
+        } else {
+          markup = `${intro(text.lessonsTitle, text.lessonsDescription, text.lessons)}<article class="sample-card"><div class="lesson-art"><p>${text.lessonEyebrow}</p><h2>${text.lessonTitle}</h2><span>total = total + number</span></div><div class="card-copy"><h3>01 · ${text.lessonOne}</h3><p>${text.lessonDetail}</p></div><div class="card-copy"><h3>02 · ${text.lessonTwo}</h3></div></article>`;
+        }
+        getElement('page-content').innerHTML = markup;
+      }
+
+      function positionTour() {
+        if (!isTourOpen) {
+          return;
+        }
+        const step = steps[stepIndex];
+        if (!step) {
+          return;
+        }
+        const frame = getElement('app-frame').getBoundingClientRect();
+        const anchor = getElement(step.anchor).getBoundingClientRect();
+        const spotlight = getElement('spotlight');
+        spotlight.style.left = `${anchor.left - frame.left - 4}px`;
+        spotlight.style.top = `${anchor.top - frame.top - 4}px`;
+        spotlight.style.width = `${anchor.width + 6}px`;
+        spotlight.style.height = `${anchor.height + 6}px`;
+        const panel = getElement('tour-panel');
+        panel.style.top = `${Math.max(44, Math.min(anchor.top - frame.top - 13, frame.height - panel.offsetHeight - 16))}px`;
+      }
+
+      /** @param {number} index @param {boolean} [shouldSave] */
+      function showStep(index, shouldSave = true) {
+        stepIndex = Math.max(0, Math.min(steps.length - 1, index));
+        const step = steps[stepIndex];
+        if (!step) {
+          return;
+        }
+        pausePlayback();
+        elapsedSeconds = 0;
+        isTourOpen = true;
+        renderPage(stepIndex);
+        getElement('tour-panel').hidden = false;
+        getElement('spotlight').hidden = false;
+        getElement('page').inert = true;
+        getElement('sidebar').inert = true;
+        getElement('tour-title').textContent = step.content[locale].title;
+        getElement('tour-description').textContent = step.content[locale].description;
+        getElement('takeaway-text').textContent = step.content[locale].takeaway;
+        getElement('transcript-text').textContent = step.content[locale].transcript;
+        getElement('board-label').textContent = step.content[locale].nav;
+        getElement('step-label').textContent =
+          `${content[locale].step} ${stepIndex + 1} ${content[locale].of} ${steps.length} · 0:${step.durationSeconds}`;
+        getElement('next-button').textContent =
+          stepIndex === steps.length - 1 ? content[locale].finish : content[locale].next;
+        const backButton = getElement('back-button');
+        if (backButton instanceof HTMLButtonElement) {
+          backButton.disabled = stepIndex === 0;
+        }
+        const transcript = getElement('transcript');
+        if (transcript instanceof HTMLDetailsElement) {
+          transcript.open = false;
+        }
+        getElement('dots').innerHTML = steps
+          .map((_, index) => `<i class="${index === stepIndex ? 'active' : ''}"></i>`)
+          .join('');
+        if (shouldSave) {
+          saveProgress('in-progress');
+        }
+        updatePlayback();
+        positionTour();
+        getElement('next-button').focus({ preventScroll: true });
+      }
+
+      function hideTour() {
+        pausePlayback();
+        isTourOpen = false;
+        getElement('tour-panel').hidden = true;
+        getElement('spotlight').hidden = true;
+        getElement('page').inert = false;
+        getElement('sidebar').inert = false;
+        getElement(steps[selectedPage]?.anchor ?? 'settings-button').focus({ preventScroll: true });
+      }
+
+      function dismissTour() {
+        saveProgress('dismissed');
+        hideTour();
+        showNotice(content[locale].dismissed);
+      }
+
+      function openSettings() {
+        getElement('settings-language').textContent = locale === 'vi' ? 'Tiếng Việt' : 'English';
+        getElement('saved-progress').textContent =
+          progress?.status === 'completed'
+            ? content[locale].completed
+            : progress
+              ? `${content[locale].progress}: ${content[locale].step} ${progress.stepIndex + 1} ${content[locale].of} 4.`
+              : content[locale].notStarted;
+        getDialog('settings-dialog').showModal();
+      }
+
+      function renderNotes() {
+        getElement('notes-content').innerHTML =
+          locale === 'vi'
+            ? `
+          <section class="note-section"><h3>01 / Luồng trải nghiệm</h3><p>Mời xem sau khi đăng nhập và thanh điều hướng sẵn sàng. Bốn video 25–35 giây, phát khi người dùng bấm. Bỏ qua hoặc đóng sẽ dừng lời mời tự động. Lần sau mở tiếp bước đang xem nếu chưa bỏ qua. Không hiển thị khi có tác vụ, giọng nói hay hộp thoại đang hoạt động.</p><p>Cài đặt → Chung → Bắt đầu lại hướng dẫn đặt lại riêng tiến trình của tài khoản hiện tại trên thiết bị này và mở ngay bước đầu tiên.</p></section>
+          <section class="note-section"><h3>02 / Nội dung tiếng Việt trước</h3><p>Mỗi bước có ID và neo giao diện cố định. Nội dung theo ngôn ngữ chứa tiêu đề, mô tả, video, ảnh bìa, phụ đề WebVTT và bản chép lời. Thêm <code>en</code> sau bằng dữ liệu nội dung, không sao chép component. Bản mẫu có bản dịch tiếng Anh để thử bố cục; chưa có video thật ở cả hai ngôn ngữ.</p><p>Nếu thiếu video tiếng Anh, giữ văn bản tiếng Anh và ghi rõ video tiếng Việt; người dùng tự chọn phát. Không đổi ngôn ngữ ngầm. Tiến trình dùng ID bước và phiên bản, không phụ thuộc ngôn ngữ.</p></section>
+          <section class="note-section"><h3>03 / Tích hợp với Tro</h3><p>Đề xuất <code>renderer/onboarding/</code> sở hữu manifest nội dung, hook điều phối và panel Mantine Popover/Portal. App.tsx cung cấp neo; SettingsDialog.tsx gọi hành động bắt đầu lại. Nếu cần lưu bền vững theo tài khoản, main sở hữu tệp tiến trình đã kiểm tra qua hợp đồng Zod và phương thức preload có tên cụ thể. Không thêm quyền IPC hoặc đường dẫn tùy ý.</p><p>Lưu phiên bản tour, ID bước, trạng thái và các hướng dẫn tính năng đã xem. Đổi tài khoản phải tắt video và hủy kết quả lưu trễ. Chỉ đánh dấu hoàn tất khi bấm Hoàn tất; xem hết video không tự chuyển bước.</p></section>
+          <section class="note-section"><h3>04 / Quay video & triển khai</h3><ol><li>Chốt kịch bản học sinh và giáo viên riêng. Bản mẫu hiện minh họa học sinh.</li><li>Quay bốn video ngang 16:9, 25–35 giây. Mở đầu bằng mục đích, chỉ một thao tác chính, kết thúc bằng việc người dùng nên thử.</li><li>Chuẩn bị MP4, ảnh bìa, phụ đề VI và bản chép lời. Dùng nội dung học mẫu; không ghi thông tin tài khoản thật.</li><li>Đóng gói video Việt cùng ứng dụng cho bản đầu, tải lười từng clip. Sau này thêm nội dung EN vào cùng manifest. Nếu chuyển sang CDN, chỉ dùng nguồn đã duyệt trong CSP.</li><li>Kiểm tra bàn phím, Esc, khôi phục focus, cuộn/resize, reduced motion, video lỗi/offline, đổi tài khoản, lưu tiến trình và reset. Văn bản luôn đọc được khi video lỗi.</li></ol></section>
+          <section class="note-section"><h3>05 / Sau tour chính</h3><p>Thêm video ở lần đầu mở từng tính năng: tham gia lớp, nộp bài, tạo bài giảng (giáo viên). Mỗi tính năng có ID và trạng thái riêng, chỉ xuất hiện đúng ngữ cảnh; không dồn mọi video vào lần đăng nhập đầu. Không tự tạo lớp, bắt đầu tác vụ hoặc cấp quyền khi xem hướng dẫn.</p><p>Bản mẫu chỉ lưu trạng thái trong trình duyệt ở khóa riêng. Kiến trúc lưu theo tài khoản, phát video thật, phân vai và các hướng dẫn tính năng là phần triển khai tiếp theo.</p></section>`
+            : `
+          <section class="note-section"><h3>01 / Experience</h3><p>Invite after sign-in when navigation is ready. Four user-initiated videos, 25–35 seconds each. Skip/close suppresses future automatic invitations; an interrupted tour resumes at its saved step. Defer while a task, voice capture or another dialog is active.</p><p>Settings → General → Restart onboarding resets only the current account’s tour on this device and immediately opens step one.</p></section>
+          <section class="note-section"><h3>02 / Vietnamese first, English next</h3><p>Each step has a stable ID and UI anchor. Localized content owns title, description, video, poster, WebVTT captions and transcript. Add <code>en</code> as content, without duplicating components. English copy is available here for layout review; both languages use placeholder video.</p><p>If English video is missing, keep English text and label an optional Vietnamese video explicitly. Never silently change language. Progress follows step IDs and tour version, independently of locale.</p></section>
+          <section class="note-section"><h3>03 / Tro implementation</h3><p>A proposed <code>renderer/onboarding/</code> feature owns the manifest, coordination hook and Mantine Popover/Portal panel. App.tsx supplies anchors; SettingsDialog.tsx invokes restart. Main owns account-scoped durable progress through Zod contracts and narrow named preload methods if file persistence is needed. Expose no arbitrary IPC or paths.</p><p>Store tour version, step ID, status and completed contextual introductions. Account changes stop playback and fence late saves. Only Finish completes the tour; video ending never advances automatically.</p></section>
+          <section class="note-section"><h3>04 / Recording & delivery</h3><ol><li>Approve separate student and teacher scripts. This prototype demonstrates the student tour.</li><li>Record four landscape 16:9 clips, 25–35 seconds each. Explain the purpose, demonstrate one action and suggest one thing to try.</li><li>Prepare MP4, poster, Vietnamese WebVTT and transcript. Record with sample course content, without real account information.</li><li>Bundle the initial Vietnamese media for offline use and lazy-load one clip at a time. Add English media to the manifest later. A future CDN must use reviewed CSP sources.</li><li>Verify keyboard/Esc/focus, scroll/resize, reduced motion, offline/media errors, account changes, progress and reset. Keep readable text available when video fails.</li></ol></section>
+          <section class="note-section"><h3>05 / Contextual follow-ups</h3><p>Add one video on first use of joining a class, handing in work or creating a lesson (teacher). Each has its own ID and state. Introduce it in context instead of adding all clips to first sign-in. Watching onboarding never creates a class, starts a task or grants permissions.</p><p>This prototype persists only browser-local demo state. Account persistence, real media, role variants and contextual introductions are proposed implementation work.</p></section>`;
+      }
+
+      function translateInterface() {
+        document.documentElement.lang = locale;
+        Object.entries(content[locale]).forEach(([key, value]) => {
+          document.querySelectorAll(`[data-copy="${key}"]`).forEach((element) => {
+            element.textContent = value;
+          });
+        });
+        document.querySelectorAll('.close-button').forEach((element) => {
+          element.setAttribute('aria-label', content[locale].closeLabel);
+        });
+        getElement('cc-button').setAttribute('aria-label', content[locale].captionsLabel);
+        getElement('tour-panel').setAttribute('aria-label', content[locale].tourKicker);
+        renderNotes();
+        renderPage(selectedPage);
+        if (isTourOpen) {
+          showStep(stepIndex, false);
+        }
+      }
+
+      getElement('play-button').addEventListener('click', togglePlayback);
+      getElement('cc-button').addEventListener('click', () => {
+        hasCaptions = !hasCaptions;
+        getElement('cc-button').setAttribute('aria-pressed', String(hasCaptions));
+        updatePlayback();
+      });
+      getElement('next-button').addEventListener('click', () => {
+        if (stepIndex < steps.length - 1) {
+          showStep(stepIndex + 1);
+        } else {
+          saveProgress('completed');
+          hideTour();
+          getDialog('finish-dialog').showModal();
+        }
+      });
+      getElement('back-button').addEventListener('click', () => {
+        showStep(stepIndex - 1);
+      });
+      getElement('skip-button').addEventListener('click', dismissTour);
+      getElement('close-tour').addEventListener('click', dismissTour);
+      getElement('settings-button').addEventListener('click', openSettings);
+      getElement('restart-button').addEventListener('click', () => {
+        getDialog('settings-dialog').close();
+        showStep(0);
+      });
+      getElement('first-visit-button').addEventListener('click', () => {
+        hideTour();
+        getDialog('welcome-dialog').showModal();
+      });
+      getElement('start-button').addEventListener('click', () => {
+        getDialog('welcome-dialog').close();
+        showStep(0);
+      });
+      getElement('welcome-skip').addEventListener('click', () => {
+        getDialog('welcome-dialog').close();
+        dismissTour();
+      });
+      getElement('finish-button').addEventListener('click', () => {
+        getDialog('finish-dialog').close();
+      });
+      getElement('finish-settings').addEventListener('click', () => {
+        getDialog('finish-dialog').close();
+        openSettings();
+      });
+      getElement('notes-button').addEventListener('click', () => {
+        pausePlayback();
+        getDialog('notes-dialog').showModal();
+      });
+      getElement('locale').addEventListener('change', (event) => {
+        if (
+          event.target instanceof HTMLSelectElement &&
+          (event.target.value === 'vi' || event.target.value === 'en')
+        ) {
+          locale = event.target.value;
+          translateInterface();
+        }
+      });
+      document.querySelectorAll('[data-close]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const dialogId = button.getAttribute('data-close');
+          if (dialogId) {
+            getDialog(dialogId).close();
+          }
+        });
+      });
+      steps.forEach((step, index) => {
+        getElement(step.anchor).addEventListener('click', () => {
+          renderPage(index);
+        });
+      });
+      getElement('transcript').addEventListener('toggle', positionTour);
+      window.addEventListener('resize', positionTour);
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          pausePlayback();
+        }
+      });
+      document.addEventListener('keydown', (event) => {
+        if (!isTourOpen || document.querySelector('dialog[open]')) {
+          return;
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          dismissTour();
+        }
+      });
+      getDialog('welcome-dialog').addEventListener('close', () => {
+        if (!isTourOpen) {
+          saveProgress('dismissed');
+        }
+      });
+      const resizeObserver = new ResizeObserver(positionTour);
+      resizeObserver.observe(getElement('tour-panel'));
+      readProgress();
+      translateInterface();
+      if (!progress || progress.status === 'in-progress') {
+        showStep(progress?.stepIndex ?? 0);
+      } else {
+        renderPage(progress.stepIndex);
+      }
+    </script>
+  </body>
+</html>

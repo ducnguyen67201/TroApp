@@ -1,3 +1,8 @@
+import { OnboardingService } from '../../../src/desktop/onboarding/application/OnboardingService.js';
+import type { OnboardingStore } from '../../../src/desktop/onboarding/application/OnboardingStore.js';
+import { createOnboardingProgress } from '../../../src/desktop/onboarding/domain/OnboardingProgress.js';
+import type { OnboardingProgress } from '#contracts/Onboarding.js';
+import { OnboardingAction } from '#contracts/OnboardingValues.js';
 import { MaterialEditor } from '../../../src/desktop/renderer/classroom/MaterialEditor.js';
 import {
   MaterialState,
@@ -2083,6 +2088,77 @@ it('restores an existing classroom participation when the desktop opens', async 
   );
 });
 
+it('runs the navbar introduction without navigating and restarts it from Settings', async () => {
+  let saved: OnboardingProgress = createOnboardingProgress();
+  const store: OnboardingStore = {
+    readProgress: () => Promise.resolve(saved),
+    saveProgress: (_accountId, progress) => {
+      saved = progress;
+      return Promise.resolve();
+    },
+  };
+  const service = new OnboardingService(store);
+  const restartOnboarding = vi
+    .fn<NonNullable<DesktopBridge['restartOnboarding']>>()
+    .mockImplementation((request) =>
+      service.changeProgress(
+        request.expectedAccountId,
+        request.expectedRevision,
+        OnboardingAction.RESTART,
+      ),
+    );
+  window.tro = {
+    ...createDesktopBridge(),
+    readOnboardingProgress: (request) => service.readProgress(request.expectedAccountId),
+    updateOnboardingProgress: (request) =>
+      service.changeProgress(request.expectedAccountId, request.expectedRevision, request.action),
+    restartOnboarding,
+  };
+  renderDesktop();
+  await screen.findByRole('dialog', { name: 'A little help getting started.' });
+  fireEvent.click(screen.getByRole('button', { name: 'Show me around' }));
+  await screen.findByRole('heading', { name: 'Start with what you want to learn.' });
+  expect(screen.queryByText('Read transcript')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+  await screen.findByRole('heading', { name: 'Your class, materials and activities.' });
+  expect(window.location.hash).toBe('#/workspace');
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+  await screen.findByRole('heading', { name: 'See how far you’ve come.' });
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+  await screen.findByRole('heading', { name: 'Watch, try, then make it yours.' });
+  expect(screen.getByLabelText('Video introduction').getAttribute('src')).toMatch(
+    /StudentGuidedLessons\.mp4$/,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+  await screen.findByRole('heading', { name: 'Talk to Tro with your microphone.' });
+  expect(screen.getByLabelText('Video introduction').getAttribute('src')).toMatch(
+    /Microphone\.mp4$/,
+  );
+  expect(screen.getByText('Step 5 of 6')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+  await screen.findByRole('heading', { name: 'A little companion on your screen.' });
+  expect(screen.getByLabelText('Video introduction').getAttribute('src')).toMatch(/Pets\.mp4$/);
+  expect(window.location.hash).toBe('#/workspace');
+  fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+  await screen.findByRole('dialog', { name: 'Ready to explore Tro.' });
+  fireEvent.click(screen.getByRole('button', { name: 'Explore Tro' }));
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+  await screen.findByRole('button', { name: 'Restart onboarding' });
+  fireEvent.change(screen.getByLabelText('Language'), {
+    target: { value: DesktopLocale.VIETNAMESE },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Bắt đầu lại hướng dẫn' }));
+  await screen.findByRole('heading', { name: 'Bắt đầu từ điều bạn muốn học.' });
+  expect(restartOnboarding).toHaveBeenCalledExactlyOnceWith({
+    expectedAccountId: testUser.id,
+    expectedRevision: 7,
+  });
+  expect(saved.revision).toBe(8);
+});
+
 function createReleaseBridge(shouldAutoShow = false) {
   const status = {
     installedVersion: '0.1.0',
@@ -2209,4 +2285,26 @@ describe('what’s new', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Next' }));
     expect(within(dialog).getByRole('heading', { name: 'A hint when it matters.' })).toBeTruthy();
   });
+});
+
+it('defers first-time onboarding until pending release highlights close', async () => {
+  const progress = createOnboardingProgress();
+  window.tro = {
+    ...createReleaseBridge(true),
+    readOnboardingProgress: vi
+      .fn<NonNullable<DesktopBridge['readOnboardingProgress']>>()
+      .mockResolvedValue({ kind: 'ok', progress }),
+    updateOnboardingProgress: vi
+      .fn<NonNullable<DesktopBridge['updateOnboardingProgress']>>()
+      .mockResolvedValue({ kind: 'ok', progress }),
+    restartOnboarding: vi
+      .fn<NonNullable<DesktopBridge['restartOnboarding']>>()
+      .mockResolvedValue({ kind: 'ok', progress }),
+  };
+  renderDesktop();
+  const releaseDialog = await screen.findByRole('dialog', { name: 'What’s new' });
+  expect(screen.queryByRole('dialog', { name: 'A little help getting started.' })).toBeNull();
+  fireEvent.click(within(releaseDialog).getByRole('button', { name: 'Close introduction' }));
+  await screen.findByRole('dialog', { name: 'A little help getting started.' });
+  expect(screen.queryByRole('dialog', { name: 'What’s new' })).toBeNull();
 });

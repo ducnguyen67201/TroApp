@@ -1,3 +1,6 @@
+import { OnboardingService } from '../onboarding/application/OnboardingService.js';
+import { OnboardingPreferences } from './onboarding/OnboardingPreferences.js';
+import { registerOnboardingHandlers } from './onboarding/RegisterOnboarding.js';
 import { WhatsNewController } from './updates/WhatsNewController.js';
 import { WhatsNewPreferences } from './updates/WhatsNewPreferences.js';
 import {
@@ -526,6 +529,11 @@ async function startDesktop(): Promise<void> {
           voice.readStatus().state !== VoiceState.IDLE &&
           voice.readStatus().state !== VoiceState.DISABLED),
       ),
+  );
+  registerOnboardingHandlers(
+    ipcMain,
+    { isTrustedSender, readSession: () => auth.readSession(), gate: accountGate },
+    new OnboardingService(new OnboardingPreferences(join(app.getPath('userData'), 'onboarding'))),
   );
 
   const worldController = new PetWorldController(

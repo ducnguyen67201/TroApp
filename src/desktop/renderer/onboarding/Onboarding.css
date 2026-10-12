@@ -1,0 +1,92 @@
+.onboarding-dialog {
+  max-height: calc(100dvh - 32px);
+  background: var(--tro-surface);
+  box-shadow: 0 22px 60px #172e3333;
+}
+
+.onboarding-header {
+  background: var(--tro-surface);
+}
+
+.onboarding-header .mantine-Modal-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.onboarding-body {
+  overflow-wrap: anywhere;
+}
+
+.onboarding-spotlight {
+  position: fixed;
+  z-index: 301;
+  pointer-events: none;
+  border: 2px solid #efc59b;
+  border-radius: 16px;
+  box-shadow: 0 0 0 2px #242d3733;
+}
+
+.onboarding-step-label {
+  letter-spacing: 0.04em;
+}
+
+.onboarding-media video {
+  display: block;
+  width: 100%;
+  max-height: 240px;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  background: var(--tro-navigation);
+}
+
+.onboarding-video-empty {
+  min-height: 150px;
+  padding: 25px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-radius: 10px;
+  background: var(--tro-muted-surface);
+  color: var(--tro-muted);
+}
+
+.onboarding-video-language {
+  margin-bottom: 8px;
+}
+
+.onboarding-title {
+  line-height: 1.3;
+  letter-spacing: -0.025em;
+}
+
+.onboarding-takeaway {
+  padding: 12px 14px;
+  border-left: 2px solid var(--tro-classroom-orange);
+  border-radius: 0 8px 8px 0;
+  background: var(--tro-muted-surface);
+}
+
+.onboarding-transcript {
+  color: var(--tro-muted);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.onboarding-transcript summary {
+  width: fit-content;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.onboarding-transcript summary:focus-visible {
+  outline: 2px solid var(--tro-accent);
+  outline-offset: 4px;
+}
+
+.onboarding-actions {
+  border-top: 1px solid var(--tro-border);
+  padding-top: 16px;
+}
