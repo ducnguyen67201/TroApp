@@ -366,7 +366,7 @@ describe('desktop scaffold', () => {
     );
     await screen.findByRole('heading', { name: 'Welcome back, Alex' });
     expect(bridge.signInWithGoogle).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull();
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeTruthy();
   });
 
@@ -375,7 +375,8 @@ describe('desktop scaffold', () => {
     const account = await screen.findByRole('region', { name: 'Your account' });
     await within(account).findByText(testUser.email);
     expect(within(account).getByText(testUser.name)).toBeTruthy();
-    expect(within(account).getByRole('button', { name: 'Sign out' })).toBeTruthy();
+    expect(within(account).getByRole('button', { name: 'Switch account' })).toBeTruthy();
+    expect(within(account).queryByRole('button', { name: 'Sign out' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Workspace' }).getAttribute('aria-current')).toBe(
       'page',
     );
@@ -453,7 +454,7 @@ describe('desktop scaffold', () => {
     expect(bridge.startAgentSession).not.toHaveBeenCalled();
   });
 
-  it('clears account, draft and conversation after successful sidebar sign-out', async () => {
+  it('clears account, draft and conversation after successful account-menu sign-out', async () => {
     const bridge = createDesktopBridge();
     window.tro = bridge;
     renderDesktop();
@@ -462,7 +463,8 @@ describe('desktop scaffold', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send to Tro' }));
     await screen.findByText('Here is your answer.');
     fireEvent.change(input, { target: { value: 'A private draft' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Switch account' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign out of this account' }));
     await screen.findByRole('button', { name: 'Continue with Google' });
     expect(screen.queryByText(testUser.email)).toBeNull();
     expect(screen.queryByText('Here is your answer.')).toBeNull();
@@ -473,7 +475,7 @@ describe('desktop scaffold', () => {
     expect(bridge.signOut).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps sign-out disabled during an active task, including on Settings', async () => {
+  it('keeps the account menu disabled during an active task, including on Settings', async () => {
     const bridge = createDesktopBridge();
     let completeTask: ((result: AgentResult) => void) | undefined;
     bridge.sendAgentMessage.mockImplementation(
@@ -492,7 +494,7 @@ describe('desktop scaffold', () => {
       expect(bridge.sendAgentMessage).toHaveBeenCalledTimes(1);
     });
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
-    expect(screen.getByRole('button', { name: 'Sign out', hidden: true })).toHaveProperty(
+    expect(screen.getByRole('button', { name: 'Switch account', hidden: true })).toHaveProperty(
       'disabled',
       true,
     );
@@ -502,7 +504,7 @@ describe('desktop scaffold', () => {
       answer: 'Task finished.',
     });
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Sign out', hidden: true })).toHaveProperty(
+      expect(screen.getByRole('button', { name: 'Switch account', hidden: true })).toHaveProperty(
         'disabled',
         false,
       );
@@ -516,7 +518,8 @@ describe('desktop scaffold', () => {
     bridge.signOut.mockRejectedValue(new Error('Unavailable'));
     window.tro = bridge;
     renderDesktop();
-    fireEvent.click(await screen.findByRole('button', { name: 'Sign out' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Switch account' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign out of this account' }));
     expect(await screen.findByRole('alert')).toHaveProperty(
       'textContent',
       expect.stringContaining('Could not sign out.'),
@@ -693,7 +696,7 @@ describe('desktop language', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Language' }), {
       target: { value: 'vi' },
     });
-    expect(screen.getByRole('button', { name: 'Đăng xuất', hidden: true })).toHaveProperty(
+    expect(screen.getByRole('button', { name: 'Chuyển tài khoản', hidden: true })).toHaveProperty(
       'disabled',
       true,
     );
@@ -704,7 +707,7 @@ describe('desktop language', () => {
       answer: 'Completed in the original language.',
     });
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Đăng xuất', hidden: true })).toHaveProperty(
+      expect(screen.getByRole('button', { name: 'Chuyển tài khoản', hidden: true })).toHaveProperty(
         'disabled',
         false,
       );
@@ -825,7 +828,8 @@ describe('desktop language', () => {
     bridge.signOut.mockResolvedValue({ kind: 'failed', message: 'Unrecognized diagnostic' });
     window.tro = bridge;
     renderDesktop();
-    fireEvent.click(await screen.findByRole('button', { name: 'Đăng xuất' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Chuyển tài khoản' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Đăng xuất tài khoản này' }));
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toContain('Không thể đăng xuất. Vui lòng thử lại.');
     expect(alert.textContent).not.toContain('Unrecognized diagnostic');
@@ -2031,7 +2035,8 @@ it('offers saved accounts after signing out of only the current account', async 
   const fixture = createSavedAccountBridge();
   renderDesktop();
   await screen.findByRole('textbox', { name: 'Your message' });
-  fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Switch account' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Sign out of this account' }));
   await screen.findByRole('button', { name: 'Continue with Google' });
   expect(screen.queryByRole('navigation')).toBeNull();
   expect(document.querySelector('.desktop-sidebar')).toBeNull();
