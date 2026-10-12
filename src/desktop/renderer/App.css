@@ -1122,6 +1122,7 @@ textarea:focus-visible {
 
 .desktop-shell[data-compact='true'] .sidebar-bottom {
   flex-shrink: 0;
+  border-top: 1px solid var(--tro-navigation-selected);
 }
 
 .desktop-shell[data-compact='true'] .brand {
