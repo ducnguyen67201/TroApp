@@ -48,6 +48,14 @@ model User {
   workSnapshots ClassroomWorkSnapshot[]
   practiceChecks ClassroomPracticeCheck[]
   workSubmissions ClassroomWorkSubmission[]
+  petWallet PetWallet?
+  petWorld PetWorld?
+  receivedPetRecognitions PetRecognition[] @relation("PetRecognitionStudent")
+  issuedPetRecognitions PetRecognition[] @relation("PetRecognitionTeacher")
+  petRecognitionCorrections PetRecognitionCorrection[]
+  petPurchases PetPurchase[]
+  petHomeShares PetHomeShare[]
+  petWorldReceipts PetWorldReceipt[]
 
   @@map("user")
 }
@@ -87,6 +95,8 @@ model ClassroomGroup {
   @@index([teacherId])
   materialCollection ClassroomMaterialCollection?
   materialFiles ClassroomMaterialFile[]
+  petRecognitions PetRecognition[]
+  petHomeShares PetHomeShare[]
 }
 
 // Guided lesson drafts use validated aggregate documents. Immutable revisions,
@@ -591,4 +601,129 @@ model ClassroomExpiredSource {
   sourceId String
   expiredAt DateTime
   @@id([classId, sourceId])
+}
+
+/** Personal accounting. Zero initialization never creates a ledger entry. */
+model PetWallet {
+  studentId String @id
+  student User @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  balance BigInt @default(0)
+  revision BigInt @default(0)
+  entries PetWalletEntry[]
+}
+
+/** Immutable signed entries. The migration adds source/sign and append-only constraints. */
+model PetWalletEntry {
+  id String @id @db.Uuid
+  studentId String
+  wallet PetWallet @relation(fields: [studentId], references: [studentId], onDelete: Restrict)
+  kind String
+  delta BigInt
+  sourceId String @db.Uuid
+  requestId String @db.Uuid
+  recognitionId String? @db.Uuid
+  recognition PetRecognition? @relation(fields: [recognitionId, studentId], references: [id, studentId], onDelete: Restrict)
+  purchaseId String? @db.Uuid
+  purchase PetPurchase? @relation(fields: [purchaseId, studentId], references: [id, studentId], onDelete: Restrict)
+  correctionId String? @unique @db.Uuid
+  correction PetRecognitionCorrection? @relation(fields: [correctionId], references: [id], onDelete: Restrict)
+  createdAt DateTime
+  @@unique([studentId, kind, sourceId])
+  @@index([studentId, createdAt, id])
+}
+
+/** Private recognition content is separate from the minimal immutable point ledger. */
+model PetRecognition {
+  id String @id @db.Uuid
+  classId String @db.Uuid
+  schoolClass ClassroomGroup @relation(fields: [classId], references: [id], onDelete: Restrict)
+  teacherId String
+  teacher User @relation("PetRecognitionTeacher", fields: [teacherId], references: [id], onDelete: Restrict)
+  studentId String
+  student User @relation("PetRecognitionStudent", fields: [studentId], references: [id], onDelete: Restrict)
+  batchId String @db.Uuid
+  requestId String @db.Uuid
+  amount BigInt
+  category String
+  note String?
+  sessionId String? @db.Uuid
+  activityId String? @db.Uuid
+  createdAt DateTime
+  correction PetRecognitionCorrection?
+  entries PetWalletEntry[]
+  @@unique([id, studentId])
+  @@index([classId, createdAt, id])
+  @@index([studentId, createdAt, id])
+}
+
+/** One final correction per recognition; correcting prose never mutates point history. */
+model PetRecognitionCorrection {
+  id String @id @db.Uuid
+  recognitionId String @unique @db.Uuid
+  recognition PetRecognition @relation(fields: [recognitionId], references: [id], onDelete: Restrict)
+  teacherId String
+  teacher User @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  kind String
+  reason String?
+  createdAt DateTime
+  entry PetWalletEntry?
+}
+
+model PetPurchase {
+  id String @id @db.Uuid
+  studentId String
+  student User @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  itemId String
+  amount BigInt
+  catalogRevision String
+  requestId String @db.Uuid
+  createdAt DateTime
+  inventory PetInventoryItem?
+  entries PetWalletEntry[]
+  @@unique([id, studentId])
+  @@unique([studentId, requestId])
+  @@index([studentId, createdAt, id])
+}
+
+/** Personal permanent entitlement, independent of catalog availability or class membership. */
+model PetInventoryItem {
+  studentId String
+  itemId String
+  purchaseId String @unique @db.Uuid
+  purchase PetPurchase @relation(fields: [purchaseId, studentId], references: [id, studentId], onDelete: Restrict)
+  acquiredAt DateTime
+  @@id([studentId, itemId])
+  @@unique([purchaseId, studentId])
+}
+
+/** The bounded profile/appearance document is validated by the canonical contract. */
+model PetWorld {
+  studentId String @id
+  student User @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  revision BigInt
+  document Json
+}
+
+model PetHomeShare {
+  studentId String
+  student User @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  classId String @db.Uuid
+  schoolClass ClassroomGroup @relation(fields: [classId], references: [id], onDelete: Restrict)
+  enabled Boolean @default(false)
+  revision BigInt @default(0)
+  @@id([studentId, classId])
+  @@index([classId, enabled])
+}
+
+/** Successful receipts are committed with their accounting/world writes and retained for deduplication. */
+model PetWorldReceipt {
+  actorId String
+  actor User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  requestId String @db.Uuid
+  digest String @db.VarChar(64)
+  scopeKind String
+  scopeId String
+  reply Json
+  createdAt DateTime @default(now())
+  @@id([actorId, requestId])
 }

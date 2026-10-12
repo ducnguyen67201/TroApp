@@ -6,6 +6,13 @@ import {
 } from '#contracts/Onboarding.js';
 import { OnboardingFailure } from '#contracts/OnboardingValues.js';
 import {
+  WhatsNewCommand,
+  WhatsNewReplyKind,
+  WhatsNewReplySchema,
+  WhatsNewFailure,
+  type WhatsNewReply,
+} from '#contracts/WhatsNew.js';
+import {
   GuidedLessonReadRequestSchema,
   GuidedLessonCommandSchema,
   GuidedLessonReplySchema,
@@ -18,6 +25,12 @@ import {
   PracticeCaptureReplySchema,
 } from '#contracts/PracticeCapture.js';
 import { petOverlayBridge } from './PetPreload.js';
+import {
+  PetWorldCommandSchema,
+  PetWorldReplySchema,
+  PetWorldFailure,
+  isPetWorldMutationCommand,
+} from '#contracts/PetWorld.js';
 import {
   ClassroomInsightCommandSchema,
   ClassroomInsightReplySchema,
@@ -131,6 +144,30 @@ const bridge: DesktopBridge = {
       return OnboardingReplySchema.parse(raw);
     } catch {
       return { kind: 'failed', reason: OnboardingFailure.UNAVAILABLE };
+    }
+  },
+  async executePetWorld(command) {
+    try {
+      const raw: unknown = await ipcRenderer.invoke(
+        'tro:pet-world-command',
+        PetWorldCommandSchema.parse(command),
+      );
+      return PetWorldReplySchema.parse(raw);
+    } catch {
+      return { kind: 'failed', code: PetWorldFailure.UNAVAILABLE };
+    }
+  },
+  async readPetWorldPending() {
+    try {
+      const raw: unknown = await ipcRenderer.invoke('tro:pet-world-pending');
+      if (!Array.isArray(raw) || raw.length > 30) {
+        return [];
+      }
+      return raw
+        .map((value: unknown) => PetWorldCommandSchema.parse(value))
+        .filter(isPetWorldMutationCommand);
+    } catch {
+      return [];
     }
   },
   async readGuidedLessons(request) {
@@ -354,6 +391,8 @@ const bridge: DesktopBridge = {
       ipcRenderer.removeListener('tro:agent-progress', receive);
     };
   },
+  readWhatsNew: () => requestWhatsNew(WhatsNewCommand.READ),
+  markWhatsNewSeen: () => requestWhatsNew(WhatsNewCommand.MARK_SEEN),
   async readAppUpdate() {
     const reply = await requestAppUpdate(AppUpdateCommand.STATUS);
     return reply.kind === 'ok'
@@ -569,6 +608,17 @@ async function requestAccountAuth(command: AccountCommand): Promise<AuthResult> 
   return result.kind === 'accounts'
     ? { kind: 'failed', message: 'Could not update saved accounts.' }
     : result;
+}
+
+async function requestWhatsNew(
+  kind: (typeof WhatsNewCommand)[keyof typeof WhatsNewCommand],
+): Promise<WhatsNewReply> {
+  try {
+    const raw: unknown = await ipcRenderer.invoke('tro:whats-new', { kind });
+    return WhatsNewReplySchema.parse(raw);
+  } catch {
+    return { kind: WhatsNewReplyKind.FAILED, reason: WhatsNewFailure.UNAVAILABLE };
+  }
 }
 
 async function requestAppUpdate(

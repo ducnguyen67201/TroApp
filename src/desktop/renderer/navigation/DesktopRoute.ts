@@ -5,6 +5,7 @@ export const DesktopPage = {
   CLASSROOM: 'classroom',
   INSIGHTS: 'insights',
   GUIDED_LESSONS: 'guided-lessons',
+  PET_WORLD: 'pet-world',
 } as const;
 
 export const ClassView = {
@@ -44,6 +45,13 @@ export function parseDesktopRoute(hash: string): DesktopRoute {
   if (segments[1] === 'guided-lessons') {
     return {
       page: DesktopPage.GUIDED_LESSONS,
+      classId: classId.success ? classId.data : null,
+      classView: ClassView.OVERVIEW,
+    };
+  }
+  if (segments[1] === 'pet-world') {
+    return {
+      page: DesktopPage.PET_WORLD,
       classId: classId.success ? classId.data : null,
       classView: ClassView.OVERVIEW,
     };

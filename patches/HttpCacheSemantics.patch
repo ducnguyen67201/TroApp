@@ -1,0 +1,19 @@
+diff --git a/index.js b/index.js
+index 56c26025074cbcf218e3ec4d810662da93f8024e..3f864293a02985e12cfff8a8e726b5fb0846b029 100644
+--- a/index.js
++++ b/index.js
+@@ -395,6 +395,14 @@ module.exports = class CachePolicy {
+     evaluateRequest(req) {
+         this._assertRequestHasHeaders(req);
+ 
++        // Client max-stale must not override response reuse restrictions.
++        if (!this.storable() || this._rescc['no-cache'] ||
++            (this._isShared && this._resHeaders['set-cookie'] &&
++                !this._rescc.public && !this._rescc.immutable) ||
++            this._resHeaders.vary === '*') {
++            return this._evaluateRequestMissResult(req);
++        }
++
+         // In all circumstances, a cache MUST NOT ignore the must-revalidate directive
+         if (this._rescc['must-revalidate']) {
+             return this._evaluateRequestMissResult(req);

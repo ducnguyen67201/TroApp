@@ -25,6 +25,7 @@ const initialSnapshot: PetSnapshot = {
   isVisible: false,
   hasPresentationError: false,
   encouragement: false,
+  backdropId: null,
 };
 
 function createBridge() {

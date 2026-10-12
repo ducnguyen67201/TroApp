@@ -1,6 +1,8 @@
 import { OnboardingService } from '../onboarding/application/OnboardingService.js';
 import { OnboardingPreferences } from './onboarding/OnboardingPreferences.js';
 import { registerOnboardingHandlers } from './onboarding/RegisterOnboarding.js';
+import { WhatsNewController } from './updates/WhatsNewController.js';
+import { WhatsNewPreferences } from './updates/WhatsNewPreferences.js';
 import {
   GuidedLessonReadRequestSchema,
   GuidedLessonCommandSchema,
@@ -12,12 +14,17 @@ import {
   failure as guidedLessonFailure,
 } from './guidedLessons/GuidedLessonApiClient.js';
 import { PetController } from './pets/PetController.js';
+import { PetWorldApiClient } from './petWorld/PetWorldApiClient.js';
+import { PetWorldController } from './petWorld/PetWorldController.js';
+import { PetWorldPreferences } from './petWorld/PetWorldPreferences.js';
+import { PetWorldCommandKind } from '#contracts/PetWorld.js';
 import { PetWindow } from './pets/PetWindow.js';
 import { PetPreferences } from './pets/PetPreferences.js';
 import {
   PetCommandSchema,
   PetOverlayCommandSchema,
   PetOverlayAction,
+  PetAction,
   PetFailure,
   PetReaction,
   type PetReply,
@@ -126,6 +133,7 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 const mainDirectory = dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | undefined;
 let pets: PetController | undefined;
+let petWorld: PetWorldController | undefined;
 let petWindow: PetWindow | undefined;
 let chat: AgentChatController | undefined;
 let classroom: ClassroomSessionController | undefined;
@@ -248,21 +256,39 @@ async function startDesktop(): Promise<void> {
     return isTrustedSender(event) && generation === petAccessGeneration;
   }
 
-  ipcMain.handle('tro:pet-read', async (event): Promise<PetReply> => {
-    return (await canUsePets(event))
-      ? { kind: 'ok', snapshot: petController.readSnapshot() }
-      : { kind: 'failed', reason: PetFailure.UNAVAILABLE };
-  });
-  ipcMain.handle('tro:pet-command', async (event, raw: unknown): Promise<PetReply> => {
-    const parsed = PetCommandSchema.safeParse(raw);
-    if (!parsed.success) {
-      return { kind: 'failed', reason: PetFailure.INVALID };
-    }
-    if (!(await canUsePets(event))) {
-      return { kind: 'failed', reason: PetFailure.UNAVAILABLE };
-    }
-    return petController.executeCommand(parsed.data);
-  });
+  ipcMain.handle('tro:pet-read', (event): Promise<PetReply> =>
+    accountGate.runRequest(
+      async (): Promise<PetReply> => {
+        if (!(await canUsePets(event))) {
+          return { kind: 'failed', reason: PetFailure.UNAVAILABLE };
+        }
+        await worldController.execute({ kind: PetWorldCommandKind.OWN_WORLD }, () =>
+          isTrustedSender(event),
+        );
+        return isTrustedSender(event)
+          ? { kind: 'ok', snapshot: petController.readSnapshot() }
+          : { kind: 'failed', reason: PetFailure.UNAVAILABLE };
+      },
+      { kind: 'failed', reason: PetFailure.UNAVAILABLE },
+    ),
+  );
+  ipcMain.handle('tro:pet-command', (event, raw: unknown): Promise<PetReply> =>
+    accountGate.runRequest(
+      async (): Promise<PetReply> => {
+        const parsed = PetCommandSchema.safeParse(raw);
+        if (!parsed.success) {
+          return { kind: 'failed', reason: PetFailure.INVALID };
+        }
+        if (!(await canUsePets(event))) {
+          return { kind: 'failed', reason: PetFailure.UNAVAILABLE };
+        }
+        return parsed.data.kind === PetAction.ADOPT
+          ? worldController.adoptPet(parsed.data, () => isTrustedSender(event))
+          : petController.executeCommand(parsed.data);
+      },
+      { kind: 'failed', reason: PetFailure.UNAVAILABLE },
+    ),
+  );
   ipcMain.handle('tro:pet-overlay-read', (event) => {
     if (!overlay.isTrustedSender(event)) {
       throw new Error('Pet presentation is unavailable.');
@@ -341,6 +367,13 @@ async function startDesktop(): Promise<void> {
   const updateController = updates;
   ipcMain.handle('tro:update-command', (event, rawCommand: unknown): Promise<AppUpdateReply> =>
     runAppUpdateCommand(updateController, rawCommand, isTrustedSender(event)),
+  );
+  const whatsNew = new WhatsNewController(
+    new WhatsNewPreferences(app.getPath('userData')),
+    app.getVersion(),
+  );
+  ipcMain.handle('tro:whats-new', (event, raw: unknown) =>
+    whatsNew.execute(raw, isTrustedSender(event)),
   );
   let isStartingMicrophone = false;
   const cancelShortcut = new GlobalTaskCancelShortcut(globalShortcut);
@@ -501,6 +534,26 @@ async function startDesktop(): Promise<void> {
     ipcMain,
     { isTrustedSender, readSession: () => auth.readSession(), gate: accountGate },
     new OnboardingService(new OnboardingPreferences(join(app.getPath('userData'), 'onboarding'))),
+  );
+
+  const worldController = new PetWorldController(
+    new PetWorldApiClient(environment.API_BASE_URL, () => auth.readCookie()),
+    accountGate,
+    new PetWorldPreferences(join(app.getPath('userData'), 'pet-world')),
+    petController,
+    () => auth.readSession(),
+  );
+  petWorld = worldController;
+  powerMonitor.on('resume', () => {
+    if (!isQuitting) {
+      void worldController.execute({ kind: PetWorldCommandKind.OWN_WORLD }, () => !isQuitting);
+    }
+  });
+  ipcMain.handle('tro:pet-world-command', (event, raw: unknown) =>
+    worldController.execute(raw, () => isTrustedSender(event)),
+  );
+  ipcMain.handle('tro:pet-world-pending', (event) =>
+    worldController.readPending(() => isTrustedSender(event)),
   );
 
   const practiceShortcut = new GlobalPracticeShortcut(globalShortcut);
@@ -1067,6 +1120,7 @@ async function startDesktop(): Promise<void> {
   ): Promise<AuthResult> {
     return accountGate.changeAccount(async () => {
       petAccessGeneration += 1;
+      worldController.dispose();
       petController.dispose();
       overlay.closePet();
       classroomController.dispose();
@@ -1117,13 +1171,23 @@ async function startDesktop(): Promise<void> {
           return { kind: 'pending' };
         }
         const generation = petAccessGeneration;
+        const isCurrentStatus = (): boolean =>
+          isTrustedSender(event) && generation === petAccessGeneration;
         const result = await chat.readAuthSession();
-        if (isTrustedSender(event) && generation === petAccessGeneration) {
-          if (result.kind === 'signed-in' || result.kind === 'signed-out') {
-            await petController.setAccount(result.kind === 'signed-in' ? result.user.id : null);
-          }
+        if (!isCurrentStatus()) {
+          return { kind: 'pending' };
         }
-        return result;
+        if (result.kind === 'signed-in' || result.kind === 'signed-out') {
+          const accountId = result.kind === 'signed-in' ? result.user.id : null;
+          await petController.setAccount(accountId);
+          if (!isCurrentStatus()) {
+            return { kind: 'pending' };
+          }
+          await worldController.setAccount(accountId).catch(() => {
+            console.warn('pet.world.local.failed', { stage: 'account' });
+          });
+        }
+        return isCurrentStatus() ? result : { kind: 'pending' };
       }
       case 'sign-in-google':
         return changeActiveAccount(() => auth.signInWithGoogle());
@@ -1233,6 +1297,7 @@ async function startDesktop(): Promise<void> {
     mainWindow = window;
     window.webContents.on('render-process-gone', () => {
       petAccessGeneration += 1;
+      worldController.dispose();
       petController.dispose();
       overlay.closePet();
       disableVoice();
@@ -1284,6 +1349,7 @@ async function startDesktop(): Promise<void> {
     );
     window.on('closed', () => {
       petAccessGeneration += 1;
+      worldController.dispose();
       petController.dispose();
       overlay.closePet();
       practiceShortcut.disable();
@@ -1293,6 +1359,14 @@ async function startDesktop(): Promise<void> {
       mainWindow = undefined;
       disableVoice();
       chat?.dispose();
+    });
+    window.on('focus', () => {
+      if (isTrustedFrameUrl(window.webContents.getURL(), documentUrl)) {
+        void worldController.execute(
+          { kind: PetWorldCommandKind.OWN_WORLD },
+          () => !window.isDestroyed(),
+        );
+      }
     });
 
     if (developmentUrl) {
@@ -1339,6 +1413,7 @@ app.on('before-quit', (event) => {
   voiceShortcut.disableShortcut();
   voice?.invalidateVoiceInput();
   desktopCompanion?.dispose();
+  petWorld?.dispose();
   pets?.dispose();
   petWindow?.dispose();
   classroom?.dispose();

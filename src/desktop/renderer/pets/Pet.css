@@ -44,6 +44,14 @@
   touch-action: none;
   cursor: grab;
 }
+.pet-backdrop {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  width: 136px;
+  height: 100px;
+  pointer-events: none;
+}
 .pet-hit-region:active {
   cursor: grabbing;
 }

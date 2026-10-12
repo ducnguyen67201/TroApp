@@ -119,6 +119,7 @@ let pet: PetSnapshot = {
   isVisible: false,
   hasPresentationError: false,
   encouragement: false,
+  backdropId: null,
 };
 
 window.localStorage.setItem('tro.desktop.locale', 'vi');

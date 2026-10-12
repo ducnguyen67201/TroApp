@@ -15,6 +15,7 @@ not requirements or evidence that a capability exists.
 - [Voice input and narration](#voice-input-and-narration)
 - [Classroom and materials](#classroom-and-materials)
 - [Guided lessons beta](#guided-lessons-beta)
+- [Pet World and classroom recognition](#pet-world-and-classroom-recognition)
 - [Local presentation and app updates](#local-presentation-and-app-updates)
 - [Code ownership](#code-ownership)
 - [Verification and current limits](#verification-and-current-limits)
@@ -863,6 +864,96 @@ lessons. Help receipts bind their reply to the resulting learner progress versio
 and scene, so a lost response can replay the same hint without consuming another
 hint or exposing a stale answer after the learner moves.
 
+## Pet World and classroom recognition
+
+[PetWorld.ts](../src/contracts/PetWorld.ts) owns strict commands, replies, decimal
+point strings, catalog capabilities and separate owner, teacher, visitor and garden
+projections. The authenticated versioned HTTP route is wired in `StartApi.ts`;
+there is no award capability in agent, model, worker or MCP tools.
+
+[PetWorldService.ts](../src/server/features/petWorld/application/PetWorldService.ts)
+is the application facade. Focused operation functions own awards, purchases,
+profile/equipment changes, sharing, corrections and reads. Framework-free domain
+functions own arithmetic, compatibility and recognition coverage. The root
+`PetWorldStore` port owns one atomic callback; its scoped `PetWorldTransaction`
+port exposes no nested transaction runner, network or Prisma surface.
+[PrismaPetWorldStore.ts](../src/server/persistence/PrismaPetWorldStore.ts) contains
+database mapping, conditional revision writes and complete serializable transaction
+retries, including commit conflicts.
+
+Each student owns one account-wide wallet and home across classes and devices.
+Wallets begin at zero; initializing the free home and pet creates no point award
+or purchased inventory. Leaving a class preserves the student's wallet and items.
+Only a current teacher owning a nondeleted class can issue positive points to its
+currently enrolled student-role accounts. Amounts have no teacher budget or product
+quota; the owning contract rejects values beyond database storage capacity. Wire
+amounts are canonical decimal strings and persistence uses bigint. A grant batch,
+ledger entries, wallet revisions and deduplication receipt commit together. Purchases
+atomically debit the server catalog price and create permanent inventory, optionally
+equipping with a world revision guard. Each student can own an item only once;
+buying an already owned item is rejected. A failed purchase leaves no charge or item.
+The additive migration also checks ledger signs/provenance, final wallet/ledger
+agreement and immutable accounting history.
+
+Mutation request IDs identify one logical intent. Matching authorized retries return
+the original minimal outcome; changed content conflicts. Replays recheck current
+resource access. The original teacher can reverse a whole uncorrected award only
+when the wallet can cover it, or finally void recognition while preserving points
+and items. Corrections cannot credit points. Sign-in, practice feedback, pet actions
+and garden milestones never mint points automatically.
+
+Homes start private, with consent scoped to one class. Class withdrawal/deletion
+disables sharing in its own transaction; visits still recheck class access, current
+enrollment and consent. Visitor projections contain cosmetics without balances,
+teacher notes, email or learning evidence. Teacher recognition views expose only
+their class's awards and descriptive coverage, never student-wide wealth/spending.
+A class garden counts distinct nonvoided award batches and changes shared scenery.
+Neighborhood reads fetch consented, currently enrolled homes in one bulk projection
+and group distinct uncorrected batches in PostgreSQL; they do not load private
+recognition prose or issue per-student home queries. These reads share the same
+serializable snapshot as the caller's class authorization.
+Recognition coverage describes recorded teacher choices within its displayed period;
+it does not establish mastery, attention or engagement. Existing practice review and
+learning insights remain the evidence owners.
+
+Private recognition notes and correction reasons expire using the existing validated
+classroom retention duration. A bounded purge, scheduled through the existing
+retention runner, removes prose while preserving accounting, ownership and minimal
+receipts. Ordinary logs record bounded operation/error identifiers and timing,
+without note content or raw requests. Successful routine reads remain quiet.
+
+[PetWorldController.ts](../src/desktop/main/petWorld/PetWorldController.ts) owns
+account fences, cancellation, confirmed appearance and persisted unresolved online
+intents. Its API client validates transport JSON; the renderer uses named,
+sender-checked preload methods. React hooks consume authoritative state rather than
+calculating balances. The Pet World page provides manual teacher awards, history,
+shop, inventory, home decoration and opted-in class visits. Active views and the
+visible companion refresh at the owning interval and on focus/resume. Mutations
+require online confirmation; retries reuse the saved intent across restarts.
+Owner history and teacher recognition append older pages while retaining the
+newest rows. Unchanged background refreshes preserve loaded teacher pages and
+their continuation cursor. Server cursors bind the full recognition dataset;
+a changed first-page cursor or an expired continuation resets that snapshot.
+Account, class and period changes discard pending recognition pages. Wallet
+revision changes invalidate owner history before another page can be accepted.
+
+Owner initialization imports the full validated local cat/fox identity/name map only
+when the cloud profile is absent. Teacher grants create wallets without pet profiles.
+Existing cloud profiles win on subsequent devices. The existing pet picker routes
+owner identity/name edits through the cloud profile; teacher pets without wallets
+keep their local flow. Device preferences retain enabled state, placement, quiet
+mode, locale and reduced motion. Main publishes only confirmed cosmetic appearance
+through the existing pet controller and restricted overlay bridge. Bundled passive
+backdrops fit the existing window and remain click-through around the pet; outfits
+await compatible animation artwork. Last confirmed account-scoped cosmetics can
+display offline. School tenancy, shared purchased inventory, transfers and real-money
+commerce are outside the current feature.
+
+The [HTML prototype](../examples/previews/PetLearningLoop.html) is a visual
+reference with fictional, in-memory interactions. Implemented ownership, boundaries
+and behavior are maintained here; the contracts and source linked above own their
+details.
+
 ## Local presentation and app updates
 
 The account-scoped introductory tour is separate from OS permission onboarding.
@@ -892,7 +983,8 @@ only named read, update and restart operations, with no media URL/path capabilit
 reads and saves across account changes. App supplies navbar anchors and activity
 admission; [OnboardingFlow](../src/desktop/renderer/onboarding/OnboardingFlow.tsx)
 owns modal focus, anchor measurement and presentation. It defers during active
-work, visible permission setup and other dialogs, including exit transitions.
+work, visible permission setup and other dialogs, including release highlights
+and their exit transitions. Pending automatic release highlights take priority.
 The six steps cover Workspace, Classes, Insights, Guided Lessons, Microphone and
 Pets. Microphone points to its navbar button; Pets points to Settings and describes
 the Pets tab. Advancing highlights controls without navigating or starting work.
@@ -912,8 +1004,8 @@ requires a user action and pauses on unmount, language/account changes, deferral
 or a hidden window. Ending a video does not advance progress. Actual presenter
 recordings are not yet supplied; five approved Vietnamese AI-narrated exports are
 bundled instead. The three classroom clips are student-specific; teachers retain
-their written classroom guidance. Microphone and Pets recordings serve both roles. Contextual first-use guides and cross-device
-progress sync remain future work. Recording setup and manual checks live in README.
+their written classroom guidance. Microphone and Pets recordings serve both roles.
+Contextual first-use guides and cross-device progress sync remain future work. Recording setup and manual checks live in README.
 
 The five Vietnamese Remotion walkthroughs in `examples/previews/onboarding/` are
 authoring source, outside the runtime. Framework-free `VideoContent` owns the
@@ -948,8 +1040,9 @@ Mantine defaults and semantic styling belong in `Theme.ts` and
 typed and voice tasks. The optional pet is composed separately by `PetController`
 and `PetWindow`: account-scoped local preferences, bundled raster assets, restricted
 preload and a sandboxed transparent window. It hides during agent work and voice
-capture, captures no screen and makes no model request. Generated pets and cloud
-collections are not implemented. `PetPresentation.ts` selects one shared
+capture, captures no screen and makes no model request. Cloud identity and equipped
+backdrops arrive through Pet World; generated pets and uploaded artwork are not
+implemented. `PetPresentation.ts` selects one shared
 `PetRenderer` implementation for the gallery and overlay. The stateless
 `PageMascotRenderer` class adapts the pinned, unmodified `page-mascot` dependency
 for bundled cat/fox direction and reaction sheets. The legacy slime asset and
@@ -976,6 +1069,35 @@ actions. Restart is blocked during active work and cleans up workers/driver firs
 Main validates events before preload exposes progress; the renderer has no arbitrary
 installer path or update URL capability. Signing, notarization and live installed-app
 update acceptance remain release work.
+
+“What’s new” is a permanent action beside Settings, with manual replay also
+available on the signed-out screen. The bundled, EN/VI release catalog in
+[ReleaseNotes.ts](../src/desktop/updates/ReleaseNotes.ts) owns versioned highlights
+and feature illustrations; it is independent of update feeds and contains no
+remote HTML. Add an entry for the shipped package version when there are meaningful
+highlights; a patch without an entry retains earlier notes for manual viewing.
+Future release notes are excluded from older installed versions.
+
+[WhatsNewController.ts](../src/desktop/main/updates/WhatsNewController.ts) compares
+Electron’s installed version with installation-scoped preferences. The first
+launch establishes a baseline without automatically opening a tour. A later stable
+upgrade with unseen highlights introduced after the previous installed version
+records a pending introduction; skipped
+versions show only the latest installed release. Downgrades do not trigger a tour.
+The renderer waits for a signed-in, permission-ready, idle window with no other
+dialog before automatic presentation. Pending state survives an interrupted startup.
+Presentation clears the unread dot and records the release as seen, even if the
+user closes early; manual replay remains unlimited. This state is per installation,
+not per account, and does not use the backend database.
+
+[WhatsNewPreferences.ts](../src/desktop/main/updates/WhatsNewPreferences.ts) owns a
+validated `WhatsNew.json` file under Electron’s userData directory and atomic writes.
+Unreadable/unsupported files are preserved, automatic presentation is suppressed,
+and bounded `whats-new.preferences.failed` events identify `load` or `mark-seen`.
+A save failure leaves the current tour usable and explains that it may reappear
+after restart. Preload exposes only named read/mark-seen methods; main verifies
+the sender and selects the release itself. The renderer receives no file paths,
+arbitrary release-write capability or database access.
 
 The backend deployment target is Railway using the repository Dockerfile and
 versioned migrations. `/health/live` reports the process, while `/health/ready`
@@ -1004,6 +1126,7 @@ try-on generation remain future work; there is no implemented try-on job pipelin
 | Persistence                      | [PrismaClassroomStore.ts](../src/server/persistence/PrismaClassroomStore.ts), [schema.prisma](../prisma/schema.prisma), reviewed additive migrations                                                                                                                                                                                                         |
 | Onboarding                       | [OnboardingService.ts](../src/desktop/onboarding/application/OnboardingService.ts), [OnboardingFlow.tsx](../src/desktop/renderer/onboarding/OnboardingFlow.tsx), [OnboardingPreferences.ts](../src/desktop/main/onboarding/OnboardingPreferences.ts)                                                                                                         |
 | Updates and pets                 | [AppUpdateController.ts](../src/desktop/main/updates/AppUpdateController.ts), [PetController.ts](../src/desktop/main/pets/PetController.ts)                                                                                                                                                                                                                  |
+| Pet World and recognition        | [PetWorldService.ts](../src/server/features/petWorld/application/PetWorldService.ts), [PetWorld.ts](../src/contracts/PetWorld.ts), [PetWorldController.ts](../src/desktop/main/petWorld/PetWorldController.ts), [PetWorldPage.tsx](../src/desktop/renderer/petWorld/PetWorldPage.tsx)                                                                        |
 | Runtime configuration            | [backend Env.ts](../src/server/Env.ts), [main Env.ts](../src/desktop/main/Env.ts), [scripts Env.ts](../scripts/Env.ts)                                                                                                                                                                                                                                       |
 
 Tests mirror `src` under `test`. Production code never imports tests or sibling

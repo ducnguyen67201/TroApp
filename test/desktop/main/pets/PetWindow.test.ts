@@ -96,6 +96,7 @@ const snapshot: PetSnapshot = {
   isVisible: true,
   hasPresentationError: false,
   encouragement: false,
+  backdropId: null,
 };
 
 function createWindow() {

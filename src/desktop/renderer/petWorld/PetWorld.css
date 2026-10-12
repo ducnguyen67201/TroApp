@@ -1,0 +1,308 @@
+.pet-world-page {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 28px 34px 48px;
+  color: var(--mantine-color-charcoal-9);
+}
+
+.desktop-shell[data-page='pet-world'] .panel-content {
+  padding: 0;
+}
+
+.desktop-shell[data-page='pet-world'] .main-panel {
+  background: #faf9f5;
+}
+
+.pet-world-heading {
+  margin-bottom: 24px;
+}
+
+.pet-world-eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 650;
+  color: #64766b;
+}
+
+.pet-world-heading h1,
+.pet-world-panel h2,
+.pet-home-heading h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+
+.pet-world-heading h1 {
+  font-size: clamp(28px, 3vw, 40px);
+  line-height: 1.15;
+  margin: 6px 0 10px;
+}
+
+.pet-world-wallet {
+  min-width: 150px;
+  border: 1px solid #e4d8b8;
+  border-radius: 18px;
+  background: #f2ead4;
+  padding: 14px 20px;
+}
+
+.pet-world-wallet strong {
+  display: block;
+  font-size: 27px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.pet-world-wallet small {
+  color: #776640;
+}
+
+.pet-world-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(270px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.pet-world-panel,
+.pet-home-card {
+  border: 1px solid #dfe5d7;
+  border-radius: 22px;
+  background: #fffefa;
+  overflow: hidden;
+}
+
+.pet-world-panel {
+  padding: 22px;
+}
+
+.pet-world-panel h2,
+.pet-home-heading h2 {
+  margin: 0 0 8px;
+  font-size: 25px;
+}
+
+.pet-world-section {
+  margin-top: 24px;
+}
+
+.pet-world-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.pet-world-item {
+  border: 1px solid #dfe5d7;
+  border-radius: 17px;
+  background: #fffefa;
+  overflow: hidden;
+}
+
+.pet-world-item-art {
+  height: 112px;
+  background: #e9efdf;
+  display: grid;
+  place-items: center;
+  color: #637d55;
+}
+
+.pet-world-item-art[data-category='backdrop'] {
+  background: #e4e9f0;
+  color: #667a97;
+}
+
+.pet-world-item-art[data-category='home'] {
+  background: #f2e8d7;
+  color: #a58b59;
+}
+
+.pet-world-item-copy {
+  padding: 13px;
+}
+
+.pet-world-item-copy p {
+  margin: 6px 0 12px;
+  min-height: 38px;
+}
+
+.pet-world-item-copy button {
+  width: 100%;
+}
+
+.pet-world-memory {
+  border-bottom: 1px solid #e7e9e1;
+  padding: 13px 0;
+}
+
+.pet-world-memory:last-child {
+  border-bottom: 0;
+}
+
+.pet-world-empty {
+  padding: 22px 0;
+  color: #6e786e;
+}
+
+.pet-home-scene {
+  position: relative;
+  min-height: 330px;
+  isolation: isolate;
+  overflow: hidden;
+  background: #e9efdf;
+}
+
+.pet-home-heading {
+  position: relative;
+  z-index: 3;
+  padding: 22px;
+  max-width: 80%;
+}
+
+.pet-home-scene[data-backdrop='starry-sky'] .pet-home-heading {
+  color: #fff7da;
+}
+
+.pet-world-garden-plants {
+  display: flex;
+  align-items: end;
+  gap: 20px;
+  padding: 25px 16px 10px;
+  margin-block: 14px;
+  min-height: 100px;
+  border-bottom: 8px solid #bdcda4;
+  border-radius: 24px;
+  background: #eef3e2;
+  color: #769263;
+  overflow: hidden;
+}
+
+.pet-home-landscape {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.pet-home-pet {
+  position: absolute;
+  left: 48%;
+  bottom: 36px;
+  z-index: 2;
+}
+
+.pet-home-decoration {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #ffffff20;
+  color: #688355;
+  z-index: 2;
+}
+
+.pet-home-decoration[data-slot='garden'] {
+  left: 9%;
+  bottom: 45px;
+}
+
+.pet-home-decoration[data-slot='home'] {
+  left: 25%;
+  bottom: 112px;
+  color: #9d8055;
+}
+
+.pet-home-decoration[data-slot='feature'] {
+  right: 10%;
+  bottom: 54px;
+  color: #738caa;
+}
+
+.pet-home-footer {
+  padding: 15px 20px;
+  background: #f5f7ed;
+  border-top: 1px solid #dfe5d7;
+}
+
+.pet-world-neighbors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.pet-world-neighbor {
+  padding: 16px;
+  border: 1px solid #dfe5d7;
+  border-radius: 16px;
+  background: #f5f7ed;
+}
+
+.pet-world-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.pet-world-table th,
+.pet-world-table td {
+  padding: 12px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid #e7e9e1;
+}
+
+.pet-world-table th {
+  color: #64766b;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+
+.pet-world-scroll {
+  overflow-x: auto;
+}
+
+.pet-world-coverage {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.pet-world-coverage article {
+  border: 1px solid #e1e7da;
+  border-radius: 14px;
+  padding: 14px;
+  background: #f7f8f2;
+}
+
+.pet-world-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(150px, 0.7fr);
+  gap: 16px;
+}
+
+@media (max-width: 1000px) {
+  .pet-world-page {
+    padding: 24px 20px 40px;
+  }
+
+  .pet-world-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .pet-world-page {
+    padding: 18px 14px 32px;
+  }
+
+  .pet-world-form {
+    grid-template-columns: 1fr;
+  }
+
+  .pet-world-panel {
+    padding: 17px;
+  }
+}

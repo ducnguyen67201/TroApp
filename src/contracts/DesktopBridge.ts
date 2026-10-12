@@ -1,3 +1,4 @@
+import type { WhatsNewReply } from './WhatsNew.js';
 import type {
   OnboardingRead,
   OnboardingUpdate,
@@ -13,6 +14,7 @@ import type {
 } from './GuidedLessons.js';
 import type { PracticeCaptureCommand, PracticeCaptureReply } from './PracticeCapture.js';
 import type { PetCommand, PetReply, PetSnapshot } from './Pet.js';
+import type { PetWorldCommand, PetWorldReply } from './PetWorld.js';
 import type { PracticeShortcutEvent } from './PracticeShortcut.js';
 import type { PracticeCommand, PracticeReply } from './PracticeCheck.js';
 import type {
@@ -51,6 +53,8 @@ export interface DesktopBridge {
   readOnboardingProgress?: (request: OnboardingRead) => Promise<OnboardingReply>;
   updateOnboardingProgress?: (request: OnboardingUpdate) => Promise<OnboardingReply>;
   restartOnboarding?: (request: OnboardingRestart) => Promise<OnboardingReply>;
+  executePetWorld?: (command: PetWorldCommand) => Promise<PetWorldReply>;
+  readPetWorldPending?: () => Promise<PetWorldCommand[]>;
   readGuidedLessons?: (request: GuidedLessonReadRequest) => Promise<GuidedLessonReply>;
   commandGuidedLesson?: (command: GuidedLessonCommand) => Promise<GuidedLessonReply>;
   readGuidedLessonArtifact?: (
@@ -80,6 +84,8 @@ export interface DesktopBridge {
   controlClassroom?: (command: ClassroomCommand) => Promise<ClassroomReply>;
   readPreparedClassroomSubmission?(): Promise<ClassroomReply>;
   updateTeachingLocale?: (sessionId: string, locale: DesktopLocale) => Promise<AgentResult>;
+  readWhatsNew?: () => Promise<WhatsNewReply>;
+  markWhatsNewSeen?: () => Promise<WhatsNewReply>;
   readAppUpdate(): Promise<AppUpdateSnapshot>;
   checkAppUpdate(): Promise<AppUpdateReply>;
   downloadAppUpdate(): Promise<AppUpdateReply>;
