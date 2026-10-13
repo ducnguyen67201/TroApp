@@ -130,6 +130,17 @@ for (const file of await collectFiles(root)) {
       }
 
       if (
+        ownerPath.startsWith('src/lessonVideoPresentation/') &&
+        /^(?:src\/(?:server|desktop|lessonRenderer)\/|node:|@prisma|openai|gaxios|electron)/.test(
+          importPath,
+        )
+      ) {
+        failures.push(
+          `${filePath}: presentation cannot import process adapters or backend configuration.`,
+        );
+      }
+
+      if (
         ownerPath.includes('/domain/') &&
         /^(?:node:|fastify|zod|react|electron|@prisma)|\/persistence\//.test(importPath)
       ) {

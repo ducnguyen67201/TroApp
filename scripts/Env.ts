@@ -141,3 +141,31 @@ export function readWindowsSigningEnv(
     publisher: validated.AZURE_SIGNING_PUBLISHER,
   };
 }
+
+/** Desktop development inherits OS paths, never backend credentials injected by Doppler. */
+export function readDesktopChildEnv(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const validated = createEnv({
+    server: {
+      PATH: z.string(),
+      HOME: z.string(),
+      TMPDIR: z.string().optional(),
+      USER: z.string().optional(),
+      SHELL: z.string().optional(),
+      LANG: z.string().optional(),
+      DISPLAY: z.string().optional(),
+    },
+    runtimeEnv: environment,
+    onValidationError: () => {
+      throw new Error('Desktop host environment is invalid.');
+    },
+  });
+  return {
+    PATH: validated.PATH,
+    HOME: validated.HOME,
+    TMPDIR: validated.TMPDIR,
+    USER: validated.USER,
+    SHELL: validated.SHELL,
+    LANG: validated.LANG,
+    DISPLAY: validated.DISPLAY,
+  };
+}

@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const DesktopPage = {
   WORKSPACE: 'workspace',
+  LESSON_VIDEOS: 'lesson-videos',
   CLASSROOM: 'classroom',
   INSIGHTS: 'insights',
   PET_WORLD: 'pet-world',
@@ -34,6 +35,13 @@ export function parseDesktopRoute(hash: string): DesktopRoute {
         : segments[3] === 'settings'
           ? ClassView.SETTINGS
           : ClassView.OVERVIEW;
+  if (segments[1] === 'lesson-videos') {
+    return {
+      page: DesktopPage.LESSON_VIDEOS,
+      classId: classId.success ? classId.data : null,
+      classView: ClassView.OVERVIEW,
+    };
+  }
   if (segments[1] === 'insights') {
     return {
       page: DesktopPage.INSIGHTS,

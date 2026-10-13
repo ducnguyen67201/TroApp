@@ -44,6 +44,88 @@ containing real data. `pnpm db:migrate` authors a new reviewed migration;
 `pnpm db:deploy` applies existing ones. Integration tests use their own disposable
 container, not the development database.
 
+## Lesson video development
+
+`pnpm dev` (or `doppler run -- pnpm dev`) starts the lesson rendering worker
+through Docker Compose, then launches the API and desktop natively. Keep your
+existing development database running; use `pnpm db:start` on a fresh setup.
+The launcher does not recreate or replace an existing database container.
+The first renderer image build installs Chromium and FFmpeg and can take several
+minutes. The development launcher creates a local renderer credential in ignored
+`.tro-development/LessonRendererSecret`; only the API and renderer receive it.
+Desktop children receive OS settings without backend Doppler credentials.
+A renderer startup failure does not prevent the native app from starting; check
+Docker output when video creation is unavailable. Ctrl-C stops the native children;
+use `docker compose stop lesson-renderer` to stop the local renderer.
+
+- `pnpm dev:renderer`: rebuild/start only the local renderer after template edits.
+- `pnpm build:renderer`: build the production renderer image without starting it.
+- `pnpm check:lesson-renderer`: render synthetic Vietnamese fixtures and combine
+  them using the local renderer; no paid model or speech calls.
+
+After updating the worker's animation runtime, rebuild its image with
+`pnpm build:renderer`, then restart `doppler run -- pnpm dev`. Alternatively,
+`pnpm dev:renderer` rebuilds and starts the local worker independently. Custom
+animation requires the new worker capability; an older baseline-only worker
+continues rendering standard animations.
+
+For separate API startup, set `LESSON_RENDER_URL=http://127.0.0.1:3010` and supply
+`LESSON_RENDER_SECRET` from the local credential file through your shell or secret
+manager. The API and renderer must share this credential to authenticate render
+requests. Do not commit it. The development launcher supplies both automatically.
+All model choices, allowances and retry limits live in
+[LessonVideoConfig.ts](src/server/config/LessonVideoConfig.ts), exported by the
+existing config index. Normal tests do not require provider credentials.
+
+On Railway, deploy the existing API Dockerfile and a separate private service using
+`Dockerfile.renderer`. Set the API's `LESSON_RENDER_URL` to the renderer's private
+HTTP address on port 3010. Set the same generated `LESSON_RENDER_SECRET` on both
+services and use `APP_ENV=stage` or `APP_ENV=prod` on the API. Keep the renderer
+private, supply no model/database keys to it, and apply
+reviewed migrations with `pnpm db:deploy` before updating the API. Start with one
+renderer instance and at least the locally tested memory allocation; benchmark
+before increasing concurrency. Renderer containers store temporary files only;
+PostgreSQL owns saved content, animation source and media. Deploy matching API and
+worker builds together so the worker advertises the animation runtime expected by
+the API. The API falls back to standard animation when that capability is absent.
+
+The teacher selects prepared/published class material, describes the desired
+explanation and creates a video. The writer saves baseline screens, narration and
+optional animation ideas first. At most two scenes receive custom animation;
+remaining scenes use maintained Remotion layouts. A separate bounded model request
+writes each selected animation. Code is saved before execution, and retries and
+repairs share the same saved allowance. There is no AI reviewer or layout critic.
+
+The reviewed policy reserves up to two writer requests and two requests for each
+of two custom scenes: 48K input and 24K output tokens, or $0.144 USD at the committed
+text-model rates. These are configured reservations, not measured average usage;
+speech and rendering are separate. See the owning
+[configuration](src/server/config/LessonVideoConfig.ts) for models and limits.
+
+Saved screens/transcript remain available before media finishes. Missing or
+unfinished optional animation degrades to standard animation; a successfully
+rendered video remains ready with a note. A speech failure produces narration text
+on that screen. Continue reuses a saved script and source; if the writer was
+interrupted before saving content, it may use only its original remaining attempt.
+Navigation, edits and Continue never renew model allowances. Edits preserve
+unchanged scenes; changed content or narration timing uses standard animation
+without another automatic coder request. New content requests create independent
+jobs with fresh daily allowance. Add missing narration uses only the remaining
+speech allowance.
+
+Continue preserves cumulative renderer attempts. New jobs may use one explicit,
+saved media recovery after the original attempts are exhausted; the action becomes
+unavailable after that allowance is consumed. Legacy jobs without that policy
+retain their original ceiling. A lost creation response keeps the request ID for
+safe retry; a confirmed response lets the next submission create a fresh job.
+
+Generated scene code runs in an isolated QuickJS/WASM child, producing validated
+SVG data for trusted Remotion components. It does not run in Electron or Chromium.
+Source artifacts remain private to the API/worker; the desktop receives status and
+MP4 media rather than executable code.
+Confirmed provider quality, real cost and hosted throughput still require a
+separately authorized paid benchmark; offline fixtures do not establish those.
+
 ## Configuration
 
 | Process                                     | Settings                                                                                                                                                                                                       |

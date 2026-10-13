@@ -1,4 +1,10 @@
 import {
+  LessonVideoCommandSchema,
+  LessonVideoReplySchema,
+  LessonMediaRequestSchema,
+  LessonMediaReplySchema,
+} from '#contracts/LessonVideos.js';
+import {
   OnboardingReadSchema,
   OnboardingUpdateSchema,
   OnboardingRestartSchema,
@@ -105,6 +111,16 @@ import {
 /* Expose named session operations, not generic IPC or direct computer tools.
    Validate IPC data before it enters the renderer. */
 const bridge: DesktopBridge = {
+  async controlLessonVideos(command) {
+    return LessonVideoReplySchema.parse(
+      await ipcRenderer.invoke('tro:lesson-videos', LessonVideoCommandSchema.parse(command)),
+    );
+  },
+  async readLessonMedia(request) {
+    return LessonMediaReplySchema.parse(
+      await ipcRenderer.invoke('tro:lesson-media', LessonMediaRequestSchema.parse(request)),
+    );
+  },
   async readOnboardingProgress(request) {
     try {
       const raw: unknown = await ipcRenderer.invoke(

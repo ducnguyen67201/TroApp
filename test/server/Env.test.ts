@@ -98,3 +98,17 @@ it('excludes feature settings from the environment contract', () => {
     ),
   ).toEqual([]);
 });
+
+it('accepts an optional HTTP renderer address and rejects other protocols', () => {
+  const base = { DATABASE_URL: databaseUrl, AUTH_SECRET: authSecret };
+
+  expect(readServerEnv(base).LESSON_RENDER_URL).toBeUndefined();
+
+  for (const url of ['http://127.0.0.1:3010', 'https://renderer.example.test']) {
+    expect(readServerEnv({ ...base, LESSON_RENDER_URL: url }).LESSON_RENDER_URL).toBe(url);
+  }
+
+  expect(() => readServerEnv({ ...base, LESSON_RENDER_URL: 'file:///private/renderer' })).toThrow(
+    'Backend configuration is invalid.',
+  );
+});
