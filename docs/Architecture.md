@@ -1033,8 +1033,11 @@ process trees so shutdown reaches watchers, Electron and other descendants.
 Shutdown waits for bounded termination and escalates when needed.
 Signal handling is installed before asynchronous startup work. Process identity
 and workspace checks preserve the invoking shell, launcher ancestors and unrelated
-processes. Windows discovery requires an explicit checkout path; relative orphan
-commands without that ownership evidence are left alone. PostgreSQL and renderer
+processes. Linux discovery reads executable identity from `/proc/<pid>/exe` because
+process names can contain a runtime thread name such as Node's `MainThread`.
+Exited or inaccessible processes are excluded. Windows discovery requires an
+explicit checkout path; relative orphan commands without that ownership evidence
+are left alone. PostgreSQL and renderer
 containers remain running. Renderer-only development skips replacement of native
 launchers.
 

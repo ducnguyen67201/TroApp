@@ -120,11 +120,39 @@ async function readProcesses(): Promise<DevelopmentProcess[]> {
     const value: unknown = JSON.parse(result.stdout);
     return z.array(processSchema).parse(value);
   }
-  const [metadata, executables] = await Promise.all([
-    executeFile('ps', ['-axo', 'pid=,ppid=,pgid=,stat=,lstart=,command='], commandLimits),
-    executeFile('ps', ['-axo', 'pid=,comm='], commandLimits),
-  ]);
-  return parseDevelopmentProcesses(metadata.stdout, executables.stdout);
+  const metadata = await executeFile(
+    'ps',
+    ['-axo', 'pid=,ppid=,pgid=,stat=,lstart=,command='],
+    commandLimits,
+  );
+  const executables =
+    process.platform === 'darwin'
+      ? (await executeFile('ps', ['-axo', 'pid=,comm='], commandLimits)).stdout
+      : await readLinuxProcessExecutables(metadata.stdout);
+  return parseDevelopmentProcesses(metadata.stdout, executables);
+}
+
+/** Linux comm is a mutable thread name (Node 24 uses MainThread), not an executable identity. */
+async function readLinuxProcessExecutables(metadata: string): Promise<string> {
+  const executables = await Promise.all(
+    metadata
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map(async (line) => {
+        const pid = /^\s*(\d+)\s/.exec(line)?.[1];
+        if (pid === undefined) {
+          throw new Error('Development process metadata is unavailable.');
+        }
+        try {
+          return `${pid} ${await readlink(`/proc/${pid}/exe`)}`;
+        } catch {
+          // Exited, kernel and inaccessible processes have no usable executable identity.
+          return '';
+        }
+      }),
+  );
+  return executables.filter(Boolean).join('\n');
 }
 
 function isDevelopmentEntry(item: DevelopmentProcess, workspace: string): boolean {
