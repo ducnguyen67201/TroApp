@@ -58,19 +58,27 @@ it('loads the five approved student videos, posters and Vietnamese transcripts w
   }
 });
 
-it('shares microphone and pet clips with teachers without presenting student-only classroom actions to them', () => {
+it('shares microphone and pet clips with teachers', () => {
   for (const stepId of [OnboardingStep.MICROPHONE, OnboardingStep.PETS]) {
-    expect(
-      readOnboardingContent(stepId, DesktopLocale.VIETNAMESE, AccountRole.TEACHER).video,
-    ).toBeTruthy();
+    const teacher = readOnboardingContent(stepId, DesktopLocale.VIETNAMESE, AccountRole.TEACHER);
+    const student = readOnboardingContent(stepId, DesktopLocale.VIETNAMESE, AccountRole.STUDENT);
+    expect(teacher.video).not.toBeNull();
+    expect(teacher.video).toEqual(student.video);
   }
-  for (const stepId of [
-    OnboardingStep.CLASSES,
-    OnboardingStep.INSIGHTS,
-    OnboardingStep.GUIDED_LESSONS,
-  ]) {
-    expect(
-      readOnboardingContent(stepId, DesktopLocale.VIETNAMESE, AccountRole.TEACHER).video,
-    ).toBeNull();
+});
+
+it('shows teacher-specific classroom videos in both locales without substituting student recordings', () => {
+  for (const [stepId, stem] of [
+    [OnboardingStep.CLASSES, 'TeacherClasses'],
+    [OnboardingStep.INSIGHTS, 'TeacherInsights'],
+    [OnboardingStep.GUIDED_LESSONS, 'TeacherGuidedLessons'],
+  ] as const) {
+    for (const locale of Object.values(DesktopLocale)) {
+      const teacher = readOnboardingContent(stepId, locale, AccountRole.TEACHER);
+      const student = readOnboardingContent(stepId, locale, AccountRole.STUDENT);
+      expect(teacher.video?.source).toContain(`/vi/${stem}.mp4`);
+      expect(teacher.videoLocale).toBe(DesktopLocale.VIETNAMESE);
+      expect(teacher.video?.source).not.toBe(student.video?.source);
+    }
   }
 });
