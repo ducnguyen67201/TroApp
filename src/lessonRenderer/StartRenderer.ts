@@ -6,11 +6,14 @@ import { join, resolve } from 'node:path';
 import {
   LessonRenderRequestSchema,
   lessonRenderVersion,
+  lessonVisualRuntimeVersion,
 } from '../contracts/LessonRenderProtocol.js';
 import { LessonLimits } from '../contracts/LessonVideos.js';
 import { readRendererEnv } from './Env.js';
 import { renderLessonClip } from './RenderLessonClip.js';
 import { combineLessonClips } from './CombineLessonClips.js';
+import { renderLessonVisualFrames } from './RenderLessonVisualFrames.js';
+import { LessonVisualCodeError } from './CompileLessonVisual.js';
 
 async function startRenderer(): Promise<void> {
   const environment = readRendererEnv(process.env);
@@ -31,14 +34,20 @@ async function startRenderer(): Promise<void> {
       await reply.code(401).send({ error: 'unauthorized' });
     }
   });
-  app.get('/health', () => Promise.resolve({ version: lessonRenderVersion, buildId }));
+  app.get('/health', () =>
+    Promise.resolve({
+      version: lessonRenderVersion,
+      buildId,
+      visualRuntimeVersion: lessonVisualRuntimeVersion,
+    }),
+  );
   app.post('/render', async (request, reply) => {
     const parsed = LessonRenderRequestSchema.safeParse(request.body);
     if (!parsed.success) {
       return await reply.code(400).send({ error: 'invalid' });
     }
     if (busy) {
-      return await reply.code(503).send({ error: 'busy' });
+      return await reply.code(503).send({ kind: 'unavailable', code: 'busy' });
     }
     busy = true;
     let directory: string | null = null;
@@ -51,6 +60,14 @@ async function startRenderer(): Promise<void> {
         if (input.audio && Buffer.byteLength(input.audio, 'base64') > LessonLimits.SCREEN_BYTES) {
           return await reply.code(413).send({ error: 'audio-too-large' });
         }
+        const visualFrames = input.visual
+          ? await renderLessonVisualFrames(
+              input.visual,
+              input.screen,
+              input.durationSeconds,
+              signal,
+            )
+          : undefined;
         await renderLessonClip(
           resolve(environment.LESSON_RENDER_BUNDLE),
           output,
@@ -58,6 +75,7 @@ async function startRenderer(): Promise<void> {
             screen: input.screen,
             durationSeconds: input.durationSeconds,
             audioUrl: input.audio ? `data:audio/wav;base64,${input.audio}` : null,
+            ...(visualFrames ? { visualFrames } : {}),
           },
           signal,
           environment.CHROME_PATH,
@@ -73,8 +91,11 @@ async function startRenderer(): Promise<void> {
         return await reply.code(413).send({ error: 'video-too-large' });
       }
       return { video: (await readFile(output)).toString('base64') };
-    } catch {
-      return await reply.code(500).send({ error: 'render-failed' });
+    } catch (error) {
+      if (error instanceof LessonVisualCodeError) {
+        return await reply.code(422).send(error.failure);
+      }
+      return await reply.code(500).send({ kind: 'unavailable', code: 'render-failed' });
     } finally {
       busy = false;
       if (directory) {

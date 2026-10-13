@@ -4,8 +4,20 @@ import {
   LessonVideoStatus,
   LessonArtifactKind,
 } from '#contracts/LessonVideos.js';
-import { lessonRenderVersion } from '#contracts/LessonRenderProtocol.js';
+import {
+  lessonRenderVersion,
+  lessonVisualRuntimeVersion,
+} from '#contracts/LessonRenderProtocol.js';
+import {
+  LessonVisualDegradation,
+  LessonVisualStatus,
+  LessonVisualTreatment,
+} from '#contracts/LessonVisuals.js';
 import { LessonVideoError } from '../domain/LessonVideoRules.js';
+import { readLessonRenderAttemptLimit } from '../domain/LessonRenderRecovery.js';
+import { RunLessonContent } from './RunLessonContent.js';
+import type { RunLessonVisual } from './RunLessonVisual.js';
+import { LessonRenderCodeError } from './LessonVideoPorts.js';
 import type {
   LessonVideoStore,
   LessonContentProvider,
@@ -17,14 +29,20 @@ import type {
 
 /** A stage saves its attempt before I/O, then atomically saves the artifact and its reference. */
 export class RunLessonVideoStage {
+  private readonly contentStage: RunLessonContent;
+
   constructor(
     private readonly store: LessonVideoStore,
-    private readonly content: LessonContentProvider,
+    content: LessonContentProvider,
     private readonly speech: LessonSpeechProvider,
     private readonly renderer: LessonRenderer,
     private readonly newId: () => string,
     private readonly report: LessonDiagnostics,
-  ) {}
+    private readonly hash: (text: string) => string,
+    private readonly visuals?: RunLessonVisual,
+  ) {
+    this.contentStage = new RunLessonContent(store, content, newId, hash, report);
+  }
   async execute(initial: StoredLesson, signal: AbortSignal): Promise<StoredLesson> {
     let lesson = initial;
     const startedAt = Date.now();
@@ -38,57 +56,12 @@ export class RunLessonVideoStage {
         throw new LessonVideoError(LessonVideoFailure.DEADLINE);
       }
       if (!lesson.screens.length) {
-        // A crash cannot reveal how many SDK attempts were billed: never replay this reservation.
-        if (lesson.contentStarted) {
-          throw new LessonVideoError(LessonVideoFailure.CONTENT);
-        }
-        await save({
-          ...lesson,
-          stage: LessonVideoStage.CONTENT,
-          contentStarted: true,
-          usageUncertain: true,
-        });
-        this.report({
-          lessonId: lesson.id,
-          revision: lesson.revision,
-          stage: lesson.stage,
-          state: 'started',
-        });
-        const result = await this.content.generate(lesson, signal);
-        const screens = result.content.screens.map((screen) => ({
-          ...screen,
-          id: this.newId(),
-          audioId: null,
-          clipId: null,
-          durationSeconds: 0,
-          silent: false,
-          speechAttempts: 0,
-          renderAttempts: 0,
-        }));
-        await save({
-          ...lesson,
-          title: result.content.title,
-          screens,
-          contentUsage: result.usage,
-          inputTokens: result.usage.inputTokens,
-          outputTokens: result.usage.outputTokens,
-          usageUncertain: lesson.settings.content.attempts > 1,
-          stage: LessonVideoStage.SPEECH,
-        });
-        this.report({
-          lessonId: lesson.id,
-          revision: lesson.revision,
-          stage: LessonVideoStage.CONTENT,
-          state: 'saved',
-          requestId: result.usage.requestId,
-          inputTokens: result.usage.inputTokens,
-          outputTokens: result.usage.outputTokens,
-        });
-        return lesson;
+        return await this.contentStage.execute(lesson, signal);
       }
       if ((await this.renderer.readBuildId()) !== lesson.rendererBuild) {
         throw new LessonVideoError(LessonVideoFailure.RENDER);
       }
+      const renderAttemptLimit = readLessonRenderAttemptLimit(lesson);
       const screen = lesson.screens.find((item) => !item.clipId);
       if (screen) {
         if (!screen.audioId && !screen.silent) {
@@ -149,19 +122,6 @@ export class RunLessonVideoStage {
             },
           );
         }
-        if (screen.renderAttempts >= lesson.settings.render.attempts) {
-          throw new LessonVideoError(LessonVideoFailure.RENDER);
-        }
-        const attempts = lesson.settings.render.attempts - screen.renderAttempts;
-        await save({
-          ...lesson,
-          stage: LessonVideoStage.CLIP,
-          screens: lesson.screens.map((item) =>
-            item.id === screen.id
-              ? { ...item, renderAttempts: item.renderAttempts + attempts }
-              : item,
-          ),
-        });
         const audio = screen.audioId
           ? await this.store.readArtifact(lesson.id, screen.audioId)
           : null;
@@ -174,38 +134,152 @@ export class RunLessonVideoStage {
               lesson.settings.presentation.minimumSeconds,
               Math.ceil(screen.narration.length / lesson.settings.presentation.charactersPerSecond),
             );
-        const bytes = await this.renderer.render(
-          {
-            kind: 'clip',
-            version: lessonRenderVersion,
-            screen: {
-              layout: screen.layout,
-              title: screen.title,
-              points: screen.points,
-              narration: screen.narration,
+        if (screen.visual?.status === LessonVisualStatus.PENDING) {
+          if (this.visuals) {
+            return await this.visuals.execute(lesson, screen.id, durationSeconds, signal);
+          }
+          return await save({
+            ...lesson,
+            screens: lesson.screens.map((item) =>
+              item.id === screen.id
+                ? {
+                    ...item,
+                    visual: {
+                      treatment: LessonVisualTreatment.BASELINE,
+                      status: LessonVisualStatus.DEGRADED,
+                      degradationReason: LessonVisualDegradation.DISABLED,
+                    },
+                  }
+                : item,
+            ),
+          });
+        }
+        const visual = lesson.visuals.find((item) => item.screenId === screen.id);
+        const custom =
+          screen.visual?.treatment === LessonVisualTreatment.CUSTOM &&
+          screen.visual.status === LessonVisualStatus.SOURCE_SAVED;
+        if (custom && renderAttemptLimit - screen.renderAttempts <= 1 && this.visuals) {
+          // A crash may have consumed executions without a receipt. Keep the final slot for baseline.
+          return await this.visuals.degrade(lesson, screen.id, LessonVisualDegradation.ATTEMPTS);
+        }
+        const sourceArtifact =
+          custom && visual?.sourceId
+            ? await this.store.readArtifact(lesson.id, visual.sourceId)
+            : null;
+        const source = sourceArtifact ? new TextDecoder().decode(sourceArtifact.bytes) : null;
+        if (
+          custom &&
+          (!source ||
+            !visual?.sourceComplete ||
+            sourceArtifact?.kind !== LessonArtifactKind.SOURCE ||
+            this.hash(source) !== visual.sourceDigest)
+        ) {
+          if (this.visuals) {
+            return await this.visuals.degrade(
+              lesson,
+              screen.id,
+              LessonVisualDegradation.INVALID_SOURCE,
+            );
+          }
+          throw new LessonVideoError(LessonVideoFailure.RENDER);
+        }
+        if (screen.renderAttempts >= renderAttemptLimit) {
+          throw new LessonVideoError(LessonVideoFailure.RENDER);
+        }
+        // Custom source gets one execution attempt, leaving room for a focused repair and baseline.
+        const attempts = custom
+          ? 1
+          : Math.min(lesson.settings.render.attempts, renderAttemptLimit - screen.renderAttempts);
+        await save({
+          ...lesson,
+          stage: LessonVideoStage.CLIP,
+          screens: lesson.screens.map((item) =>
+            item.id === screen.id
+              ? {
+                  ...item,
+                  renderAttempts: item.renderAttempts + attempts,
+                }
+              : item,
+          ),
+        });
+        let bytes: Uint8Array;
+        try {
+          bytes = await this.renderer.render(
+            {
+              kind: 'clip',
+              version: lessonRenderVersion,
+              screen: {
+                layout: screen.layout,
+                title: screen.title,
+                points: screen.points,
+                narration: screen.narration,
+              },
+              durationSeconds,
+              audio: audio ? Buffer.from(audio.bytes).toString('base64') : null,
+              ...(custom && source
+                ? { visual: { source, runtimeVersion: lessonVisualRuntimeVersion } }
+                : {}),
             },
-            durationSeconds,
-            audio: audio ? Buffer.from(audio.bytes).toString('base64') : null,
-          },
-          lesson.settings.render.timeoutMs,
-          signal,
-          attempts,
-        );
+            lesson.settings.render.timeoutMs,
+            signal,
+            attempts,
+          );
+        } catch (error) {
+          signal.throwIfAborted();
+          if (custom && error instanceof LessonRenderCodeError && this.visuals) {
+            // Source remains saved. The next visual step may spend only its remaining slot.
+            return await save({
+              ...lesson,
+              visuals: lesson.visuals.map((item) =>
+                item.screenId === screen.id
+                  ? {
+                      ...item,
+                      diagnostic: error.diagnostic.slice(
+                        0,
+                        lesson.settings.visual.maxDiagnosticCharacters,
+                      ),
+                    }
+                  : item,
+              ),
+              screens: lesson.screens.map((item) =>
+                item.id === screen.id && item.visual
+                  ? {
+                      ...item,
+                      visual: { ...item.visual, status: LessonVisualStatus.PENDING },
+                    }
+                  : item,
+              ),
+            });
+          }
+          throw error;
+        }
         const id = this.newId();
         return await this.store.saveStageResult(
           {
             ...lesson,
             screens: lesson.screens.map((item) =>
-              item.id === screen.id ? { ...item, durationSeconds, clipId: id } : item,
+              item.id === screen.id
+                ? {
+                    ...item,
+                    durationSeconds,
+                    clipId: id,
+                    ...(custom && item.visual
+                      ? { visual: { ...item.visual, status: LessonVisualStatus.READY } }
+                      : {}),
+                  }
+                : item,
             ),
           },
           { id, lessonId: lesson.id, kind: LessonArtifactKind.CLIP, bytes },
         );
       }
-      if (lesson.combineAttempts >= lesson.settings.render.attempts) {
+      if (lesson.combineAttempts >= renderAttemptLimit) {
         throw new LessonVideoError(LessonVideoFailure.RENDER);
       }
-      const attempts = lesson.settings.render.attempts - lesson.combineAttempts;
+      const attempts = Math.min(
+        lesson.settings.render.attempts,
+        renderAttemptLimit - lesson.combineAttempts,
+      );
       await save({
         ...lesson,
         stage: LessonVideoStage.COMBINE,

@@ -9,8 +9,18 @@ import {
   type LessonVideoReply,
   type LessonVideo,
 } from '#contracts/LessonVideos.js';
+import { LessonModelRole, LessonVisualDegradation } from '#contracts/LessonVisuals.js';
 import { LessonVideoError, isLessonActive, canContinueLesson } from '../domain/LessonVideoRules.js';
-import { estimateContentReservation } from './LessonVideoBudget.js';
+import {
+  canContinueLessonRendering,
+  needsLessonRenderRecovery,
+} from '../domain/LessonRenderRecovery.js';
+import { estimateLessonReservation, estimateLessonFirstPass } from './LessonVideoBudget.js';
+import {
+  editLessonScreens,
+  invalidateLessonAnimations,
+  resetUnfinishedLessonRenders,
+} from './EditLessonScreens.js';
 import type { LessonVideoSettings } from '../../../config/LessonVideoConfig.js';
 import type {
   LessonVideoStore,
@@ -25,7 +35,25 @@ import type {
 export function readLessonView(lesson: StoredLesson): LessonVideo {
   return z
     .object(LessonVideoSchema.shape)
-    .parse({ ...lesson, canContinue: canContinueLesson(lesson) });
+    .parse({ ...lesson, canContinue: canContinueSavedLesson(lesson) });
+}
+
+/** A new job may finish its original writer allowance; legacy unknown dispatches stay consumed. */
+function canContinueSavedLesson(lesson: StoredLesson): boolean {
+  if (lesson.screens.length) {
+    return canContinueLesson(lesson) && canContinueLessonRendering(lesson);
+  }
+  const hasWriterAttempt =
+    lesson.stateVersion >= 2
+      ? lesson.modelAttempts.filter((attempt) => attempt.role === LessonModelRole.CONTENT).length <
+        lesson.settings.content.attempts
+      : !lesson.contentStarted;
+  return (
+    hasWriterAttempt &&
+    !isLessonActive(lesson.status) &&
+    lesson.status !== LessonVideoStatus.READY &&
+    lesson.error !== LessonVideoFailure.BUDGET
+  );
 }
 
 export class LessonVideoService {
@@ -60,11 +88,8 @@ export class LessonVideoService {
         kind: 'options',
         classes,
         available,
-        estimatedMicroUsd: Math.ceil(
-          6000 * this.settings.budget.inputMicroUsdPerToken +
-            2000 * this.settings.budget.outputMicroUsdPerToken,
-        ),
-        maximumMicroUsd: estimateContentReservation(this.settings),
+        estimatedMicroUsd: estimateLessonFirstPass(this.settings),
+        maximumMicroUsd: estimateLessonReservation(this.settings),
       };
     }
     if (command.kind === LessonCommand.LIST) {
@@ -107,12 +132,23 @@ export class LessonVideoService {
     }
     const rendererBuild = await this.renderer.readBuildId();
     if (rendererBuild !== lesson.rendererBuild) {
+      const invalidated = invalidateLessonAnimations(
+        lesson,
+        new Set(lesson.screens.map((screen) => screen.id)),
+        LessonVisualDegradation.UNSUPPORTED,
+      );
       lesson = {
         ...lesson,
+        ...invalidated,
+        screens: invalidated.screens.map((screen) => ({
+          ...screen,
+          clipId: null,
+          renderAttempts: 0,
+        })),
         rendererBuild,
         revision: lesson.revision + 1,
-        screens: lesson.screens.map((screen) => ({ ...screen, clipId: null, renderAttempts: 0 })),
         combineAttempts: 0,
+        renderRecoveries: 0,
       };
     }
     if (command.kind === LessonCommand.EDIT) {
@@ -122,50 +158,37 @@ export class LessonVideoService {
       ) {
         throw new LessonVideoError(LessonVideoFailure.INVALID);
       }
-      const screens = command.content.screens.map((screen, index) => {
-        const previous = lesson.screens[index];
-        const sameNarration = previous?.narration === screen.narration;
-        const sameVisuals =
-          previous?.layout === screen.layout &&
-          previous.title === screen.title &&
-          JSON.stringify(previous.points) === JSON.stringify(screen.points);
-        return {
-          ...screen,
-          id: previous?.id ?? this.newId(),
-          audioId: sameNarration ? previous.audioId : null,
-          clipId: sameNarration && sameVisuals ? previous.clipId : null,
-          durationSeconds: sameNarration ? previous.durationSeconds : 0,
-          silent: !sameNarration || previous.silent,
-          speechAttempts: previous?.speechAttempts ?? lesson.settings.speech.attempts,
-          renderAttempts: 0,
-        };
-      });
+      const edited = editLessonScreens(lesson, command.content, this.newId);
       lesson = {
         ...lesson,
+        ...edited,
+        screens: resetUnfinishedLessonRenders(edited.screens),
         title: command.content.title,
-        screens,
         revision: lesson.revision + 1,
         combineAttempts: 0,
+        renderRecoveries: 0,
         error: null,
         status: LessonVideoStatus.QUEUED,
         claimId: null,
         deadline: new Date(this.now().getTime() + lesson.settings.jobs.deadlineMs).toISOString(),
       };
     } else if (command.kind === LessonCommand.CONTINUE) {
-      if (!lesson.screens.length) {
-        throw new LessonVideoError(LessonVideoFailure.CONTENT);
+      if (!canContinueSavedLesson(lesson)) {
+        throw new LessonVideoError(
+          lesson.error === LessonVideoFailure.BUDGET
+            ? LessonVideoFailure.BUDGET
+            : lesson.screens.length
+              ? LessonVideoFailure.STALE
+              : LessonVideoFailure.CONTENT,
+        );
       }
       lesson = {
         ...lesson,
         status: LessonVideoStatus.QUEUED,
         claimId: null,
         error: null,
-        combineAttempts: 0,
+        renderRecoveries: lesson.renderRecoveries + (needsLessonRenderRecovery(lesson) ? 1 : 0),
         deadline: new Date(this.now().getTime() + lesson.settings.jobs.deadlineMs).toISOString(),
-        screens: lesson.screens.map((screen) => ({
-          ...screen,
-          renderAttempts: screen.clipId ? screen.renderAttempts : 0,
-        })),
       };
     } else {
       // No new allowance is silently granted. Edits may use text until a new job is admitted.
@@ -176,18 +199,35 @@ export class LessonVideoService {
       ) {
         throw new LessonVideoError(LessonVideoFailure.BUDGET);
       }
+      const narrationIds = new Set(
+        lesson.screens
+          .filter(
+            (screen) => screen.silent && screen.speechAttempts < lesson.settings.speech.attempts,
+          )
+          .map((screen) => screen.id),
+      );
+      // New audio may change scene timing. Keep the saved content without dispatching a new coder.
+      const invalidated = invalidateLessonAnimations(
+        lesson,
+        narrationIds,
+        LessonVisualDegradation.EDITED,
+      );
       lesson = {
         ...lesson,
+        ...invalidated,
         revision: lesson.revision + 1,
         status: LessonVideoStatus.QUEUED,
         claimId: null,
         error: null,
         combineAttempts: 0,
+        renderRecoveries: 0,
         deadline: new Date(this.now().getTime() + lesson.settings.jobs.deadlineMs).toISOString(),
-        screens: lesson.screens.map((screen) =>
-          screen.silent && screen.speechAttempts < lesson.settings.speech.attempts
-            ? { ...screen, silent: false, clipId: null, renderAttempts: 0 }
-            : screen,
+        screens: resetUnfinishedLessonRenders(
+          invalidated.screens.map((screen) =>
+            narrationIds.has(screen.id)
+              ? { ...screen, silent: false, clipId: null, renderAttempts: 0 }
+              : screen,
+          ),
         ),
       };
     }
@@ -227,6 +267,9 @@ export class LessonVideoService {
       requestId: command.requestId,
       requestHash,
       recordVersion: 0,
+      stateVersion: 2,
+      visuals: [],
+      modelAttempts: [],
       classId: command.classId,
       title: command.prompt.slice(0, 120),
       prompt: command.prompt,
@@ -240,7 +283,7 @@ export class LessonVideoService {
       videoRevision: null,
       inputTokens: 0,
       outputTokens: 0,
-      reservedMicroUsd: estimateContentReservation(this.settings, counted),
+      reservedMicroUsd: estimateLessonReservation(this.settings),
       usageUncertain: false,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -252,6 +295,7 @@ export class LessonVideoService {
       contentUsage: null,
       speechCharacters: 0,
       combineAttempts: 0,
+      renderRecoveries: 0,
       deadline: new Date(this.now().getTime() + this.settings.jobs.deadlineMs).toISOString(),
       claimId: null,
     });

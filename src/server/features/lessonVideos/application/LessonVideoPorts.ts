@@ -3,7 +3,15 @@ import type {
   LessonVideo,
   LessonArtifactKind,
   LessonVideoCommand,
+  LessonScreen,
 } from '#contracts/LessonVideos.js';
+import { LessonModelAttemptState } from '#contracts/LessonVisuals.js';
+import type {
+  LessonModelUsage,
+  LessonModelAttempt,
+  StoredLessonVisual,
+  LessonVisualBrief,
+} from '#contracts/LessonVisuals.js';
 import type { LessonRenderRequest } from '#contracts/LessonRenderProtocol.js';
 import type { LessonVideoSettings } from '../../../config/LessonVideoConfig.js';
 
@@ -13,14 +21,12 @@ export interface LessonSource {
   text: string;
 }
 
-export interface LessonUsage {
-  inputTokens: number;
-  outputTokens: number;
-  cachedTokens: number;
-  requestId: string | null;
-}
+export type LessonUsage = LessonModelUsage;
 
 export interface StoredLesson extends LessonVideo {
+  stateVersion: number;
+  visuals: StoredLessonVisual[];
+  modelAttempts: LessonModelAttempt[];
   ownerId: string;
   requestId: string;
   requestHash: string;
@@ -32,6 +38,7 @@ export interface StoredLesson extends LessonVideo {
   contentUsage: LessonUsage | null;
   speechCharacters: number;
   combineAttempts: number;
+  renderRecoveries: number;
   deadline: string;
   claimId: string | null;
 }
@@ -49,6 +56,13 @@ export interface LessonVideoStore {
   read(id: string): Promise<StoredLesson | null>;
   createLessonWithReservation(lesson: StoredLesson): Promise<StoredLesson>;
   saveStageResult(lesson: StoredLesson, artifact?: LessonArtifact): Promise<StoredLesson>;
+  beginModelAttempt(lesson: StoredLesson, attempt: LessonModelAttempt): Promise<StoredLesson>;
+  saveModelAttemptResult(
+    lesson: StoredLesson,
+    attemptId: string,
+    result: Pick<LessonModelAttempt, 'state' | 'usage' | 'usageUncertain'>,
+    artifact?: LessonArtifact,
+  ): Promise<StoredLesson>;
   claimNextLesson(now: Date, claimId: string): Promise<StoredLesson | null>;
   renewClaim(id: string, claimId: string, leaseUntil: Date): Promise<boolean>;
   readArtifact(lessonId: string, artifactId: string): Promise<LessonArtifact | null>;
@@ -70,7 +84,52 @@ export interface LessonContentProvider {
   generate(
     lesson: StoredLesson,
     signal: AbortSignal,
-  ): Promise<{ content: LessonContent; usage: LessonUsage }>;
+  ): Promise<{ content: LessonContent; usage: LessonUsage; briefs?: LessonVisualBrief[] }>;
+}
+
+/** Each call is one charged dispatch; retry decisions belong to the saved job. */
+export class LessonModelRequestError extends Error {
+  constructor(
+    readonly outcome:
+      typeof LessonModelAttemptState.INCOMPLETE | typeof LessonModelAttemptState.UNAVAILABLE,
+    readonly usage: LessonUsage | null,
+    readonly usageUncertain: boolean,
+  ) {
+    super('Lesson model request did not complete.');
+  }
+}
+
+export interface LessonVisualRequest {
+  screen: LessonScreen;
+  brief: LessonVisualBrief;
+  durationSeconds: number;
+  locale: 'en' | 'vi';
+  settings: LessonVideoSettings;
+  source?: string;
+  diagnostic?: string;
+}
+
+export const LessonVisualResultKind = {
+  SOURCE: 'source',
+  INCOMPLETE: 'incomplete',
+  UNAVAILABLE: 'unavailable',
+} as const;
+
+export type LessonVisualResult =
+  | { kind: typeof LessonVisualResultKind.SOURCE; source: string; usage: LessonUsage }
+  | { kind: typeof LessonVisualResultKind.INCOMPLETE; source?: string; usage: LessonUsage | null }
+  | { kind: typeof LessonVisualResultKind.UNAVAILABLE; usage: null; usageUncertain: true };
+
+export interface LessonVisualProvider {
+  countRequest(request: LessonVisualRequest): Promise<number>;
+  generateVisual(request: LessonVisualRequest, signal: AbortSignal): Promise<LessonVisualResult>;
+}
+
+/** Only validated, bounded worker diagnostics cross this application boundary. */
+export class LessonRenderCodeError extends Error {
+  constructor(readonly diagnostic: string) {
+    super('Lesson animation could not execute.');
+  }
 }
 
 export interface LessonSpeechProvider {
@@ -83,6 +142,7 @@ export interface LessonSpeechProvider {
 
 export interface LessonRenderer {
   readBuildId(): Promise<string>;
+  readVisualRuntime?(): Promise<string | null>;
   render(
     request: LessonRenderRequest,
     timeoutMs: number,
@@ -103,5 +163,9 @@ export interface LessonDiagnostics {
     requestId?: string | null;
     inputTokens?: number;
     outputTokens?: number;
+    screenId?: string;
+    attempt?: number;
+    reason?: string;
+    sourceDigest?: string;
   }): void;
 }

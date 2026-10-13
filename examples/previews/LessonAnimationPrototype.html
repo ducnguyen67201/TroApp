@@ -1,0 +1,1612 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tro · Lesson animation prototype</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #17372f;
+        background: #f7f5ec;
+        font-synthesis: none;
+        --ink: #17372f;
+        --muted: #64756b;
+        --line: #d8decc;
+        --paper: #fffdf6;
+        --gold: #e6b45d;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      button,
+      input {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      summary:focus-visible,
+      .video:focus-visible {
+        outline: 3px solid #ac7324;
+        outline-offset: 4px;
+      }
+      button {
+        color: inherit;
+      }
+      .shell {
+        max-width: 1420px;
+        margin: auto;
+        padding: 28px 36px 30px;
+      }
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--line);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        font-weight: 750;
+        font-size: 19px;
+        letter-spacing: -0.5px;
+      }
+      .brand-mark {
+        width: 32px;
+        height: 32px;
+        display: grid;
+        place-items: center;
+        color: #f9ddaa;
+        background: var(--ink);
+        border-radius: 10px;
+        font-family: Georgia, serif;
+        font-size: 26px;
+      }
+      .topbar-note {
+        font-size: 12px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #70866d;
+      }
+      .intro {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        margin: 26px 0 20px;
+      }
+      .eyebrow {
+        color: #866025;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1.6px;
+        text-transform: uppercase;
+        margin: 0 0 8px;
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-family: Georgia, 'Times New Roman', serif;
+        font-weight: 500;
+        font-size: clamp(27px, 3vw, 38px);
+        letter-spacing: -1.2px;
+      }
+      .intro p {
+        margin: 0;
+        line-height: 1.6;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      .allowance {
+        flex: 0 0 auto;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 11px 14px;
+        background: #f1f2e7;
+        font-size: 12px;
+        line-height: 1.7;
+      }
+      .allowance strong {
+        display: block;
+        font-size: 14px;
+        font-weight: 650;
+      }
+      .prompt {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        padding: 14px 18px;
+        background: #fffdf7;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        margin-bottom: 20px;
+      }
+      .prompt-label {
+        color: #7e6337;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        white-space: nowrap;
+        margin-top: 3px;
+      }
+      .prompt p {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.65;
+      }
+      .prompt span {
+        color: var(--muted);
+      }
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px;
+        gap: 22px;
+        align-items: start;
+      }
+      .preview-heading {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 35px;
+        margin-bottom: 9px;
+      }
+      .preview-heading h2 {
+        font-size: 15px;
+        margin: 0;
+        font-weight: 650;
+      }
+      .badge {
+        border-radius: 30px;
+        padding: 5px 9px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        white-space: nowrap;
+        background: #e9eee1;
+      }
+      .badge.custom {
+        background: #f9e8c9;
+        color: #815619;
+      }
+      .video {
+        position: relative;
+        aspect-ratio: 16 / 9;
+        border-radius: 17px;
+        background: #17372f;
+        overflow: hidden;
+        box-shadow: 0 8px 22px #17372f0b;
+      }
+      .video svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .video svg text {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      .scene-visual {
+        display: none;
+      }
+      .caption {
+        position: absolute;
+        bottom: 74px;
+        width: 83%;
+        left: 8.5%;
+        text-align: center;
+        font-size: clamp(11px, 1.1vw, 15px);
+        line-height: 1.5;
+        color: #faf8ef;
+        text-shadow: 0 1px 1px #17372f;
+      }
+      .caption span {
+        padding: 5px 10px;
+        border-radius: 7px;
+        background: #0b251fcc;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+      }
+      .controls {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 28px 16px 12px;
+        background: linear-gradient(transparent, #0a211cf0);
+        color: #fffdf6;
+      }
+      .scrubber {
+        display: block;
+        width: 100%;
+        height: 4px;
+        margin: 0 0 12px;
+        accent-color: #edc57f;
+        cursor: pointer;
+      }
+      .control-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .icon-button {
+        border: 0;
+        background: transparent;
+        width: 30px;
+        height: 28px;
+        color: inherit;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 19px;
+        border-radius: 6px;
+      }
+      .icon-button:hover {
+        background: #ffffff22;
+      }
+      .skip {
+        font-size: 12px;
+        font-weight: 650;
+        width: 32px;
+      }
+      .time {
+        color: #e0e6d9;
+        font-size: 11px;
+        margin-left: 4px;
+        font-variant-numeric: tabular-nums;
+      }
+      .silent {
+        margin-left: auto;
+        font-size: 10px;
+        color: #c4d2c5;
+      }
+      .mode-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin: 13px 0 17px;
+      }
+      .mode-row p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .mode-switch {
+        display: inline-flex;
+        padding: 3px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #eeeee3;
+      }
+      .mode-switch button {
+        font-size: 11px;
+        padding: 7px 11px;
+        border-radius: 6px;
+        border: 0;
+        background: transparent;
+        color: #64756b;
+      }
+      .mode-switch button[aria-pressed='true'] {
+        color: var(--ink);
+        background: var(--paper);
+        box-shadow: 0 1px 3px #17372f14;
+      }
+      .storyboard-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 9px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .storyboard-label strong {
+        font-weight: 650;
+        color: var(--ink);
+      }
+      .storyboard {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .scene-card {
+        text-align: left;
+        padding: 11px;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        min-width: 0;
+      }
+      .scene-card[aria-pressed='true'] {
+        border-color: #bc8032;
+        box-shadow: 0 0 0 1px #bc8032;
+        background: #fcf0da;
+      }
+      .card-art {
+        border-radius: 7px;
+        height: 62px;
+        margin-bottom: 10px;
+        background: #ebeee0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        overflow: hidden;
+      }
+      .card-art span {
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border: 1px solid #a9b5a3;
+        border-radius: 50%;
+        font-size: 12px;
+      }
+      .card-art .even {
+        background: #f0c471;
+        border-color: #aa792d;
+      }
+      .card-art.formula {
+        font-size: 17px;
+        letter-spacing: 2px;
+        font-weight: 600;
+      }
+      .card-art.recap {
+        font-family: Georgia, serif;
+        font-size: 29px;
+        color: #53735e;
+      }
+      .card-art.intro-art {
+        font-size: 18px;
+        color: #536957;
+        gap: 7px;
+      }
+      .scene-number {
+        font-size: 10px;
+        color: #8a7657;
+        margin-right: 5px;
+      }
+      .scene-card h3 {
+        margin: 0 0 7px;
+        font-size: 11px;
+        line-height: 1.4;
+        font-weight: 650;
+        min-height: 30px;
+      }
+      .scene-card .card-type {
+        font-size: 9px;
+        color: var(--muted);
+      }
+      .scene-card .card-type.custom-type {
+        color: #8b611e;
+      }
+      .inspector {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        overflow: hidden;
+        margin-top: 44px;
+      }
+      .inspector-section {
+        padding: 19px 19px 18px;
+      }
+      .inspector-section + .inspector-section {
+        border-top: 1px solid var(--line);
+      }
+      .inspector h2 {
+        font-size: 16px;
+        font-weight: 650;
+        letter-spacing: -0.3px;
+        margin: 0 0 10px;
+      }
+      .inspector p {
+        font-size: 12px;
+        line-height: 1.7;
+        margin: 0;
+        color: var(--muted);
+      }
+      .reason-title {
+        margin: 15px 0 6px;
+        color: #866025;
+        font-size: 10px;
+        text-transform: uppercase;
+        font-weight: 750;
+        letter-spacing: 0.8px;
+      }
+      .reason {
+        padding: 12px;
+        background: #f2f3e8;
+        border-radius: 9px;
+      }
+      .reason strong {
+        display: block;
+        font-size: 12px;
+        margin-bottom: 5px;
+      }
+      .reason p {
+        font-size: 11px;
+      }
+      .custom-count {
+        display: flex;
+        gap: 5px;
+        margin-top: 12px;
+      }
+      .custom-count i {
+        display: block;
+        width: 32px;
+        height: 5px;
+        border-radius: 5px;
+        background: #dce3d1;
+      }
+      .custom-count i.enhanced {
+        background: #d7a34b;
+      }
+      details summary {
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 650;
+        list-style: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      details summary::-webkit-details-marker {
+        display: none;
+      }
+      details summary::after {
+        content: '+';
+        font-size: 18px;
+        font-weight: 400;
+        color: #7c876f;
+      }
+      details[open] summary::after {
+        content: '−';
+      }
+      .selection-copy {
+        padding-top: 13px;
+      }
+      .selection-copy p + p {
+        margin-top: 9px;
+      }
+      .workflow {
+        display: grid;
+        gap: 12px;
+        margin-top: 14px;
+      }
+      .workflow-item {
+        display: flex;
+        gap: 9px;
+        align-items: flex-start;
+      }
+      .step {
+        display: grid;
+        place-items: center;
+        border: 1px solid #d0d9c6;
+        color: #698069;
+        width: 21px;
+        height: 21px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        font-size: 10px;
+      }
+      .workflow-item strong {
+        display: block;
+        font-size: 11px;
+        font-weight: 650;
+        margin: 2px 0 3px;
+      }
+      .workflow-item p {
+        font-size: 11px;
+        line-height: 1.6;
+      }
+      .fallback-note {
+        padding: 12px 14px;
+        margin-top: 14px;
+        border-radius: 9px;
+        background: #faf0dd;
+        color: #765b2d;
+        font-size: 11px;
+        line-height: 1.6;
+      }
+      .footer {
+        margin-top: 22px;
+        padding-top: 15px;
+        border-top: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        gap: 15px;
+        font-size: 10px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .footer strong {
+        font-weight: 600;
+      }
+      @media (max-width: 1060px) {
+        .shell {
+          padding: 22px;
+        }
+        .workspace {
+          grid-template-columns: minmax(0, 1fr) 260px;
+          gap: 17px;
+        }
+        .inspector-section {
+          padding: 16px;
+        }
+        .mode-row {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 9px;
+        }
+        .card-art {
+          height: 51px;
+        }
+        .card-art.formula {
+          font-size: 13px;
+          letter-spacing: 0;
+        }
+      }
+      @media (max-width: 780px) {
+        .workspace {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .inspector {
+          margin-top: 2px;
+        }
+        .intro {
+          align-items: flex-start;
+        }
+        .allowance {
+          display: none;
+        }
+        .prompt {
+          flex-direction: column;
+          gap: 5px;
+        }
+        .caption {
+          bottom: 67px;
+          font-size: 12px;
+        }
+        .inspector {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+        }
+        .inspector-section + .inspector-section {
+          border-top: 0;
+          border-left: 1px solid var(--line);
+        }
+        .inspector-section:last-child {
+          grid-column: 1 / -1;
+          border-left: 0;
+          border-top: 1px solid var(--line);
+        }
+        .workflow {
+          grid-template-columns: 1fr 1fr 1fr;
+        }
+      }
+      @media (max-width: 500px) {
+        .shell {
+          padding: 18px 15px;
+        }
+        .topbar-note {
+          font-size: 10px;
+        }
+        .intro {
+          margin-top: 22px;
+        }
+        h1 {
+          font-size: 30px;
+        }
+        .preview-heading h2 {
+          font-size: 13px;
+        }
+        .badge {
+          font-size: 9px;
+        }
+        .storyboard {
+          grid-template-columns: 1fr 1fr;
+        }
+        .scene-card h3 {
+          min-height: 0;
+        }
+        .card-art {
+          height: 56px;
+        }
+        /* Keep captions and controls below the small canvas, clear of the explanation. */
+        .video {
+          aspect-ratio: auto;
+          padding-bottom: 112px;
+        }
+        .video svg {
+          height: auto;
+          aspect-ratio: 16 / 9;
+        }
+        .caption {
+          bottom: 64px;
+          font-size: 11px;
+          width: 90%;
+          left: 5%;
+        }
+        .silent {
+          font-size: 8px;
+        }
+        .controls {
+          padding: 20px 10px 8px;
+        }
+        .scrubber {
+          margin-bottom: 7px;
+        }
+        .inspector {
+          display: block;
+        }
+        .inspector-section + .inspector-section {
+          border-left: 0;
+          border-top: 1px solid var(--line);
+        }
+        .workflow {
+          grid-template-columns: 1fr;
+        }
+        .footer {
+          flex-direction: column;
+          gap: 6px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">t</span> Tro
+          <span
+            style="
+              color: #7b8875;
+              font-size: 12px;
+              font-weight: 400;
+              letter-spacing: 0;
+              margin-left: 7px;
+            "
+            >Lesson studio</span
+          >
+        </div>
+        <div class="topbar-note">
+          <span class="dot" aria-hidden="true"></span> Prototype · no AI requests
+        </div>
+      </header>
+
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">A lesson, brought to life</p>
+          <h1 id="page-title">Motion where it helps explain.</h1>
+          <p>
+            Every scene gets reusable motion. Two scenes get custom animation to make the idea
+            visible.
+          </p>
+        </div>
+        <div class="allowance">
+          <strong>2 of 2 custom scenes</strong>Illustrative allowance for this lesson
+        </div>
+      </section>
+
+      <section class="prompt" aria-label="Example teacher request">
+        <div class="prompt-label">Teacher request</div>
+        <p>
+          “Explain how to count three-digit even numbers using the digits 1–6.
+          <strong>Repetition is allowed.</strong>”<br /><span
+            >Selected material: counting principles · Vietnamese explanation · four short
+            scenes</span
+          >
+        </p>
+      </section>
+
+      <div class="workspace">
+        <section aria-label="Interactive lesson preview">
+          <div class="preview-heading">
+            <h2>
+              <span id="scene-number" style="color: #8a7657; font-weight: 400; margin-right: 7px"
+                >02</span
+              ><span id="scene-title">Chọn chữ số hàng đơn vị</span>
+            </h2>
+            <span class="badge custom" id="preview-badge">Custom explanatory animation</span>
+          </div>
+
+          <div
+            class="video"
+            id="video"
+            tabindex="0"
+            role="group"
+            aria-label="Silent animation preview. Space toggles playback; arrow keys seek five seconds."
+          >
+            <svg
+              viewBox="0 0 960 540"
+              role="img"
+              aria-labelledby="visual-title visual-description"
+              lang="vi"
+            >
+              <title id="visual-title">Chọn chữ số hàng đơn vị</title>
+              <desc id="visual-description">
+                Các chữ số chẵn 2, 4, 6 di chuyển thành một nhóm: ba lựa chọn cho hàng đơn vị.
+              </desc>
+              <defs>
+                <radialGradient id="glow">
+                  <stop offset="0" stop-color="#6e8e6d" stop-opacity="0.16" />
+                  <stop offset="1" stop-color="#17372f" stop-opacity="0" />
+                </radialGradient>
+              </defs>
+              <rect width="960" height="540" fill="#17372f" />
+              <ellipse cx="800" cy="70" rx="360" ry="330" fill="url(#glow)" />
+              <text
+                id="video-kicker"
+                x="56"
+                y="49"
+                fill="#b9c9b4"
+                font-size="13"
+                letter-spacing="2"
+              >
+                NGUYÊN TẮC ĐẾM
+              </text>
+              <text id="video-title" x="56" y="91" fill="#fbf6e9" font-size="30" font-weight="650">
+                Chọn chữ số hàng đơn vị
+              </text>
+              <line x1="56" y1="111" x2="904" y2="111" stroke="#6d8770" stroke-opacity="0.35" />
+
+              <g class="scene-visual" id="intro-visual">
+                <g id="intro-content">
+                  <text
+                    x="480"
+                    y="196"
+                    fill="#fbf6e9"
+                    text-anchor="middle"
+                    font-size="28"
+                    font-weight="550"
+                  >
+                    Có bao nhiêu số chẵn có 3 chữ số?
+                  </text>
+                  <text x="480" y="236" fill="#b9c9b4" text-anchor="middle" font-size="18">
+                    Dùng các chữ số từ 1 đến 6 · Được lặp lại
+                  </text>
+                  <g id="intro-digits" fill="#f5e3ba" font-size="32" text-anchor="middle">
+                    <text x="305" y="315">1</text>
+                    <text x="375" y="315">2</text>
+                    <text x="445" y="315">3</text>
+                    <text x="515" y="315">4</text>
+                    <text x="585" y="315">5</text>
+                    <text x="655" y="315">6</text>
+                  </g>
+                  <rect x="323" y="349" width="314" height="45" rx="22" fill="#294b3d" />
+                  <text x="480" y="378" text-anchor="middle" fill="#d8e6ce" font-size="17">
+                    Bắt đầu từ hàng đơn vị
+                  </text>
+                </g>
+              </g>
+
+              <g class="scene-visual" id="digits-visual">
+                <text
+                  id="digit-hint"
+                  x="480"
+                  y="157"
+                  fill="#b9c9b4"
+                  text-anchor="middle"
+                  font-size="17"
+                >
+                  Số chẵn kết thúc bằng chữ số nào?
+                </text>
+                <g id="digit-1">
+                  <circle r="29" fill="#27483c" stroke="#8a9e83" />
+                  <text y="9" text-anchor="middle" fill="#f6efdc" font-size="25">1</text>
+                </g>
+                <g id="digit-2">
+                  <circle r="29" fill="#27483c" stroke="#8a9e83" />
+                  <text y="9" text-anchor="middle" fill="#f6efdc" font-size="25">2</text>
+                </g>
+                <g id="digit-3">
+                  <circle r="29" fill="#27483c" stroke="#8a9e83" />
+                  <text y="9" text-anchor="middle" fill="#f6efdc" font-size="25">3</text>
+                </g>
+                <g id="digit-4">
+                  <circle r="29" fill="#27483c" stroke="#8a9e83" />
+                  <text y="9" text-anchor="middle" fill="#f6efdc" font-size="25">4</text>
+                </g>
+                <g id="digit-5">
+                  <circle r="29" fill="#27483c" stroke="#8a9e83" />
+                  <text y="9" text-anchor="middle" fill="#f6efdc" font-size="25">5</text>
+                </g>
+                <g id="digit-6">
+                  <circle r="29" fill="#27483c" stroke="#8a9e83" />
+                  <text y="9" text-anchor="middle" fill="#f6efdc" font-size="25">6</text>
+                </g>
+                <g id="digit-result">
+                  <path
+                    d="M 348 337 V 352 H 612 V 337"
+                    fill="none"
+                    stroke="#e9be70"
+                    stroke-width="2"
+                  />
+                  <text
+                    x="480"
+                    y="391"
+                    text-anchor="middle"
+                    fill="#efc77e"
+                    font-size="22"
+                    font-weight="600"
+                  >
+                    3 lựa chọn
+                  </text>
+                </g>
+              </g>
+
+              <g class="scene-visual" id="count-visual">
+                <text x="480" y="153" fill="#b9c9b4" text-anchor="middle" font-size="17">
+                  Được lặp chữ số → mỗi vị trí được chọn độc lập
+                </text>
+                <g id="hundreds">
+                  <rect
+                    x="190"
+                    y="184"
+                    width="160"
+                    height="106"
+                    rx="15"
+                    fill="#294a3d"
+                    stroke="#6f8c71"
+                  />
+                  <text x="270" y="222" text-anchor="middle" fill="#c9d6bf" font-size="15">
+                    Hàng trăm
+                  </text>
+                  <text
+                    x="270"
+                    y="268"
+                    text-anchor="middle"
+                    fill="#fbf6e9"
+                    font-size="38"
+                    font-weight="600"
+                  >
+                    6
+                  </text>
+                </g>
+                <text x="375" y="250" text-anchor="middle" fill="#829b81" font-size="30">×</text>
+                <g id="tens">
+                  <rect
+                    x="400"
+                    y="184"
+                    width="160"
+                    height="106"
+                    rx="15"
+                    fill="#294a3d"
+                    stroke="#6f8c71"
+                  />
+                  <text x="480" y="222" text-anchor="middle" fill="#c9d6bf" font-size="15">
+                    Hàng chục
+                  </text>
+                  <text
+                    x="480"
+                    y="268"
+                    text-anchor="middle"
+                    fill="#fbf6e9"
+                    font-size="38"
+                    font-weight="600"
+                  >
+                    6
+                  </text>
+                </g>
+                <text x="585" y="250" text-anchor="middle" fill="#829b81" font-size="30">×</text>
+                <g id="units">
+                  <rect
+                    x="610"
+                    y="184"
+                    width="160"
+                    height="106"
+                    rx="15"
+                    fill="#dec084"
+                    stroke="#edca83"
+                  />
+                  <text x="690" y="222" text-anchor="middle" fill="#3c4c30" font-size="15">
+                    Hàng đơn vị
+                  </text>
+                  <text
+                    x="690"
+                    y="268"
+                    text-anchor="middle"
+                    fill="#17372f"
+                    font-size="38"
+                    font-weight="650"
+                  >
+                    3
+                  </text>
+                </g>
+                <g id="count-result">
+                  <text
+                    x="480"
+                    y="355"
+                    text-anchor="middle"
+                    fill="#efc77e"
+                    font-size="35"
+                    font-weight="600"
+                  >
+                    6 × 6 × 3 = 108
+                  </text>
+                  <text x="480" y="391" text-anchor="middle" fill="#b9c9b4" font-size="17">
+                    108 số chẵn có 3 chữ số
+                  </text>
+                </g>
+              </g>
+
+              <g class="scene-visual" id="recap-visual">
+                <g id="recap-content">
+                  <text
+                    x="480"
+                    y="225"
+                    text-anchor="middle"
+                    fill="#efc77e"
+                    font-size="72"
+                    font-weight="650"
+                  >
+                    108
+                  </text>
+                  <text x="480" y="269" text-anchor="middle" fill="#fbf6e9" font-size="22">
+                    số chẵn có 3 chữ số
+                  </text>
+                  <rect x="230" y="309" width="500" height="72" rx="13" fill="#294a3d" />
+                  <text x="480" y="340" text-anchor="middle" fill="#e3e9d7" font-size="17">
+                    Chọn từng vị trí, rồi nhân số lựa chọn.
+                  </text>
+                  <text x="480" y="365" text-anchor="middle" fill="#b9c9b4" font-size="14">
+                    Kết quả này áp dụng khi được lặp chữ số.
+                  </text>
+                </g>
+              </g>
+
+              <g class="scene-visual" id="baseline-visual">
+                <g id="baseline-content">
+                  <rect
+                    x="155"
+                    y="163"
+                    width="650"
+                    height="219"
+                    rx="18"
+                    fill="#294a3d"
+                    stroke="#617e62"
+                  />
+                  <text
+                    id="baseline-line-1"
+                    x="480"
+                    y="218"
+                    text-anchor="middle"
+                    fill="#d5dfc9"
+                    font-size="18"
+                  >
+                    Hàng đơn vị phải là chữ số chẵn.
+                  </text>
+                  <text
+                    id="baseline-line-2"
+                    x="480"
+                    y="284"
+                    text-anchor="middle"
+                    fill="#efc77e"
+                    font-size="38"
+                    font-weight="650"
+                  >
+                    2, 4, 6
+                  </text>
+                  <text
+                    id="baseline-line-3"
+                    x="480"
+                    y="338"
+                    text-anchor="middle"
+                    fill="#f4efdf"
+                    font-size="22"
+                  >
+                    Có 3 lựa chọn.
+                  </text>
+                </g>
+              </g>
+            </svg>
+            <div class="caption" lang="vi">
+              <span id="caption">Hàng đơn vị có 3 lựa chọn: 2, 4 hoặc 6.</span>
+            </div>
+            <div class="controls">
+              <input
+                class="scrubber"
+                id="scrubber"
+                type="range"
+                min="0"
+                max="10"
+                step="0.01"
+                value="6.4"
+                aria-label="Seek within this scene"
+              />
+              <div class="control-row">
+                <button
+                  class="icon-button"
+                  id="play"
+                  aria-label="Play animation"
+                  title="Play / pause (Space)"
+                >
+                  ▶
+                </button>
+                <button
+                  class="icon-button"
+                  id="replay"
+                  aria-label="Replay this scene"
+                  title="Replay scene"
+                >
+                  ↺
+                </button>
+                <button
+                  class="icon-button skip"
+                  id="back"
+                  aria-label="Back five seconds"
+                  title="Back 5 seconds"
+                >
+                  −5s
+                </button>
+                <button
+                  class="icon-button skip"
+                  id="forward"
+                  aria-label="Forward five seconds"
+                  title="Forward 5 seconds"
+                >
+                  +5s
+                </button>
+                <span class="time" id="time">0:06 / 0:10</span>
+                <span class="silent">Silent demo · captions only</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mode-row">
+            <div class="mode-switch" role="group" aria-label="Compare scene treatment">
+              <button id="custom-mode" aria-pressed="true">Custom animation</button>
+              <button id="baseline-mode" aria-pressed="false">Use saved baseline</button>
+            </div>
+            <p id="mode-hint">Try both versions of scene 2 or 3.</p>
+          </div>
+
+          <div class="storyboard-label">
+            <strong>One lesson · four scenes</strong><span>Pick a scene to watch</span>
+          </div>
+          <div class="storyboard" aria-label="Lesson scenes">
+            <button class="scene-card" data-scene="0" aria-pressed="false">
+              <div class="card-art intro-art" aria-hidden="true">
+                1 2 3 <b style="color: #aa792d">?</b>
+              </div>
+              <h3><span class="scene-number">01</span>Bài toán cần giải</h3>
+              <div class="card-type">Reusable motion</div>
+            </button>
+            <button class="scene-card" data-scene="1" aria-pressed="true">
+              <div class="card-art" aria-hidden="true">
+                <span class="even">2</span><span class="even">4</span><span class="even">6</span>
+              </div>
+              <h3><span class="scene-number">02</span>Chọn hàng đơn vị</h3>
+              <div class="card-type custom-type">✦ Custom animation</div>
+            </button>
+            <button class="scene-card" data-scene="2" aria-pressed="false">
+              <div class="card-art formula" aria-hidden="true">
+                6 × 6 × <b style="color: #9a6d27">3</b>
+              </div>
+              <h3><span class="scene-number">03</span>Nhân số lựa chọn</h3>
+              <div class="card-type custom-type">✦ Custom animation</div>
+            </button>
+            <button class="scene-card" data-scene="3" aria-pressed="false">
+              <div class="card-art recap" aria-hidden="true">108</div>
+              <h3><span class="scene-number">04</span>Ghi nhớ cách làm</h3>
+              <div class="card-type">Reusable motion</div>
+            </button>
+          </div>
+        </section>
+
+        <aside class="inspector" aria-label="How scene selection works">
+          <section class="inspector-section">
+            <p class="eyebrow" style="margin-bottom: 9px">Why this scene?</p>
+            <h2 id="reason-heading">Make the selection visible.</h2>
+            <p id="reason-copy">
+              Moving 2, 4 and 6 into a group shows which digits can end an even number.
+            </p>
+            <div class="reason-title" id="treatment-label">Custom animation · priority 1</div>
+            <div class="reason">
+              <strong id="reason-action">Highlight → move → count</strong>
+              <p id="reason-detail">
+                The movement explains the rule. It does more than decorate the text.
+              </p>
+            </div>
+            <div
+              class="custom-count"
+              aria-label="Scenes two and three selected for custom animation"
+            >
+              <i></i><i class="enhanced"></i><i class="enhanced"></i><i></i>
+            </div>
+          </section>
+          <section class="inspector-section">
+            <details open>
+              <summary>Who picks the scenes?</summary>
+              <div class="selection-copy">
+                <p>
+                  The lesson writer proposes a visual brief and priority while writing the four
+                  scenes. <strong>No separate selection call.</strong>
+                </p>
+                <p>
+                  The backend takes up to two scenes where motion helps explain a change,
+                  relationship or process. Intro and recap still have reusable fades and reveals.
+                </p>
+              </div>
+            </details>
+          </section>
+          <section class="inspector-section">
+            <details>
+              <summary>What keeps the work bounded?</summary>
+              <div class="workflow">
+                <div class="workflow-item">
+                  <span class="step">1</span>
+                  <div>
+                    <strong>Save the full explanation</strong>
+                    <p>Every scene has a baseline before custom work begins.</p>
+                  </div>
+                </div>
+                <div class="workflow-item">
+                  <span class="step">2</span>
+                  <div>
+                    <strong>Enhance selected scenes</strong>
+                    <p>One small component per scene, with at most one repair.</p>
+                  </div>
+                </div>
+                <div class="workflow-item">
+                  <span class="step">3</span>
+                  <div>
+                    <strong>Render saved work</strong>
+                    <p>A render retry reuses the saved animation.</p>
+                  </div>
+                </div>
+              </div>
+            </details>
+            <div class="fallback-note" id="fallback-note">
+              If custom animation cannot finish, the saved baseline still explains the same idea.
+              Try the switch below the player.
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      <footer class="footer">
+        <span
+          ><strong>Design prototype.</strong> Animation, selection and fallback are simulated
+          locally. This page does not call AI, render an MP4 or save to a database.</span
+        ><span>Illustrative plan · no usage or cost measured</span>
+      </footer>
+    </main>
+
+    <script>
+      /** @typedef {{ title: string, duration: number, custom: boolean, visualId: string, heading: string, reason: string, action: string, detail: string, description: string }} Scene */
+      /** @type {Scene[]} */
+      const scenes = [
+        {
+          title: 'Bài toán cần giải',
+          duration: 8,
+          custom: false,
+          visualId: 'intro-visual',
+          heading: 'Introduce the question clearly.',
+          reason:
+            'This scene establishes the digits and the repetition rule. No custom movement is needed to understand it.',
+          action: 'Reveal the prompt and digits',
+          detail: 'A maintained layout and simple reveals do the job.',
+          description: 'Bài toán đếm số chẵn có ba chữ số, dùng chữ số 1 đến 6 và được lặp lại.',
+        },
+        {
+          title: 'Chọn chữ số hàng đơn vị',
+          duration: 10,
+          custom: true,
+          visualId: 'digits-visual',
+          heading: 'Make the selection visible.',
+          reason: 'Moving 2, 4 and 6 into a group shows which digits can end an even number.',
+          action: 'Highlight → move → count',
+          detail: 'The movement explains the rule. It does more than decorate the text.',
+          description:
+            'Các chữ số chẵn 2, 4, 6 di chuyển thành một nhóm: ba lựa chọn cho hàng đơn vị.',
+        },
+        {
+          title: 'Nhân số lựa chọn',
+          duration: 10,
+          custom: true,
+          visualId: 'count-visual',
+          heading: 'Connect each place to the total.',
+          reason: 'Revealing the choices for each position shows why the product is 6 × 6 × 3.',
+          action: 'Build positions → multiply',
+          detail: 'The animation connects the counting rule to the three places in the number.',
+          description:
+            'Hàng trăm có 6 lựa chọn, hàng chục có 6, hàng đơn vị có 3: tổng cộng 108 số.',
+        },
+        {
+          title: 'Ghi nhớ cách làm',
+          duration: 8,
+          custom: false,
+          visualId: 'recap-visual',
+          heading: 'Let the answer settle.',
+          reason: 'The recap repeats the conclusion and its condition. Clear text is enough here.',
+          action: 'Reveal the answer and takeaway',
+          detail:
+            'Reusable motion keeps the lesson consistent without another code-generation request.',
+          description:
+            'Có 108 số chẵn có ba chữ số khi được lặp chữ số. Chọn từng vị trí rồi nhân số lựa chọn.',
+        },
+      ];
+
+      /** @type {{ sceneIndex: number, seconds: number, playing: boolean, fallback: boolean }} */
+      const state = { sceneIndex: 1, seconds: 6.4, playing: false, fallback: false };
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let previousTimestamp = 0;
+
+      /** The prototype only uses its own known markup; missing nodes are programming errors. @param {string} id @returns {HTMLElement | SVGElement} */
+      function getElement(id) {
+        const element = document.getElementById(id);
+
+        if (!(element instanceof HTMLElement) && !(element instanceof SVGElement)) {
+          throw new Error('Missing prototype element: ' + id);
+        }
+
+        return element;
+      }
+
+      /** @returns {Scene} */
+      function getScene() {
+        const scene = scenes[state.sceneIndex];
+
+        if (!scene) {
+          throw new Error('Unknown prototype scene');
+        }
+
+        return scene;
+      }
+
+      /** @param {number} value @param {number} minimum @param {number} maximum @returns {number} */
+      function clamp(value, minimum, maximum) {
+        return Math.min(maximum, Math.max(minimum, value));
+      }
+
+      /** @param {number} start @param {number} end @returns {number} */
+      function readProgress(start, end) {
+        const progress = clamp((state.seconds - start) / (end - start), 0, 1);
+        return progress * progress * (3 - 2 * progress);
+      }
+
+      /** @param {string} id @param {number} opacity */
+      function setOpacity(id, opacity) {
+        getElement(id).setAttribute('opacity', String(opacity));
+      }
+
+      /** @param {string} id @param {string} value */
+      function setText(id, value) {
+        getElement(id).textContent = value;
+      }
+
+      /** All animation values derive from scene time, so backward seeking reproduces the same frame. */
+      function paintDigits() {
+        const highlight = readProgress(1.7, 2.6);
+        const movement = readProgress(3.2, 5.5);
+
+        for (let digit = 1; digit <= 6; digit += 1) {
+          const element = getElement('digit-' + digit);
+          const isEven = digit % 2 === 0;
+          const startX = 255 + (digit - 1) * 90;
+          const endX = 380 + (digit / 2 - 1) * 100;
+          const x = isEven ? startX + (endX - startX) * movement : startX;
+          const y = 221 + (isEven ? 78 * movement : 0);
+          element.setAttribute('transform', 'translate(' + x + ',' + y + ')');
+          element.setAttribute(
+            'opacity',
+            String(isEven ? readProgress(0, 0.6) : 1 - 0.72 * movement),
+          );
+          const circle = element.querySelector('circle');
+          const text = element.querySelector('text');
+
+          if (circle && text) {
+            circle.setAttribute('fill', isEven && highlight > 0.5 ? '#e9be70' : '#27483c');
+            circle.setAttribute('stroke', isEven && highlight > 0.5 ? '#f2d294' : '#8a9e83');
+            text.setAttribute('fill', isEven && highlight > 0.5 ? '#17372f' : '#f6efdc');
+          }
+        }
+
+        setOpacity('digit-result', readProgress(5.5, 6.4));
+        setText(
+          'caption',
+          state.seconds < 2.8
+            ? 'Một số chẵn phải có chữ số chẵn ở hàng đơn vị.'
+            : state.seconds < 5.7
+              ? 'Ta chọn các chữ số 2, 4 và 6.'
+              : 'Hàng đơn vị có 3 lựa chọn: 2, 4 hoặc 6.',
+        );
+      }
+
+      function paintCount() {
+        setOpacity('hundreds', readProgress(0, 0.8));
+        setOpacity('tens', readProgress(1.7, 2.5));
+        setOpacity('units', readProgress(3.4, 4.2));
+        setOpacity('count-result', readProgress(5.5, 6.5));
+        setText(
+          'caption',
+          state.seconds < 1.8
+            ? 'Hàng trăm có 6 lựa chọn, từ 1 đến 6.'
+            : state.seconds < 3.5
+              ? 'Được lặp chữ số nên hàng chục cũng có 6 lựa chọn.'
+              : state.seconds < 5.7
+                ? 'Hàng đơn vị có 3 lựa chọn: 2, 4 hoặc 6.'
+                : 'Theo quy tắc nhân: 6 nhân 6 nhân 3 bằng 108.',
+        );
+      }
+
+      function paintFrame() {
+        const scene = getScene();
+        const usesBaseline = scene.custom && state.fallback;
+
+        for (const element of document.querySelectorAll('.scene-visual')) {
+          if (element instanceof SVGElement) {
+            element.style.display =
+              element.id === (usesBaseline ? 'baseline-visual' : scene.visualId) ? 'block' : 'none';
+          }
+        }
+
+        if (usesBaseline) {
+          const isSelectionScene = state.sceneIndex === 1;
+          setText(
+            'baseline-line-1',
+            isSelectionScene
+              ? 'Hàng đơn vị phải là chữ số chẵn.'
+              : 'Mỗi vị trí có số lựa chọn riêng.',
+          );
+          setText('baseline-line-2', isSelectionScene ? '2, 4, 6' : '6 × 6 × 3 = 108');
+          setText('baseline-line-3', isSelectionScene ? 'Có 3 lựa chọn.' : 'Được lặp chữ số.');
+          setOpacity('baseline-content', readProgress(0, 0.7));
+          setText(
+            'caption',
+            isSelectionScene
+              ? 'Hàng đơn vị có 3 lựa chọn: 2, 4 hoặc 6.'
+              : 'Theo quy tắc nhân, có 108 số chẵn có 3 chữ số.',
+          );
+        } else if (state.sceneIndex === 0) {
+          setOpacity('intro-content', readProgress(0, 0.7));
+          setOpacity('intro-digits', readProgress(1.5, 2.5));
+          setText(
+            'caption',
+            'Dùng các chữ số từ 1 đến 6, được lặp lại, để lập số chẵn có 3 chữ số.',
+          );
+        } else if (state.sceneIndex === 1) {
+          paintDigits();
+        } else if (state.sceneIndex === 2) {
+          paintCount();
+        } else {
+          setOpacity('recap-content', readProgress(0, 0.7));
+          setText(
+            'caption',
+            'Chọn từng vị trí rồi nhân số lựa chọn. Kết quả là 108 khi được lặp chữ số.',
+          );
+        }
+
+        const scrubber = getElement('scrubber');
+
+        if (scrubber instanceof HTMLInputElement) {
+          scrubber.max = String(scene.duration);
+          scrubber.value = String(state.seconds);
+          scrubber.setAttribute(
+            'aria-valuetext',
+            state.seconds.toFixed(1) + ' of ' + scene.duration + ' seconds',
+          );
+        }
+
+        setText(
+          'time',
+          '0:' +
+            String(Math.floor(state.seconds)).padStart(2, '0') +
+            ' / 0:' +
+            String(scene.duration).padStart(2, '0'),
+        );
+        setText('play', state.playing ? 'Ⅱ' : '▶');
+        getElement('play').setAttribute(
+          'aria-label',
+          state.playing ? 'Pause animation' : 'Play animation',
+        );
+      }
+
+      function paintScene() {
+        const scene = getScene();
+        const usesBaseline = scene.custom && state.fallback;
+        setText('scene-number', String(state.sceneIndex + 1).padStart(2, '0'));
+        setText('scene-title', scene.title);
+        setText('video-title', scene.title);
+        setText('visual-title', scene.title);
+        setText('visual-description', scene.description);
+        setText('reason-heading', scene.heading);
+        setText('reason-copy', scene.reason);
+        setText('reason-action', scene.action);
+        setText('reason-detail', scene.detail);
+        setText(
+          'treatment-label',
+          scene.custom
+            ? 'Custom animation · priority ' + state.sceneIndex
+            : 'Reusable motion · no custom code',
+        );
+        setText(
+          'preview-badge',
+          usesBaseline
+            ? 'Saved baseline layout'
+            : scene.custom
+              ? 'Custom explanatory animation'
+              : 'Reusable motion',
+        );
+        getElement('preview-badge').classList.toggle('custom', scene.custom && !usesBaseline);
+        setText(
+          'mode-hint',
+          usesBaseline
+            ? 'Same explanation, using the saved reusable layout.'
+            : scene.custom
+              ? 'Try both versions of this scene.'
+              : 'Intro and recap use the same maintained layout in both modes.',
+        );
+        setText(
+          'fallback-note',
+          state.fallback
+            ? 'Baseline mode is selected. Scenes 2 and 3 use saved layouts; every scene remains watchable.'
+            : 'If custom animation cannot finish, the saved baseline still explains the same idea. Try the switch below the player.',
+        );
+        getElement('custom-mode').setAttribute('aria-pressed', String(!state.fallback));
+        getElement('baseline-mode').setAttribute('aria-pressed', String(state.fallback));
+
+        for (const card of document.querySelectorAll('[data-scene]')) {
+          card.setAttribute(
+            'aria-pressed',
+            String(Number(card.getAttribute('data-scene')) === state.sceneIndex),
+          );
+        }
+
+        paintFrame();
+      }
+
+      /** @param {number} seconds */
+      function seek(seconds) {
+        if (!Number.isFinite(seconds)) {
+          return;
+        }
+
+        state.seconds = clamp(seconds, 0, getScene().duration);
+        paintFrame();
+      }
+
+      /** @param {number} index */
+      function setScene(index) {
+        if (!Number.isInteger(index) || !scenes[index]) {
+          return;
+        }
+
+        state.sceneIndex = index;
+        state.seconds = 0;
+        state.playing = false;
+        paintScene();
+      }
+
+      /** @param {boolean} fallback */
+      function setFallback(fallback) {
+        state.fallback = Boolean(fallback);
+        paintScene();
+      }
+
+      function togglePlayback() {
+        if (state.seconds >= getScene().duration) {
+          state.seconds = 0;
+        }
+
+        state.playing = !state.playing;
+        previousTimestamp = performance.now();
+        paintFrame();
+      }
+
+      getElement('play').addEventListener('click', togglePlayback);
+      getElement('replay').addEventListener('click', () => {
+        state.seconds = 0;
+        state.playing = !prefersReducedMotion;
+        previousTimestamp = performance.now();
+        paintFrame();
+      });
+      getElement('back').addEventListener('click', () => seek(state.seconds - 5));
+      getElement('forward').addEventListener('click', () => seek(state.seconds + 5));
+      getElement('scrubber').addEventListener('input', (event) => {
+        if (event.target instanceof HTMLInputElement) {
+          state.playing = false;
+          seek(Number(event.target.value));
+        }
+      });
+      getElement('custom-mode').addEventListener('click', () => setFallback(false));
+      getElement('baseline-mode').addEventListener('click', () => setFallback(true));
+
+      for (const card of document.querySelectorAll('[data-scene]')) {
+        card.addEventListener('click', () => {
+          setScene(Number(card.getAttribute('data-scene')));
+          state.playing = !prefersReducedMotion;
+          previousTimestamp = performance.now();
+          paintFrame();
+        });
+      }
+
+      getElement('video').addEventListener('keydown', (event) => {
+        if (!(event instanceof KeyboardEvent) || event.target !== getElement('video')) {
+          return;
+        }
+
+        if (event.code === 'Space') {
+          event.preventDefault();
+          togglePlayback();
+        } else if (event.code === 'ArrowLeft') {
+          event.preventDefault();
+          seek(state.seconds - 5);
+        } else if (event.code === 'ArrowRight') {
+          event.preventDefault();
+          seek(state.seconds + 5);
+        }
+      });
+
+      /** @param {number} timestamp */
+      function animate(timestamp) {
+        if (state.playing && document.visibilityState === 'visible') {
+          state.seconds = clamp(
+            state.seconds + Math.min((timestamp - previousTimestamp) / 1000, 0.1),
+            0,
+            getScene().duration,
+          );
+
+          if (state.seconds >= getScene().duration) {
+            state.playing = false;
+          }
+
+          paintFrame();
+        }
+
+        previousTimestamp = timestamp;
+        window.requestAnimationFrame(animate);
+      }
+
+      /** Deterministic preview controls for local visual smoke checks. No network or model calls. */
+      window.prototypeApi = {
+        setScene,
+        seek(seconds) {
+          state.playing = false;
+          seek(seconds);
+        },
+        setFallback,
+        getState() {
+          const scene = getScene();
+          return {
+            ...state,
+            title: scene.title,
+            durationSeconds: scene.duration,
+            treatment: scene.custom && !state.fallback ? 'custom' : 'reusable',
+            customSceneIndices: [1, 2],
+            hasAudio: false,
+            makesAiRequests: false,
+          };
+        },
+      };
+
+      paintScene();
+      window.requestAnimationFrame(animate);
+    </script>
+  </body>
+</html>

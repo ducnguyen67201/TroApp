@@ -17,7 +17,7 @@ export function useLessonVideo(): {
   busy: boolean;
   error: (typeof LessonVideoFailure)[keyof typeof LessonVideoFailure] | null;
   select: (lesson: LessonVideo | null) => void;
-  execute: (command: LessonVideoCommand) => Promise<void>;
+  execute: (command: LessonVideoCommand, onAcknowledged?: () => void) => Promise<void>;
 } {
   const [options, setOptions] = useState<Options | null>(null);
   const [lessons, setLessons] = useState<LessonVideo[]>([]);
@@ -28,46 +28,53 @@ export function useLessonVideo(): {
   >(null);
   const epoch = useRef(0);
   const alive = useRef(true);
-  const execute = useCallback(async (command: LessonVideoCommand): Promise<void> => {
-    const generation = ++epoch.current;
-    setBusy(true);
-    setError(null);
-    try {
-      const reply = await window.tro.controlLessonVideos?.(command);
-      if (!alive.current || generation !== epoch.current) {
-        return;
+  const execute = useCallback(
+    async (command: LessonVideoCommand, onAcknowledged?: () => void): Promise<void> => {
+      const generation = ++epoch.current;
+      setBusy(true);
+      setError(null);
+      try {
+        const reply = await window.tro.controlLessonVideos?.(command);
+        if (!alive.current || generation !== epoch.current) {
+          return;
+        }
+        // Main also maps lost HTTP replies to UNAVAILABLE; keep their idempotency key for retry.
+        if (reply && (reply.kind !== 'failed' || reply.code !== LessonVideoFailure.UNAVAILABLE)) {
+          onAcknowledged?.();
+        }
+        if (!reply || reply.kind === 'failed') {
+          setError(reply?.code ?? LessonVideoFailure.UNAVAILABLE);
+          return;
+        }
+        if (reply.kind === 'options') {
+          setOptions(reply);
+        }
+        if (reply.kind === 'list') {
+          setLessons(reply.lessons);
+        }
+        if (reply.kind === 'lesson') {
+          setSelected(reply.lesson);
+          setLessons((current) => [
+            reply.lesson,
+            ...current.filter((item) => item.id !== reply.lesson.id),
+          ]);
+        }
+        if (reply.kind === 'ok' && command.kind === LessonCommand.DELETE) {
+          setSelected(null);
+          setLessons((current) => current.filter((item) => item.id !== command.id));
+        }
+      } catch {
+        if (alive.current && generation === epoch.current) {
+          setError(LessonVideoFailure.UNAVAILABLE);
+        }
+      } finally {
+        if (alive.current && generation === epoch.current) {
+          setBusy(false);
+        }
       }
-      if (!reply || reply.kind === 'failed') {
-        setError(reply?.code ?? LessonVideoFailure.UNAVAILABLE);
-        return;
-      }
-      if (reply.kind === 'options') {
-        setOptions(reply);
-      }
-      if (reply.kind === 'list') {
-        setLessons(reply.lessons);
-      }
-      if (reply.kind === 'lesson') {
-        setSelected(reply.lesson);
-        setLessons((current) => [
-          reply.lesson,
-          ...current.filter((item) => item.id !== reply.lesson.id),
-        ]);
-      }
-      if (reply.kind === 'ok' && command.kind === LessonCommand.DELETE) {
-        setSelected(null);
-        setLessons((current) => current.filter((item) => item.id !== command.id));
-      }
-    } catch {
-      if (alive.current && generation === epoch.current) {
-        setError(LessonVideoFailure.UNAVAILABLE);
-      }
-    } finally {
-      if (alive.current && generation === epoch.current) {
-        setBusy(false);
-      }
-    }
-  }, []);
+    },
+    [],
+  );
   useEffect(() => {
     alive.current = true;
     void (async () => {

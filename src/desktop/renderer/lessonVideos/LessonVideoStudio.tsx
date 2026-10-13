@@ -23,7 +23,12 @@ import {
 } from '#contracts/LessonVideos.js';
 import { LessonComposition } from '../../../lessonVideoPresentation/LessonComposition.js';
 import { LessonVideoPlayer } from './LessonVideoPlayer.js';
-import { describeLesson, describeLessonFailure } from './LessonVideoLabels.js';
+import {
+  describeLesson,
+  describeLessonFailure,
+  describeScreenAnimation,
+  describeScreenAnimationNote,
+} from './LessonVideoLabels.js';
 
 export function LessonVideoStudio({
   lesson,
@@ -42,7 +47,9 @@ export function LessonVideoStudio({
   const active =
     lesson.status === LessonVideoStatus.RUNNING || lesson.status === LessonVideoStatus.QUEUED;
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const screen = lesson.screens[index] ?? lesson.screens[0];
+  const selectedIndex = lesson.screens[index] ? index : 0;
+  const screen = lesson.screens[selectedIndex];
+  const animationNote = screen ? describeScreenAnimationNote(screen, vi) : null;
   const downloadTranscript = (): void => {
     const text = [
       lesson.title,
@@ -104,8 +111,8 @@ export function LessonVideoStudio({
               />
               <Text size="xs" c="dimmed">
                 {vi
-                  ? 'Xem nội dung · chưa phải video hoàn chỉnh'
-                  : 'Content preview · not the finished video'}
+                  ? 'Xem nội dung với hoạt ảnh tiêu chuẩn · chưa phải video hoàn chỉnh'
+                  : 'Content preview with standard animation · not the finished video'}
               </Text>
             </div>
           ) : (
@@ -126,15 +133,31 @@ export function LessonVideoStudio({
             {lesson.screens.map((item, position) => (
               <button
                 key={item.id}
-                aria-pressed={index === position}
+                type="button"
+                aria-pressed={selectedIndex === position}
                 onClick={() => {
                   setIndex(position);
                 }}
               >
-                {position + 1}. {item.title}
+                <strong>
+                  {position + 1}. {item.title}
+                </strong>
+                <span>{describeScreenAnimation(item, vi)}</span>
               </button>
             ))}
           </div>
+          {screen && (
+            <div className="lesson-animation-note">
+              <Text size="sm" fw={600}>
+                {vi ? 'Cảnh' : 'Scene'} {selectedIndex + 1}: {describeScreenAnimation(screen, vi)}
+              </Text>
+              {animationNote && (
+                <Text size="sm" c="dimmed">
+                  {animationNote}
+                </Text>
+              )}
+            </div>
+          )}
           <Group mt="sm">
             <Button
               size="xs"
@@ -208,7 +231,7 @@ export function LessonVideoStudio({
               </Button>
             ) : (
               <>
-                {lesson.screens.length > 0 && lesson.status !== LessonVideoStatus.READY && (
+                {lesson.canContinue && (
                   <Button
                     disabled={busy}
                     onClick={() => {
@@ -221,6 +244,13 @@ export function LessonVideoStudio({
                   >
                     {vi ? 'Tiếp tục dựng video' : 'Continue rendering'}
                   </Button>
+                )}
+                {lesson.canContinue && (
+                  <Text size="xs" c="dimmed">
+                    {vi
+                      ? 'Tiếp tục dùng nội dung và hoạt ảnh đã lưu; không cấp thêm lượt gọi AI.'
+                      : 'Continue reuses saved content and animation; it does not grant new AI attempts.'}
+                  </Text>
                 )}
                 {lesson.screens.some((item) => item.silent && item.speechAttempts < 3) && (
                   <Button

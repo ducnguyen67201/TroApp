@@ -60,7 +60,12 @@ export function registerLessonVideoRoutes(
         parameters.data.id,
         parameters.data.artifactId,
       );
-      if (!artifact) {
+      if (
+        !artifact ||
+        (artifact.kind !== LessonArtifactKind.AUDIO &&
+          artifact.kind !== LessonArtifactKind.CLIP &&
+          artifact.kind !== LessonArtifactKind.VIDEO)
+      ) {
         return await reply.code(404).send();
       }
       const bytes = Buffer.from(artifact.bytes);

@@ -8,6 +8,16 @@ import {
   LessonArtifactKind,
 } from '#contracts/LessonVideos.js';
 import { LessonVideoConfigSchema } from '../config/LessonVideoConfig.js';
+import {
+  LessonModelAttemptSchema,
+  LessonModelUsageSchema,
+  StoredLessonVisualSchema,
+} from '#contracts/LessonVisuals.js';
+import {
+  beginLessonModelAttempt,
+  settleLessonModelAttempt,
+  preservesLessonModelAttempts,
+} from '../features/lessonVideos/domain/LessonModelAttempts.js';
 import { LessonVideoError } from '../features/lessonVideos/domain/LessonVideoRules.js';
 import type {
   LessonVideoStore,
@@ -15,6 +25,9 @@ import type {
 } from '../features/lessonVideos/application/LessonVideoPorts.js';
 
 const storedSchema = LessonVideoSchema.extend({
+  stateVersion: z.number().int().min(1).max(2).default(1),
+  visuals: z.array(StoredLessonVisualSchema).max(2).default([]),
+  modelAttempts: z.array(LessonModelAttemptSchema).max(6).default([]),
   ownerId: z.string(),
   requestId: z.uuid(),
   requestHash: z.string(),
@@ -23,17 +36,10 @@ const storedSchema = LessonVideoSchema.extend({
   settings: LessonVideoConfigSchema,
   rendererBuild: z.string(),
   contentStarted: z.boolean(),
-  contentUsage: z
-    .strictObject({
-      inputTokens: z.number().nonnegative(),
-      outputTokens: z.number().nonnegative(),
-      cachedTokens: z.number().nonnegative(),
-      requestId: z.string().nullable(),
-    })
-    .nullable()
-    .default(null),
+  contentUsage: LessonModelUsageSchema.nullable().default(null),
   speechCharacters: z.number().int().nonnegative(),
   combineAttempts: z.number().int(),
+  renderRecoveries: z.number().int().min(0).max(1).default(0),
   deadline: z.string(),
   claimId: z.uuid().nullable(),
 });
@@ -83,7 +89,7 @@ export function createPrismaLessonVideoStore(databaseUrl: string): LessonVideoSt
     throw new LessonVideoError(LessonVideoFailure.STALE);
   }
 
-  return {
+  const store: LessonVideoStore = {
     async findRequest(ownerId, requestId) {
       const row = await client.lessonVideo.findUnique({
         where: { ownerId_requestId: { ownerId, requestId } },
@@ -172,6 +178,20 @@ export function createPrismaLessonVideoStore(databaseUrl: string): LessonVideoSt
     },
     async saveStageResult(lesson, artifact) {
       return transact(async (transaction) => {
+        const previous = await transaction.lessonVideo.findUnique({
+          where: { id: lesson.id },
+          include: { screens: true },
+        });
+        const saved = previous ? readLesson(previous) : null;
+        if (
+          !saved ||
+          !preservesLessonModelAttempts(saved, lesson) ||
+          (lesson.revision === saved.revision &&
+            lesson.renderRecoveries < saved.renderRecoveries) ||
+          lesson.renderRecoveries > lesson.settings.render.recoveries
+        ) {
+          throw new LessonVideoError(LessonVideoFailure.STALE);
+        }
         const changed = await transaction.lessonVideo.updateMany({
           where: { id: lesson.id, recordVersion: lesson.recordVersion },
           data: {
@@ -218,6 +238,14 @@ export function createPrismaLessonVideoStore(databaseUrl: string): LessonVideoSt
         }
         return { ...lesson, recordVersion: lesson.recordVersion + 1 };
       });
+    },
+    async beginModelAttempt(lesson, attempt) {
+      return store.saveStageResult(
+        beginLessonModelAttempt(lesson, LessonModelAttemptSchema.parse(attempt)),
+      );
+    },
+    async saveModelAttemptResult(lesson, attemptId, result, artifact) {
+      return store.saveStageResult(settleLessonModelAttempt(lesson, attemptId, result), artifact);
     },
     async claimNextLesson(now, claimId) {
       return transact(async (transaction) => {
@@ -290,4 +318,5 @@ export function createPrismaLessonVideoStore(databaseUrl: string): LessonVideoSt
     },
     close: () => client.$disconnect(),
   };
+  return store;
 }

@@ -8,8 +8,10 @@ import {
   LessonCommand,
 } from '../../../../src/contracts/LessonVideos.js';
 import { createLessonFixture, createLessonPorts } from './LessonVideoFixtures.js';
-import { estimateContentReservation } from '../../../../src/server/features/lessonVideos/application/LessonVideoBudget.js';
+import { estimateLessonReservation } from '../../../../src/server/features/lessonVideos/application/LessonVideoBudget.js';
 import { readLessonVideoConfig } from '../../../../src/server/config/LessonVideoConfig.js';
+
+const hash = (text: string): string => createHash('sha256').update(text).digest('hex');
 
 const signal = new AbortController().signal;
 
@@ -24,6 +26,7 @@ describe('durable lesson generation', () => {
       ports.renderer,
       randomUUID,
       vi.fn(),
+      hash,
     );
     lesson = await stages.execute(lesson, signal);
     expect(lesson.screens).toHaveLength(3);
@@ -48,6 +51,7 @@ describe('durable lesson generation', () => {
       ports.renderer,
       randomUUID,
       vi.fn(),
+      hash,
     );
     for (let step = 0; step < 8; step += 1) {
       lesson = await stages.execute(lesson, signal);
@@ -70,6 +74,7 @@ describe('durable lesson generation', () => {
       ports.renderer,
       randomUUID,
       vi.fn(),
+      hash,
     ).execute(lesson, signal);
     expect(result.status).toBe(LessonVideoStatus.STOPPED);
     expect(result.error).toBe(LessonVideoFailure.CONTENT);
@@ -85,6 +90,7 @@ describe('durable lesson generation', () => {
       ports.renderer,
       randomUUID,
       vi.fn(),
+      hash,
     );
     lesson = await stages.execute(lesson, signal);
     lesson = await stages.execute(lesson, signal);
@@ -105,6 +111,7 @@ describe('durable lesson generation', () => {
       ports.renderer,
       randomUUID,
       vi.fn(),
+      hash,
     ).execute(lesson, signal);
     expect(result.error).toBe(LessonVideoFailure.DEADLINE);
     expect(ports.content.generate).not.toHaveBeenCalled();
@@ -123,8 +130,32 @@ describe('durable lesson generation', () => {
       ports.renderer,
       randomUUID,
       vi.fn(),
+      hash,
     ).execute(lesson, signal);
     expect(ports.readSaved().usageUncertain).toBe(true);
+  });
+  it('consumes writer connection failures from the same two saved slots after restart', async () => {
+    let lesson = createLessonFixture();
+    const ports = createLessonPorts(lesson);
+    ports.content.generate.mockRejectedValue(new Error('connection lost'));
+    const createStages = () =>
+      new RunLessonVideoStage(
+        ports.store,
+        ports.content,
+        ports.speech,
+        ports.renderer,
+        randomUUID,
+        vi.fn(),
+        hash,
+      );
+    lesson = await createStages().execute(lesson, signal);
+    lesson = await createStages().execute(lesson, signal);
+    lesson = await createStages().execute(lesson, signal);
+    expect(lesson.status).toBe(LessonVideoStatus.STOPPED);
+    expect(lesson.error).toBe(LessonVideoFailure.CONTENT);
+    expect(lesson.modelAttempts).toHaveLength(2);
+    expect(ports.content.generate).toHaveBeenCalledTimes(2);
+    expect(lesson.usageUncertain).toBe(true);
   });
   it('requires owner access and a matching revision for edits', async () => {
     const lesson = createLessonFixture();
@@ -152,9 +183,111 @@ describe('durable lesson generation', () => {
   });
   it('rejects a model configuration whose maximum reservation does not fit', () => {
     const settings = readLessonVideoConfig();
-    expect(estimateContentReservation(settings)).toBe(108000);
+    expect(estimateLessonReservation(settings)).toBe(144000);
     expect(() =>
       readLessonVideoConfig({ ...settings, budget: { ...settings.budget, revisionMicroUsd: 100 } }),
     ).toThrow();
   });
+});
+
+it('finishes media after one bounded recovery without replaying saved content or speech', async () => {
+  let lesson = createLessonFixture();
+  const ports = createLessonPorts(lesson);
+  const stages = new RunLessonVideoStage(
+    ports.store,
+    ports.content,
+    ports.speech,
+    ports.renderer,
+    randomUUID,
+    vi.fn(),
+    hash,
+  );
+  lesson = await stages.execute(lesson, signal);
+  lesson = await stages.execute(lesson, signal);
+  ports.renderer.render.mockRejectedValueOnce(new Error('Renderer disconnected'));
+  lesson = await stages.execute(lesson, signal);
+  expect(lesson.screens[0]?.renderAttempts).toBe(3);
+  const service = new LessonVideoService(
+    ports.store,
+    {
+      authorize: () => Promise.resolve(),
+      read: () => Promise.resolve(lesson.sources),
+      list: () => Promise.resolve([]),
+    },
+    ports.content,
+    ports.renderer,
+    lesson.settings,
+    randomUUID,
+    hash,
+  );
+  await service.execute(lesson.ownerId, {
+    kind: LessonCommand.CONTINUE,
+    id: lesson.id,
+    revision: lesson.revision,
+  });
+  lesson = { ...ports.readSaved(), status: LessonVideoStatus.RUNNING };
+  expect(lesson.renderRecoveries).toBe(1);
+  expect(lesson.screens[0]?.renderAttempts).toBe(3);
+  for (
+    let operation = 0;
+    operation < 8 && lesson.status === LessonVideoStatus.RUNNING;
+    operation += 1
+  ) {
+    lesson = await stages.execute(lesson, signal);
+  }
+  expect(lesson.status).toBe(LessonVideoStatus.READY);
+  expect(lesson.screens[0]?.renderAttempts).toBe(6);
+  expect(ports.content.generate).toHaveBeenCalledTimes(1);
+  expect(ports.speech.synthesize).toHaveBeenCalledTimes(3);
+  expect(lesson.modelAttempts).toHaveLength(1);
+});
+
+it('stops rendering at the cumulative ceiling even after repeated manual execution', async () => {
+  let lesson = createLessonFixture();
+  const ports = createLessonPorts(lesson);
+  const stages = new RunLessonVideoStage(
+    ports.store,
+    ports.content,
+    ports.speech,
+    ports.renderer,
+    randomUUID,
+    vi.fn(),
+    hash,
+  );
+  lesson = await stages.execute(lesson, signal);
+  lesson = await stages.execute(lesson, signal);
+  ports.renderer.render.mockRejectedValue(new Error('Renderer remains unavailable'));
+  lesson = await stages.execute(lesson, signal);
+  const service = new LessonVideoService(
+    ports.store,
+    {
+      authorize: () => Promise.resolve(),
+      read: () => Promise.resolve(lesson.sources),
+      list: () => Promise.resolve([]),
+    },
+    ports.content,
+    ports.renderer,
+    lesson.settings,
+    randomUUID,
+    hash,
+  );
+  await service.execute(lesson.ownerId, {
+    kind: LessonCommand.CONTINUE,
+    id: lesson.id,
+    revision: lesson.revision,
+  });
+  lesson = await stages.execute(ports.readSaved(), signal);
+  expect(lesson.screens[0]?.renderAttempts).toBe(6);
+  for (let operation = 0; operation < 2; operation += 1) {
+    lesson = await stages.execute(lesson, signal);
+  }
+  expect(ports.renderer.render).toHaveBeenCalledTimes(2);
+  expect(ports.renderer.render.mock.calls.map((call) => call[3])).toEqual([3, 3]);
+  await expect(
+    service.execute(lesson.ownerId, {
+      kind: LessonCommand.CONTINUE,
+      id: lesson.id,
+      revision: lesson.revision,
+    }),
+  ).rejects.toMatchObject({ code: LessonVideoFailure.STALE });
 });

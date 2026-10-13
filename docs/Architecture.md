@@ -1,7 +1,7 @@
 # Tro architecture
 
 This is the single maintained description of Tro's implemented system. Updated
-October 11, 2026. Change this document when component ownership, communication or
+October 12, 2026. Change this document when component ownership, communication or
 an architectural invariant changes. Contracts and configuration in the linked code
 own exact wire shapes and policy values. Setup and validation commands live in the
 [root README](../README.md). Research and UI prototypes are reference material,
@@ -952,7 +952,8 @@ Lesson videos are a new teacher-only feature. Retired Guided Lesson records and
 applied migrations remain untouched; no runner reads or resumes them. The retained
 onboarding preview remains available. New ownership is under
 `server/features/lessonVideos`, with public `contracts/LessonVideos.ts` and private
-`contracts/LessonRenderProtocol.ts`. React uses validated preload methods and an
+`contracts/LessonRenderProtocol.ts`; `contracts/LessonVisuals.ts` owns visual
+metadata and backend checkpoint schemas. React uses validated preload methods and an
 account-gated main-process API client. Only main attaches cookies; media is fetched
 by authorized artifact IDs with a byte ceiling and downloaded through a native
 save dialog. Navigating away does not cancel the API job.
@@ -965,36 +966,81 @@ speech, budget and timeout policy through the existing `config/Index.ts` pattern
 The address is deployment configuration and is not saved in lesson policy
 snapshots. The shared credential authenticates API requests at the renderer boundary.
 `LessonVideoRunner` claims durable rows with a lease; `RunLessonVideoStage` owns
-explicit content, speech, clip and combination steps. One bounded content-model
-request supplies all screens. There are no model tools, generated code, layout
-checker, AI reviewer or approval gates. OpenAI SDK retries share the reserved
-content ceiling; gaxios retries share the persisted media ceiling. A lost content
-response is not silently regenerated after restart. Uncertain attempts conservatively
-retain their reservations, even after lesson deletion.
+explicit content, speech, optional visual, clip and combination steps.
+`RunLessonContent` saves baseline screens, narration and visual briefs from one
+bounded whole-lesson response. Stable priority ordering selects at most two briefs.
+`RunLessonVisual` generates one selected scene through its application-owned
+provider port. These are two bounded model roles, not autonomous tool-using agents.
+There is no AI reviewer, layout critic or approval gate.
+
+The policy in [LessonVideoConfig.ts](../src/server/config/LessonVideoConfig.ts)
+reserves two writer attempts and two coder attempts per selected scene. Retry,
+repair and interrupted dispatches consume the same durable slots. With two selected
+scenes the configured ceiling is 48K input plus 24K output tokens and 144,000
+micro-USD at the committed text-model rates; speech and rendering are accounted
+separately. This reservation is not a measured quality, latency or typical-cost
+claim. SDK model retries are disabled so every paid dispatch is represented in the
+ledger; gaxios media retries share persisted media ceilings. Uncertain attempts
+retain their slots and reservations, even after lesson deletion.
 
 `PrismaLessonVideoStore` owns new `LessonVideo`, `LessonVideoScreen`,
 `LessonVideoArtifact` and `LessonVideoAllowance` records. Artifact bytes/reference
 writes are atomic, and record versions fence cancelled or superseded workers.
-Saved screens precede audio/clips/final MP4. Edits retain unchanged media and an older
-finished video is labelled while a newer revision runs. Fresh content generation
-creates an independent lesson, retaining the original. Media remains bounded in
-PostgreSQL for this beta; memory/container files are not checkpoints. Speech usage
-is bounded separately by text submissions and output/byte/deadline ceilings.
+Versioned JSON state in the existing records holds the durable model-attempt ledger,
+visual briefs and source references; no additional job system or table is required.
+Dispatch is checkpointed before provider I/O, and generated source is saved as a
+private source artifact before worker execution. Public media routes exclude source
+artifacts. Saved screens precede audio/clips/final MP4. Edits retain unchanged
+server-owned screen IDs, source and media, including unchanged reordered scenes.
+Changed content or narration timing invalidates the affected custom source and
+uses standard animation without renewing coder attempts. An older finished video
+is labelled while a newer revision runs. Fresh content generation creates an
+independent lesson, retaining the original. Media remains bounded in PostgreSQL
+for this beta; memory/container files are not checkpoints. Speech usage is bounded
+separately by text submissions and output/byte/deadline ceilings.
 
 `lessonVideoPresentation` contains maintained React/Remotion layouts, font assets
-and deterministic animations shared by content preview and Docker rendering.
-`lessonRenderer` runs Chromium/FFmpeg against a prebuilt bundle, sequentially, with
-bounded authenticated HTTP requests and temporary files. It receives no model keys,
-database credentials or executable user content. Bundle identity changes invalidate
-clip reuse on continuation. A speech outage can finish with paginated narration
-text; a render failure leaves screens and transcript usable. Only a committed full
-MP4 marks the job ready. API and Electron stay native in local development; Railway
-runs the renderer as one private Docker service. README owns commands and deployment.
+and deterministic animations shared by content preview and Docker rendering. The
+trusted frame owns title, captions and audio. Custom scenes use a small React-like
+SVG component and supported frame/interpolation helpers, not unrestricted browser
+code. `lessonRenderer` compiles source without evaluating it in the host, then
+executes it in a QuickJS/WASM child with no exposed host callbacks, filesystem,
+network, environment or DOM. The independent WASM linear-memory maximum is 32 MiB;
+the child also has a 128 MiB V8 heap ceiling and a 20-second wall-time supervisor.
+These limits do not claim to cap total renderer RSS. The owning
+[render protocol](../src/contracts/LessonRenderProtocol.ts) defines execution and
+output limits. Independently validated inert SVG trees are the only generated
+output supplied to the trusted Remotion bundle. Generated JavaScript never runs
+in Chromium or the authenticated Electron renderer.
+
+The rendering worker runs Chromium/FFmpeg sequentially against that prebuilt bundle,
+with authenticated bounded HTTP requests and temporary files. It receives no model
+or database credentials. Runtime capability negotiation lets older workers finish
+with standard animation. Bundle identity changes invalidate source and clip reuse
+on continuation. Exhausted or failed optional custom animation degrades to the
+standard layout and preserves lesson content; a completed degraded video remains
+Ready with an inline note. A speech outage can finish with paginated narration
+text; renderer outages leave screens, source and transcript available to Continue.
+Only a committed full MP4 marks the job ready. API and Electron stay native in local
+development; Railway runs the worker as one private Docker service. README owns
+rebuild, startup and deployment commands.
 
 Safe `lesson.video.stage` diagnostics report lesson/revision/stage, state, timing
-and provider usage when available. They exclude material text, narration, secrets
-and hidden reasoning. A stopped content job with uncertain usage requires a new
-explicit content request; repeated navigation/Continue never grants model attempts.
+and provider usage when available, plus screen/attempt identity, degradation reason
+and source digest. They exclude generated source, material text, narration, secrets
+and hidden reasoning. Continue reuses saved source/media and only remaining
+original model slots; it never replenishes them. A version-two interrupted writer
+may consume its remaining saved slot, whereas a legacy unknown dispatch without
+an attempt ledger cannot be replayed automatically.
+
+Media attempt counts are cumulative within a revision. Continue may consume the
+configured explicit recovery allowance, saved before dispatch, when a required
+clip or combine operation has exhausted its original ceiling. It never resets
+those counts, and each transport batch remains bounded by the configured attempt
+limit. Once that recovery is exhausted, Continue is unavailable. Legacy jobs
+without a saved recovery policy receive no additional allowance. A confirmed
+creation response rotates the desktop request ID for the next submission;
+transport uncertainty retains it so retrying reconciles the original job.
 
 Reviewed feature settings for classroom insights, practice, materials and HUD
 voiceover belong to `src/server/config/`, exported through `Index.ts`. Startup

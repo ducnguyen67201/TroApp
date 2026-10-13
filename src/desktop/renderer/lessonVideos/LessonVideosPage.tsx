@@ -61,14 +61,22 @@ export function LessonVideosPage({ locale }: { locale: 'en' | 'vi' }): ReactElem
             onSubmit={(event) => {
               event.preventDefault();
               if (classId) {
-                void view.execute({
-                  kind: LessonCommand.CREATE,
-                  requestId: requestId.current,
-                  classId,
-                  materialIds,
-                  prompt,
-                  locale,
-                });
+                const submittedRequestId = requestId.current;
+                void view.execute(
+                  {
+                    kind: LessonCommand.CREATE,
+                    requestId: submittedRequestId,
+                    classId,
+                    materialIds,
+                    prompt,
+                    locale,
+                  },
+                  () => {
+                    if (requestId.current === submittedRequestId) {
+                      requestId.current = crypto.randomUUID();
+                    }
+                  },
+                );
               }
             }}
           >
@@ -151,8 +159,10 @@ export function LessonVideosPage({ locale }: { locale: 'en' | 'vi' }): ReactElem
               <details>
                 <summary>{vi ? 'Chi phí và giới hạn' : 'Cost and limits'}</summary>
                 <Text size="sm">
-                  {vi ? 'Ước tính nội dung' : 'Content estimate'}: $
-                  {(view.options.estimatedMicroUsd / 1e6).toFixed(4)} ·{' '}
+                  {vi
+                    ? 'Giới hạn lượt đầu (nội dung và hoạt ảnh)'
+                    : 'First-pass limit (content and animation)'}
+                  : ${(view.options.estimatedMicroUsd / 1e6).toFixed(4)} ·{' '}
                   {vi ? 'Dự phòng tối đa' : 'Maximum reservation'}: $
                   {(view.options.maximumMicroUsd / 1e6).toFixed(3)} USD.{' '}
                   {vi ? 'Giọng đọc và máy chủ tính riêng.' : 'Narration and hosting are separate.'}

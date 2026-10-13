@@ -11,10 +11,10 @@ await bundle({
     resolve: { ...configuration.resolve, extensionAlias: { '.js': ['.ts', '.tsx', '.js'] } },
   }),
 });
-console.info('Fixed lesson templates bundled.');
+console.info('Maintained lesson presentation bundled.');
 
 const digest = createHash('sha256');
-for (const directory of ['src/lessonVideoPresentation', 'src/contracts']) {
+for (const directory of ['src/lessonVideoPresentation', 'src/lessonRenderer', 'src/contracts']) {
   for (const file of (await readdir(directory)).sort()) {
     if (/\.tsx?$/.test(file)) {
       digest.update(await readFile(`${directory}/${file}`));

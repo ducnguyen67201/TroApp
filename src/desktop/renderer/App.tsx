@@ -334,7 +334,9 @@ export function App(): ReactElement {
                   }}
                 >
                   <IconPlayerPlay size={19} stroke={1.6} />
-                  <span>{locale === 'vi' ? 'Video bài giảng' : 'Lesson videos'}</span>
+                  <span>
+                    {locale === 'vi' ? 'Video bài giảng (Thử nghiệm)' : 'Lesson videos (Beta)'}
+                  </span>
                 </UnstyledButton>
               )}
               <UnstyledButton

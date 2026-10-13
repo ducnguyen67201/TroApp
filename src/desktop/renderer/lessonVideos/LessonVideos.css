@@ -72,6 +72,15 @@
   background: #fffdf5;
   color: #17372f;
   cursor: pointer;
+  display: grid;
+  gap: 5px;
+  text-align: left;
+  max-width: 260px;
+  overflow-wrap: anywhere;
+}
+.lesson-screen-list button span {
+  font-size: 11px;
+  color: #63715c;
 }
 .lesson-screen-list button[aria-pressed='true'] {
   background: #f9e6c7;
@@ -82,6 +91,13 @@
 }
 .lesson-details summary {
   cursor: pointer;
+}
+.lesson-animation-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-left: 3px solid #b78136;
+  background: #fffdf5;
+  border-radius: 0 8px 8px 0;
 }
 .lesson-player {
   position: relative;

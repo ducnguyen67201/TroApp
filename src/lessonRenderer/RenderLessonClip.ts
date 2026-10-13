@@ -1,7 +1,7 @@
 import { renderMedia, selectComposition, makeCancelSignal } from '@remotion/renderer';
 import type { LessonRenderProps } from '../contracts/LessonRenderProtocol.js';
 
-/** Rendering uses a prebuilt bundle and bundled fonts. No generated source is executed. */
+/** Chromium runs only the maintained bundle; optional visual frames are validated SVG data. */
 export async function renderLessonClip(
   bundle: string,
   output: string,

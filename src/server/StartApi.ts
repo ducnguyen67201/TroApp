@@ -4,6 +4,8 @@ import { createPrismaLessonVideoStore } from './persistence/PrismaLessonVideoSto
 import { LessonVideoService } from './features/lessonVideos/application/LessonVideoService.js';
 import { LessonVideoRunner } from './features/lessonVideos/application/LessonVideoRunner.js';
 import { RunLessonVideoStage } from './features/lessonVideos/application/RunLessonVideoStage.js';
+import { RunLessonVisual } from './features/lessonVideos/application/RunLessonVisual.js';
+import { OpenAiLessonVisual } from './features/lessonVideos/infrastructure/OpenAiLessonVisual.js';
 import { ClassroomLessonSources } from './features/lessonVideos/infrastructure/ClassroomLessonSources.js';
 import { OpenAiLessonContent } from './features/lessonVideos/infrastructure/OpenAiLessonContent.js';
 import { OpenAiLessonSpeech } from './features/lessonVideos/infrastructure/OpenAiLessonSpeech.js';
@@ -101,6 +103,16 @@ async function startApi(): Promise<void> {
   const lessonDiagnostics: LessonDiagnostics = (event) => {
     logger.info(event, 'lesson.video.stage');
   };
+  const hashLessonValue = (value: string): string =>
+    createHash('sha256').update(value).digest('hex');
+  const lessonVisuals = new RunLessonVisual(
+    lessonStore,
+    new OpenAiLessonVisual(environment.OPENAI_API_KEY),
+    lessonRenderer,
+    randomUUID,
+    hashLessonValue,
+    lessonDiagnostics,
+  );
   const lessonStages = new RunLessonVideoStage(
     lessonStore,
     lessonContent,
@@ -108,6 +120,8 @@ async function startApi(): Promise<void> {
     lessonRenderer,
     randomUUID,
     lessonDiagnostics,
+    hashLessonValue,
+    lessonVisuals,
   );
   const lessonRunner = new LessonVideoRunner(
     lessonStore,
@@ -122,7 +136,7 @@ async function startApi(): Promise<void> {
     lessonRenderer,
     lessonConfig,
     randomUUID,
-    (value) => createHash('sha256').update(value).digest('hex'),
+    hashLessonValue,
   );
   registerLessonVideoRoutes(api, authentication.readSignedInUserId, lessons, () => {
     lessonRunner.wake();

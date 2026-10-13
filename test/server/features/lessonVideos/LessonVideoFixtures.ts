@@ -6,6 +6,11 @@ import {
   LessonVideoStage,
 } from '../../../../src/contracts/LessonVideos.js';
 import { readLessonVideoConfig } from '../../../../src/server/config/LessonVideoConfig.js';
+import { lessonVisualRuntimeVersion } from '../../../../src/contracts/LessonRenderProtocol.js';
+import {
+  beginLessonModelAttempt,
+  settleLessonModelAttempt,
+} from '../../../../src/server/features/lessonVideos/domain/LessonModelAttempts.js';
 import type {
   StoredLesson,
   LessonVideoStore,
@@ -17,6 +22,9 @@ import type {
 export function createLessonFixture(): StoredLesson {
   const settings = readLessonVideoConfig();
   return {
+    stateVersion: 2,
+    visuals: [],
+    modelAttempts: [],
     id: randomUUID(),
     ownerId: randomUUID(),
     requestId: randomUUID(),
@@ -35,7 +43,7 @@ export function createLessonFixture(): StoredLesson {
     videoRevision: null,
     inputTokens: 0,
     outputTokens: 0,
-    reservedMicroUsd: 108000,
+    reservedMicroUsd: 144000,
     usageUncertain: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -47,6 +55,7 @@ export function createLessonFixture(): StoredLesson {
     contentUsage: null,
     speechCharacters: 0,
     combineAttempts: 0,
+    renderRecoveries: 0,
     deadline: new Date(Date.now() + 600000).toISOString(),
     claimId: randomUUID(),
   };
@@ -72,6 +81,25 @@ export function createLessonPorts(initial: StoredLesson) {
       }
       return Promise.resolve(saved);
     }),
+    beginModelAttempt: vi.fn<LessonVideoStore['beginModelAttempt']>((lesson, attempt) => {
+      saved = {
+        ...beginLessonModelAttempt(lesson, attempt),
+        recordVersion: lesson.recordVersion + 1,
+      };
+      return Promise.resolve(saved);
+    }),
+    saveModelAttemptResult: vi.fn<LessonVideoStore['saveModelAttemptResult']>(
+      (lesson, attemptId, result, artifact) => {
+        saved = {
+          ...settleLessonModelAttempt(lesson, attemptId, result),
+          recordVersion: lesson.recordVersion + 1,
+        };
+        if (artifact) {
+          artifacts.set(artifact.id, artifact);
+        }
+        return Promise.resolve(saved);
+      },
+    ),
     claimNextLesson: vi.fn<LessonVideoStore['claimNextLesson']>(() => Promise.resolve(saved)),
     renewClaim: vi.fn<LessonVideoStore['renewClaim']>().mockResolvedValue(true),
     readArtifact: vi.fn<LessonVideoStore['readArtifact']>((_lessonId, id) =>
@@ -103,6 +131,9 @@ export function createLessonPorts(initial: StoredLesson) {
   } satisfies LessonSpeechProvider;
   const renderer = {
     readBuildId: vi.fn<LessonRenderer['readBuildId']>().mockResolvedValue('fixture-v1'),
+    readVisualRuntime: vi
+      .fn<NonNullable<LessonRenderer['readVisualRuntime']>>()
+      .mockResolvedValue(lessonVisualRuntimeVersion),
     render: vi.fn<LessonRenderer['render']>().mockResolvedValue(new Uint8Array([1, 2, 3])),
   } satisfies LessonRenderer;
   return { store, content, speech, renderer, readSaved: () => saved };

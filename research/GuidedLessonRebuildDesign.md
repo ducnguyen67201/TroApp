@@ -1,6 +1,10 @@
-# Guided Lesson Rebuild — Engineering Spec
+# Guided Lesson Rebuild — Historical Design
 
-Status: implementation authorized; Architecture.md describes shipped runtime ownership.
+Status: historical planning snapshot, archived October 12, 2026.
+This preserves the requested design discussion; it is not a maintained runtime specification.
+Current behavior, configuration ownership and recovery guarantees belong to
+[Architecture.md](../docs/Architecture.md). Paid model benchmarks and production
+deployment were outside this implementation.
 Date: October 12, 2026.
 Baseline: `main` at `1d4ec9c`.
 
@@ -10,8 +14,13 @@ small set of structured screens, saves them, and renders their content with
 maintained animated Remotion templates and narration. The teacher decides whether the content is
 useful. Creation does not require an AI reviewer or approval workflow.
 
-This is the requested planning artifact; implementation details and accepted beta limits are maintained in Architecture.md. [Architecture.md](Architecture.md) remains
-the description of the implemented system. Update it when these changes ship.
+This is the requested planning artifact; implementation details and accepted beta limits are maintained in Architecture.md. [Architecture.md](../docs/Architecture.md) remains
+the maintained description of the implemented system. Keep this snapshot historical.
+
+Sections 1–11 describe the original fixed-layout baseline. Section 12 extends that
+baseline with optional AI-generated scene visuals. Statements below that exclude
+generated code apply to the original delivery. Section 12 records the extension;
+Architecture.md describes the current runtime and its supported limits.
 
 ## 1. Decisions
 
@@ -1201,3 +1210,786 @@ Before implementation, confirm the proposed teacher-only scope and beta media
 limits. Confirm the mini content-model candidate, speech model and renderer resource
 allocation through the bounded fixture benchmark. These choices are configuration decisions; they should
 not expand the architecture.
+
+## 12. AI-generated explanatory animation
+
+Status: implemented, October 12, 2026. A bounded writer supplies lesson content and
+visual briefs. A bounded coder can supply SVG animation components for up to two
+selected scenes. The worker interprets those components in QuickJS/WASM and passes
+validated drawing data into the maintained Remotion composition. The supported API
+is a small synchronous SVG subset, rather than arbitrary React/Remotion projects.
+The [interactive prototype](../examples/previews/LessonAnimationPrototype.html)
+simulates scene selection, playback and fallback locally; it makes no AI requests.
+
+### 12.1. What is a template, and what does AI do?
+
+The word "template" has two meanings here:
+
+| Term                         | Meaning                                                                                                         | Owner                                                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Remotion starter application | Example application connecting a prompt, model-generated React code, preview and export. It uses AI.            | Remotion provides the reference project.                  |
+| Tro presentation template    | Maintained video frame, fonts, narration, captions, timing, baseline layouts and reusable animation components. | Tro engineers write and version this code.                |
+| Custom scene visual          | A small React/Remotion component explaining one scene inside that maintained frame.                             | AI generates it from the saved lesson and a visual brief. |
+
+**AI does more than choose a template.** It writes lesson content, proposes what
+visual would explain each scene, and writes custom animation code for the selected
+scenes. Maintained application code chooses which proposals fit the allowance and
+controls execution. Remotion renders the saved result; it does not make model calls.
+
+```text
+WE BUILD AND MAINTAIN                 AI GENERATES FOR EACH LESSON
+---------------------                ----------------------------
+Video frame and typography           Lesson text and narration
+Reusable motion components           What visual explains each scene
+Baseline lesson layouts              Code for selected custom visuals
+Saving, budgets and recovery
+Speech and rendering integration
+
+                     Combined by the worker
+                              |
+                              v
+                    Finished narrated video
+```
+
+For example, engineers provide text, arrows, circles, grouping, highlighting and
+frame-based movement as optional reusable components. AI can combine those pieces
+or draw additional SVG/React content inside the scene. This is not a mandatory
+catalogue of subject-specific layouts or a fixed animation-action language.
+
+```text
+Trusted Tro video frame
++--------------------------------------------------------------+
+| Title, consistent fonts and background                        |
+| +----------------------------------------------------------+ |
+| | Custom instructional visual                              | |
+| |                                                          | |
+| | AI-generated code: digits move / argument branches /      | |
+| | code blocks highlight while a sprite moves                | |
+| +----------------------------------------------------------+ |
+| Narration/captions and timing supplied by maintained code    |
++--------------------------------------------------------------+
+```
+
+The custom component receives a bounded scene rectangle, saved content, current
+frame, fps and duration. It returns only the instructional visual. Trusted code
+owns composition registration, audio, captions, overall duration and export.
+Use deterministic Remotion frame values; no live CSS animations, random layout,
+downloads, package installation, model tools or runtime external assets.
+
+### 12.2. Subjects and scene selection
+
+The teacher supplies the existing prompt and selected class materials. Start with
+automatic selection; do not require the teacher to choose an animation technique.
+
+The content request returns ordinary baseline screen data plus a short visual
+brief and optional priority for each screen. A brief states what the viewer should
+understand, which objects matter and what change or relationship to show. It
+should add explanatory value rather than ask for decorative motion.
+
+The backend selects up to two eligible scenes, ordered by proposed priority with
+scene position as a stable tie-break. Persist that selection once. Zero selected
+scenes is valid. Intro/recap or unsuitable proposals use maintained animations.
+Selection does not require another classifier, reviewer or model call. The model
+proposes the teaching decision; deterministic backend rules enforce the allowance.
+
+| Class content | Example visual brief                                            | Possible custom visual                                                                      |
+| ------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Counting      | Show why only even digits can occupy the units place.           | Highlight 2, 4 and 6, move them into a group, reveal "3 choices".                           |
+| Philosophy    | Explain how two theories evaluate the same dilemma.             | Reveal the dilemma, branch into two lines of reasoning, then compare conclusions.           |
+| Scratch       | Explain which block runs and how repetition changes the sprite. | Highlight a displayed loop, increment a counter and move a drawn sprite for each iteration. |
+
+A philosophy scene can also connect premises to a conclusion or introduce a
+counterexample. A Scratch scene is an illustrative animation of code behavior;
+embedding or executing the Scratch engine is outside this increment. Every custom
+brief must stay grounded in the selected material. Teachers inspect the result;
+neither compilation nor animation proves the explanation is educationally correct.
+
+```text
+Example lesson: four screens
+
+1. Introduce the question       -> reusable animated layout
+2. Show the key relationship    -> custom visual, priority 1
+3. Work through an example     -> custom visual, priority 2
+4. Recap the conclusion        -> reusable animated layout
+
+All four screens have motion.
+Only screens 2 and 3 request custom animation code from AI.
+```
+
+### 12.3. Two model responsibilities, one existing runner
+
+Use two bounded model adapters, zero autonomous agents and the existing durable
+API runner. No Agents SDK loop is required. Speech synthesis remains a separate
+provider operation; the Docker render worker makes no language-model requests.
+
+```text
+Teacher prompt + selected material
+                 |
+                 v
+API: authorize, snapshot input, reserve allowance
+                 |
+                 v
+AI WRITER: one request for the whole lesson
+  -> content + narration + visual briefs + priorities
+                 |
+                 v
+POSTGRES: save screens and fixed custom-scene selection
+                 |
+                 v
+For each saved screen:
+  Speech -> save audio/duration, or select text-only mode
+                 |
+                 v
+  Custom visual selected and allowance remains?
+       | No                            | Yes
+       v                               v
+  Maintained layout          AI CODER: one scene only
+       |                       -> small React/Remotion source
+       |                               |
+       |                     POSTGRES: save source + hash
+       |                               |
+       |                     Isolated compilation/render
+       |                       | success       | code error
+       |                       |               v
+       |                       |       One focused repair,
+       |                       |       only if attempt remains
+       |                       |               |
+       |                       |       Save revised source;
+       |                       |       render, or use baseline
+       +-----------------------+---------------+
+                               |
+                               v
+                    POSTGRES: save completed clip
+                               |
+                               v
+          Combine saved clips -> save final MP4 -> Ready
+```
+
+The writer request includes bounded selected source text, teacher goal, locale and
+the baseline/visual-brief schema. It must not include code examples, render logs or
+past lesson conversations. The coder receives only the chosen screen, its visual
+brief, narration/duration, component contract and a small relevant recipe set.
+Choose recipes from the brief using maintained rules; do not add a skill-selection
+model request. Do not send the entire class material or other generated scenes.
+
+The total successful first-pass path is one writer request plus at most two coder
+requests. A repair gets the latest source once, its brief and a bounded concrete
+compile/runtime error. It never receives all prior code revisions or full logs.
+Prefer unique search/replace edits with a checked result; an ambiguous patch uses
+the same remaining allowance or falls back, rather than opening another loop.
+
+### 12.4. Bounded cost and timing
+
+All figures below are proposed limits for this extension, not measured averages.
+Start with `gpt-5.4-mini` for both roles. A different coding model requires a new
+rate snapshot and admission calculation; the same dollar estimate cannot carry
+over automatically.
+
+| Work                                   | Input per attempt | Output per attempt | Total model attempts |
+| -------------------------------------- | ----------------: | -----------------: | -------------------: |
+| Whole-lesson content and visual briefs |            12,000 |              6,000 |                    2 |
+| One custom scene                       |             6,000 |              3,000 |          2 per scene |
+| Custom scene count                     |                   |                    |            At most 2 |
+
+The input limits include instructions, schemas, examples and current source on
+repair. Output limits include any billed reasoning output. Keep reasoning disabled
+initially and validate that compact components fit the allowance. Count the exact
+request before dispatch. Oversized animation input uses a maintained recipe set
+that fits, or baseline; do not silently truncate code or explanatory material.
+
+```text
+FIRST ATTEMPTS ONLY
+  Writer:       12K input + 6K output
+  Two visuals:  12K input + 6K output
+  ---------------------------------
+  Total:        24K input + 12K output = 36K tokens
+
+ALL ALLOWED ATTEMPTS
+  Writer:       2 x (12K input + 6K output)
+  Two visuals:  2 x 2 x (6K input + 3K output)
+  ------------------------------------------
+  Total:        48K input + 24K output = 72K tokens
+```
+
+At standard uncached rates of $0.75/M input and $4.50/M output, the first-attempt
+ceiling is $0.072 and the all-attempt ceiling is $0.144 USD. These rates were checked
+against [OpenAI's model page](https://developers.openai.com/api/docs/models/gpt-5.4-mini)
+on October 12, 2026. Cache hits may reduce cost; admission assumes no cache savings.
+Speech, rendering, storage and transfer are separate costs. The existing $0.15
+text-model revision allowance can cover this proposal at those rates.
+
+The current content-only configuration allows three total transport attempts.
+**This proposal reduces the writer to two total attempts** and reserves the two
+scene allowances; keeping the old three-attempt writer policy would exceed the
+72K-token/$0.144 calculation. Configuration validation must enforce the sum.
+
+Admission reserves the full ceiling once. Before each paid dispatch, atomically
+consume a slot from that saved reservation; do not reserve the same spend twice.
+Transport retries, code repair and timeout retries share the same two-attempt count for that role or
+scene. Disable hidden SDK retries for these adapters and let the existing runner
+dispatch the next persisted attempt. Do not put an outer repair loop around an
+SDK retry loop. Keep unknown provider usage reserved after connection loss; the
+cost table is an application reservation ceiling, not a guarantee of exactly-once
+provider billing or a complete invoice from incomplete usage receipts.
+
+Continue, navigation and process restarts never replenish model attempts. A new
+explicit content-generation request receives a new admission decision under the
+teacher/deployment daily allowance. Exhausting a custom-scene allowance selects
+baseline; it does not discard the saved lesson or completed clips.
+
+Completion target: a few minutes for a short lesson, pending measurement. Do not
+show a promised ETA from token counts. Record writer time, coder/repair time,
+speech time, render time and queue time separately, then measure p50/p95 across
+representative lessons. Keep per-call timeouts and the overall job deadline bounded;
+stop custom work early enough to leave time for baseline rendering and combination.
+A timed-out job exposes saved work and a media-only Continue action where possible.
+
+#### 12.4.1. Graceful degradation when optional animation cannot finish
+
+Call this behavior **graceful degradation**: reduce the optional animation treatment
+while preserving the saved explanation, narration and completed work. Baseline
+rendering is the fallback mechanism. Reaching an animation limit does not cancel
+the lesson or discard its content.
+
+```text
+Saved content + narration
+           |
+           v
+Try optional custom animation
+           |
+           +-- succeeds ------------------> render custom scene
+           |
+           +-- allowance/time exhausted ----------+
+           |                                      |
+           +-- code unusable after allowed -------+
+               attempts/repair                    |
+                                                  v
+                                      DEGRADE to baseline animation
+                                                  |
+                                                  v
+                                      Render -> combine -> save MP4
+                                                  |
+                                                  v
+                                      Ready, with degradation note
+```
+
+If a model response reaches its output limit, it may contain incomplete code.
+Persist it as an incomplete attempt, never as executable/accepted source. A focused
+repair or complete replacement may use the existing remaining scene attempt; it
+does not receive a new allowance. If that attempt cannot produce usable source,
+persist the baseline treatment and continue rendering. Do not silently accept
+truncated code or repeatedly increase `max_output_tokens`.
+
+Keep the essential lesson-content reservation separate from optional animation
+reservations. Animation cannot spend the writer's allowance or consume allowances
+reserved for speech/baseline media work. If no valid lesson content was saved before
+the writer exhausted its attempts, stop with a clear content-generation error;
+graceful degradation cannot invent the missing lesson. Render outages or exhausted
+media limits can also leave the video unfinished, with saved content still usable.
+
+Persist a safe degradation reason with the affected scene, such as output limit,
+animation allowance exhausted, code error or optional time exhausted. Baseline
+scenes selected normally are not degraded; only an intended enhancement that was
+replaced is recorded this way. Degradation is scene-treatment metadata, not a new
+primary job status: a committed complete video remains `ready`, an unfinished job
+is `stopped`, and an explicit cancellation is `cancelled`. Continue never resets
+attempts or converts graceful degradation into an automatic new paid request.
+
+### 12.5. Durable artifacts and recovery
+
+PostgreSQL remains the checkpoint owner. No important result lives only in API
+memory, a browser tab or container files. Extend the existing store and additive
+Prisma migrations rather than creating a second job framework.
+
+Persist baseline content first, then the visual brief, selected treatment, scene
+source revisions, source digest, code/recipe/build version, render inputs, attempt
+records and safe error classification. Save source before compilation or rendering.
+Compilation is not source persistence, and a saved source is not a finished video.
+Commit an artifact and its reference atomically using the existing revision/claim
+fencing. Do not return executable source through the ordinary desktop lesson reply.
+
+Prefer the existing screen state and immutable artifact records for brief/source
+metadata and the small bounded attempt list. Validate stored JSON with an owned
+schema/version and upgrade older records to baseline defaults when read. Add a
+reviewed migration only where a new indexed field or relation is needed; do not
+rewrite applied migrations or reinterpret retired Guided Lesson data.
+
+| Event                                                              | Recovery                                                                               | Additional text/code model work                                                            |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Worker loses connection while rendering saved source               | Retry the same saved source and input digest within the media allowance.               | None.                                                                                      |
+| API or worker restarts after source commit                         | Read saved source; resume missing media.                                               | None.                                                                                      |
+| Model connection is lost before source commit                      | Keep that attempt charged/reserved; use the remaining attempt, otherwise baseline.     | At most the existing remaining attempt.                                                    |
+| Source fails compilation or throws a deterministic execution error | One focused repair only if a model attempt remains, then baseline.                     | Never more than two total scene dispatches.                                                |
+| Worker timeout, OOM or service outage                              | Classify as infrastructure failure; retry within media limits, then expose saved work. | None; infrastructure faults do not ask AI to rewrite code.                                 |
+| Custom budget or custom time allowance is exhausted                | Persist baseline treatment and render saved screen content.                            | None.                                                                                      |
+| Teacher edits one screen                                           | Fence old work and invalidate that screen's affected visual/audio/clip inputs.         | No automatic new allowance; use saved baseline unless an explicit enhancement is admitted. |
+| Teacher cancels                                                    | Stop new dispatches, abort active work and preserve committed artifacts.               | None.                                                                                      |
+
+Source/clip reuse requires matching scene content, brief, duration, presentation
+mode and renderer/recipe build identity. Editing another screen does not invalidate
+unchanged work. Cancellation, revision changes and expired claims reject late writes.
+An in-flight model attempt after a crash consumes its allowance conservatively;
+do not replay it merely because a usage receipt is missing.
+
+```text
+Continue / restart
+        |
+        v
+Read durable scene state
+        |
+        +-- Clip saved and inputs match -------> reuse clip
+        |
+        +-- Source saved and inputs match -----> render saved source
+        |
+        +-- Baseline already chosen ----------> render maintained layout
+        |
+        +-- Custom source missing ------------> check persisted attempts
+                                                  |
+                                      remaining -> generate within allowance
+                                      exhausted -> select baseline
+```
+
+Graceful degradation guarantees reuse of saved content, not availability of rendering
+infrastructure. A baseline clip still has to render. If that render or final
+combination cannot complete, leave the job stopped with usable screens/transcript
+and an accurate Continue action. Only a committed full MP4 marks the lesson ready.
+
+### 12.6. Execution boundary and minimum checks
+
+Generated source runs only inside the QuickJS/WASM guest. It is never evaluated in
+Electron, the API, the worker supervisor or Chromium. A trusted child compiles TSX
+with fixed TypeScript tooling and provides only the maintained React element and
+Remotion frame helpers. It installs no host I/O bindings or guest module loader.
+The child starts with an empty environment. Docker alone is not the isolation
+boundary.
+
+```text
+Native API: authorization, model key, saved dispatch ledger, database
+                              |
+                    private source + bounded props
+                              v
+Trusted Docker worker supervisor
+                              |
+                 empty-environment interpreter child
+                              |
+                 fixed compiler -> QuickJS/WASM guest
+                              |
+                bounded, validated inert SVG frame trees
+                              v
+Trusted maintained Remotion bundle in Chromium -> MP4
+```
+
+The guest has a hard 32 MiB WebAssembly linear-memory maximum, a stack limit and
+an interrupt deadline. The supervisor kills the child after 20 seconds and caps
+its output bytes. The child also has a 128 MiB V8 heap limit; that limit is not a
+whole-process RSS guarantee. These limits bound guest execution and do not claim
+the trusted TypeScript compiler itself is a security sandbox.
+
+Strict SVG validation rejects active attributes, external references, raw HTML,
+URLs, unsupported tags, excessive depth and oversized frame trees. The trusted
+presentation owns titles, captions, fonts, audio and duration. Guest code cannot
+import files, install dependencies, access network/credentials, or replace that
+host frame. The supported custom canvas is 1176 by 390 logical pixels; custom
+scenes longer than 90 seconds degrade to baseline.
+
+The worker advertises the exact `quickjs-svg-v1` capability. Older workers render
+baseline layouts, with a visible degradation note, and receive no generated source.
+Compilation/execution failures are typed code errors eligible for the one remaining
+focused repair. Worker outages stop at the saved checkpoint. There is no runtime
+overflow scorer, pixel critic, AI reviewer or layout-perfection loop. Offline
+math, philosophy and Scratch fixtures exercise the actual interpreter; live model
+quality, latency and production Railway behavior still require rollout measurement.
+
+### 12.7. Code ownership and configuration
+
+Extend the current owners; do not replace the working lesson pipeline.
+
+| Owner                                                 | Planned change                                                                                                                                                  |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/contracts/LessonVideos.ts`                       | Add bounded visual-brief and saved treatment/status metadata. Preserve stable server-owned scene IDs.                                                           |
+| `src/contracts/LessonRenderProtocol.ts`               | Version the private protocol for custom source, fixed props and typed failures; define mixed-version rejection/compatibility explicitly.                        |
+| `src/server/config/LessonVideoConfig.ts`              | Add custom enablement, model, max scenes, per-attempt input/output, attempts, source/error size and time limits; reduce writer attempts to two for this policy. |
+| `src/server/config/Index.ts`                          | Validate/export the extended configuration through the existing pattern.                                                                                        |
+| `OpenAiLessonContent.ts`                              | Return baseline screens and visual briefs together; keep content grounded and bounded.                                                                          |
+| New `infrastructure/OpenAiLessonVisual.ts`            | Count and generate/repair one small scene through an application-owned visual provider port. No autonomous tools or hidden retries.                             |
+| `LessonVideoService.ts` and `LessonVideoBudget.ts`    | Atomically reserve the full model allowance and reject unaffordable requests before dispatch.                                                                   |
+| `LessonVideoRunner.ts` and `RunLessonVideoStage.ts`   | Add one persisted optional visual operation; keep explicit stage selection, bounded dispatch and media-only recovery.                                           |
+| `LessonVideoPorts.ts` and `PrismaLessonVideoStore.ts` | Persist selection, source, individual attempts, safe outcomes and artifact references through typed ports/transactions.                                         |
+| `src/lessonVideoPresentation/`                        | Maintain the frame, baseline layouts, reusable motion components and representative recipe fixtures.                                                            |
+| `src/lessonRenderer/`                                 | Add isolated compilation/render execution behind the trusted supervisor; keep baseline rendering available.                                                     |
+| `src/desktop/renderer/lessonVideos/`                  | Show stage, selected treatment and degradation; play returned media inline without evaluating generated code.                                                   |
+
+Models, feature policy, budgets and recipe selection belong in committed config
+and maintained code. API keys, renderer credentials and deployment addresses stay
+in each process's validated `Env.ts`. Snapshot validated policy on job creation;
+editing config cannot replenish an old job's allowance. Use existing `as const`
+domain vocabulary and strict schemas at boundaries; application ports do not import
+provider SDKs, Prisma, Remotion or Electron.
+
+Keep comments focused on why attempts remain consumed after uncertain failures,
+why media retries never regenerate source, and where untrusted code executes.
+Avoid generic graph engines or a separate service for each stage.
+
+### 12.8. Teacher-visible behavior and diagnostics
+
+Keep the prompt/material creation form and inline playback. No new approval gate
+is introduced. Navigating away or closing the editor does not cancel the saved job;
+the explicit Cancel action owns cancellation.
+
+Show the actual active operation: writing lesson, generating animation for scene
+2 of 2, creating narration, rendering scene 3 of 5, or combining video. Counts come
+from saved state; they are not an invented percentage or promised ETA. Show
+custom/reusable treatment and a short visual explanation when useful.
+
+If custom work degrades to baseline and rendering succeeds, show Ready with a concise
+note such as "Video ready. Scene 3 uses standard animation." Use plain language in
+the teacher interface; "graceful degradation" is the engineering term. Do not mark the whole
+lesson failed merely because the optional enhancement failed. A stopped render
+instead says which operation failed and whether Continue can reuse saved work.
+
+Extend safe stage diagnostics with lesson/revision/screen ID, attempt number,
+source/build digest, operation, elapsed time, typed failure and reported
+input/cached/output tokens. Record an uncertain-usage flag separately. Log state
+changes and the safe degradation reason when a scene switches to baseline. Log
+each transition once, not repeated polling. Never log raw generated source, material,
+narration, secrets, screenshots or hidden model reasoning in ordinary events.
+
+### 12.9. Implementation order and acceptance
+
+1. **Prove the execution boundary and reusable frame with fixtures.** Render
+   counting, philosophy and Scratch examples in isolation. Demonstrate rejection
+   of forbidden imports/network access and termination of infinite loops/oversized
+   output. This step uses maintained fixtures, no paid model calls.
+2. **Add contracts, config and durable source/attempt storage.** Use additive
+   migrations and typed adapters. Prove atomic reservation, selection, source
+   commit, revision fencing and crash recovery without providers.
+3. **Add bounded writer/coder adapters and stage selection.** Use typed fake
+   providers first. Verify at most six text/code dispatches, at most 72K admitted
+   tokens, no nested retries and one common retry/repair count per scene.
+4. **Integrate custom rendering, graceful degradation and inline status.** Prove that worker
+   disconnect/restart causes zero additional model calls when source exists; code
+   failure/budget exhaustion degrades to baseline; renderer outage retains usable
+   work. Verify truncated output is never executed, writer/media reservations stay
+   protected, and a completed degraded video is ready rather than failed/cancelled.
+5. **Measure representative output before rollout.** With separately authorized
+   paid calls, compare baseline and enhanced lessons across mathematics, philosophy
+   and Scratch in EN/VI. Record total cost including failures, teacher acceptance,
+   first-pass success, fallback rate and p50/p95 completion times. Keep custom
+   enablement off until those results justify rollout.
+
+Acceptance must also cover a lost model response, cancellation during each stage,
+duplicate Continue, concurrent reservation, edited duration, mismatched renderer
+build and delayed stale writes. A valid MP4 containing a caught error screen does
+not pass. Private custom source never executes in the authenticated desktop.
+
+Finish implementation before final validation. Use the repository's required
+lint/format/type/unit checks, build and disposable-database integration checks for
+runtime changes. Keep ordinary verification independent of credentials and paid
+inference. Update Architecture.md only when the extension is implemented, and
+README.md when its development/deployment commands change.
+
+### 12.10. What to reuse from Remotion's starter
+
+Use [Remotion's prompt-to-motion-graphics starter](https://github.com/remotion-dev/template-prompt-to-motion-graphics-saas)
+as a reference for selected working examples, focused generation prompts and
+targeted source edits. Retain Tro's existing authentication, database, runner,
+budgets and Docker/Railway rendering. The starter's Next.js/AWS Lambda app does not
+need to become a second Tro application.
+
+The inspected starter does not establish Tro's durable recovery, isolation or
+spending ceiling. Its initial validation/skill-selection model calls are excluded
+from this plan; the writer supplies a brief and maintained rules choose recipes.
+Review any reused source against [the repository's Remotion licensing terms](https://github.com/remotion-dev/template-prompt-to-motion-graphics-saas#license).
+It is not presented here as an MIT-licensed animation library.
+
+The [research notes](../research/RemotionAgentOptimizationResearch.md) contain the
+inspected source revision and supporting evidence. The prototype and research are
+reference artifacts; this proposed section does not claim that custom generation,
+its isolation boundary, its token ceiling or its timing target already ships.
+
+### 12.11. Concrete implementation plan and clean-code rules
+
+This is the implementation plan for the proposed extension, not an instruction to
+start paid generation or deploy it. Keep the existing lesson feature and implement
+one vertical path from saved visual brief to saved clip. Add abstractions only at
+real I/O boundaries or for decisions that need independent testing.
+
+#### 12.11.1. Organize code around three small responsibilities
+
+```text
+StartApi.ts: validate config and construct concrete adapters
+                         |
+                         v
+LessonVideoRunner: lease, wake, cancellation and shutdown
+                         |
+                         v
+RunLessonVideoStage: choose ONE missing operation
+    | content     | speech     | optional visual     | clip/combine
+    |             |            v                     |
+    |             |     RunLessonVisual              |
+    |             |       |       |                  |
+    |             |       |       +--> visual provider port
+    |             |       |              ^
+    |             |       |       OpenAiLessonVisual
+    |             |       |       (SDK and prompt code)
+    |             |       v                          |
+    +-------------+--> existing store port <----------+
+                              ^
+                     PrismaLessonVideoStore
+
+Pure LessonVisualRules supplies decisions to application code.
+HTTP/Remotion execution stays behind the existing renderer port.
+```
+
+| File                                       | Responsibility and limits                                                                                                                                       |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| New `domain/LessonVisualRules.ts`          | Pure selection, reuse and next-action decisions. Receives typed state/policy/time; returns a decision. No SDK, database, filesystem, clock reads or HTTP calls. |
+| New `application/RunLessonVisual.ts`       | Perform one missing visual operation, checkpoint its outcome and return control to the existing runner. No retry-until-success loop.                            |
+| New `infrastructure/OpenAiLessonVisual.ts` | Build/count the exact request, call the SDK once, validate the response and return a typed outcome. Keep prompt/patch helpers private unless genuinely reused.  |
+
+Keep the following focused functions together in `LessonVisualRules.ts`:
+
+- `selectLessonVisuals`: stable priority selection, maximum two, persisted once.
+- `chooseNextVisualAction`: choose saved-source reuse, generation, repair or
+  degradation from persisted state, attempts, capability and remaining time.
+- `canReuseLessonVisual`: compare the complete saved input/build identity.
+
+Do not extract an obvious boolean into its own module, create a generic `utils.ts`,
+or add a class for every function. Use `RunLessonVisual` because visual generation
+is a distinct I/O responsibility; leave speech and combination with their existing
+owners. Extract shared frame markup from `LessonComposition.tsx` only when custom
+rendering needs the same frame, so fonts, caption spacing and timing have one owner.
+
+#### 12.11.2. Define contracts before wiring adapters
+
+Keep `LessonContentSchema` as the canonical editable baseline content contract.
+Define a writer-output schema that adds bounded visual briefs and priorities
+without making those internal decisions teacher-editable fields. Map draft scene
+positions to server-assigned stable IDs when saving; reject invalid references or
+duplicate briefs instead of accepting model-invented IDs.
+
+Use canonical schemas and named `as const` objects for visual actions, treatments,
+attempt outcomes and degradation reasons. Derive types from those owners. Separate
+the public lesson view from private persisted state and private render input:
+
+| Data                                                                                    | Allowed consumers                                                 |
+| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Baseline content, intended/effective treatment, progress and safe degradation reason    | API and desktop through validated public contracts.               |
+| Full source snapshot, generated TSX, model request payload and detailed attempt records | Backend persistence and owning adapters only.                     |
+| Source artifact plus fixed props/build identity                                         | Authenticated private render boundary and isolated job execution. |
+| Audio, clips and final MP4                                                              | Existing authorized playback/download paths.                      |
+
+Extend ordinary artifact routes to explicitly allow media kinds. Omitting source
+from lesson JSON is insufficient: knowing an artifact ID must not make generated
+source downloadable through the existing generic artifact route. Keep source
+artifacts distinct from playable media and validate their size/digest privately.
+
+Add a narrow `LessonVisualProvider` port in `LessonVideoPorts.ts`, with request
+counting and single-dispatch generation methods. The following is an interface
+sketch; its types must come from the owning validated schemas, not duplicated
+SDK shapes:
+
+```ts
+export interface LessonVisualProvider {
+  countRequest(request: LessonVisualRequest): Promise<number>;
+  generateVisual(request: LessonVisualRequest, signal: AbortSignal): Promise<LessonVisualResult>;
+}
+```
+
+Use a discriminated result rather than `null`, unchecked assertions or one generic
+exception for every expected failure:
+
+```text
+Visual-model result
+  source       -> complete source/patch + available usage receipt
+  incomplete   -> output limit/refusal + available usage receipt
+  unavailable  -> safe transport classification + uncertain-usage flag
+
+Private render result
+  rendered     -> validated MP4 bytes
+  code-error   -> bounded compilation/execution diagnostic
+  unavailable  -> infrastructure classification, never an AI rewrite request
+```
+
+Cancellation/abort and stale revision/claim failures propagate to the runner;
+they are not successful degradation. Unexpected database failures also propagate.
+An optional animation may degrade only after its state change is committed.
+Validate unknown provider/HTTP/JSON data before reading fields. Keep provider SDK,
+Prisma and Remotion types out of domain/application interfaces.
+
+#### 12.11.3. Persist each dispatch and each result
+
+Put the bounded model-attempt list on the lesson, not inside replaceable screen
+state. Maximum six dispatch records cover the writer and two scenes. Each record
+identifies its role, screen ID when applicable, ordinal, request digest, saved
+token ceilings, dispatch/outcome state and reported usage. IDs and digests are
+backend-owned; edits cannot replace this list from public input.
+
+```text
+Build exact request from saved state
+                |
+Count request input; reject/degrade if it cannot fit
+                |
+                v
+beginModelAttempt transaction
+  verify current revision, record version and claim
+  verify remaining reserved slot and job time
+  append dispatched record and consume ONE slot
+                |
+             commit
+                |
+                v
+ONE provider dispatch, SDK retries disabled
+                |
+                v
+saveModelAttemptResult transaction
+  verify claim/revision again
+  save usage/outcome
+  save immutable source artifact + reference together when present
+                |
+             commit
+                |
+                v
+Next runner operation: render saved source, repair, or degrade
+```
+
+Extend the existing store with focused `beginModelAttempt` and
+`saveModelAttemptResult` operations, using its transaction-scoped Prisma client.
+Do not expose a Prisma client or generic mutation callback through the port. The
+existing revision/record-version/claim checks must fence both operations, and no
+transaction stays open during counting, model requests or rendering.
+
+A crash after dispatch but before result commit leaves an uncertain consumed
+attempt. The next claim can use only the remaining saved slot, or degrade. A saved
+source result is reused without another generation call. Complete/incomplete
+source artifacts are immutable and distinguished; only a complete accepted source
+can enter isolated compilation/rendering.
+
+Keep the current runner's control loop. `RunLessonVisual` executes one decision and
+returns saved state; a subsequent runner iteration decides the next action. It
+must not call itself recursively or add another scheduler. Existing media retries
+may remain behind gaxios with their own persisted allowance; they cannot dispatch
+language-model requests or multiply model attempts.
+
+#### 12.11.4. Keep model requests small and failures specific
+
+In `OpenAiLessonContent.ts`, add visual briefs to the one whole-lesson response.
+The baseline lesson remains usable if every brief is absent or unselected. In
+`OpenAiLessonVisual.ts`, use private, readable functions such as
+`buildVisualRequest` and `applyVisualPatch`; pass the exact prepared request to
+both counting and generation so they cannot disagree about context.
+
+Start with a small versioned recipe set for text/objects, relationships and code
+execution illustrations. Recipe selection is ordinary maintained code. Send only
+the selected examples, public component contract and one scene. Repairs include
+the latest source once and the relevant diagnostic; they do not append a chat
+history or replay earlier attempts.
+
+For a patch, require each search fragment to match exactly one region and enforce
+the final source-size limit. Invalid/ambiguous patches are failed attempts and
+degrade when no slot remains; do not ask another model to interpret them. Treat
+output-limit responses as incomplete even if they contain a source-looking string.
+Provider transport failures stay separate from deterministic code errors.
+
+The renderer's typed error must survive `HttpLessonRenderer` parsing. Compilation
+or execution errors may permit the one repair; network loss, worker OOM, timeout,
+busy state or unavailable execution capability never justify AI code rewriting.
+Unexpected render exceptions must not be converted into a successful error-frame
+MP4. Keep cancellation signals through each adapter and terminate isolated work
+on abort or deadline.
+
+#### 12.11.5. Extend configuration and composition roots
+
+Add one `visual` group to the existing `LessonVideoConfig.ts`, validated/exported
+through `config/Index.ts`. It owns enablement, model, maximum scenes, input/output
+ceilings, shared attempts, source/diagnostic limits and optional-work time limits.
+Keep model rates, revision reservation and daily admission under the existing
+budget owner. Validate the full worst-case sum; a change to any model/attempt/token
+setting must either fit the allowance or fail startup validation.
+
+Custom enablement defaults off until isolation and fixture acceptance pass. Preserve
+renderer URL/credential and provider keys in validated process env modules. Do not
+add an environment variable per animation policy or expose backend config in the
+browser. Persist the validated policy/version on creation. New enhanced jobs use
+the two-attempt writer policy; older baseline jobs retain their recorded settings
+and accounting rather than acquiring new limits during an upgrade.
+
+`StartApi.ts` constructs the visual adapter and injects it and the store into
+`RunLessonVisual`, then injects that operation into `RunLessonVideoStage`. The
+existing runner owns wake/close; no new worker deployment or background queue is
+needed. Keep concrete construction in startup, with typed ports in application code.
+
+Version private render requests and advertise supported custom-component/build
+capability from the renderer. Deploy capability support before enabling enhanced
+jobs. Missing custom capability selects maintained baseline; unsupported source
+contracts are never silently executed against an incompatible build. Validate
+older stored records into baseline defaults without losing policy, attempts,
+usage, current media or cancellation state.
+
+The trusted renderer supervisor calls a small isolated compile/render adapter.
+Keep its platform mechanism explicit after the isolation spike; do not hide an
+ordinary child process behind a name that promises a sandbox. Only the supervisor
+handles authentication and media I/O. Generated code receives fixed props and
+permitted components, with no credentials or application-network access.
+
+#### 12.11.6. Preserve accounting through edits, Continue and degradation
+
+Extend `LessonVideoService` edits by comparing dependency inputs per stable screen
+ID. Reuse matching source/audio/clips; invalidate only affected references. Model
+attempt records stay at lesson scope when screens are edited, reordered or removed.
+The existing Continue/build-change path can reset eligible media counters under
+its current policy, but must never reset writer/coder dispatch counts.
+
+Implement degradation as one named application operation that saves baseline
+treatment and a safe reason, then returns to the ordinary clip path. It does not
+render inside a catch block, pretend a database write succeeded, or alter the
+lesson's main status to `cancelled`/`failed`. Ready still requires final MP4 commit.
+Continue reuses valid saved source/media; any remaining original model slot is
+bounded by the same saved policy, never a new automatic allowance.
+
+In `LessonVideoStudio.tsx` and the existing locale/label owner, derive progress and
+available actions from the public view. Keep non-component status helpers in `.ts`
+files, not component export modules. Account/lesson/revision keys fence stale
+polling results. Play saved MP4 inline; never evaluate source or preview generated
+components in the authenticated Electron renderer.
+
+#### 12.11.7. Delivery slices, tests and clean-code acceptance
+
+Use the order in section 12.9 to organize implementation. Finish the entire
+authorized delivery's code, imports, schemas, fixtures and documentation before
+running final verification; do not run checks between intermediate edits. Tests
+should prove observable behavior and invariants, rather than duplicate helpers.
+
+| Test owner                                                        | Evidence to add                                                                                                                                            |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| New `test/server/features/lessonVideos/LessonVisualRules.test.ts` | Stable selection, zero eligible scenes, two-scene cap and source reuse invalidation when content/duration/build changes.                                   |
+| New `test/server/features/lessonVideos/RunLessonVisual.test.ts`   | Two total dispatches shared by retry/repair; truncation/ambiguous patch degrades; saved source renders with zero new model calls.                          |
+| Existing `LessonVideoRecovery.test.ts`                            | Restart, late writes, cancellation and successful degraded completion; renderer outage leaves saved content with stopped status.                           |
+| Existing `PrismaLessonVideoStore.integration.test.ts`             | Concurrent final-slot admission, atomic source/reference commit, consumed uncertain attempts and old-record compatibility.                                 |
+| Existing `LessonVideoRoutes.test.ts`                              | Source artifacts excluded from media endpoints; ownership and body/byte limits remain enforced.                                                            |
+| Existing `UseLessonVideo.test.ts` and UI tests                    | Stale replies ignored, navigation preserves job, degraded scenes have accurate labels and Continue cannot replenish allowances.                            |
+| Isolated renderer fixtures                                        | Counting, philosophy and Scratch in EN/VI, unsupported imports/network blocked, bounded runaway execution, code-error vs infrastructure-error distinction. |
+
+Use typed fake ports and injected clock/ID/hash values for deterministic unit
+tests. Keep database checks disposable and model generation scripted during
+ordinary verification. A separately authorized benchmark measures real model
+quality, retries, token spend and timing; unit tests cannot establish those results.
+
+Review the implementation for these concrete properties:
+
+- Application/domain files contain no provider SDK, Prisma or renderer execution.
+- Strict schemas own boundary types; no `any`, unchecked casts, non-null assertions
+  or TypeScript/ESLint suppressions hide errors.
+- A new teammate can follow selection -> saved attempt -> provider -> saved source
+  -> rendering -> degradation without opening a generic graph engine.
+- Action-first names describe reads, decisions and writes honestly. Helpers stay
+  with their owner and meaningful spacing keeps control flow readable.
+- Short JSDoc documents port side effects and units. Comments explain uncertain
+  billing, claim fencing and execution isolation; they do not narrate obvious code.
+- Logs are bounded stage events. Source/material/credentials and hidden reasoning
+  are absent from ordinary diagnostics.
+
+For runtime implementation, finish with `pnpm lint`, `pnpm format:check`,
+`pnpm typecheck`, `pnpm test`, `pnpm build` and `pnpm test:integration`, after all
+scoped edits are complete. Report any failures and unrun checks. This documentation
+update itself does not run paid jobs, change configuration or enable execution.

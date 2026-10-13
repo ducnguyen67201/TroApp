@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LessonVisualBriefSchema, LessonVisualStateSchema } from './LessonVisuals.js';
 
 export const LessonVideoStatus = {
   QUEUED: 'queued',
@@ -11,6 +12,7 @@ export const LessonVideoStatus = {
 export const LessonVideoStage = {
   CONTENT: 'content',
   SPEECH: 'speech',
+  VISUAL: 'visual',
   CLIP: 'clip',
   COMBINE: 'combine',
 } as const;
@@ -33,7 +35,12 @@ export const LessonLayout = {
   COMPARISON: 'comparison',
 } as const;
 
-export const LessonArtifactKind = { AUDIO: 'audio', CLIP: 'clip', VIDEO: 'video' } as const;
+export const LessonArtifactKind = {
+  AUDIO: 'audio',
+  CLIP: 'clip',
+  VIDEO: 'video',
+  SOURCE: 'source',
+} as const;
 
 export const LessonCommand = {
   OPTIONS: 'options',
@@ -58,7 +65,7 @@ export const LessonLimits = {
   FPS: 30,
 } as const;
 
-/** All layouts have bounded slots. The model supplies content, never markup or coordinates. */
+/** Editable baseline content has bounded slots and never contains generated source. */
 export const LessonScreenSchema = z.strictObject({
   layout: z.enum(LessonLayout),
   title: z.string().min(1).max(80),
@@ -74,6 +81,15 @@ export const LessonContentSchema = z.strictObject({
 export type LessonScreen = z.infer<typeof LessonScreenSchema>;
 
 export type LessonContent = z.infer<typeof LessonContentSchema>;
+
+/** The writer proposes visuals alongside content without another classifier request. */
+export const LessonWriterOutputSchema = z.strictObject({
+  content: LessonContentSchema,
+  briefs: z.array(LessonVisualBriefSchema).max(6),
+});
+
+export type LessonWriterOutput = z.infer<typeof LessonWriterOutputSchema>;
+
 const screen = LessonScreenSchema.extend({
   id: z.uuid(),
   audioId: z.uuid().nullable(),
@@ -82,6 +98,7 @@ const screen = LessonScreenSchema.extend({
   durationSeconds: z.number().nonnegative(),
   speechAttempts: z.number().int().nonnegative(),
   renderAttempts: z.number().int().nonnegative(),
+  visual: LessonVisualStateSchema.optional(),
 });
 export const LessonVideoSchema = z.strictObject({
   id: z.uuid(),
