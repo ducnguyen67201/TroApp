@@ -1038,6 +1038,12 @@ commands without that ownership evidence are left alone. PostgreSQL and renderer
 containers remain running. Renderer-only development skips replacement of native
 launchers.
 
+The development launcher reports one `development.startup.failed` event when
+startup throws. Its stage identifies workspace setup, previous-process cleanup,
+renderer credential preparation, desktop environment validation, renderer startup
+or native service startup. Reasons use known messages and allowlisted OS codes;
+raw exceptions, command arguments and environment values are excluded.
+
 Safe `lesson.video.stage` diagnostics report lesson/revision/stage, state, timing
 and provider usage when available, plus screen/attempt identity, degradation reason
 and source digest. They exclude generated source, material text, narration, secrets
