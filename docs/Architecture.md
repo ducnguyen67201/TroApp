@@ -911,8 +911,18 @@ the renderer resources.
 disabled in development or without a feed. Downloads and installation require user
 actions. Restart is blocked during active work and cleans up workers/driver first.
 Main validates events before preload exposes progress; the renderer has no arbitrary
-installer path or update URL capability. Signing, notarization and live installed-app
-update acceptance remain release work.
+installer path or update URL capability. Signed release tooling belongs to
+`scripts/MacSigning.ts`, `scripts/VerifyMacRelease.ts`, and the platform release
+workflows, outside the runtime application. The manual Mac workflow builds each
+architecture natively, signs extra Mach-O resources before sealing the outer app,
+requires Apple notarization/stapling, and verifies extracted ZIP and mounted DMG
+contents before artifact upload. The pre-sign companion metadata remains input
+provenance; the external release inventory records final signed hashes. Apple
+credentials stay in a temporary runner keychain/files and never become app config.
+The first Mac workflow rejects update feeds because container stapling changes
+artifact hashes. Signing activation, physical Mac acceptance, public publication
+and installed-update acceptance remain separate release gates; checked-in tooling
+alone does not establish successful Apple authorization or hardware behavior.
 
 “What’s new” is a permanent action beside Settings, with manual replay also
 available on the signed-out screen. The bundled, EN/VI release catalog in

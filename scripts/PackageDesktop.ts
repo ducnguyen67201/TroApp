@@ -4,12 +4,24 @@ import { join, resolve } from 'node:path';
 import { build, WinPackager } from 'electron-builder';
 import { z } from 'zod';
 import { prepareCuaCompanion } from './PrepareCuaCompanion.js';
-import { readWindowsSigningEnv } from './Env.js';
+import { readMacSigningEnv, readWindowsSigningEnv } from './Env.js';
 import {
   createWindowsSigningConfig,
   signAndVerifyWindowsFile,
   signWindowsResources,
 } from './WindowsSigning.js';
+
+import {
+  checkMacReleaseSettings,
+  createMacSigningConfig,
+  signMacResources,
+  verifyMacApp,
+} from './MacSigning.js';
+
+const macSettings = readMacSigningEnv(process.env, process.platform, process.arch);
+if (macSettings.enabled) {
+  await checkMacReleaseSettings(macSettings);
+}
 
 const signingSettings = readWindowsSigningEnv(process.env, process.platform, process.arch);
 const signingConfig = createWindowsSigningConfig(signingSettings);
@@ -28,6 +40,10 @@ try {
     await readFile(join(appDirectory, 'package.json'), 'utf8'),
   );
   const appPackage = z.looseObject({ build: z.record(z.string(), z.unknown()) }).parse(rawPackage);
+
+  if (macSettings.enabled && appPackage.build['publish'] != null) {
+    throw new Error('macOS release update feeds are not enabled for this rollout.');
+  }
 
   await writeFile(
     join(appDirectory, 'package.json'),
@@ -50,6 +66,7 @@ try {
     publish: 'never',
     config: {
       ...signingConfig,
+      ...createMacSigningConfig(macSettings),
       afterPack: async (context) => {
         const resourcesPath = context.packager.getResourcesDir(context.appOutDir);
         /* electron-builder skips a node_modules directory at a resource
@@ -63,6 +80,9 @@ try {
         ]) {
           await access(join(resourcesPath, entry));
         }
+        if (macSettings.enabled) {
+          await signMacResources(join(context.appOutDir, 'Tro.app'), macSettings);
+        }
         if (signingSettings.enabled) {
           const packager = context.packager;
           if (!(packager instanceof WinPackager)) {
@@ -73,6 +93,11 @@ try {
           const signFile = packager.signIf.bind(packager);
           packager.signIf = (path) => signAndVerifyWindowsFile(path, signFile);
           await signWindowsResources(context.appOutDir, (path) => packager.signIf(path));
+        }
+      },
+      afterSign: async (context) => {
+        if (macSettings.enabled) {
+          await verifyMacApp(join(context.appOutDir, 'Tro.app'), macSettings);
         }
       },
     },

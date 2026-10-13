@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { readWindowsSigningEnv } from '../../scripts/Env.js';
+import { readMacSigningEnv, readWindowsSigningEnv } from '../../scripts/Env.js';
 import {
   createWindowsSigningConfig,
   signAndVerifyWindowsFile,
@@ -20,6 +20,7 @@ const environment = {
 describe('Windows release configuration', () => {
   it('leaves local builds independent of Azure', () => {
     expect(readWindowsSigningEnv({}, 'darwin', 'arm64')).toEqual({ enabled: false });
+    expect(readMacSigningEnv(environment, 'win32', 'x64')).toEqual({ enabled: false });
     expect(createWindowsSigningConfig({ enabled: false })).toEqual({});
     expect(readWindowsSigningEnv({ TRO_SIGN_WINDOWS: 'false' }, 'win32', 'x64')).toEqual({
       enabled: false,
