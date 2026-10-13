@@ -21,7 +21,7 @@ import type { AccountReply } from '#contracts/DesktopAccounts.js';
 import type { AuthResult, AuthUser } from '#contracts/AuthSession.js';
 import type { AgentResult } from '#contracts/AgentSession.js';
 import { AgentTaskMode } from '#contracts/CursorCompanion.js';
-import type { VoiceReply } from '#contracts/VoiceInput.js';
+import { VoiceShortcut, VoiceState, type VoiceReply } from '#contracts/VoiceInput.js';
 import { AppUpdateState, type AppUpdateSnapshot } from '#contracts/AppUpdate.js';
 import { CompletionMode, TaskOutcomeStatus } from '#contracts/TaskOutcome.js';
 import { microphoneStorageKey } from '../../../src/desktop/renderer/voice/Microphones.js';
@@ -822,13 +822,51 @@ describe('desktop language', () => {
     },
   );
 
-  it('uses a localized fallback for an unknown bridge error', async () => {
+  it('uses a localized fallback for an unknown bridge error after voice startup', async () => {
     window.localStorage.clear();
     const bridge = createDesktopBridge();
+    let finishVoiceStartup: ((reply: VoiceReply) => void) | undefined;
+    const voiceStartup = new Promise<VoiceReply>((resolve) => {
+      finishVoiceStartup = resolve;
+    });
+    bridge.controlVoiceInput.mockImplementation((command) =>
+      command.kind === 'enable'
+        ? voiceStartup
+        : Promise.resolve({
+            kind: 'ok',
+            status: {
+              state: VoiceState.DISABLED,
+              shortcut: VoiceShortcut.COMMAND_CONTROL,
+              globalShortcutAvailable: false,
+            },
+          }),
+    );
     bridge.signOut.mockResolvedValue({ kind: 'failed', message: 'Unrecognized diagnostic' });
     window.tro = bridge;
     renderDesktop();
-    fireEvent.click(await screen.findByRole('button', { name: 'Chuyển tài khoản' }));
+    const accountButton = await screen.findByRole('button', { name: 'Chuyển tài khoản' });
+    // Presence does not imply readiness: voice startup deliberately blocks account changes.
+    expect(accountButton).toHaveProperty('disabled', true);
+    fireEvent.click(accountButton);
+    expect(screen.queryByRole('dialog', { name: 'Chuyển tài khoản' })).toBeNull();
+    await act(async () => {
+      if (!finishVoiceStartup) {
+        throw new Error('Voice startup fixture is unavailable.');
+      }
+      finishVoiceStartup({
+        kind: 'ok',
+        status: {
+          state: VoiceState.IDLE,
+          shortcut: VoiceShortcut.COMMAND_CONTROL,
+          globalShortcutAvailable: true,
+        },
+      });
+      await voiceStartup;
+    });
+    await waitFor(() => {
+      expect(accountButton).toHaveProperty('disabled', false);
+    });
+    fireEvent.click(accountButton);
     fireEvent.click(await screen.findByRole('button', { name: 'Đăng xuất tài khoản này' }));
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toContain('Không thể đăng xuất. Vui lòng thử lại.');
