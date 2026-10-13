@@ -1,0 +1,274 @@
+import { mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readMacSigningEnv } from '../../scripts/Env.js';
+import {
+  checkMacReleaseSettings,
+  createMacSigningConfig,
+  isMachO,
+  readMacNativeFiles,
+  readMacFileDigest,
+  runMacCommand,
+  signMacResources,
+  verifyMacApp,
+  verifyMacArchitecture,
+  verifyMacSignature,
+  type MacCommand,
+} from '../../scripts/MacSigning.js';
+import {
+  createMacFixture,
+  macCommand,
+  macSettings,
+  macSignature,
+} from '../scripts/MacReleaseFixtures.js';
+
+const environment = {
+  TRO_SIGN_MACOS: 'true',
+  MACOS_SIGNING_IDENTITY_SHA1: macSettings.identity,
+  APPLE_TEAM_ID: macSettings.teamId,
+  CSC_KEYCHAIN: macSettings.keychain,
+  APPLE_API_KEY: macSettings.apiKey,
+  APPLE_API_KEY_ID: macSettings.apiKeyId,
+  APPLE_API_ISSUER: macSettings.apiIssuer,
+  MAIN_VITE_API_BASE_URL: 'https://api.example.test',
+  MAIN_VITE_APP_ENV: 'prod',
+} satisfies NodeJS.ProcessEnv;
+const temporary: string[] = [];
+
+async function createTemporary(): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), 'tro-mac-test-'));
+  temporary.push(directory);
+  return realpath(directory);
+}
+
+afterEach(async () => {
+  await Promise.all(
+    temporary.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
+  );
+});
+
+describe('Mac release configuration', () => {
+  it('keeps local builds credential-free and selects pinned builder options', () => {
+    expect(readMacSigningEnv({}, 'linux', 'x64')).toEqual({ enabled: false });
+    expect(readMacSigningEnv({ TRO_SIGN_MACOS: 'false' }, 'darwin', 'arm64')).toEqual({
+      enabled: false,
+    });
+    expect(createMacSigningConfig({ enabled: false })).toEqual({});
+    const settings = readMacSigningEnv(environment, 'darwin', 'arm64');
+    expect(settings).toEqual(macSettings);
+    const config = createMacSigningConfig(settings);
+    expect(config).toMatchObject({
+      forceCodeSigning: true,
+      mac: {
+        identity: macSettings.identity,
+        hardenedRuntime: true,
+        notarize: true,
+        strictVerify: true,
+        entitlements: 'DesktopEntitlements.plist',
+      },
+    });
+    expect(config.mac?.target).toEqual([
+      { target: 'dmg', arch: ['arm64'] },
+      { target: 'zip', arch: ['arm64'] },
+    ]);
+    expect(config).not.toHaveProperty('publish');
+    expect(JSON.stringify(config)).not.toContain(macSettings.apiKey);
+    expect(
+      createMacSigningConfig(readMacSigningEnv(environment, 'darwin', 'x64')).mac?.target,
+    ).toContainEqual({ target: 'dmg', arch: ['x64'] });
+  });
+
+  it.each(Object.keys(environment).filter((name) => name !== 'TRO_SIGN_MACOS'))(
+    'rejects missing required release setting %s',
+    (name) => {
+      expect(() => readMacSigningEnv({ ...environment, [name]: '' }, 'darwin', 'arm64')).toThrow(
+        /^macOS release configuration is invalid\.$/,
+      );
+    },
+  );
+
+  it.each([
+    { TRO_SIGN_MACOS: 'yes' },
+    { TRO_SIGN_WINDOWS: 'true' },
+    { MAIN_VITE_APP_ENV: 'dev' },
+    { MAIN_VITE_API_BASE_URL: 'https://localhost/' },
+    { MAIN_VITE_API_BASE_URL: 'http://example.test' },
+    { MAIN_VITE_API_BASE_URL: 'https://user:secret@example.test' },
+    { CSC_KEYCHAIN: 'relative' },
+    { APPLE_API_KEY: '' },
+    { MACOS_SIGNING_IDENTITY_SHA1: '-' },
+    { APPLE_API_ISSUER: 'secret' },
+    { APPLE_ID: 'secret@example.test' },
+    { APPLE_KEYCHAIN_PROFILE: 'other' },
+    { CSC_LINK: 'secret' },
+    { MAIN_VITE_UPDATE_FEED_URL: 'https://example.test/feed/' },
+  ])('fails closed without leaking configuration: %j', (overrides) => {
+    expect(() => readMacSigningEnv({ ...environment, ...overrides }, 'darwin', 'arm64')).toThrow(
+      /^macOS release configuration is invalid\.$/,
+    );
+  });
+
+  it.each([
+    ['linux', 'arm64'],
+    ['darwin', 'ia32'],
+    ['win32', 'x64'],
+  ] as const)('rejects %s/%s', (platform, architecture) => {
+    expect(() => readMacSigningEnv(environment, platform, architecture)).toThrow();
+  });
+
+  it('requires a usable Developer ID private key from the expected team', async () => {
+    const directory = await createTemporary();
+    const settings = {
+      ...macSettings,
+      apiKey: join(directory, 'key'),
+      keychain: join(directory, 'keychain'),
+    };
+    await writeFile(settings.apiKey, 'fixture');
+    await writeFile(settings.keychain, 'fixture');
+    const run = vi.fn<MacCommand>().mockResolvedValue({
+      stdout: `1) ${settings.identity} "Developer ID Application: Example (${settings.teamId})"`,
+      stderr: '',
+    });
+    await checkMacReleaseSettings(settings, run);
+    run.mockResolvedValue({
+      stdout: `${settings.identity} "Apple Development: Example (${settings.teamId})"`,
+      stderr: '',
+    });
+    await expect(checkMacReleaseSettings(settings, run)).rejects.toThrow('private key');
+  });
+});
+
+describe('Mac native signatures', () => {
+  it.each([
+    'feedface',
+    'cefaedfe',
+    'feedfacf',
+    'cffaedfe',
+    'cafebabe',
+    'bebafeca',
+    'cafebabf',
+    'bfbafeca',
+  ])('recognizes %s magic', (hex) => {
+    expect(isMachO(Buffer.from(hex, 'hex'))).toBe(true);
+  });
+
+  it('rejects short, Windows and Linux files', () => {
+    expect(isMachO(Buffer.alloc(0))).toBe(false);
+    expect(isMachO(Buffer.from('4d5a0000', 'hex'))).toBe(false);
+    expect(isMachO(Buffer.from('7f454c46', 'hex'))).toBe(false);
+  });
+
+  it('deduplicates internal symlinks and rejects external ones', async () => {
+    const directory = await createTemporary();
+    const app = join(directory, 'app');
+    await mkdir(app);
+    await writeFile(join(app, 'driver'), Buffer.from('cffaedfe', 'hex'));
+    await writeFile(join(app, 'text'), 'not executable');
+    await symlink('driver', join(app, 'alias'));
+    expect(await readMacNativeFiles(app)).toEqual([join(app, 'driver')]);
+    await writeFile(join(directory, 'outside'), Buffer.from('cffaedfe', 'hex'));
+    await symlink('../outside', join(app, 'escape'));
+    await expect(readMacNativeFiles(app)).rejects.toThrow('escaped');
+  });
+
+  it('verifies trust metadata, timestamp and runtime after cryptographic verification', async () => {
+    await verifyMacSignature('/app', macSettings.teamId, macCommand);
+    for (const details of [
+      macSignature.replace('TESTTEAM12', 'WRONGTEAM1'),
+      macSignature.replace('Timestamp=', 'Missing='),
+      macSignature.replace('runtime', 'none'),
+      macSignature + 'Signature=adhoc',
+    ]) {
+      await expect(
+        verifyMacSignature('/app', macSettings.teamId, () =>
+          Promise.resolve({ stdout: '', stderr: details }),
+        ),
+      ).rejects.toThrow('invalid');
+    }
+    await expect(
+      verifyMacSignature('/app', macSettings.teamId, () =>
+        Promise.reject(new Error('verification failed')),
+      ),
+    ).rejects.toThrow('verification failed');
+  });
+
+  it('requires matching CPU slices', async () => {
+    expect(await verifyMacArchitecture('/app', 'x64', macCommand)).toContain('x86_64');
+    await expect(
+      verifyMacArchitecture('/app', 'arm64', () =>
+        Promise.resolve({ stdout: 'x86_64', stderr: '' }),
+      ),
+    ).rejects.toThrow('architecture');
+  });
+
+  it('signs native resources before verification and removes irrelevant hook prebuilds', async () => {
+    const directory = await createTemporary();
+    const app = join(directory, 'Tro.app');
+    await createMacFixture(app);
+    const prebuilds = join(
+      app,
+      'Contents',
+      'Resources',
+      'app.asar.unpacked',
+      'node_modules',
+      'uiohook-napi',
+      'prebuilds',
+    );
+    for (const platform of ['darwin-arm64', 'darwin-x64', 'win32-x64']) {
+      await mkdir(join(prebuilds, platform), { recursive: true });
+      await writeFile(
+        join(prebuilds, platform, 'uiohook_napi.node'),
+        Buffer.from('cffaedfe', 'hex'),
+      );
+    }
+    const run = vi.fn<MacCommand>(macCommand);
+    await signMacResources(app, macSettings, run);
+    const signCalls = run.mock.calls.filter(([, args]) => args.includes('--sign'));
+    expect(signCalls).toHaveLength(2);
+    expect(
+      signCalls.every(
+        ([, args]) => args.includes(macSettings.identity) && args.includes('--timestamp'),
+      ),
+    ).toBe(true);
+    await expect(readFile(join(prebuilds, 'darwin-x64', 'uiohook_napi.node'))).rejects.toThrow();
+    await verifyMacApp(app, macSettings, run);
+    expect(run.mock.calls.some(([, args]) => args.includes('stapler'))).toBe(true);
+    expect(run.mock.calls.some(([, args]) => args.includes('--assess'))).toBe(true);
+    const digest = await readMacFileDigest(
+      join(app, 'Contents', 'Resources', 'cua-driver', 'cua-driver'),
+    );
+    expect(digest.sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(digest.size).toBe(8);
+  });
+
+  it('blocks a missing staple and unapproved entitlement', async () => {
+    const app = join(await createTemporary(), 'Tro.app');
+    await createMacFixture(app);
+    await expect(
+      verifyMacApp(app, macSettings, (exe, args) => {
+        if (args.includes('stapler')) {
+          return Promise.reject(new Error('missing ticket'));
+        }
+        return macCommand(exe, args);
+      }),
+    ).rejects.toThrow('missing ticket');
+    await expect(
+      verifyMacApp(app, macSettings, async (exe, args) => {
+        const result = await macCommand(exe, args);
+        return args.includes('--entitlements')
+          ? { ...result, stdout: result.stdout + 'get-task-allow' }
+          : result;
+      }),
+    ).rejects.toThrow('unapproved');
+  });
+
+  it('bounds real command execution and strips raw command errors', async () => {
+    expect(
+      (await runMacCommand(process.execPath, ['-e', 'process.stdout.write("ok")'])).stdout,
+    ).toBe('ok');
+    await expect(
+      runMacCommand(process.execPath, ['-e', 'throw new Error("secret-input")']),
+    ).rejects.toThrow(/^macOS release command failed: node\.$/);
+  });
+});

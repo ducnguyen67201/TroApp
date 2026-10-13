@@ -1,3 +1,4 @@
+import { isAbsolute } from 'node:path';
 import { createEnv } from '@t3-oss/env-core';
 import { loadEnv } from 'vite';
 import { AppUpdateUrlSchema } from '../src/contracts/AppUpdate.js';
@@ -167,5 +168,80 @@ export function readDesktopChildEnv(environment: NodeJS.ProcessEnv): NodeJS.Proc
     SHELL: validated.SHELL,
     LANG: validated.LANG,
     DISPLAY: validated.DISPLAY,
+  };
+}
+
+export type MacSigningEnv =
+  | { enabled: false }
+  | {
+      enabled: true;
+      architecture: 'arm64' | 'x64';
+      identity: string;
+      teamId: string;
+      keychain: string;
+      apiKey: string;
+      apiKeyId: string;
+      apiIssuer: string;
+    };
+
+/** Apple credentials belong to release tooling, never the packaged application. */
+export function readMacSigningEnv(
+  environment: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform,
+  architecture: string,
+): MacSigningEnv {
+  const fail = (): never => {
+    throw new Error('macOS release configuration is invalid.');
+  };
+  const mode = environment['TRO_SIGN_MACOS'];
+  if (mode === undefined || mode === '' || mode === 'false') {
+    return { enabled: false };
+  }
+  if (
+    mode !== 'true' ||
+    platform !== 'darwin' ||
+    (architecture !== 'arm64' && architecture !== 'x64') ||
+    environment['TRO_SIGN_WINDOWS'] === 'true' ||
+    environment['MAIN_VITE_UPDATE_FEED_URL']?.trim() ||
+    [
+      'APPLE_ID',
+      'APPLE_APP_SPECIFIC_PASSWORD',
+      'APPLE_KEYCHAIN_PROFILE',
+      'CSC_LINK',
+      'CSC_NAME',
+    ].some((name) => Boolean(environment[name]?.trim()))
+  ) {
+    return fail();
+  }
+  const absolutePath = z.string().min(1).refine(isAbsolute);
+  const validated = createEnv({
+    server: {
+      MACOS_SIGNING_IDENTITY_SHA1: z.string().regex(/^[A-Fa-f0-9]{40}$/),
+      APPLE_TEAM_ID: z.string().regex(/^[A-Z0-9]{10}$/),
+      CSC_KEYCHAIN: absolutePath,
+      APPLE_API_KEY: absolutePath,
+      APPLE_API_KEY_ID: z.string().regex(/^[A-Z0-9]{10}$/),
+      APPLE_API_ISSUER: z.uuid(),
+      MAIN_VITE_API_BASE_URL: AppUpdateUrlSchema,
+      MAIN_VITE_APP_ENV: z.literal('prod'),
+    },
+    runtimeEnv: environment,
+    emptyStringAsUndefined: true,
+    onValidationError: fail,
+  });
+  if (
+    ['localhost', '127.0.0.1', '[::1]'].includes(new URL(validated.MAIN_VITE_API_BASE_URL).hostname)
+  ) {
+    return fail();
+  }
+  return {
+    enabled: true,
+    architecture,
+    identity: validated.MACOS_SIGNING_IDENTITY_SHA1.toUpperCase(),
+    teamId: validated.APPLE_TEAM_ID,
+    keychain: validated.CSC_KEYCHAIN,
+    apiKey: validated.APPLE_API_KEY,
+    apiKeyId: validated.APPLE_API_KEY_ID,
+    apiIssuer: validated.APPLE_API_ISSUER,
   };
 }

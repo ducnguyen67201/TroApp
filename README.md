@@ -566,6 +566,136 @@ Set the HTTPS update feed during the same build/package invocation. Development
 updates remain disabled. Signing/notarization and distribution require a separate
 reviewed release; ad hoc local signing is not release signing.
 
+### Signed macOS release from GitHub Actions
+
+[MacRelease.yml](.github/workflows/MacRelease.yml) is manually dispatched from
+reviewed `main`. It runs the full Linux validation suite, then builds the pinned
+native companion and desktop separately on Apple Silicon and Intel runners. It
+requires Developer ID signing, Apple notarization and stapling, and verifies both
+the ZIP's extracted app and the DMG's mounted app before uploading artifacts.
+It does not publish a GitHub Release or change website download links.
+
+The workflow is prepared for activation after Apple Developer enrollment. Its
+presence does not mean a signed Mac release has passed hardware acceptance.
+
+#### Apple setup after enrollment
+
+1. Confirm active membership and the intended Apple Team ID. Create a
+   **Developer ID Application** certificate with its private key, and export a
+   password-protected P12. A `.cer` alone cannot sign. DMG/ZIP distribution does
+   not need a Developer ID Installer certificate or an App Store provisioning
+   profile for the current capabilities.
+2. Create an App Store Connect **team API key** with App Manager access for
+   notarization. Keep its P8, key ID and issuer ID. Do not use an issuer-less
+   individual key with this pinned electron-builder version.
+3. Create GitHub environment `release-macos`, restrict it to `main`, and configure
+   the following secrets/variables. Do not paste private keys into chat or commit
+   them. Base64 encodes transport bytes; it does not encrypt them.
+
+| Setting                        | GitHub environment storage                                    |
+| ------------------------------ | ------------------------------------------------------------- |
+| `MACOS_CERTIFICATE_P12_BASE64` | Secret: exported Developer ID Application P12, base64 encoded |
+| `MACOS_CERTIFICATE_PASSWORD`   | Secret: P12 password                                          |
+| `APPLE_NOTARY_KEY_P8_BASE64`   | Secret: notarization team API private key, base64 encoded     |
+| `MACOS_SIGNING_IDENTITY_SHA1`  | Variable: exact 40-hex certificate fingerprint                |
+| `APPLE_TEAM_ID`                | Variable: expected 10-character Apple Team ID                 |
+| `APPLE_API_KEY_ID`             | Variable: team API key ID                                     |
+| `APPLE_API_ISSUER`             | Variable: team API issuer UUID                                |
+| `MAIN_VITE_API_BASE_URL`       | Variable: production public HTTPS API URL                     |
+
+The certificate fingerprint selects an identity; release artifact integrity uses
+SHA-256. Find the usable identity with `security find-identity -v -p codesigning`.
+The workflow imports its key into an isolated temporary keychain, restores the
+runner's prior search list, and removes credentials in an always-run cleanup.
+Certificate/key values are absent from the application configuration and uploaded
+artifact allowlist. Native dependency compilation happens before credentials are
+installed. Standard build/test/local packaging needs no Apple account.
+
+#### Run and inspect a candidate
+
+```sh
+gh workflow run MacRelease.yml --repo ducnguyen67201/TroApp --ref main
+```
+
+Select the resulting run in GitHub Actions and confirm **both** architecture jobs
+passed. Artifacts are named `Tro-macos-<arch>-<sha>-<run-id>-<attempt>` and contain
+`Tro-<version>-macos-<arch>.dmg`, the matching ZIP, and
+`MacSignatures-<arch>.json`. Download artifacts from that exact run; they expire
+after 14 days and are not permanent public release URLs. The inventory records
+final hashes, app archive hash, native minimum OS versions, expected team, and
+Apple DMG submission ID. Its `preSigningCompanion` section records the input
+provenance verified before Developer ID signing changes the native executable.
+
+The first Mac release deliberately disables installed update feeds. Release mode
+rejects a nonempty `MAIN_VITE_UPDATE_FEED_URL` or staged update publishing config,
+because stapling the DMG changes its bytes after builder metadata generation.
+Future update support must generate hashes after final stapling and validate both
+architecture feeds; do not enable updates by setting a variable alone.
+
+On a Mac with the same validated release settings, the owning verification entry
+points are:
+
+```sh
+pnpm exec tsx scripts/MacSigning.ts --check-macos-release
+pnpm package:desktop
+pnpm exec tsx scripts/VerifyMacRelease.ts --directory release --arch arm64
+pnpm check:microphone-package release/mac-arm64/Tro.app
+```
+
+Use `--arch x64` and `release/mac/Tro.app` on Intel. Verification checks native
+architecture, Developer ID/Team ID, secure timestamps, hardened runtime, expected
+bundle ID, entitlements, companion provenance, app version, Gatekeeper acceptance,
+and staples. It rejects native minimum OS versions above the currently advertised
+macOS 13.0; raising that minimum requires a reviewed website/docs change.
+`codesign --verify --deep --strict`, `xcrun stapler validate`, and
+`spctl --assess --type execute --verbose=4` are useful independent checks against
+the downloaded app. Signing uses inside-out native resource handling; `--deep` is
+used for verification, not blanket signing. No library-validation bypass is added.
+
+#### Diagnostics and recovery
+
+`mac.release.stage` identifies archive verification or container notarization.
+`mac.release.notary.submitted` records a submission ID before polling;
+`mac.release.notary.rejected` reports that ID and issue count without raw Apple
+messages. `mac.release.command.failed` names the failed tool without arguments.
+`mac.release.verified` is emitted only after the inventory is written. No inventory
+is uploaded if any preceding step fails.
+
+For missing identities, check P12 private-key export, fingerprint, Team ID and
+certificate validity. For notary authorization failures, check team API access and
+key/issuer pairing. Inspect Apple's detailed log privately using the recorded ID;
+do not paste credentials or raw logs into public issues. The DMG verifier submits
+once and polls that ID for up to 30 minutes. After a timeout or network failure,
+check that ID before creating another candidate. App notarization runs through
+builder's pinned integration and is also bounded by the job timeout. Rejection,
+missing staples or failed Gatekeeper assessment must never downgrade to unsigned
+output. Fix the owning stage and rerun a reviewed candidate.
+
+#### Hardware acceptance and rollout
+
+Test browser-downloaded, quarantined DMG and ZIP on real Apple Silicon and Intel
+Macs using normal Gatekeeper settings. Install to Applications, launch via Finder,
+and check OAuth callbacks, saved accounts, permission onboarding, Screen Recording,
+Accessibility, microphone routing, global shortcuts, native teaching/HUD,
+click/drag/Esc, shutdown and relaunch. Verify the advertised minimum OS and an
+upgrade from the legacy app without deleting user data. New signing identity may
+require permission reauthorization. Hosted CI cannot prove these interactions.
+Do not remove quarantine or disable Gatekeeper to count a test as passing.
+
+After approval, choose a new unused release version committed before the build;
+never overwrite the Windows `v0.1.0` tag with different source. Publish **the exact
+verified files** from both architecture artifacts to a draft TroApp GitHub Release
+at the build SHA, compare hashes, record hardware acceptance, then publish. Keep
+existing Windows assets intact. The marketing website is a separate repository
+(`ducnguyen67201/Tro`): its Mac source migration must wait for these verified
+releases. Its resolver must select releases per platform so a Mac-only release
+cannot hide the older Windows installer. Deploy that separately reviewed website
+change only after both Mac downloads are public, then verify all three redirects.
+
+Developer ID signing and notarization do not pregrant macOS privacy permissions
+or remove the normal Internet-download confirmation. The expected outcome is
+successful Gatekeeper assessment, not the absence of every operating-system prompt.
+
 ### Windows release from GitHub Actions
 
 The **Windows Release** workflow builds a signed x64 NSIS installer from `main`
