@@ -32,6 +32,10 @@ including orphaned watchers. Ctrl-C stops the current native process trees, even
 during startup. PostgreSQL and renderer containers stay running. The API defaults to
 `http://127.0.0.1:3000`; local PostgreSQL uses port 54329.
 
+If startup fails before service output, `development.startup.failed` reports the
+failed stage and a safe reason. It excludes command arguments, environment values
+and raw child-process errors, which can contain credentials.
+
 For separate terminals, with the corresponding configs selected:
 
 ```sh

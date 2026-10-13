@@ -4,6 +4,49 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { readDesktopChildEnv } from './Env.js';
 import { createDevelopmentProcessGroup } from './DevelopmentProcesses.js';
 
+const DevelopmentStartupStage = {
+  WORKSPACE: 'workspace',
+  CLEANUP: 'previous-process-cleanup',
+  CREDENTIAL: 'renderer-credential',
+  ENVIRONMENT: 'desktop-environment',
+  RENDERER: 'renderer-startup',
+  API: 'api-startup',
+  DESKTOP: 'desktop-startup',
+  SERVICES: 'native-services',
+} as const;
+
+let startupStage: (typeof DevelopmentStartupStage)[keyof typeof DevelopmentStartupStage] =
+  DevelopmentStartupStage.WORKSPACE;
+
+/** Report only owned messages or allowlisted OS codes; errors can contain secret-bearing arguments. */
+function readStartupFailureReason(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return 'Unexpected startup failure.';
+  }
+  const messages = new Set([
+    'Development process metadata is unavailable.',
+    'The development launcher could not identify itself.',
+    'A previous development process could not be stopped.',
+    'Previous development processes are still running. Close their terminal and retry.',
+    'Development startup has already stopped.',
+    'Desktop host environment is invalid.',
+    'Renderer startup failed.',
+  ]);
+  if (messages.has(error.message)) {
+    return error.message;
+  }
+  if (
+    'code' in error &&
+    typeof error.code === 'string' &&
+    ['ENOENT', 'EACCES', 'EPERM', 'ETIMEDOUT'].includes(error.code)
+  ) {
+    return `Host operation failed (${error.code}).`;
+  }
+  return error.name === 'ZodError'
+    ? 'Running process metadata is invalid.'
+    : 'Unexpected startup failure.';
+}
+
 function waitForDevelopmentChild(child: ChildProcess): Promise<number> {
   return new Promise<number>((resolve, reject) => {
     child.once('error', reject);
@@ -39,10 +82,12 @@ async function startDevelopment(): Promise<void> {
     shutdown.signal.throwIfAborted();
     const rendererOnly = process.argv.includes('--renderer-only');
     if (!rendererOnly) {
+      startupStage = DevelopmentStartupStage.CLEANUP;
       await processes.stopPrevious();
       shutdown.signal.throwIfAborted();
     }
 
+    startupStage = DevelopmentStartupStage.CREDENTIAL;
     await mkdir('.tro-development', { recursive: true });
     const secretPath = '.tro-development/LessonRendererSecret';
     let secret: string;
@@ -53,6 +98,7 @@ async function startDevelopment(): Promise<void> {
       await writeFile(secretPath, secret, { mode: 0o600, flag: 'wx' });
     }
     shutdown.signal.throwIfAborted();
+    startupStage = DevelopmentStartupStage.ENVIRONMENT;
     const desktopEnvironment = readDesktopChildEnv(process.env);
     const apiEnvironment = {
       ...process.env,
@@ -61,6 +107,7 @@ async function startDevelopment(): Promise<void> {
     };
 
     try {
+      startupStage = DevelopmentStartupStage.RENDERER;
       const code = await waitForDevelopmentChild(
         processes.spawn('docker', ['compose', 'up', '-d', '--build', 'lesson-renderer'], {
           ...desktopEnvironment,
@@ -86,8 +133,11 @@ async function startDevelopment(): Promise<void> {
     shutdown.signal.throwIfAborted();
 
     // The helper owns each native command's process group, including watchers and Electron.
+    startupStage = DevelopmentStartupStage.API;
     const api = processes.spawn('doppler', ['run', '--', 'pnpm', 'dev:api'], apiEnvironment);
+    startupStage = DevelopmentStartupStage.DESKTOP;
     const desktop = processes.spawn('pnpm', ['dev:desktop'], desktopEnvironment);
+    startupStage = DevelopmentStartupStage.SERVICES;
     const code = await Promise.race([
       waitForDevelopmentChild(api),
       waitForDevelopmentChild(desktop),
@@ -106,7 +156,14 @@ async function startDevelopment(): Promise<void> {
   }
 }
 
-void startDevelopment().catch(() => {
+void startDevelopment().catch((error: unknown) => {
+  console.error(
+    JSON.stringify({
+      event: 'development.startup.failed',
+      stage: startupStage,
+      reason: readStartupFailureReason(error),
+    }),
+  );
   console.error('Development startup failed. Check local configuration and host prerequisites.');
   process.exitCode = 1;
 });
