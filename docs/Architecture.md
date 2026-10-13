@@ -1025,6 +1025,19 @@ Only a committed full MP4 marks the job ready. API and Electron stay native in l
 development; Railway runs the worker as one private Docker service. README owns
 rebuild, startup and deployment commands.
 
+`scripts/StartDevelopment.ts` owns the local native development lifetime through
+`scripts/DevelopmentProcesses.ts`. Before Docker/build work, a normal new launch
+stops prior Tro development processes belonging to the same checkout, including
+orphaned API watchers. Owned commands use separate POSIX process groups or Windows
+process trees so shutdown reaches watchers, Electron and other descendants.
+Shutdown waits for bounded termination and escalates when needed.
+Signal handling is installed before asynchronous startup work. Process identity
+and workspace checks preserve the invoking shell, launcher ancestors and unrelated
+processes. Windows discovery requires an explicit checkout path; relative orphan
+commands without that ownership evidence are left alone. PostgreSQL and renderer
+containers remain running. Renderer-only development skips replacement of native
+launchers.
+
 Safe `lesson.video.stage` diagnostics report lesson/revision/stage, state, timing
 and provider usage when available, plus screen/attempt identity, degradation reason
 and source digest. They exclude generated source, material text, narration, secrets
