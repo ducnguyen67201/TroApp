@@ -26,7 +26,10 @@ pnpm dev
 At `pnpm select`, choose the backend `tro-api` project and intended development
 config. `pnpm dev` injects that configuration into the API only; it applies committed
 migrations and generates Prisma before startup. It launches the desktop without
-backend secrets. Ctrl-C stops both processes. The API defaults to
+backend secrets. Before building or starting services, a new `pnpm dev` stops prior
+Tro API/desktop development launchers and their descendants from this checkout,
+including orphaned watchers. Ctrl-C stops the current native process trees, even
+during startup. PostgreSQL and renderer containers stay running. The API defaults to
 `http://127.0.0.1:3000`; local PostgreSQL uses port 54329.
 
 For separate terminals, with the corresponding configs selected:
@@ -55,13 +58,16 @@ minutes. The development launcher creates a local renderer credential in ignored
 `.tro-development/LessonRendererSecret`; only the API and renderer receive it.
 Desktop children receive OS settings without backend Doppler credentials.
 A renderer startup failure does not prevent the native app from starting; check
-Docker output when video creation is unavailable. Ctrl-C stops the native children;
+Docker output when video creation is unavailable. Ctrl-C stops the native process trees;
 use `docker compose stop lesson-renderer` to stop the local renderer.
 
 - `pnpm dev:renderer`: rebuild/start only the local renderer after template edits.
 - `pnpm build:renderer`: build the production renderer image without starting it.
 - `pnpm check:lesson-renderer`: render synthetic Vietnamese fixtures and combine
   them using the local renderer; no paid model or speech calls.
+
+`pnpm dev:renderer` leaves the running native API and desktop in place; it skips the
+normal launcher's replacement of prior native development processes.
 
 After updating the worker's animation runtime, rebuild its image with
 `pnpm build:renderer`, then restart `doppler run -- pnpm dev`. Alternatively,
