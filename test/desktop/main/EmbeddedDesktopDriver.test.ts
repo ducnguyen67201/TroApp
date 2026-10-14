@@ -67,9 +67,6 @@ afterEach(() => {
 });
 
 it('connects the worker to the host-owned private endpoint and releases the daemon', async () => {
-  if (process.platform !== 'darwin') {
-    return;
-  }
   const driver = new EmbeddedDesktopDriver();
   expect(await driver.start(vi.fn<() => void>())).toEqual({
     command: connection.mcp.command,
@@ -106,9 +103,6 @@ it('preserves the identity for a direct Electron launch', async () => {
 });
 
 it('invalidates a worker connection when its daemon unexpectedly exits', async () => {
-  if (process.platform !== 'darwin') {
-    return;
-  }
   const onExit = vi.fn<() => void>();
   const driver = new EmbeddedDesktopDriver();
   await driver.start(onExit);
@@ -123,9 +117,6 @@ it('invalidates a worker connection when its daemon unexpectedly exits', async (
 });
 
 it('cancels pending startup and releases the host before admitting another worker', async () => {
-  if (process.platform !== 'darwin') {
-    return;
-  }
   let resolveStart: ((value: EmbeddedDriverConnection) => void) | undefined;
   let notifyStart: (() => void) | undefined;
   const starting = new Promise<void>((resolve) => {
@@ -152,9 +143,6 @@ it('cancels pending startup and releases the host before admitting another worke
 });
 
 it('shares one daemon with both workers and invalidates every subscriber on unexpected exit', async () => {
-  if (process.platform !== 'darwin') {
-    return;
-  }
   const driver = new EmbeddedDesktopDriver();
   const hudExit = vi.fn<() => void>();
   const agentExit = vi.fn<() => void>();
@@ -175,9 +163,6 @@ it('shares one daemon with both workers and invalidates every subscriber on unex
 });
 
 it('keeps one synchronous lifecycle watcher across sustained uptime', async () => {
-  if (process.platform !== 'darwin') {
-    return;
-  }
   const driver = new EmbeddedDesktopDriver();
   const onExit = vi.fn<() => void>();
   await driver.start(onExit);
@@ -193,9 +178,6 @@ it('keeps one synchronous lifecycle watcher across sustained uptime', async () =
 });
 
 it('invalidates a connection if the native host switches generations', async () => {
-  if (process.platform !== 'darwin') {
-    return;
-  }
   const driver = new EmbeddedDesktopDriver();
   const onExit = vi.fn<() => void>();
   await driver.start(onExit);
@@ -207,9 +189,6 @@ it('invalidates a connection if the native host switches generations', async () 
 });
 
 it('invalidates a connection if its native lifecycle can no longer be read', async () => {
-  if (process.platform !== 'darwin') {
-    return;
-  }
   const driver = new EmbeddedDesktopDriver();
   const onExit = vi.fn<() => void>();
   await driver.start(onExit);
@@ -223,9 +202,6 @@ it('invalidates a connection if its native lifecycle can no longer be read', asy
 });
 
 it('does not reuse an old watcher after stopping and restarting the native host', async () => {
-  if (process.platform !== 'darwin') {
-    return;
-  }
   const driver = new EmbeddedDesktopDriver();
   const oldExit = vi.fn<() => void>();
   await driver.start(oldExit);

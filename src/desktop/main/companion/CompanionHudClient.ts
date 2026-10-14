@@ -48,6 +48,10 @@ export class CompanionHudClient implements CompanionPresentationPort {
     this.connectingGeneration = generation;
     this.connecting = this.startWorker(generation)
       .catch(() => {
+        console.warn('companion.presentation.failed', {
+          stage: 'start',
+          reason: 'driver_unavailable',
+        });
         if (generation === this.generation) {
           this.scheduleReconnect();
         }
@@ -69,6 +73,7 @@ export class CompanionHudClient implements CompanionPresentationPort {
     this.worker = child;
     await new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
+        console.warn('companion.presentation.failed', { stage: 'connect', reason: 'timeout' });
         child.kill();
         resolve();
       }, 30_000);
@@ -98,6 +103,10 @@ export class CompanionHudClient implements CompanionPresentationPort {
             this.attempts = 0;
             child.postMessage({ kind: 'snapshot', snapshot: this.latest });
           } else {
+            console.warn('companion.presentation.failed', {
+              stage: 'connect',
+              reason: 'native_presentation_unavailable',
+            });
             child.kill();
           }
           finish();

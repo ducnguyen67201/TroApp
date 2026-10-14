@@ -1,5 +1,5 @@
 diff --git a/libs/cua-driver/rust/Cargo.lock b/libs/cua-driver/rust/Cargo.lock
-index 74051d8..caee44c 100644
+index 74051d8..29ab38c 100644
 --- a/libs/cua-driver/rust/Cargo.lock
 +++ b/libs/cua-driver/rust/Cargo.lock
 @@ -1205,7 +1205,7 @@ dependencies = [
@@ -7,7 +7,7 @@ index 74051d8..caee44c 100644
  [[package]]
  name = "cua-driver"
 -version = "0.30.4"
-+version = "0.30.4-tro.24"
++version = "0.30.4-tro.25"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -16,7 +16,7 @@ index 74051d8..caee44c 100644
  [[package]]
  name = "cua-driver-bindgen"
 -version = "0.30.4"
-+version = "0.30.4-tro.24"
++version = "0.30.4-tro.25"
  dependencies = [
   "cbindgen",
   "uniffi",
@@ -25,7 +25,7 @@ index 74051d8..caee44c 100644
  [[package]]
  name = "cua-driver-contract"
 -version = "0.30.4"
-+version = "0.30.4-tro.24"
++version = "0.30.4-tro.25"
  dependencies = [
   "schemars",
   "serde",
@@ -34,7 +34,7 @@ index 74051d8..caee44c 100644
  [[package]]
  name = "cua-driver-core"
 -version = "0.30.4"
-+version = "0.30.4-tro.24"
++version = "0.30.4-tro.25"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -43,7 +43,7 @@ index 74051d8..caee44c 100644
  [[package]]
  name = "cua-driver-e2e"
 -version = "0.30.4"
-+version = "0.30.4-tro.24"
++version = "0.30.4-tro.25"
  dependencies = [
   "base64",
   "core-foundation",
@@ -52,7 +52,7 @@ index 74051d8..caee44c 100644
  [[package]]
  name = "cua-driver-sdk"
 -version = "0.30.4"
-+version = "0.30.4-tro.24"
++version = "0.30.4-tro.25"
  dependencies = [
   "async-trait",
   "core-foundation",
@@ -61,7 +61,7 @@ index 74051d8..caee44c 100644
  [[package]]
  name = "cua-driver-testkit"
 -version = "0.30.4"
-+version = "0.30.4-tro.24"
++version = "0.30.4-tro.25"
  dependencies = [
   "arbitrary",
   "async-trait",
@@ -70,7 +70,7 @@ index 74051d8..caee44c 100644
  [[package]]
  name = "cua-driver-uia"
 -version = "0.30.4"
-+version = "0.30.4-tro.24"
++version = "0.30.4-tro.25"
  dependencies = [
   "anyhow",
   "cua-driver-core",
@@ -79,7 +79,7 @@ index 74051d8..caee44c 100644
  [[package]]
  name = "cursor-overlay"
 -version = "0.30.4"
-+version = "0.30.4-tro.24"
++version = "0.30.4-tro.25"
  dependencies = [
   "anyhow",
   "cua-driver-contract",
@@ -88,7 +88,7 @@ index 74051d8..caee44c 100644
  [[package]]
  name = "cursor-theme-cli"
 -version = "0.30.4"
-+version = "0.30.4-tro.24"
++version = "0.30.4-tro.25"
  dependencies = [
   "anyhow",
   "cursor-overlay",
@@ -97,7 +97,7 @@ index 74051d8..caee44c 100644
  [[package]]
  name = "pip-preview"
 -version = "0.30.4"
-+version = "0.30.4-tro.24"
++version = "0.30.4-tro.25"
  dependencies = [
   "serde_json",
  ]
@@ -106,7 +106,7 @@ index 74051d8..caee44c 100644
  [[package]]
  name = "platform-linux"
 -version = "0.30.4"
-+version = "0.30.4-tro.24"
++version = "0.30.4-tro.25"
  dependencies = [
   "anyhow",
   "ashpd",
@@ -115,7 +115,7 @@ index 74051d8..caee44c 100644
  [[package]]
  name = "platform-macos"
 -version = "0.30.4"
-+version = "0.30.4-tro.24"
++version = "0.30.4-tro.25"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -124,12 +124,12 @@ index 74051d8..caee44c 100644
  [[package]]
  name = "platform-windows"
 -version = "0.30.4"
-+version = "0.30.4-tro.24"
++version = "0.30.4-tro.25"
  dependencies = [
   "anyhow",
   "async-trait",
 diff --git a/libs/cua-driver/rust/Cargo.toml b/libs/cua-driver/rust/Cargo.toml
-index 53edeb0..c1ce83d 100644
+index 53edeb0..14c32bf 100644
 --- a/libs/cua-driver/rust/Cargo.toml
 +++ b/libs/cua-driver/rust/Cargo.toml
 @@ -19,7 +19,7 @@ members = [
@@ -137,13 +137,13 @@ index 53edeb0..c1ce83d 100644
  
  [workspace.package]
 -version = "0.30.4"
-+version = "0.30.4-tro.24"
++version = "0.30.4-tro.25"
  edition = "2021"
  authors = ["trycua"]
  license = "MIT"
 diff --git a/libs/cua-driver/rust/crates/cua-driver-contract/src/companion.rs b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion.rs
 new file mode 100644
-index 0000000..634cdd6
+index 0000000..8a2d315
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion.rs
 @@ -0,0 +1,621 @@
@@ -378,7 +378,7 @@ index 0000000..634cdd6
 +    ToolContract {
 +        name: I::TOOL_NAME.into(),
 +        description: description.into(),
-+        platforms: vec![Platform::Macos],
++        platforms: vec![Platform::Macos, Platform::Windows],
 +        aliases: vec![],
 +        capabilities: vec!["agent_cursor.teaching".into()],
 +        annotations: ToolAnnotations {
@@ -770,7 +770,7 @@ index 0000000..634cdd6
 +}
 diff --git a/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs
 new file mode 100644
-index 0000000..388a511
+index 0000000..3402252
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cua-driver-contract/src/companion_hud.rs
 @@ -0,0 +1,352 @@
@@ -1061,7 +1061,7 @@ index 0000000..388a511
 +    ToolContract {
 +        name: I::TOOL_NAME.into(),
 +        description: "Private host presentation. Not a model tool or desktop action.".into(),
-+        platforms: vec![Platform::Macos],
++        platforms: vec![Platform::Macos, Platform::Windows],
 +        aliases: vec![],
 +        capabilities: vec!["agent_cursor.presentation".into()],
 +        annotations: ToolAnnotations {
@@ -3316,10 +3316,10 @@ index 0000000..cceea34
 +}
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs
 new file mode 100644
-index 0000000..edf8101
+index 0000000..dacd981
 --- /dev/null
 +++ b/libs/cua-driver/rust/crates/cursor-overlay/src/companion_hud.rs
-@@ -0,0 +1,634 @@
+@@ -0,0 +1,639 @@
 +//! Compact host HUD in logical points. Never posts input or performs submission.
 +use cua_driver_contract::{CompanionHudLocale as Locale, CompanionHudPhase as Phase};
 +use fontdue::layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle};
@@ -3698,7 +3698,7 @@ index 0000000..edf8101
 +        Phase::NeedsInput => "Needs input",
 +    }
 +}
-+/// macOS-only native HUD: a vector Command glyph avoids missing font symbols.
++/// The native HUD labels the shortcut actually registered by Tro on this platform.
 +fn paint_practice_shortcut(
 +    image: &mut Pixmap,
 +    origin: (f32, f32),
@@ -3708,6 +3708,11 @@ index 0000000..edf8101
 +    locale: Locale,
 +) {
 +    let (x, y) = origin;
++    if cfg!(target_os = "windows") {
++        paint_text(image, "Alt K", (x + 7.0, y), 27.0, scale, alpha);
++        paint_text(image, label(Phase::PracticeReady, locale), (x + 39.0, y), width - 45.0, scale, alpha);
++        return;
++    }
 +    let transform = Transform::from_scale(scale, scale);
 +    let ink = paint([138, 200, 250], alpha);
 +    let mut command = PathBuilder::new();
@@ -9638,3 +9643,4302 @@ index b6ec2b0..74f2153 100644
      registry.register(Box::new(get_screen_size::GetScreenSizeTool));
      registry.register(Box::new(get_desktop_state::GetDesktopStateTool::new(
          state.clone(),
+diff --git a/libs/cua-driver/rust/crates/platform-windows/Cargo.toml b/libs/cua-driver/rust/crates/platform-windows/Cargo.toml
+index 935d1dc..7eedf0d 100644
+--- a/libs/cua-driver/rust/crates/platform-windows/Cargo.toml
++++ b/libs/cua-driver/rust/crates/platform-windows/Cargo.toml
+@@ -17,6 +17,7 @@ cursor-overlay = { path = "../cursor-overlay" }
+ pip-preview = { path = "../pip-preview" }
+ zeroize = { workspace = true }
+ getrandom = { workspace = true }
++uuid = { workspace = true }
+ # IndexMap gives the keyed cursor render collection deterministic
+ # insertion-ordered iteration = stable per-session cursor z-order frame to
+ # frame (mirrors platform-macos's per-session overlay).
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/CompanionHud.rs b/libs/cua-driver/rust/crates/platform-windows/src/CompanionHud.rs
+new file mode 100644
+index 0000000..98e7024
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/platform-windows/src/CompanionHud.rs
+@@ -0,0 +1,1077 @@
++//! One presentation owner. Message admission, completion and Win32 frame installation share this mutex.
++use cua_driver_contract::{
++    CompanionHudCommand, CompanionHudLocale, CompanionHudPhase, CompanionRenderToken,
++    CompanionTeachingMessage, SendCompanionHudCommandInput, SetCompanionHudInput,
++};
++use cursor_overlay::companion_hud::CompanionHudPainter;
++use std::{
++    collections::VecDeque,
++    sync::{Arc, Mutex, OnceLock},
++    time::{Duration, Instant},
++};
++use tokio::sync::watch;
++
++const LEASE_DURATION: Duration = Duration::from_secs(25);
++const RENDER_DEADLINE: Duration = Duration::from_secs(1);
++const MAX_REVISION: u64 = 9_007_199_254_740_991;
++
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub(super) enum CancelReason {
++    ExplicitClear,
++    LeaseExpired,
++    OwnerRetired,
++    BindingRetired,
++    CompletionFinished,
++}
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub(super) enum RenderFailure {
++    DeadlineExceeded,
++    ImageConversion,
++    FrameInstallation,
++}
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub(super) enum RenderOutcome {
++    Pending,
++    Presented,
++    Superseded,
++    Cancelled(CancelReason),
++    Failed(RenderFailure),
++}
++
++/// Frame consumers can observe completion, but cannot mutate it.
++#[derive(Clone)]
++pub(super) struct MessageFrame {
++    pub message: Arc<CompanionTeachingMessage>,
++    pub token: CompanionRenderToken,
++    pub deadline: Instant,
++    outcome: watch::Receiver<RenderOutcome>,
++}
++
++impl MessageFrame {
++    pub fn outcome(&self) -> RenderOutcome {
++        *self.outcome.borrow()
++    }
++
++    pub async fn wait(&self) -> RenderOutcome {
++        let mut outcome = self.outcome.clone();
++        loop {
++            let current = *outcome.borrow_and_update();
++            if current != RenderOutcome::Pending {
++                return current;
++            }
++            if outcome.changed().await.is_err() {
++                return RenderOutcome::Cancelled(CancelReason::OwnerRetired);
++            }
++        }
++    }
++}
++
++struct Presentation {
++    frame: MessageFrame,
++    sender: watch::Sender<RenderOutcome>,
++    sources: Vec<String>,
++}
++
++impl Presentation {
++    fn finish(&self, next: RenderOutcome) -> bool {
++        if next == RenderOutcome::Pending {
++            return false;
++        }
++        let changed = self.sender.send_if_modified(|outcome| {
++            if *outcome != RenderOutcome::Pending {
++                return false;
++            }
++            *outcome = next;
++            true
++        });
++        if changed {
++            if let RenderOutcome::Failed(reason) = next {
++                tracing::warn!(target: "companion_hud", render_id = %self.frame.token.render_id,
++                    message_sequence = self.frame.message.sequence, reason = ?reason,
++                    "Native message presentation failed.");
++            }
++        }
++        changed
++    }
++}
++
++/// Every composite, including empty scenes, is fenced against message and owner changes.
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub(super) struct SceneToken {
++    epoch: String,
++    revision: u64,
++}
++
++pub(super) struct HudState {
++    owner: Option<String>,
++    group: Option<String>,
++    sequence: Option<u64>,
++    expires: Option<Instant>,
++    epoch: String,
++    revision: u64,
++    watermark: Option<CompanionTeachingMessage>,
++    active_lesson: Option<String>,
++    retired_lessons: VecDeque<String>,
++    current: Option<Presentation>,
++    pub bindings: VecDeque<String>,
++    pub painter: CompanionHudPainter,
++}
++
++impl Default for HudState {
++    fn default() -> Self {
++        Self {
++            owner: None,
++            group: None,
++            sequence: None,
++            expires: None,
++            epoch: uuid::Uuid::new_v4().to_string(),
++            revision: 0,
++            watermark: None,
++            active_lesson: None,
++            retired_lessons: VecDeque::new(),
++            current: None,
++            bindings: VecDeque::new(),
++            painter: CompanionHudPainter::default(),
++        }
++    }
++}
++
++pub(super) fn state() -> &'static Mutex<HudState> {
++    static STATE: OnceLock<Mutex<HudState>> = OnceLock::new();
++    STATE.get_or_init(|| Mutex::new(HudState::default()))
++}
++
++impl HudState {
++    fn has_live_lease(&self, now: Instant) -> bool {
++        self.expires.is_some_and(|expires| expires > now)
++    }
++
++    fn can_present(&self, session: &str, group: &str, now: Instant) -> bool {
++        self.group.as_deref() == Some(group)
++            && self.has_live_lease(now)
++            && (self.owner.as_deref() == Some(session)
++                || self.bindings.iter().any(|key| key == session))
++    }
++
++    fn advance_scene(&mut self) -> Result<(), &'static str> {
++        self.revision = self
++            .revision
++            .checked_add(1)
++            .filter(|revision| *revision <= MAX_REVISION)
++            .ok_or("revision_exhausted")?;
++        Ok(())
++    }
++
++    fn cancel_current(&mut self, reason: CancelReason) {
++        if let Some(current) = self.current.take() {
++            current.finish(RenderOutcome::Cancelled(reason));
++        }
++        self.painter.update_message(None);
++    }
++
++    fn retire_owner(&mut self, reason: CancelReason) {
++        self.cancel_current(reason);
++        self.epoch = uuid::Uuid::new_v4().to_string();
++        self.revision = 0;
++        self.watermark = None;
++        self.active_lesson = None;
++        self.retired_lessons.clear();
++        self.owner = None;
++        self.sequence = None;
++        self.expires = None;
++        self.painter
++            .update(CompanionHudPhase::Idle, CompanionHudLocale::English, 0.0);
++    }
++
++    fn claim_owner(&mut self, session: &str, group: &str, sequence: u64, now: Instant) -> bool {
++        if self.has_live_lease(now) && self.owner.as_deref() != Some(session) {
++            return false;
++        }
++        if self.owner.as_deref() == Some(session)
++            && self.group.as_deref() == Some(group)
++            && self.sequence.is_some_and(|previous| sequence <= previous)
++        {
++            return false;
++        }
++        if self.owner.as_deref() != Some(session)
++            || self.group.as_deref() != Some(group)
++            || !self.has_live_lease(now)
++        {
++            if self.group.as_deref() != Some(group) {
++                self.bindings.clear();
++            }
++            self.retire_owner(CancelReason::OwnerRetired);
++        }
++        self.owner = Some(session.into());
++        self.group = Some(group.into());
++        self.sequence = Some(sequence);
++        self.expires = Some(now + LEASE_DURATION);
++        true
++    }
++    /// Legacy snapshots go through common admission. A stale payload can never rewrite the receipt.
++    pub fn update(&mut self, session: &str, input: SetCompanionHudInput) -> bool {
++        let now = Instant::now();
++        if !self.claim_owner(session, &input.group, input.sequence, now) {
++            return false;
++        }
++        if let Some(message) = input.message {
++            // Legacy refreshes cannot switch an established lesson context.
++            let _ = self.accept_message(session, message, now, false);
++        }
++        // Omitted legacy message is appearance-only. Explicit clears require the native token.
++        self.painter.message.set_speaking(input.speaking_sequence);
++        self.painter
++            .update(input.phase, input.locale, input.level as f32);
++        true
++    }
++
++    pub fn apply_command(&mut self, session: &str, input: &SendCompanionHudCommandInput) -> bool {
++        let now = Instant::now();
++        if self.owner.as_deref() != Some(session)
++            || self.group.as_deref() != Some(&input.group)
++            || !self.has_live_lease(now)
++            || self
++                .sequence
++                .is_some_and(|sequence| input.sequence <= sequence)
++        {
++            return false;
++        }
++        self.sequence = Some(input.sequence);
++        self.expires = Some(now + LEASE_DURATION);
++        match &input.command {
++            CompanionHudCommand::UpdateAppearance {
++                phase,
++                locale,
++                level,
++                speaking_sequence,
++            } => {
++                self.painter.message.set_speaking(*speaking_sequence);
++                self.painter.update(*phase, *locale, *level as f32);
++            }
++            CompanionHudCommand::ClearMessage { expected_token } => {
++                self.clear_token(session, &input.group, expected_token);
++            }
++            _ => {}
++        }
++        true
++    }
++
++    fn accept_message(
++        &mut self,
++        session: &str,
++        message: CompanionTeachingMessage,
++        now: Instant,
++        allow_context_change: bool,
++    ) -> Result<MessageFrame, &'static str> {
++        if !message.validate() {
++            return Err("invalid_message");
++        }
++        if self
++            .retired_lessons
++            .iter()
++            .any(|lesson| lesson == &message.lesson_id)
++        {
++            return Err("foreign_lesson");
++        }
++        if self
++            .active_lesson
++            .as_ref()
++            .is_some_and(|lesson| lesson != &message.lesson_id)
++            && !allow_context_change
++        {
++            return Err("foreign_lesson");
++        }
++        if let Some(previous) = &self.watermark {
++            if previous.lesson_id != message.lesson_id && !allow_context_change {
++                return Err("foreign_lesson");
++            }
++            if previous.lesson_id == message.lesson_id {
++                if message.sequence < previous.sequence {
++                    return Err("stale_message");
++                }
++                if message.sequence == previous.sequence {
++                    if previous != &message {
++                        return Err("message_conflict");
++                    }
++                    let current = self.current.as_mut().ok_or("message_cleared")?;
++                    if current.frame.outcome() == RenderOutcome::Pending
++                        && !current.sources.iter().any(|source| source == session)
++                    {
++                        // At most the lease owner plus its eight registered cursor bindings.
++                        current.sources.push(session.into());
++                    }
++                    return Ok(current.frame.clone());
++                }
++            }
++        }
++        self.advance_scene()?;
++        let token = CompanionRenderToken {
++            owner_epoch: self.epoch.clone(),
++            revision: self.revision,
++            render_id: uuid::Uuid::new_v4().to_string(),
++        };
++        let (sender, outcome) = watch::channel(RenderOutcome::Pending);
++        let frame = MessageFrame {
++            token,
++            message: Arc::new(message.clone()),
++            deadline: now + RENDER_DEADLINE,
++            outcome,
++        };
++        if let Some(previous) = self.current.take() {
++            previous.finish(RenderOutcome::Superseded);
++        }
++        if self
++            .active_lesson
++            .as_ref()
++            .is_some_and(|lesson| lesson != &message.lesson_id)
++        {
++            if let Some(previous) = self.active_lesson.take() {
++                if self.retired_lessons.len() >= 8 {
++                    self.retired_lessons.pop_front();
++                }
++                self.retired_lessons.push_back(previous);
++            }
++        }
++        self.active_lesson = Some(message.lesson_id.clone());
++        self.watermark = Some(message.clone());
++        self.painter.update_message(Some(message));
++        self.current = Some(Presentation {
++            frame: frame.clone(),
++            sender,
++            sources: vec![session.into()],
++        });
++        Ok(frame)
++    }
++
++    pub fn present_message(
++        &mut self,
++        session: &str,
++        group: &str,
++        locale: CompanionHudLocale,
++        message: CompanionTeachingMessage,
++    ) -> Result<MessageFrame, &'static str> {
++        let now = Instant::now();
++        if !self.can_present(session, group, now) {
++            return Err("owner_unavailable");
++        }
++        let frame = self.accept_message(
++            session,
++            message,
++            now,
++            self.owner.as_deref() == Some(session),
++        )?;
++        self.painter.update(CompanionHudPhase::Showing, locale, 0.0);
++        Ok(frame)
++    }
++
++    pub fn scene_token(&self) -> SceneToken {
++        SceneToken {
++            epoch: self.epoch.clone(),
++            revision: self.revision,
++        }
++    }
++
++    pub fn message_frame(&self) -> Option<MessageFrame> {
++        self.current
++            .as_ref()
++            .filter(|current| {
++                self.painter.message.message.as_ref() == Some(current.frame.message.as_ref())
++            })
++            .map(|current| current.frame.clone())
++    }
++    /// Called on the main queue while holding HudState; installation is synchronous and cannot acquire RENDER.
++    /// Guidance fences are acquired after HudState everywhere; no callback holds them while acquiring HudState.
++    pub fn install_frame(
++        &mut self,
++        scene: &SceneToken,
++        message: Option<&CompanionRenderToken>,
++        now: Instant,
++        install: impl FnOnce() -> Result<bool, RenderFailure>,
++    ) -> bool {
++        if &self.scene_token() != scene {
++            return false;
++        }
++        if message.is_some() && !self.has_live_lease(now) {
++            self.retire_owner(CancelReason::LeaseExpired);
++            return false;
++        }
++        if let Some(token) = message {
++            let Some(current) = &self.current else {
++                return false;
++            };
++            if &current.frame.token != token {
++                return false;
++            }
++            match current.frame.outcome() {
++                RenderOutcome::Pending if now >= current.frame.deadline => {
++                    self.fail_token(token, RenderFailure::DeadlineExceeded);
++                    return false;
++                }
++                RenderOutcome::Pending | RenderOutcome::Presented => {}
++                _ => return false,
++            }
++        }
++        match install() {
++            Ok(true) => {
++                if message.is_some() {
++                    if let Some(current) = &self.current {
++                        current.finish(RenderOutcome::Presented);
++                    }
++                }
++                true
++            }
++            Ok(false) => false,
++            Err(reason) => {
++                if let Some(token) = message {
++                    self.fail_token(token, reason);
++                }
++                false
++            }
++        }
++    }
++
++    pub fn fail_token(&mut self, token: &CompanionRenderToken, reason: RenderFailure) -> bool {
++        let failed = self
++            .current
++            .as_ref()
++            .filter(|current| &current.frame.token == token)
++            .is_some_and(|current| current.finish(RenderOutcome::Failed(reason)));
++        if failed {
++            // Retain the terminal job for exact duplicates, but invalidate queued pixels and clear its projection.
++            let _ = self.advance_scene();
++            self.painter.update_message(None);
++        }
++        failed
++    }
++
++    pub fn clear_token(
++        &mut self,
++        session: &str,
++        group: &str,
++        token: &CompanionRenderToken,
++    ) -> bool {
++        if !self.can_present(session, group, Instant::now())
++            || !self
++                .current
++                .as_ref()
++                .is_some_and(|current| &current.frame.token == token)
++            || self.advance_scene().is_err()
++        {
++            return false;
++        }
++        self.cancel_current(CancelReason::ExplicitClear);
++        true
++    }
++
++    pub fn read_message(&self, session: &str, group: &str) -> Option<MessageFrame> {
++        if self.owner.as_deref() != Some(session)
++            || self.group.as_deref() != Some(group)
++            || !self.has_live_lease(Instant::now())
++        {
++            return None;
++        }
++        self.current
++            .as_ref()
++            .filter(|current| current.frame.outcome() == RenderOutcome::Presented)
++            .map(|current| current.frame.clone())
++    }
++
++    pub fn bind(&mut self, session: &str, group: &str) -> bool {
++        if self.group.as_deref() != Some(group) || !self.has_live_lease(Instant::now()) {
++            return false;
++        }
++        self.bindings.retain(|key| key != session);
++        if self.bindings.len() >= 8 {
++            if let Some(removed) = self.bindings.pop_front() {
++                self.cancel_source(&removed);
++            }
++        }
++        self.bindings.push_back(session.into());
++        true
++    }
++
++    pub fn bind_lesson(&mut self, session: &str, group: &str, lesson: &str) -> bool {
++        if !self.can_present(session, group, Instant::now())
++            || self.bindings.back().map(String::as_str) != Some(session)
++            || self
++                .retired_lessons
++                .iter()
++                .any(|previous| previous == lesson)
++        {
++            return false;
++        }
++        if self.active_lesson.as_deref() == Some(lesson) {
++            return true;
++        }
++        if self.advance_scene().is_err() {
++            return false;
++        }
++        if let Some(previous) = self.active_lesson.take() {
++            if self.retired_lessons.len() >= 8 {
++                self.retired_lessons.pop_front();
++            }
++            self.retired_lessons.push_back(previous);
++        }
++        if let Some(current) = self.current.take() {
++            current.finish(RenderOutcome::Superseded);
++        }
++        self.painter.update_message(None);
++        self.watermark = None;
++        self.active_lesson = Some(lesson.into());
++        true
++    }
++
++    fn cancel_source(&mut self, session: &str) {
++        if self.current.as_ref().is_some_and(|current| {
++            current.sources.iter().any(|source| source == session)
++                && current.frame.outcome() == RenderOutcome::Pending
++        }) {
++            if self.advance_scene().is_ok() {
++                self.cancel_current(CancelReason::BindingRetired);
++            }
++        }
++    }
++
++    /// Expiry and receipt deadlines need cheap wakeups even when the installed scene is static.
++    pub fn needs_maintenance(&self) -> bool {
++        self.expires.is_some() || self.painter.is_visible()
++    }
++
++    pub fn tick(&mut self, dt: f32, reduced: bool) -> bool {
++        let scene_before_tick = self.scene_token();
++        let now = Instant::now();
++        if self.expires.is_some() && !self.has_live_lease(now) {
++            self.retire_owner(CancelReason::LeaseExpired);
++        }
++        let expired = self
++            .current
++            .as_ref()
++            .filter(|current| {
++                now >= current.frame.deadline && current.frame.outcome() == RenderOutcome::Pending
++            })
++            .map(|current| current.frame.token.clone());
++        if let Some(token) = expired {
++            self.fail_token(&token, RenderFailure::DeadlineExceeded);
++        }
++        self.painter.tick(dt, reduced);
++        if self
++            .current
++            .as_ref()
++            .is_some_and(|current| current.frame.outcome() == RenderOutcome::Presented)
++            && self.painter.message.has_finished_completion(reduced)
++            && self.advance_scene().is_ok()
++        {
++            self.cancel_current(CancelReason::CompletionFinished);
++        }
++        self.painter.needs_frame_tick(reduced) || self.scene_token() != scene_before_tick
++    }
++
++    pub fn retire(&mut self, key: &str, prefix: bool) {
++        let matches = |candidate: &str| {
++            if prefix {
++                candidate.starts_with(key)
++            } else {
++                candidate == key
++            }
++        };
++        let removed: Vec<_> = self
++            .bindings
++            .iter()
++            .filter(|candidate| matches(candidate))
++            .cloned()
++            .collect();
++        self.bindings.retain(|candidate| !matches(candidate));
++        for session in removed {
++            self.cancel_source(&session);
++        }
++        if self.owner.as_deref().is_some_and(matches) {
++            self.retire_owner(CancelReason::OwnerRetired);
++        }
++    }
++}
++
++#[cfg(test)]
++mod companion_tests {
++    use super::*;
++    use cua_driver_contract::TeachingMessageKind;
++    const GROUP: &str = "11111111-1111-4111-8111-111111111111";
++    fn snapshot(sequence: u64, message: Option<CompanionTeachingMessage>) -> SetCompanionHudInput {
++        SetCompanionHudInput {
++            session: None,
++            group: GROUP.into(),
++            sequence,
++            phase: CompanionHudPhase::Thinking,
++            locale: CompanionHudLocale::English,
++            level: 0.0,
++            message,
++            speaking_sequence: None,
++        }
++    }
++
++    fn message(sequence: u64) -> CompanionTeachingMessage {
++        CompanionTeachingMessage {
++            lesson_id: GROUP.into(),
++            step_id: GROUP.into(),
++            sequence,
++            kind: TeachingMessageKind::Instruction,
++            text: "Synthetic native instruction".into(),
++        }
++    }
++
++    fn fixture() -> HudState {
++        let mut state = HudState::default();
++        assert!(state.update("host", snapshot(0, None)));
++        assert!(state.bind("cursor", GROUP));
++        state
++    }
++
++    fn present(state: &mut HudState, sequence: u64) -> MessageFrame {
++        state
++            .present_message(
++                "cursor",
++                GROUP,
++                CompanionHudLocale::English,
++                message(sequence),
++            )
++            .unwrap()
++    }
++
++    fn install(state: &mut HudState, frame: &MessageFrame) -> bool {
++        state.install_frame(
++            &state.scene_token(),
++            Some(&frame.token),
++            Instant::now(),
++            || Ok(true),
++        )
++    }
++    #[test]
++    fn companion_static_scene_keeps_deadline_and_lease_maintenance_without_redraw() {
++        let mut state = fixture();
++        state
++            .painter
++            .update(CompanionHudPhase::Waiting, CompanionHudLocale::English, 0.0);
++        let pending = present(&mut state, 1);
++        assert!(install(&mut state, &pending));
++        assert!(!state.tick(1.0, false));
++        assert!(state.needs_maintenance());
++        assert_eq!(pending.outcome(), RenderOutcome::Presented);
++        state.expires = Some(Instant::now() - Duration::from_millis(1));
++        assert!(state.tick(0.1, false));
++        assert!(state.painter.message.message.is_none());
++        state.tick(0.3, false);
++        assert!(!state.needs_maintenance());
++
++        let mut state = fixture();
++        state
++            .painter
++            .update(CompanionHudPhase::Waiting, CompanionHudLocale::English, 0.0);
++        let pending = present(&mut state, 1);
++        state.current.as_mut().unwrap().frame.deadline = Instant::now() - Duration::from_millis(1);
++        assert!(state.tick(1.0, false));
++        assert_eq!(
++            pending.outcome(),
++            RenderOutcome::Failed(RenderFailure::DeadlineExceeded)
++        );
++    }
++
++    #[test]
++    fn companion_reduced_completion_clears_from_maintenance_and_preserves_receipt() {
++        let mut state = fixture();
++        state
++            .painter
++            .update(CompanionHudPhase::Waiting, CompanionHudLocale::English, 0.0);
++        let mut completion = message(1);
++        completion.kind = TeachingMessageKind::Completion;
++        let frame = state
++            .present_message("cursor", GROUP, CompanionHudLocale::English, completion)
++            .unwrap();
++        assert!(install(&mut state, &frame));
++        assert!(!state.tick(0.3, true));
++        assert!(state.needs_maintenance());
++        assert!(state.tick(2.0, true));
++        assert!(state.painter.message.message.is_none());
++        assert_eq!(frame.outcome(), RenderOutcome::Presented);
++    }
++
++    #[test]
++    fn companion_stale_refresh_preserves_pending_message_and_receipt() {
++        let mut state = fixture();
++        let first = present(&mut state, 1);
++        assert!(install(&mut state, &first));
++        let second = present(&mut state, 2);
++        assert!(state.update("host", snapshot(1, Some(message(1)))));
++        assert_eq!(state.message_frame().unwrap().token, second.token);
++        assert_eq!(state.painter.message.message, Some(message(2)));
++        assert_eq!(second.outcome(), RenderOutcome::Pending);
++        assert!(install(&mut state, &second));
++        assert_eq!(second.outcome(), RenderOutcome::Presented);
++    }
++    #[test]
++    fn companion_exact_duplicates_preserve_token_deadline_and_terminal_outcome() {
++        let mut state = fixture();
++        let pending = present(&mut state, 2);
++        let duplicate = present(&mut state, 2);
++        assert_eq!(pending.token, duplicate.token);
++        assert_eq!(pending.deadline, duplicate.deadline);
++        assert!(install(&mut state, &pending));
++        assert_eq!(duplicate.outcome(), RenderOutcome::Presented);
++        let repeated = present(&mut state, 2);
++        assert_eq!(repeated.token, pending.token);
++        assert_eq!(repeated.outcome(), RenderOutcome::Presented);
++    }
++    #[test]
++    fn companion_admission_rejects_kind_conflicts_old_messages_and_foreign_lessons() {
++        let mut state = fixture();
++        let pending = present(&mut state, 2);
++        let mut conflict = message(2);
++        conflict.kind = TeachingMessageKind::Question;
++        assert!(matches!(
++            state.present_message("cursor", GROUP, CompanionHudLocale::English, conflict),
++            Err("message_conflict")
++        ));
++        assert!(matches!(
++            state.present_message("cursor", GROUP, CompanionHudLocale::English, message(1)),
++            Err("stale_message")
++        ));
++        let mut foreign = message(3);
++        foreign.lesson_id = uuid::Uuid::new_v4().to_string();
++        assert!(matches!(
++            state.present_message("cursor", GROUP, CompanionHudLocale::English, foreign),
++            Err("foreign_lesson")
++        ));
++        assert_eq!(state.message_frame().unwrap().token, pending.token);
++        assert!(install(&mut state, &pending));
++    }
++    #[test]
++    fn companion_explicit_host_context_change_invalidates_old_frame() {
++        let mut state = fixture();
++        let old = present(&mut state, 2);
++        let scene = state.scene_token();
++        let mut next = message(1);
++        next.lesson_id = uuid::Uuid::new_v4().to_string();
++        let new = state
++            .present_message("host", GROUP, CompanionHudLocale::English, next)
++            .unwrap();
++        assert_eq!(old.outcome(), RenderOutcome::Superseded);
++        assert!(
++            !state.install_frame(&scene, Some(&old.token), Instant::now(), || panic!(
++                "obsolete frame installed"
++            ))
++        );
++        assert!(install(&mut state, &new));
++    }
++    #[tokio::test]
++    async fn companion_superseded_and_cancelled_waiters_finish_without_polling() {
++        let mut state = fixture();
++        let old = present(&mut state, 1);
++        let scene = state.scene_token();
++        let new = present(&mut state, 2);
++        assert_eq!(old.wait().await, RenderOutcome::Superseded);
++        assert!(
++            !state.install_frame(&scene, Some(&old.token), Instant::now(), || panic!(
++                "obsolete install"
++            ))
++        );
++        assert!(!state.fail_token(&old.token, RenderFailure::DeadlineExceeded));
++        assert!(!state.clear_token("cursor", GROUP, &old.token));
++        assert_eq!(new.outcome(), RenderOutcome::Pending);
++        assert!(state.clear_token("cursor", GROUP, &new.token));
++        assert_eq!(
++            new.wait().await,
++            RenderOutcome::Cancelled(CancelReason::ExplicitClear)
++        );
++        assert!(matches!(
++            state.present_message("cursor", GROUP, CompanionHudLocale::English, message(2)),
++            Err("message_cleared")
++        ));
++    }
++    #[test]
++    fn companion_lease_and_appearance_commands_do_not_mutate_delivery() {
++        let mut state = fixture();
++        let pending = present(&mut state, 2);
++        for (index, command) in [
++            CompanionHudCommand::RenewLease,
++            CompanionHudCommand::UpdateAppearance {
++                phase: CompanionHudPhase::Thinking,
++                locale: CompanionHudLocale::Vietnamese,
++                level: 0.75,
++                speaking_sequence: Some(2),
++            },
++        ]
++        .into_iter()
++        .enumerate()
++        {
++            assert!(state.apply_command(
++                "host",
++                &SendCompanionHudCommandInput {
++                    session: None,
++                    group: GROUP.into(),
++                    sequence: index as u64 + 1,
++                    command
++                }
++            ));
++            assert_eq!(state.message_frame().unwrap().token, pending.token);
++            assert_eq!(state.painter.message.message, Some(message(2)));
++        }
++        assert!(install(&mut state, &pending));
++    }
++    #[test]
++    fn companion_empty_and_cancelled_scenes_cannot_erase_a_new_message() {
++        let mut state = fixture();
++        let empty = state.scene_token();
++        let pending = present(&mut state, 2);
++        assert!(
++            !state.install_frame(&empty, None, Instant::now(), || panic!(
++                "obsolete empty frame installed"
++            ))
++        );
++        let scene = state.scene_token();
++        assert!(state.clear_token("host", GROUP, &pending.token));
++        assert!(
++            !state.install_frame(&scene, Some(&pending.token), Instant::now(), || panic!(
++                "cancelled frame installed"
++            ))
++        );
++        assert!(state.install_frame(&state.scene_token(), None, Instant::now(), || Ok(true)));
++    }
++    #[test]
++    fn companion_installation_deadline_failure_is_terminal_and_animation_still_installs() {
++        let mut state = fixture();
++        let pending = present(&mut state, 1);
++        assert!(!state.install_frame(
++            &state.scene_token(),
++            Some(&pending.token),
++            pending.deadline,
++            || panic!("late install")
++        ));
++        assert_eq!(
++            pending.outcome(),
++            RenderOutcome::Failed(RenderFailure::DeadlineExceeded)
++        );
++        assert!(!install(&mut state, &pending));
++        let repeated = present(&mut state, 1);
++        assert_eq!(repeated.outcome(), pending.outcome());
++        let next = present(&mut state, 2);
++        assert!(install(&mut state, &next));
++        assert!(state.install_frame(
++            &state.scene_token(),
++            Some(&next.token),
++            next.deadline + Duration::from_secs(1),
++            || Ok(true)
++        ));
++        assert!(!state.fail_token(&next.token, RenderFailure::ImageConversion));
++        assert_eq!(next.outcome(), RenderOutcome::Presented);
++    }
++    #[test]
++    fn companion_rejected_drawing_frame_does_not_poison_pending_message() {
++        let mut state = fixture();
++        let pending = present(&mut state, 1);
++        assert!(!state.install_frame(
++            &state.scene_token(),
++            Some(&pending.token),
++            Instant::now(),
++            || Ok(false)
++        ));
++        assert_eq!(pending.outcome(), RenderOutcome::Pending);
++        assert!(install(&mut state, &pending));
++    }
++    #[test]
++    fn companion_image_failure_does_not_complete_or_clear_newer_receipts() {
++        let mut state = fixture();
++        let first = present(&mut state, 1);
++        assert!(state.fail_token(&first.token, RenderFailure::ImageConversion));
++        assert!(!install(&mut state, &first));
++        let next = present(&mut state, 2);
++        assert!(!state.fail_token(&first.token, RenderFailure::ImageConversion));
++        assert!(install(&mut state, &next));
++    }
++    #[test]
++    fn companion_owner_binding_and_expiry_cancel_pending_jobs() {
++        for reason in [
++            CancelReason::OwnerRetired,
++            CancelReason::BindingRetired,
++            CancelReason::LeaseExpired,
++        ] {
++            let mut state = fixture();
++            let pending = present(&mut state, 2);
++            let scene = state.scene_token();
++            match reason {
++                CancelReason::OwnerRetired => state.retire("host", false),
++                CancelReason::BindingRetired => state.retire("cursor", false),
++                CancelReason::LeaseExpired => {
++                    state.expires = Some(Instant::now());
++                    state.tick(0.0, false);
++                }
++                _ => unreachable!(),
++            }
++            assert_eq!(pending.outcome(), RenderOutcome::Cancelled(reason));
++            assert!(
++                !state.install_frame(&scene, Some(&pending.token), Instant::now(), || panic!(
++                    "retired install"
++                ))
++            );
++        }
++    }
++    #[test]
++    fn companion_hud_fences_ownership_sequence_readback_and_bounded_bindings() {
++        let mut state = fixture();
++        assert!(!state.update("foreign", snapshot(1, None)));
++        assert!(!state.update("host", snapshot(0, None)));
++        assert!(!state.bind("cursor", "foreign-group"));
++        let pending = present(&mut state, 1);
++        assert!(state.read_message("host", GROUP).is_none());
++        assert!(install(&mut state, &pending));
++        assert_eq!(
++            state.read_message("host", GROUP).unwrap().token,
++            pending.token
++        );
++        assert!(state.read_message("foreign", GROUP).is_none());
++        for index in 0..20 {
++            assert!(state.bind(&format!("cursor-{index}"), GROUP));
++        }
++        assert_eq!(state.bindings.len(), 8);
++        state.retire("host", false);
++        assert!(state.update("new-host", snapshot(0, None)));
++        assert_eq!(state.bindings.len(), 8);
++        assert!(state.read_message("new-host", GROUP).is_none());
++    }
++    #[test]
++    fn companion_completion_fade_is_owned_and_cannot_resurrect_from_stale_snapshot() {
++        let mut state = fixture();
++        let mut completion = message(2);
++        completion.kind = TeachingMessageKind::Completion;
++        let frame = state
++            .present_message(
++                "cursor",
++                GROUP,
++                CompanionHudLocale::English,
++                completion.clone(),
++            )
++            .unwrap();
++        assert!(install(&mut state, &frame));
++        state.tick(2.0, true);
++        assert!(state.message_frame().is_none());
++        assert!(state.update("host", snapshot(1, Some(completion))));
++        assert!(state.message_frame().is_none());
++    }
++    #[test]
++    fn companion_event_permutations_preserve_the_current_owner_and_terminal_result() {
++        for first in 0..4 {
++            for second in 0..4 {
++                for third in 0..4 {
++                    for fourth in 0..4 {
++                        let events = [first, second, third, fourth];
++                        if (0..4).any(|event| {
++                            events
++                                .iter()
++                                .filter(|candidate| **candidate == event)
++                                .count()
++                                != 1
++                        }) {
++                            continue;
++                        }
++                        let mut state = fixture();
++                        let old = present(&mut state, 1);
++                        let old_scene = state.scene_token();
++                        let new = present(&mut state, 2);
++                        for event in events {
++                            match event {
++                                0 => {
++                                    state.update("host", snapshot(1, Some(message(1))));
++                                }
++                                1 => {
++                                    assert!(!state.clear_token("cursor", GROUP, &old.token));
++                                }
++                                2 => {
++                                    assert!(!state
++                                        .fail_token(&old.token, RenderFailure::DeadlineExceeded));
++                                }
++                                3 => {
++                                    assert!(!state.install_frame(
++                                        &old_scene,
++                                        Some(&old.token),
++                                        Instant::now(),
++                                        || panic!("obsolete install")
++                                    ));
++                                }
++                                _ => unreachable!(),
++                            }
++                            assert_eq!(state.message_frame().unwrap().token, new.token);
++                            assert_eq!(new.outcome(), RenderOutcome::Pending);
++                            assert_eq!(old.outcome(), RenderOutcome::Superseded);
++                        }
++                        assert!(install(&mut state, &new));
++                    }
++                }
++            }
++        }
++    }
++    #[test]
++    fn companion_installation_failure_keeps_its_terminal_reason() {
++        let mut state = fixture();
++        let pending = present(&mut state, 1);
++        assert!(!state.install_frame(
++            &state.scene_token(),
++            Some(&pending.token),
++            Instant::now(),
++            || Err(RenderFailure::FrameInstallation)
++        ));
++        assert_eq!(
++            pending.outcome(),
++            RenderOutcome::Failed(RenderFailure::FrameInstallation)
++        );
++        assert!(!state.fail_token(&pending.token, RenderFailure::DeadlineExceeded));
++    }
++    #[test]
++    fn companion_explicit_lesson_binding_resets_order_and_rejects_delayed_context() {
++        let mut state = fixture();
++        let old = present(&mut state, 8);
++        let scene = state.scene_token();
++        let lesson = uuid::Uuid::new_v4().to_string();
++        assert!(state.bind_lesson("cursor", GROUP, &lesson));
++        assert_eq!(old.outcome(), RenderOutcome::Superseded);
++        let mut next = message(1);
++        next.lesson_id = lesson.clone();
++        let new = state
++            .present_message("cursor", GROUP, CompanionHudLocale::English, next)
++            .unwrap();
++        assert!(!state.bind_lesson("cursor", GROUP, GROUP));
++        assert!(matches!(
++            state.present_message("host", GROUP, CompanionHudLocale::English, message(9)),
++            Err("foreign_lesson")
++        ));
++        assert!(
++            !state.install_frame(&scene, Some(&old.token), Instant::now(), || panic!(
++                "old lesson install"
++            ))
++        );
++        assert!(install(&mut state, &new));
++    }
++    #[test]
++    fn companion_retiring_shared_pending_cursor_cancels_the_original_host_job() {
++        let mut state = fixture();
++        let host = state
++            .present_message("host", GROUP, CompanionHudLocale::English, message(1))
++            .unwrap();
++        let cursor = present(&mut state, 1);
++        assert_eq!(host.token, cursor.token);
++        state.retire("cursor", false);
++        assert_eq!(
++            host.outcome(),
++            RenderOutcome::Cancelled(CancelReason::BindingRetired)
++        );
++        assert_eq!(cursor.outcome(), host.outcome());
++    }
++    #[test]
++    fn companion_revision_exhaustion_preserves_current_job() {
++        let mut state = fixture();
++        let pending = present(&mut state, 1);
++        state.revision = MAX_REVISION;
++        assert!(matches!(
++            state.present_message("cursor", GROUP, CompanionHudLocale::English, message(2)),
++            Err("revision_exhausted")
++        ));
++        assert_eq!(state.message_frame().unwrap().token, pending.token);
++        assert_eq!(pending.outcome(), RenderOutcome::Pending);
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/CompanionInput.rs b/libs/cua-driver/rust/crates/platform-windows/src/CompanionInput.rs
+new file mode 100644
+index 0000000..eaaff70
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/platform-windows/src/CompanionInput.rs
+@@ -0,0 +1,77 @@
++//! Physical activity counters only. Key values and typed contents are never retained.
++use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
++use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
++use windows::Win32::UI::WindowsAndMessaging::*;
++
++static INPUT: [AtomicU32; 7] = [const { AtomicU32::new(0) }; 7];
++static READY: AtomicBool = AtomicBool::new(false);
++pub fn read_input_counters() -> [u32; 7] {
++    std::array::from_fn(|index| INPUT[index].load(Ordering::Acquire))
++}
++pub fn is_ready() -> bool {
++    READY.load(Ordering::Acquire)
++}
++pub fn are_buttons_down() -> bool {
++    use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_RBUTTON};
++    unsafe {
++        GetAsyncKeyState(i32::from(VK_LBUTTON.0)) < 0
++            || GetAsyncKeyState(i32::from(VK_RBUTTON.0)) < 0
++    }
++}
++unsafe extern "system" fn keyboard(code: i32, event: WPARAM, data: LPARAM) -> LRESULT {
++    if code >= 0 {
++        let key = &*(data.0 as *const KBDLLHOOKSTRUCT);
++        if key.flags.0 & LLKHF_INJECTED.0 == 0 {
++            INPUT[0].fetch_add(1, Ordering::AcqRel);
++        }
++    }
++    CallNextHookEx(None, code, event, data)
++}
++unsafe extern "system" fn mouse(code: i32, event: WPARAM, data: LPARAM) -> LRESULT {
++    if code >= 0 {
++        let input = &*(data.0 as *const MSLLHOOKSTRUCT);
++        if input.flags & LLMHF_INJECTED == 0 {
++            let index = match event.0 as u32 {
++                WM_LBUTTONDOWN | WM_LBUTTONUP => Some(1),
++                WM_RBUTTONDOWN | WM_RBUTTONUP => Some(2),
++                WM_MBUTTONDOWN | WM_MBUTTONUP => Some(3),
++                WM_XBUTTONDOWN | WM_XBUTTONUP => Some(4),
++                WM_MOUSEWHEEL => Some(5),
++                WM_MOUSEHWHEEL => Some(6),
++                _ => None,
++            };
++            if let Some(index) = index {
++                INPUT[index].fetch_add(1, Ordering::AcqRel);
++            }
++        }
++    }
++    CallNextHookEx(None, code, event, data)
++}
++pub struct InputHooks {
++    keyboard: HHOOK,
++    mouse: HHOOK,
++}
++impl Drop for InputHooks {
++    fn drop(&mut self) {
++        READY.store(false, Ordering::Release);
++        unsafe {
++            let _ = UnhookWindowsHookEx(self.keyboard);
++            let _ = UnhookWindowsHookEx(self.mouse);
++        }
++    }
++}
++pub fn install_input_hooks() -> Result<InputHooks, windows::core::Error> {
++    unsafe {
++        let module = HINSTANCE(windows::Win32::System::LibraryLoader::GetModuleHandleW(None)?.0);
++        let keyboard = SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard), module, 0)?;
++        let mouse = match SetWindowsHookExW(WH_MOUSE_LL, Some(mouse), module, 0) {
++            Ok(hook) => hook,
++            Err(error) => {
++                let _ = UnhookWindowsHookEx(keyboard);
++                return Err(error);
++            }
++        };
++        READY.store(true, Ordering::Release);
++        Ok(InputHooks { keyboard, mouse })
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/lib.rs b/libs/cua-driver/rust/crates/platform-windows/src/lib.rs
+index 4e56ef6..3966834 100644
+--- a/libs/cua-driver/rust/crates/platform-windows/src/lib.rs
++++ b/libs/cua-driver/rust/crates/platform-windows/src/lib.rs
+@@ -21,6 +21,11 @@ use cua_driver_core::tool::ToolRegistry;
+ pub mod diagnostics;
+ pub mod health_report;
+ pub mod overlay;
++#[path = "CompanionHud.rs"]
++mod companion_hud;
++#[cfg(target_os = "windows")]
++#[path = "CompanionInput.rs"]
++mod companion_input;
+ pub mod pip;
+ pub mod recording_hooks;
+ pub mod terminal;
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/overlay.rs b/libs/cua-driver/rust/crates/platform-windows/src/overlay.rs
+index b7dfcd7..0586c0c 100644
+--- a/libs/cua-driver/rust/crates/platform-windows/src/overlay.rs
++++ b/libs/cua-driver/rust/crates/platform-windows/src/overlay.rs
+@@ -31,14 +31,151 @@
+ #![allow(non_snake_case, non_upper_case_globals)]
+ 
+ use std::collections::HashMap;
++use std::sync::atomic::{AtomicBool, Ordering};
+ use std::sync::{Mutex, OnceLock};
+ use std::time::Instant;
++static HUD_REDUCED_MOTION: AtomicBool = AtomicBool::new(false);
+ 
+ use cursor_overlay::{
+     CursorConfig, CursorKey, KeyedOverlayCommand, MotionConfig, MsgOutcome, OverlayCommand,
+     OverlayMsg, RenderEntry, RenderStateCore, ScreenFrame, ZOrderEnforcer,
+ };
+ 
++pub fn update_companion_hud(
++    session: &str,
++    input: cua_driver_contract::SetCompanionHudInput,
++) -> bool {
++    let applied = super::companion_hud::state()
++        .lock()
++        .unwrap()
++        .update(session, input);
++    if applied {
++        send_command_default(OverlayCommand::WakeCompanionHud);
++    }
++    applied
++}
++/// Wait for CALayer installation of the message before beginning a pointer cue.
++/// This bounds a stalled compositor and does not claim physical scan-out timing.
++pub async fn present_companion_message(
++    session: &str,
++    group: &str,
++    locale: cua_driver_contract::CompanionHudLocale,
++    message: cua_driver_contract::CompanionTeachingMessage,
++) -> Result<cua_driver_contract::CompanionRenderToken, &'static str> {
++    use super::companion_hud::{RenderFailure, RenderOutcome};
++    let frame = super::companion_hud::state()
++        .lock()
++        .unwrap()
++        .present_message(session, group, locale, message)?;
++    send_command_default(OverlayCommand::WakeCompanionHud);
++    let result =
++        tokio::time::timeout_at(tokio::time::Instant::from_std(frame.deadline), frame.wait()).await;
++    let outcome = match result {
++        Ok(outcome) => outcome,
++        Err(_) => {
++            super::companion_hud::state()
++                .lock()
++                .unwrap()
++                .fail_token(&frame.token, RenderFailure::DeadlineExceeded);
++            frame.outcome()
++        }
++    };
++    match outcome {
++        RenderOutcome::Presented => Ok(frame.token),
++        RenderOutcome::Superseded => Err("message_superseded"),
++        RenderOutcome::Cancelled(_) => Err("message_cancelled"),
++        RenderOutcome::Failed(RenderFailure::ImageConversion) => Err("image_conversion_failed"),
++        RenderOutcome::Failed(RenderFailure::FrameInstallation) => Err("frame_installation_failed"),
++        RenderOutcome::Failed(RenderFailure::DeadlineExceeded) | RenderOutcome::Pending => {
++            send_command_default(OverlayCommand::WakeCompanionHud);
++            Err("render_timeout")
++        }
++    }
++}
++
++pub fn read_companion_hud_message(
++    session: &str,
++    group: &str,
++) -> cua_driver_contract::CompanionHudMessageOutput {
++    let frame = super::companion_hud::state()
++        .lock()
++        .unwrap()
++        .read_message(session, group);
++    cua_driver_contract::CompanionHudMessageOutput {
++        message: frame.as_ref().map(|frame| frame.message.as_ref().clone()),
++        render_token: frame.map(|frame| frame.token),
++    }
++}
++pub fn clear_companion_message(
++    session: &str,
++    group: &str,
++    token: &cua_driver_contract::CompanionRenderToken,
++) {
++    if super::companion_hud::state()
++        .lock()
++        .unwrap()
++        .clear_token(session, group, token)
++    {
++        send_command_default(OverlayCommand::WakeCompanionHud);
++    }
++}
++pub async fn send_companion_hud_command(
++    session: &str,
++    input: cua_driver_contract::SendCompanionHudCommandInput,
++) -> Result<cua_driver_contract::CompanionHudOutput, &'static str> {
++    if !super::companion_hud::state()
++        .lock()
++        .unwrap()
++        .apply_command(session, &input)
++    {
++        return Err("owner_unavailable");
++    }
++    let render_token =
++        if let cua_driver_contract::CompanionHudCommand::PresentMessage { locale, message } =
++            input.command
++        {
++            match present_companion_message(session, &input.group, locale, message).await {
++                Ok(token) => Some(token),
++                Err(
++                    "stale_message" | "message_cleared" | "message_superseded"
++                    | "message_cancelled",
++                ) => None,
++                Err(reason) => return Err(reason),
++            }
++        } else {
++            None
++        };
++    send_command_default(OverlayCommand::WakeCompanionHud);
++    Ok(cua_driver_contract::CompanionHudOutput {
++        applied: true,
++        render_token,
++    })
++}
++pub fn bind_companion_hud(session: &str, group: &str, lesson: Option<&str>) -> bool {
++    let applied = {
++        let mut hud = super::companion_hud::state().lock().unwrap();
++        if let Some(lesson) = lesson {
++            hud.bind_lesson(session, group, lesson)
++        } else {
++            hud.bind(session, group)
++        }
++    };
++    if applied {
++        send_command(
++            session.to_owned(),
++            OverlayCommand::SuppressSessionBadge(true),
++        );
++    }
++    applied
++}
++pub fn retire_companion_hud(key: &str, prefix: bool) {
++    super::companion_hud::state()
++        .lock()
++        .unwrap()
++        .retire(key, prefix);
++    send_command_default(OverlayCommand::WakeCompanionHud);
++}
++
+ // ── Global channel ────────────────────────────────────────────────────────
+ 
+ static CMD_TX: OnceLock<std::sync::mpsc::SyncSender<OverlayMsg>> = OnceLock::new();
+@@ -99,6 +236,7 @@ struct WinScreen {
+     /// timer resolution defaults to 15ms so a hardcoded 8ms would run the
+     /// animation at half speed).
+     last_tick: Instant,
++    last_hud_pointer: Option<(f64, f64)>,
+ }
+ 
+ impl WinScreen {
+@@ -127,6 +265,74 @@ fn apply_msg(map: &mut RenderMap, msg: OverlayMsg) -> Option<CursorKey> {
+     outcome.applied_key().cloned()
+ }
+ 
++/// At most one pending guidance scene. A wake is best effort because a full
++/// command queue already wakes the renderer. Endpoint senders wait for receipt.
++static GUIDANCE_FRAME: Mutex<Option<(String, cursor_overlay::guidance::GuidanceFrame)>> =
++    Mutex::new(None);
++pub fn present_guidance_frame(
++    session: &str,
++    frame: cursor_overlay::guidance::GuidanceFrame,
++) -> bool {
++    if CMD_TX.get().is_none() {
++        return false;
++    }
++    let fence = frame.fence.clone();
++    let guard = fence.lock().unwrap();
++    if guard.generation != frame.generation {
++        return false;
++    }
++    *GUIDANCE_FRAME.lock().unwrap() = Some((session.to_owned(), frame));
++    drop(guard);
++    if let Some(tx) = CMD_TX.get() {
++        let _ = tx.try_send(OverlayMsg::Wake);
++    }
++    wake_overlay();
++    true
++}
++pub fn has_primary_guidance_geometry(width: i64, height: i64, scale: f64) -> bool {
++    RENDER.lock().unwrap().as_ref().is_some_and(|map| {
++        let primary = unsafe {
++            (
++                windows::Win32::UI::WindowsAndMessaging::GetSystemMetrics(
++                    windows::Win32::UI::WindowsAndMessaging::SM_CXSCREEN,
++                ),
++                windows::Win32::UI::WindowsAndMessaging::GetSystemMetrics(
++                    windows::Win32::UI::WindowsAndMessaging::SM_CYSCREEN,
++                ),
++            )
++        };
++        primary == (width as i32, height as i32)
++            && map.platform.virt_w >= primary.0
++            && map.platform.virt_h >= primary.1
++            && scale == 1.0
++    })
++}
++
++static SYSTEM_REDUCED_MOTION: AtomicBool = AtomicBool::new(false);
++pub fn companion_reduced_motion() -> bool {
++    SYSTEM_REDUCED_MOTION.load(Ordering::Acquire)
++        || RENDER.lock().unwrap().as_ref().is_some_and(|map| {
++            map.cursors
++                .values()
++                .any(|rs| rs.core.visual.reduced_motion == cursor_overlay::ReducedMotion::On)
++        })
++}
++
++pub fn is_initialized() -> bool {
++    CMD_TX.get().is_some()
++}
++
++pub fn try_send_command(key: CursorKey, cmd: OverlayCommand) -> bool {
++    let sent = CMD_TX.get().is_some_and(|tx| {
++        tx.try_send(OverlayMsg::Cmd(KeyedOverlayCommand { key, cmd }))
++            .is_ok()
++    });
++    if sent {
++        wake_overlay();
++    }
++    sent
++}
++
+ pub fn init(cfg: CursorConfig) {
+     static INITIALIZED: OnceLock<()> = OnceLock::new();
+     INITIALIZED.get_or_init(|| {
+@@ -144,6 +350,7 @@ pub fn init(cfg: CursorConfig) {
+                 virt_w: 1920,
+                 virt_h: 1080,
+                 last_tick: Instant::now(),
++                last_hud_pointer: None,
+             },
+         ));
+     });
+@@ -511,6 +718,25 @@ fn run_overlay_thread(cfg: CursorConfig, rx: std::sync::mpsc::Receiver<OverlayMs
+     // longer holds the global resolution at 1 ms for its whole lifetime
+     // (it raises system-wide timer-interrupt/wakeup rates and power draw).
+ 
++    let mut client_animation = windows::Win32::Foundation::BOOL(1);
++    unsafe {
++        let _ = SystemParametersInfoW(
++            SPI_GETCLIENTAREAANIMATION,
++            0,
++            Some((&mut client_animation as *mut windows::Win32::Foundation::BOOL).cast()),
++            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
++        );
++    }
++    HUD_REDUCED_MOTION.store(!client_animation.as_bool(), Ordering::Release);
++    SYSTEM_REDUCED_MOTION.store(!client_animation.as_bool(), Ordering::Release);
++    let _input_hooks = match crate::companion_input::install_input_hooks() {
++        Ok(hooks) => Some(hooks),
++        Err(_) => {
++            tracing::warn!(target: "companion", stage = "input_hooks", reason = "hook_failed", "Windows companion input observation unavailable");
++            None
++        }
++    };
++
+     // Collect virtual screen bounds (all monitors).
+     let virt_x = unsafe { GetSystemMetrics(SM_XVIRTUALSCREEN) };
+     let virt_y = unsafe { GetSystemMetrics(SM_YVIRTUALSCREEN) };
+@@ -527,6 +753,7 @@ fn run_overlay_thread(cfg: CursorConfig, rx: std::sync::mpsc::Receiver<OverlayMs
+                 virt_w,
+                 virt_h,
+                 last_tick: Instant::now(),
++                last_hud_pointer: None,
+             };
+         }
+     }
+@@ -851,7 +1078,7 @@ thread_local! {
+ /// window-local region that must be pushed to the screen (`None` = nothing
+ /// painted and nothing stale to erase — skip the present entirely).
+ #[cfg(target_os = "windows")]
+-fn composite_dirty(map: &RenderMap) -> Option<DirtyRect> {
++fn composite_dirty(map: &RenderMap) -> Option<CompanionUpload> {
+     let screen = &map.platform;
+     let (w, h) = (screen.virt_w.max(1), screen.virt_h.max(1));
+     SURFACE.with(|cell| {
+@@ -897,6 +1124,36 @@ fn composite_dirty(map: &RenderMap) -> Option<DirtyRect> {
+             current = DirtyRect::union(current, r);
+         }
+ 
++        let mut hud = super::companion_hud::state().lock().unwrap();
++        let has_guidance = map.cursors.values().any(|state| {
++            state
++                .core
++                .guidance_frame
++                .as_ref()
++                .is_some_and(|frame| frame.teaching)
++        });
++        if hud.painter.is_visible() || has_guidance {
++            current = Some(DirtyRect {
++                x0: 0,
++                y0: 0,
++                x1: w,
++                y1: h,
++            });
++        }
++        let frames: Vec<_> = map
++            .cursors
++            .values()
++            .filter_map(|state| state.core.guidance_frame.clone())
++            .filter(|frame| frame.is_current())
++            .collect();
++        if current.is_none() && !frames.is_empty() {
++            current = Some(DirtyRect {
++                x0: 0,
++                y0: 0,
++                x1: 1,
++                y1: 1,
++            });
++        }
+         let prev = PREV_DIRTY.with(std::cell::Cell::get);
+         for r in [prev, current].into_iter().flatten() {
+             surf.clear_rect(r);
+@@ -911,11 +1168,48 @@ fn composite_dirty(map: &RenderMap) -> Option<DirtyRect> {
+                 1.0,
+             );
+         }
++        let mut message_frame = None;
++        if hud.painter.is_visible() {
++            let bound = hud
++                .bindings
++                .iter()
++                .rev()
++                .find_map(|key| map.cursors.get(key).filter(|state| state.core.visible));
++            let position = bound.map(|state| state.core.pos).or_else(|| {
++                cua_driver_core::cursor_sampler::read_cursor_position()
++                    .map(|(x, y)| (x + 24.0, y + 24.0))
++            });
++            if let Some(position) = position {
++                let position = (
++                    (position.0 - screen.virt_x as f64) as f32,
++                    (position.1 - screen.virt_y as f64) as f32,
++                );
++                if bound.is_none() {
++                    cursor_overlay::companion_hud::paint_fallback_pointer(
++                        &mut surf.pixmap,
++                        position,
++                        1.0,
++                    );
++                }
++                hud.painter.paint(
++                    &mut surf.pixmap,
++                    position,
++                    1.0,
++                    HUD_REDUCED_MOTION.load(Ordering::Acquire),
++                );
++                message_frame = hud.message_frame();
++            }
++        }
+         PREV_DIRTY.with(|p| p.set(current));
+ 
+         let upload = DirtyRect::union(prev, current)?;
+         surf.swizzle_rect(upload);
+-        Some(upload)
++        Some(CompanionUpload {
++            dirty: upload,
++            frames,
++            scene: hud.scene_token(),
++            message: message_frame,
++        })
+     })
+ }
+ 
+@@ -923,7 +1217,10 @@ fn composite_dirty(map: &RenderMap) -> Option<DirtyRect> {
+ /// `UpdateLayeredWindowIndirect`. The DWM copies the region into its own
+ /// backing store, so the surface itself may be freed afterwards.
+ #[cfg(target_os = "windows")]
+-unsafe fn present_surface(hwnd: windows::Win32::Foundation::HWND, dirty: DirtyRect) {
++unsafe fn present_surface(
++    hwnd: windows::Win32::Foundation::HWND,
++    dirty: DirtyRect,
++) -> Result<(), super::companion_hud::RenderFailure> {
+     use windows::Win32::Foundation::{COLORREF, POINT, RECT, SIZE};
+     use windows::Win32::Graphics::Gdi::{GetDC, ReleaseDC, BLENDFUNCTION, HDC};
+     use windows::Win32::UI::WindowsAndMessaging::{
+@@ -932,7 +1229,9 @@ unsafe fn present_surface(hwnd: windows::Win32::Foundation::HWND, dirty: DirtyRe
+ 
+     SURFACE.with(|cell| {
+         let slot = cell.borrow();
+-        let Some(surf) = slot.as_ref() else { return };
++        let Some(surf) = slot.as_ref() else {
++            return Err(super::companion_hud::RenderFailure::FrameInstallation);
++        };
+         let dirty = if FIRST_PRESENT.with(std::cell::Cell::get) {
+             DirtyRect {
+                 x0: 0,
+@@ -977,11 +1276,17 @@ unsafe fn present_surface(hwnd: windows::Win32::Foundation::HWND, dirty: DirtyRe
+             dwFlags: ULW_ALPHA,
+             prcDirty: &rc_dirty,
+         };
+-        if UpdateLayeredWindowIndirect(hwnd, &info).as_bool() {
++        let installed = UpdateLayeredWindowIndirect(hwnd, &info).as_bool();
++        if installed {
+             FIRST_PRESENT.with(|f| f.set(false));
+         }
+         ReleaseDC(None, hdc_screen);
+-    });
++        if installed {
++            Ok(())
++        } else {
++            Err(super::companion_hud::RenderFailure::FrameInstallation)
++        }
++    })
+ }
+ 
+ // ── Idle render gate (issue #1808) ────────────────────────────────────────
+@@ -1100,6 +1405,52 @@ unsafe extern "system" fn wnd_proc(
+                         }
+                     }
+ 
++                    /* Release the mailbox before taking a frame fence in apply_msg.
++                       Publishers acquire the fence before replacing the mailbox. */
++                    let pending_guidance = GUIDANCE_FRAME.lock().unwrap().take();
++                    if let Some((session, frame)) = pending_guidance {
++                        had_msg = true;
++                        apply_msg(
++                            map,
++                            OverlayMsg::Cmd(KeyedOverlayCommand {
++                                key: session,
++                                cmd: OverlayCommand::GuidanceFrame(frame),
++                            }),
++                        );
++                    }
++                    let bounds = unsafe {
++                        (
++                            GetSystemMetrics(SM_XVIRTUALSCREEN),
++                            GetSystemMetrics(SM_YVIRTUALSCREEN),
++                            GetSystemMetrics(SM_CXVIRTUALSCREEN),
++                            GetSystemMetrics(SM_CYVIRTUALSCREEN),
++                        )
++                    };
++                    if bounds
++                        != (
++                            map.platform.virt_x,
++                            map.platform.virt_y,
++                            map.platform.virt_w,
++                            map.platform.virt_h,
++                        )
++                    {
++                        map.platform.virt_x = bounds.0;
++                        map.platform.virt_y = bounds.1;
++                        map.platform.virt_w = bounds.2;
++                        map.platform.virt_h = bounds.3;
++                        unsafe {
++                            let _ = SetWindowPos(
++                                hwnd,
++                                HWND_TOP,
++                                bounds.0,
++                                bounds.1,
++                                bounds.2,
++                                bounds.3,
++                                SWP_NOACTIVATE | SWP_NOZORDER,
++                            );
++                        }
++                        had_msg = true;
++                    }
+                     let now = Instant::now();
+                     let real_dt = now.duration_since(map.platform.last_tick).as_secs_f64();
+                     // Clamped dt for the motion physics: a large gap between
+@@ -1132,17 +1483,29 @@ unsafe extern "system" fn wnd_proc(
+                     let pointer = GetCursorPos(&mut pointer)
+                         .ok()
+                         .map(|_| (f64::from(pointer.x), f64::from(pointer.y)));
+-                    let mut hover_changed = false;
++                    let hud_visible = super::companion_hud::state()
++                        .lock()
++                        .unwrap()
++                        .painter
++                        .is_visible();
++                    let hud_pointer = if hud_visible { pointer } else { None };
++                    let mut hover_changed = hud_pointer != map.platform.last_hud_pointer;
++                    map.platform.last_hud_pointer = hud_pointer;
+                     for rs in map.cursors.values_mut() {
+                         hover_changed |= rs.core.update_session_badge_hover(pointer);
+                     }
+ 
+                     // After ticking: does any cursor still need frame ticks?
+-                    let needs_tick = map.needs_frame_tick();
+-                    let needs_hover_poll = map
+-                        .cursors
+-                        .values()
+-                        .any(|rs| rs.core.session_badge_needs_hover_poll());
++                    let hud_needs_tick = super::companion_hud::state().lock().unwrap().tick(
++                        real_dt.min(0.25) as f32,
++                        HUD_REDUCED_MOTION.load(Ordering::Acquire),
++                    );
++                    let needs_tick = map.needs_frame_tick() || hud_needs_tick;
++                    let needs_hover_poll = hud_visible
++                        || map
++                            .cursors
++                            .values()
++                            .any(|rs| rs.core.session_badge_needs_hover_poll());
+ 
+                     // Render only when something can have changed pixels this
+                     // frame: a fresh command, a still-running animation, or the
+@@ -1204,8 +1567,18 @@ unsafe extern "system" fn wnd_proc(
+                 }
+             };
+ 
+-            if let Some(dirty) = upload {
+-                unsafe { present_surface(hwnd, dirty) };
++            if let Some(upload) = upload {
++                let installed = install_current_composite(
++                    &mut super::companion_hud::state().lock().unwrap(),
++                    &upload.scene,
++                    upload.message.as_ref().map(|message| &message.token),
++                    &upload.frames,
++                    Instant::now(),
++                    || unsafe { present_surface(hwnd, upload.dirty) },
++                );
++                if !installed {
++                    wake_overlay();
++                }
+ 
+                 // Z-order maintenance every 80ms — delegate to the cross-platform
+                 // ZOrderEnforcer so the contract for "z+1 of the application under
+@@ -1506,6 +1879,7 @@ mod tests {
+                 virt_w: 100,
+                 virt_h: 100,
+                 last_tick: Instant::now(),
++                last_hud_pointer: None,
+             },
+         )
+     }
+@@ -1627,3 +2001,145 @@ mod tests {
+         );
+     }
+ }
++
++fn install_current_composite(
++    hud: &mut super::companion_hud::HudState,
++    scene: &super::companion_hud::SceneToken,
++    token: Option<&cua_driver_contract::CompanionRenderToken>,
++    frames: &[cursor_overlay::guidance::GuidanceFrame],
++    now: Instant,
++    install: impl FnOnce() -> Result<(), super::companion_hud::RenderFailure>,
++) -> bool {
++    hud.install_frame(scene, token, now, || {
++        let mut unique_fences: Vec<_> = frames.iter().map(|frame| frame.fence.clone()).collect();
++        unique_fences.sort_by_key(|fence| std::sync::Arc::as_ptr(fence) as usize);
++        unique_fences.dedup_by(|first, second| std::sync::Arc::ptr_eq(first, second));
++        let mut fences: Vec<_> = unique_fences
++            .iter()
++            .map(|fence| fence.lock().unwrap())
++            .collect();
++        let fence_index = |frame: &cursor_overlay::guidance::GuidanceFrame| {
++            unique_fences
++                .binary_search_by_key(&(std::sync::Arc::as_ptr(&frame.fence) as usize), |fence| {
++                    std::sync::Arc::as_ptr(fence) as usize
++                })
++                .expect("composite fence collected above")
++        };
++        if !frames.iter().all(|frame| {
++            let fence = &fences[fence_index(frame)];
++            fence.generation == frame.generation && frame.revision >= fence.rendered_revision
++        }) {
++            return Ok(false);
++        }
++        install()?;
++        let rendered_at = Instant::now();
++        for frame in frames {
++            let fence = &mut fences[fence_index(frame)];
++            fence.rendered_revision = fence.rendered_revision.max(frame.revision);
++            let mut receipt = frame.receipt.lock().unwrap();
++            if receipt.is_none() {
++                *receipt = Some(rendered_at);
++            }
++        }
++        Ok(true)
++    })
++}
++
++#[cfg(target_os = "windows")]
++struct CompanionUpload {
++    dirty: DirtyRect,
++    frames: Vec<cursor_overlay::guidance::GuidanceFrame>,
++    scene: super::companion_hud::SceneToken,
++    message: Option<super::companion_hud::MessageFrame>,
++}
++
++#[cfg(test)]
++mod companion_installation_tests {
++    use super::super::companion_hud::{HudState, RenderOutcome};
++    use super::*;
++    use cua_driver_contract::{
++        CompanionHudLocale, CompanionHudPhase, CompanionTeachingMessage, SetCompanionHudInput,
++        TeachingMessageKind,
++    };
++    fn fixture() -> (HudState, super::super::companion_hud::MessageFrame) {
++        let group = "11111111-1111-4111-8111-111111111111";
++        let mut hud = HudState::default();
++        hud.update(
++            "host",
++            SetCompanionHudInput {
++                session: None,
++                group: group.into(),
++                sequence: 0,
++                phase: CompanionHudPhase::Showing,
++                locale: CompanionHudLocale::English,
++                level: 0.0,
++                message: None,
++                speaking_sequence: None,
++            },
++        );
++        let message = CompanionTeachingMessage {
++            lesson_id: group.into(),
++            step_id: group.into(),
++            sequence: 1,
++            kind: TeachingMessageKind::Instruction,
++            text: "Synthetic boundary test".into(),
++        };
++        let frame = hud
++            .present_message("host", group, CompanionHudLocale::English, message)
++            .unwrap();
++        (hud, frame)
++    }
++    #[test]
++    fn companion_actual_composite_guard_rejects_invalid_drawing_and_old_hud_scene() {
++        let (mut hud, message) = fixture();
++        let scene = hud.scene_token();
++        let fence = std::sync::Arc::new(Mutex::new(cursor_overlay::guidance::FrameFence {
++            generation: 2,
++            rendered_revision: 0,
++        }));
++        let drawing = cursor_overlay::guidance::GuidanceFrame {
++            generation: 1,
++            revision: 1,
++            fence: fence.clone(),
++            receipt: std::sync::Arc::new(Mutex::new(None)),
++            paint_geometry: std::sync::Arc::new(Mutex::new(None)),
++            pointer: (1.0, 1.0),
++            cue: vec![],
++            cue_alpha: 1.0,
++            teaching: true,
++            visible: true,
++            pressed: false,
++        };
++        assert!(!install_current_composite(
++            &mut hud,
++            &scene,
++            Some(&message.token),
++            &[drawing.clone()],
++            Instant::now(),
++            || panic!("invalid drawing installed")
++        ));
++        assert_eq!(message.outcome(), RenderOutcome::Pending);
++        assert!(drawing.receipt.lock().unwrap().is_none());
++        fence.lock().unwrap().generation = 1;
++        // Shared fences in a composite are locked exactly once, avoiding a self-deadlock.
++        assert!(install_current_composite(
++            &mut hud,
++            &scene,
++            Some(&message.token),
++            &[drawing.clone(), drawing.clone()],
++            Instant::now(),
++            || Ok(())
++        ));
++        assert_eq!(message.outcome(), RenderOutcome::Presented);
++        assert!(drawing.receipt.lock().unwrap().is_some());
++        hud.retire("host", false);
++        assert!(!install_current_composite(
++            &mut hud,
++            &scene,
++            Some(&message.token),
++            &[],
++            Instant::now(),
++            || panic!("retired scene installed")
++        ));
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/tools/CompanionHudTools.rs b/libs/cua-driver/rust/crates/platform-windows/src/tools/CompanionHudTools.rs
+new file mode 100644
+index 0000000..baaafb2
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/platform-windows/src/tools/CompanionHudTools.rs
+@@ -0,0 +1,108 @@
++use super::impl_::{resolve_cursor_key, ToolState};
++use async_trait::async_trait;
++use cua_driver_contract::{
++    BindCompanionHudCursorInput, ReadCompanionHudMessageInput, SendCompanionHudCommandInput,
++    SetCompanionHudInput, ToolInput,
++};
++use cua_driver_core::{
++    protocol::ToolResult,
++    tool::{Tool, ToolDef, ToolRegistry},
++    tool_args::parse_typed_input,
++};
++use serde_json::{json, Value};
++use std::sync::Arc;
++struct HudTool {
++    definition: ToolDef,
++    state: Arc<ToolState>,
++}
++#[async_trait]
++impl Tool for HudTool {
++    fn def(&self) -> &ToolDef {
++        &self.definition
++    }
++    async fn invoke(&self, args: Value) -> ToolResult {
++        if !self.state.cursor_overlay_available {
++            return super::cursor_overlay_unavailable();
++        }
++        let session = resolve_cursor_key(&args);
++        if self.definition.name == ReadCompanionHudMessageInput::TOOL_NAME {
++            let input = match parse_typed_input::<ReadCompanionHudMessageInput>(
++                &self.definition.name,
++                args,
++            ) {
++                Ok(input) => input,
++                Err(error) => return error,
++            };
++            if let Err(error) = input.validate() {
++                return ToolResult::error(error);
++            }
++            return ToolResult::text("message").with_structured(json!(
++                crate::overlay::read_companion_hud_message(&session, &input.group)
++            ));
++        }
++        if self.definition.name == SendCompanionHudCommandInput::TOOL_NAME {
++            let input = match parse_typed_input::<SendCompanionHudCommandInput>(
++                &self.definition.name,
++                args,
++            ) {
++                Ok(input) => input,
++                Err(error) => return error,
++            };
++            if let Err(error) = input.validate() {
++                return ToolResult::error(error);
++            }
++            return match crate::overlay::send_companion_hud_command(&session, input).await {
++                Ok(output) => ToolResult::text("applied").with_structured(json!(output)),
++                Err(reason) => ToolResult::error(reason),
++            };
++        }
++        let applied = if self.definition.name == SetCompanionHudInput::TOOL_NAME {
++            let input = match parse_typed_input::<SetCompanionHudInput>(&self.definition.name, args)
++            {
++                Ok(input) => input,
++                Err(error) => return error,
++            };
++            if let Err(error) = input.validate() {
++                return ToolResult::error(error);
++            }
++            crate::overlay::update_companion_hud(&session, input)
++        } else {
++            let input =
++                match parse_typed_input::<BindCompanionHudCursorInput>(&self.definition.name, args)
++                {
++                    Ok(input) => input,
++                    Err(error) => return error,
++                };
++            if let Err(error) = input.validate() {
++                return ToolResult::error(error);
++            }
++            crate::overlay::bind_companion_hud(&session, &input.group, input.lesson_id.as_deref())
++        };
++        if !applied {
++            return ToolResult::error("HUD lease, cursor binding or sequence refused.");
++        }
++        ToolResult::text("applied").with_structured(json!({"applied":true}))
++    }
++}
++pub(super) fn register_tools(registry: &mut ToolRegistry, state: Arc<ToolState>) {
++    for name in [
++        SetCompanionHudInput::TOOL_NAME,
++        SendCompanionHudCommandInput::TOOL_NAME,
++        BindCompanionHudCursorInput::TOOL_NAME,
++        ReadCompanionHudMessageInput::TOOL_NAME,
++    ] {
++        let contract = cua_driver_contract::tool_contract(name).expect("HUD canonical contract");
++        registry.register(Box::new(HudTool {
++            state: state.clone(),
++            definition: ToolDef {
++                name: contract.name.clone(),
++                description: contract.description.clone(),
++                input_schema: contract.input_schema.clone(),
++                read_only: false,
++                destructive: false,
++                idempotent: true,
++                open_world: false,
++            },
++        }));
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/tools/CompanionTools.rs b/libs/cua-driver/rust/crates/platform-windows/src/tools/CompanionTools.rs
+new file mode 100644
+index 0000000..fa23d5e
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/platform-windows/src/tools/CompanionTools.rs
+@@ -0,0 +1,531 @@
++//! Native companion controller. This module never imports input executors.
++//! A single desktop lease prevents competing agents from painting guidance.
++use super::impl_::{resolve_cursor_key, ToolState};
++use super::main_screen_size;
++#[path = "TeachingGuidance.rs"]
++mod guidance;
++use async_trait::async_trait;
++use cua_driver_contract::{
++    CancelCursorSequenceInput, CompanionMode, GetCursorCompanionStateInput,
++    PresentTeachingGuidanceInput, SetCursorCompanionModeInput, ToolInput,
++};
++use cua_driver_core::{
++    protocol::ToolResult,
++    tool::{Tool, ToolDef, ToolRegistry},
++    tool_args::parse_typed_input,
++};
++use cursor_overlay::OverlayCommand;
++use serde_json::{json, Value};
++use std::sync::{
++    atomic::{AtomicBool, Ordering},
++    Arc, Mutex, OnceLock,
++};
++use std::time::{Duration, Instant};
++
++#[derive(Clone, Copy, PartialEq)]
++struct FollowingProjection {
++    generation: u64,
++    width: i64,
++    height: i64,
++    point: Option<(f64, f64)>,
++}
++
++#[derive(Default)]
++struct CompanionSession {
++    owner: Option<String>,
++    task_epoch: Option<String>,
++    task_owner: Option<String>,
++    terminal: Option<&'static str>,
++    task_input: Option<[u32; 7]>,
++    ended_task: Option<(String, Option<&'static str>)>,
++    fence: Arc<Mutex<cursor_overlay::guidance::FrameFence>>,
++    revision: u64,
++    pointer: Option<(f64, f64)>,
++    following_projection: Option<FollowingProjection>,
++    generation: u64,
++    follow_generation: u64,
++    following: bool,
++    active: bool,
++    lease_until: Option<Instant>,
++}
++impl CompanionSession {
++    /// Keep polling takeover/lease state, but publish only changes to the visible follower.
++    fn create_following_frame(
++        &mut self,
++        pointer: (f64, f64),
++        width: i64,
++        height: i64,
++    ) -> Option<cursor_overlay::guidance::GuidanceFrame> {
++        let visible = pointer.0 >= 0.0
++            && pointer.1 >= 0.0
++            && pointer.0 < width as f64
++            && pointer.1 < height as f64;
++        let point = visible.then(|| {
++            (
++                (pointer.0 + 24.0).min(width as f64 - 2.0),
++                (pointer.1 + 24.0).min(height as f64 - 2.0),
++            )
++        });
++        let projection = FollowingProjection {
++            generation: self.generation,
++            width,
++            height,
++            point,
++        };
++        if self.following_projection == Some(projection) {
++            return None;
++        }
++        let frame = self.create_frame(
++            point.unwrap_or_else(|| self.pointer.unwrap_or((0.0, 0.0))),
++            vec![],
++            0.0,
++            false,
++            visible,
++            false,
++        );
++        self.following_projection = Some(projection);
++        Some(frame)
++    }
++
++    fn begin_sequence(&mut self, session: &str) -> Result<u64, String> {
++        if self.active || self.owner.as_deref().is_some_and(|owner| owner != session) {
++            return Err("Desktop companion is busy.".into());
++        }
++        self.owner = Some(session.to_owned());
++        if self.terminal.is_some() {
++            return Err("Teaching task has ended.".into());
++        }
++        self.active = true;
++        self.generation = self.generation.wrapping_add(1);
++        self.fence.lock().unwrap().generation = self.generation;
++        Ok(self.generation)
++    }
++    fn cancel_sequence(&mut self, session: &str) -> bool {
++        if self.owner.as_deref() != Some(session) {
++            return false;
++        }
++        self.generation = self.generation.wrapping_add(1);
++        self.active = false;
++        if self.task_epoch.is_some() {
++            self.terminal = Some("explicit_stop");
++        }
++        self.fence.lock().unwrap().generation = self.generation;
++        true
++    }
++}
++
++/// Count only keyboard, button and scroll events. Guidance never posts any
++/// of these events; a changed counter signals student interaction.
++pub(super) fn read_user_input_counters() -> [u32; 7] {
++    crate::companion_input::read_input_counters()
++}
++
++fn state() -> &'static Mutex<CompanionSession> {
++    static STATE: OnceLock<Mutex<CompanionSession>> = OnceLock::new();
++    STATE.get_or_init(|| Mutex::new(CompanionSession::default()))
++}
++fn send(session: &str, command: OverlayCommand) -> Result<(), String> {
++    if crate::overlay::try_send_command(session.to_owned(), command) {
++        Ok(())
++    } else {
++        Err("Native overlay unavailable or command queue full.".into())
++    }
++}
++
++fn hide_companion(session: &str) {
++    let _ = send(session, OverlayCommand::SetEnabled(false));
++    let _ = send(session, OverlayCommand::SetCompanionAppearance(false));
++}
++
++// Host-only progression metadata; never expose key values, locations or screen
++// content. An input revision requests observation, not verification of success.
++fn read_guidance_snapshot(
++    state: &CompanionSession,
++    session: &str,
++    input: [u32; 7],
++) -> Option<Value> {
++    if state.owner.as_deref() != Some(session) {
++        return None;
++    }
++    state.task_epoch.as_ref().map(|epoch| {
++        json!({
++            "task_epoch": epoch,
++            "reason": state.terminal,
++            "input_revision": input.iter().map(|value| u64::from(*value)).sum::<u64>(),
++        })
++    })
++}
++
++fn snapshot(session: &str, status: &str) -> ToolResult {
++    let state = state().lock().unwrap();
++    let owned = state.owner.as_deref() == Some(session);
++    let guidance = read_guidance_snapshot(&state, session, read_user_input_counters());
++    let mut result = json!({
++        "status": status, "following": owned && state.following, "active": owned && state.active,
++    });
++    if let Some(guidance) = guidance {
++        result["guidance"] = guidance;
++    }
++    ToolResult::text(status).with_structured(result)
++}
++pub(super) fn retire_session(session: &str) {
++    let mut state = state().lock().unwrap();
++    retire_owned_cursor(&mut state, session);
++}
++fn retire_owned_cursor(state: &mut CompanionSession, session: &str) {
++    if state.owner.as_deref() == Some(session) {
++        state.generation = state.generation.wrapping_add(1);
++        state.follow_generation = state.follow_generation.wrapping_add(1);
++        state.fence.lock().unwrap().generation = state.generation;
++        if state.task_epoch.is_some() {
++            state.terminal = Some("session_lost");
++        }
++        state.active = false;
++        state.following = false;
++        state.owner = None;
++        state.lease_until = None;
++        state.clear_guidance(session, false);
++        hide_companion(session);
++    }
++}
++pub(super) fn retire_runtime(prefix: &str) {
++    let owner = state().lock().unwrap().owner.clone();
++    if let Some(owner) = owner.filter(|owner| owner.starts_with(prefix)) {
++        retire_session(&owner);
++    }
++}
++fn can_continue_playback(session: &str) -> bool {
++    !cua_driver_core::session::is_session_ending(session)
++}
++
++fn start_following(session: String, generation: u64) {
++    std::thread::spawn(move || loop {
++        if !can_continue_playback(&session) {
++            retire_session(&session);
++            break;
++        }
++        {
++            let mut state = state().lock().unwrap();
++            if state.owner.as_deref() != Some(&session)
++                || !state.following
++                || state.follow_generation != generation
++            {
++                break;
++            }
++            if state
++                .lease_until
++                .is_some_and(|deadline| Instant::now() > deadline)
++            {
++                state.terminal = Some("lease_expired");
++                retire_owned_cursor(&mut state, &session);
++                state.terminal = Some("lease_expired");
++                break;
++            }
++            if state.task_epoch.is_some()
++                && state.terminal.is_none()
++                && state
++                    .task_input
++                    .is_some_and(|initial| read_user_input_counters() != initial)
++            {
++                state.terminal = Some("user_takeover");
++                state.active = false;
++                let visible = state.following;
++                state.clear_guidance(&session, visible);
++            }
++            if !state.active {
++                if let (Some((x, y)), Some((width, height, _))) = (
++                    cua_driver_core::cursor_sampler::read_cursor_position(),
++                    main_screen_size(),
++                ) {
++                    if let Some(frame) = state.create_following_frame((x, y), width, height) {
++                        if send(&session, OverlayCommand::SetEnabled(frame.visible)).is_err()
++                            || !crate::overlay::present_guidance_frame(&session, frame)
++                        {
++                            retire_owned_cursor(&mut state, &session);
++                            break;
++                        }
++                    }
++                }
++            }
++        }
++        std::thread::sleep(Duration::from_millis(33));
++    });
++}
++
++struct CompanionTool {
++    companion: TeachingGuidanceAdapter,
++    definition: ToolDef,
++}
++
++/// Tool adapter composes session admission and the single scribble renderer.
++/// Pointer following remains owned by CompanionSession and start_following.
++struct TeachingGuidanceAdapter {
++    state: Arc<ToolState>,
++}
++#[async_trait]
++impl Tool for CompanionTool {
++    fn def(&self) -> &ToolDef {
++        &self.definition
++    }
++    async fn invoke(&self, args: Value) -> ToolResult {
++        if !self.companion.state.cursor_overlay_available || !crate::companion_input::is_ready() {
++            return super::cursor_overlay_unavailable();
++        }
++        let session = resolve_cursor_key(&args);
++        match self.definition.name.as_str() {
++            "get_cursor_companion_capabilities"
++            | "begin_cursor_guidance_task"
++            | "end_cursor_guidance_task" => {
++                self.companion
++                    .invoke_guidance_lifecycle(&self.definition.name, &session, args)
++                    .await
++            }
++            "get_cursor_companion_state" => {
++                if let Err(error) =
++                    parse_typed_input::<GetCursorCompanionStateInput>(&self.definition.name, args)
++                {
++                    return error;
++                }
++                snapshot(&session, "state")
++            }
++            "cancel_cursor_sequence" => {
++                if let Err(error) =
++                    parse_typed_input::<CancelCursorSequenceInput>(&self.definition.name, args)
++                {
++                    return error;
++                }
++                let mut state = state().lock().unwrap();
++                if state.cancel_sequence(&session) {
++                    let visible = state.following;
++                    state.clear_guidance(&session, visible);
++                    if !state.following {
++                        state.owner = None;
++                        hide_companion(&session);
++                    }
++                }
++                drop(state);
++                snapshot(&session, "canceled")
++            }
++            "set_cursor_companion_mode" => {
++                let input = match parse_typed_input::<SetCursorCompanionModeInput>(
++                    &self.definition.name,
++                    args,
++                ) {
++                    Ok(input) => input,
++                    Err(error) => return error,
++                };
++                if let Err(error) = input.validate() {
++                    return ToolResult::error(error);
++                }
++                if matches!(input.mode, CompanionMode::Hidden) {
++                    retire_session(&session);
++                    self.companion
++                        .state
++                        .cursor_registry
++                        .set_enabled(&session, false);
++                    return snapshot(&session, "hidden");
++                }
++                let mut state = state().lock().unwrap();
++                if state.owner.as_deref().is_some_and(|owner| owner != session) {
++                    return ToolResult::error("Another session owns the desktop companion.");
++                }
++                if state.owner.is_none() && state.task_owner.as_deref() != Some(&session) {
++                    state.task_epoch = None;
++                    state.task_owner = None;
++                    state.task_input = None;
++                    state.terminal = None;
++                    state.ended_task = None;
++                }
++                if !state.active {
++                    if let Err(error) = send(&session, OverlayCommand::SetCompanionAppearance(true))
++                    {
++                        return ToolResult::error(error);
++                    }
++                }
++                if let Some(label) = input.label {
++                    if let Err(error) = send(&session, OverlayCommand::SetSessionLabel(label)) {
++                        return ToolResult::error(error);
++                    }
++                }
++                let start = !state.following;
++                if start {
++                    state.follow_generation = state.follow_generation.wrapping_add(1);
++                }
++                let follow_generation = state.follow_generation;
++                state.owner = Some(session.clone());
++                state.following = true;
++                state.lease_until = Some(Instant::now() + Duration::from_secs(60));
++                self.companion
++                    .state
++                    .cursor_registry
++                    .set_enabled(&session, true);
++                if let Err(error) = send(&session, OverlayCommand::SetEnabled(true)) {
++                    state.owner = None;
++                    state.following = false;
++                    return ToolResult::error(error);
++                }
++                drop(state);
++                if start {
++                    start_following(session.clone(), follow_generation);
++                }
++                snapshot(&session, "following")
++            }
++            "present_teaching_guidance" => {
++                let input = match parse_typed_input::<PresentTeachingGuidanceInput>(
++                    &self.definition.name,
++                    args.clone(),
++                ) {
++                    Ok(input) => input,
++                    Err(_) => return self.companion.refuse_guidance(&session, "invalid_request"),
++                };
++                if input.presentation_version != 3 {
++                    return self
++                        .companion
++                        .refuse_guidance(&session, "unsupported_version");
++                }
++                self.companion
++                    .present_guidance(&session, &args, input)
++                    .await
++            }
++            _ => ToolResult::error("Unknown companion operation."),
++        }
++    }
++}
++
++pub(super) fn register_tools(registry: &mut ToolRegistry, state: Arc<ToolState>) {
++    for name in [
++        "get_cursor_companion_capabilities",
++        "begin_cursor_guidance_task",
++        "end_cursor_guidance_task",
++        "present_teaching_guidance",
++        "set_cursor_companion_mode",
++        "cancel_cursor_sequence",
++        "get_cursor_companion_state",
++    ] {
++        let contract =
++            cua_driver_contract::tool_contract(name).expect("companion canonical contract");
++        registry.register(Box::new(CompanionTool {
++            companion: TeachingGuidanceAdapter {
++                state: state.clone(),
++            },
++            definition: ToolDef {
++                name: contract.name.clone(),
++                description: contract.description.clone(),
++                input_schema: contract.input_schema.clone(),
++                read_only: contract.annotations.read_only,
++                destructive: false,
++                idempotent: contract.annotations.idempotent,
++                open_world: false,
++            },
++        }));
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn companion_progress_snapshot_is_epoch_bound_and_contains_no_input_content() {
++        let mut state = CompanionSession::default();
++        state.owner = Some("teacher".to_owned());
++        assert!(read_guidance_snapshot(&state, "teacher", [0; 7]).is_none());
++        state.task_epoch = Some(uuid::Uuid::new_v4().to_string());
++        state.terminal = Some("user_takeover");
++        assert!(read_guidance_snapshot(&state, "other", [1; 7]).is_none());
++        let snapshot = read_guidance_snapshot(&state, "teacher", [1; 7]).unwrap();
++        assert_eq!(snapshot["task_epoch"], json!(state.task_epoch));
++        assert_eq!(snapshot["reason"], "user_takeover");
++        assert_eq!(snapshot["input_revision"], 7);
++        assert_eq!(snapshot.as_object().unwrap().len(), 3);
++        assert_eq!(state.terminal, Some("user_takeover"));
++    }
++    #[test]
++    fn companion_ownership_prevents_overlap_and_foreign_cancellation() {
++        let mut state = CompanionSession::default();
++        let generation = state.begin_sequence("teacher").unwrap();
++        assert!(state.begin_sequence("teacher").is_err());
++        assert!(state.begin_sequence("other").is_err());
++        assert!(!state.cancel_sequence("other"));
++        assert_eq!(state.generation, generation);
++        assert!(state.cancel_sequence("teacher"));
++        assert_ne!(state.generation, generation);
++        assert!(!state.active);
++        assert!(state.begin_sequence("teacher").is_ok());
++    }
++    #[test]
++    fn companion_stops_before_deferred_session_cleanup() {
++        use cua_driver_core::session::{
++            begin_session_dispatch, end_session, is_session_ended, SessionClientKind,
++            SessionTransport,
++        };
++        let session = format!("companion-cancellation-{}", uuid::Uuid::new_v4());
++        let guard = begin_session_dispatch(
++            &session,
++            None,
++            &session,
++            true,
++            SessionTransport::McpStdio,
++            SessionClientKind::Mcp,
++        )
++        .unwrap();
++        assert!(can_continue_playback(&session));
++        end_session(&session);
++        assert!(
++            !is_session_ended(&session),
++            "cleanup waits for active dispatch"
++        );
++        assert!(
++            !can_continue_playback(&session),
++            "playback sees the stop request immediately"
++        );
++        drop(guard);
++        assert!(is_session_ended(&session));
++    }
++}
++
++#[cfg(test)]
++mod companion_following_memory_tests {
++    use super::*;
++
++    #[test]
++    fn companion_following_publishes_movement_visibility_and_generation_changes() {
++        let mut state = CompanionSession::default();
++        let initial = state
++            .create_following_frame((10.0, 20.0), 800, 600)
++            .unwrap();
++        assert_eq!(initial.pointer, (34.0, 44.0));
++        assert!(initial.visible);
++        for _ in 0..1000 {
++            assert!(state
++                .create_following_frame((10.0, 20.0), 800, 600)
++                .is_none());
++        }
++        assert_eq!(state.revision, initial.revision);
++        let moved = state
++            .create_following_frame((11.0, 20.0), 800, 600)
++            .unwrap();
++        assert!(moved.revision > initial.revision);
++        let hidden = state
++            .create_following_frame((-1.0, 20.0), 800, 600)
++            .unwrap();
++        assert!(!hidden.visible);
++        assert!(state
++            .create_following_frame((-20.0, 50.0), 800, 600)
++            .is_none());
++        assert!(
++            state
++                .create_following_frame((11.0, 20.0), 800, 600)
++                .unwrap()
++                .visible
++        );
++        state.generation += 1;
++        state.fence.lock().unwrap().generation = state.generation;
++        let resumed = state
++            .create_following_frame((11.0, 20.0), 800, 600)
++            .unwrap();
++        assert_eq!(resumed.generation, state.generation);
++        assert!(state
++            .create_following_frame((11.0, 20.0), 1024, 768)
++            .is_some());
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/tools/DesktopObservation.rs b/libs/cua-driver/rust/crates/platform-windows/src/tools/DesktopObservation.rs
+new file mode 100644
+index 0000000..1aee24c
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/platform-windows/src/tools/DesktopObservation.rs
+@@ -0,0 +1,501 @@
++//! Session-owned Windows desktop observation. Pixels stay inside the native driver.
++use super::{impl_::resolve_cursor_key, main_screen_size};
++use async_trait::async_trait;
++use cua_driver_core::{
++    protocol::ToolResult,
++    tool::{Tool, ToolDef, ToolRegistry},
++    tool_args::parse_typed_input,
++};
++use serde::Deserialize;
++use serde_json::{json, Value};
++use std::sync::{Arc, Mutex, OnceLock};
++use std::time::{Duration, Instant};
++const MAX_WIDTH: usize = 768;
++const TILE: usize = 32;
++const LEASE: Duration = Duration::from_secs(60);
++
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++struct WatchInput {
++    watch_id: String,
++    #[serde(default)]
++    input_only: bool,
++    session: Option<String>,
++    #[serde(default)]
++    regions: Option<Vec<ObservationRegion>>,
++}
++
++#[derive(Clone, Deserialize)]
++#[serde(deny_unknown_fields)]
++struct ObservationRegion {
++    x: f64,
++    y: f64,
++    width: f64,
++    height: f64,
++}
++impl ObservationRegion {
++    fn valid(&self) -> bool {
++        [self.x, self.y, self.width, self.height]
++            .iter()
++            .all(|v| v.is_finite())
++            && self.x >= 0.0
++            && self.y >= 0.0
++            && self.width > 0.0
++            && self.height > 0.0
++            && self.x + self.width <= 1.0
++            && self.y + self.height <= 1.0
++    }
++}
++struct Changes {
++    input_only: bool,
++    hashes: Vec<u64>,
++    regions: Vec<ObservationRegion>,
++    relevant_revision: u64,
++    columns: usize,
++    revision: u64,
++    fraction: f64,
++    ready: bool,
++    failed: bool,
++    lease_until: Instant,
++    last_input: u64,
++    input_at: Instant,
++}
++struct Watch {
++    id: String,
++    owner: String,
++    width: usize,
++    height: usize,
++    changes: Arc<Mutex<Changes>>,
++}
++// Lesson IDs survive resource pauses. Instance identity fences an old stream
++// from a replacement watch that legitimately reuses the same lesson ID.
++fn owns_stream(watch: &Watch, id: &str, changes: &Arc<Mutex<Changes>>) -> bool {
++    watch.id == id && Arc::ptr_eq(&watch.changes, changes)
++}
++fn watches() -> &'static Mutex<Option<Watch>> {
++    static WATCH: OnceLock<Mutex<Option<Watch>>> = OnceLock::new();
++    WATCH.get_or_init(|| Mutex::new(None))
++}
++fn read_primary_dimensions() -> Option<(usize, usize)> {
++    let (width, height, _) = main_screen_size()?;
++    let width = usize::try_from(width).ok()?;
++    let height = usize::try_from(height).ok()?;
++    if width == 0 || height == 0 {
++        return None;
++    }
++    Some((width, height))
++}
++fn input_revision() -> u64 {
++    super::companion_tools::read_user_input_counters()
++        .iter()
++        .map(|n| u64::from(*n))
++        .sum()
++}
++fn buttons_down() -> bool {
++    crate::companion_input::are_buttons_down()
++}
++
++fn update_input(changes: &mut Changes) {
++    let revision = input_revision();
++    if changes.last_input != revision {
++        changes.last_input = revision;
++        changes.input_at = Instant::now();
++    }
++}
++fn describe(watch: &Watch) -> Value {
++    let mut changes = watch.changes.lock().unwrap();
++    update_input(&mut changes);
++    let (width, height) = if changes.input_only {
++        read_primary_dimensions().unwrap_or((watch.width, watch.height))
++    } else {
++        (watch.width, watch.height)
++    };
++    json!({"watch_id":watch.id,"input_only":changes.input_only,"screen_revision":changes.revision,
++        "input_revision":changes.last_input,"relevant_revision":changes.relevant_revision,"ready":changes.ready,
++        "changed_fraction":changes.fraction,"quiet_ms":changes.input_at.elapsed().as_millis() as u64,
++        "buttons_down":buttons_down(),"screen_width":width,"screen_height":height})
++}
++/// Bracket the screenshot from its starting revision. Later changes stay pending,
++/// including a frame callback racing the full-resolution capture.
++pub(super) fn read_capture_observation(session: &str) -> Option<Value> {
++    watches()
++        .lock()
++        .unwrap()
++        .as_ref()
++        .filter(|w| w.owner == session)
++        .map(describe)
++}
++pub(super) fn retire_session(session: &str) {
++    let mut watches = watches().lock().unwrap();
++    if watches.as_ref().is_some_and(|w| w.owner == session) {
++        *watches = None;
++    }
++}
++pub(super) fn retire_runtime(prefix: &str) {
++    let mut watches = watches().lock().unwrap();
++    if watches
++        .as_ref()
++        .is_some_and(|w| w.owner.starts_with(prefix))
++    {
++        *watches = None;
++    }
++}
++
++fn hash_tiles(bytes: &[u8], width: usize, height: usize, stride: usize) -> Vec<u64> {
++    if width == 0 || height == 0 || stride < width * 4 || bytes.len() < stride * height {
++        return vec![];
++    }
++    let columns = width.div_ceil(TILE);
++    let mut hashes = vec![14695981039346656037u64; columns * height.div_ceil(TILE)];
++    for y in 0..height {
++        for x in 0..width {
++            let cell = (y / TILE) * columns + x / TILE;
++            let offset = y * stride + x * 4;
++            for channel in 0..3 {
++                // Quantization suppresses minor compositor/color noise.
++                hashes[cell] = (hashes[cell] ^ u64::from(bytes[offset + channel] >> 4))
++                    .wrapping_mul(1099511628211);
++            }
++        }
++    }
++    hashes
++}
++fn record_frame(changes: &mut Changes, hashes: Vec<u64>) {
++    if hashes.is_empty() {
++        changes.failed = true;
++        return;
++    }
++    let different = if changes.hashes.len() == hashes.len() {
++        changes
++            .hashes
++            .iter()
++            .zip(&hashes)
++            .filter(|(a, b)| a != b)
++            .count()
++    } else {
++        hashes.len()
++    };
++    let rows = hashes.len().div_ceil(changes.columns.max(1));
++    let relevant_changed = !changes.regions.is_empty()
++        && changes
++            .hashes
++            .iter()
++            .zip(&hashes)
++            .enumerate()
++            .any(|(index, (before, after))| {
++                if before == after {
++                    return false;
++                }
++                let x = (index % changes.columns.max(1)) as f64 / changes.columns.max(1) as f64;
++                let y = (index / changes.columns.max(1)) as f64 / rows.max(1) as f64;
++                changes.regions.iter().any(|region| {
++                    x < region.x + region.width
++                        && x + 1.0 / changes.columns.max(1) as f64 > region.x
++                        && y < region.y + region.height
++                        && y + 1.0 / rows.max(1) as f64 > region.y
++                })
++            });
++    if relevant_changed {
++        changes.relevant_revision += 1;
++    }
++    // A blinking caret is commonly one tile. Input still forces observation of
++    // small edits; ignored deltas accumulate against this retained baseline.
++    if !changes.ready || different > 1 || relevant_changed {
++        changes.fraction = different as f64 / hashes.len() as f64;
++        changes.hashes = hashes;
++        changes.revision += 1;
++    }
++    changes.ready = true;
++}
++fn begin_stream(
++    id: String,
++    changes: Arc<Mutex<Changes>>,
++    _width: usize,
++    _height: usize,
++) -> Result<(), String> {
++    std::thread::spawn(move || {
++        loop {
++            let owned = watches()
++                .lock()
++                .unwrap()
++                .as_ref()
++                .is_some_and(|watch| owns_stream(watch, &id, &changes));
++            let expired = {
++                let changes = changes.lock().unwrap();
++                changes.failed || Instant::now() > changes.lease_until
++            };
++            if !owned || expired {
++                break;
++            }
++            let sampled = crate::capture::screenshot_display_bytes_excluding_overlay()
++                .and_then(|(png, _)| crate::capture::resize_png_if_needed(&png, MAX_WIDTH as u32))
++                .and_then(|png| image::load_from_memory(&png).map_err(Into::into));
++            match sampled {
++                Ok(image) => {
++                    let rgba = image.to_rgba8();
++                    let width = rgba.width() as usize;
++                    let height = rgba.height() as usize;
++                    let hashes = hash_tiles(rgba.as_raw(), width, height, width * 4);
++                    let mut changes = changes.lock().unwrap();
++                    changes.columns = width.div_ceil(TILE);
++                    record_frame(&mut changes, hashes);
++                }
++                Err(_) => {
++                    changes.lock().unwrap().failed = true;
++                    break;
++                }
++            }
++            if let Some((width, height)) = read_primary_dimensions() {
++                let mut watches = watches().lock().unwrap();
++                if let Some(watch) = watches
++                    .as_mut()
++                    .filter(|watch| owns_stream(watch, &id, &changes))
++                {
++                    if (watch.width, watch.height) != (width, height) {
++                        watch.width = width;
++                        watch.height = height;
++                        let mut changes = changes.lock().unwrap();
++                        changes.hashes.clear();
++                        changes.ready = false;
++                        changes.revision += 1;
++                    }
++                }
++            }
++            let quiet = {
++                let mut changes = changes.lock().unwrap();
++                update_input(&mut changes);
++                changes.input_at.elapsed() > Duration::from_secs(3)
++            };
++            std::thread::sleep(Duration::from_millis(if quiet { 2000 } else { 500 }));
++        }
++        let mut watches = watches().lock().unwrap();
++        if watches
++            .as_ref()
++            .is_some_and(|watch| owns_stream(watch, &id, &changes))
++        {
++            *watches = None;
++        }
++    });
++    Ok(())
++}
++
++struct ObservationTool {
++    definition: ToolDef,
++}
++#[async_trait]
++impl Tool for ObservationTool {
++    fn def(&self) -> &ToolDef {
++        &self.definition
++    }
++    async fn invoke(&self, args: Value) -> ToolResult {
++        let owner = resolve_cursor_key(&args);
++        // Resolve ownership before the standard parser removes trusted transport
++        // fields. Public unknown fields remain rejected by WatchInput.
++        let input: WatchInput = match parse_typed_input(&self.definition.name, args) {
++            Ok(input) => input,
++            Err(error) => return error,
++        };
++        let _ = &input.session;
++        if input
++            .regions
++            .as_ref()
++            .is_some_and(|regions| regions.len() > 8 || regions.iter().any(|r| !r.valid()))
++        {
++            return ToolResult::error("invalid_watch");
++        }
++        if uuid::Uuid::parse_str(&input.watch_id).is_err() {
++            return ToolResult::error("invalid_watch");
++        }
++        if self.definition.name == "end_desktop_watch" {
++            let mut watches = watches().lock().unwrap();
++            if watches
++                .as_ref()
++                .is_some_and(|w| w.id == input.watch_id && w.owner == owner)
++            {
++                *watches = None;
++            }
++            return ToolResult::text("watch_ended");
++        }
++        if self.definition.name == "begin_desktop_watch" {
++            let Some((width, height)) = read_primary_dimensions() else {
++                return ToolResult::error("capture_unavailable");
++            };
++            let changes = Arc::new(Mutex::new(Changes {
++                input_only: input.input_only,
++                hashes: vec![],
++                regions: vec![],
++                relevant_revision: 0,
++                columns: 24,
++                revision: 0,
++                fraction: 0.0,
++                ready: input.input_only,
++                failed: false,
++                lease_until: Instant::now() + LEASE,
++                last_input: input_revision(),
++                input_at: Instant::now(),
++            }));
++            {
++                let mut watches = watches().lock().unwrap();
++                if watches.is_some() {
++                    return ToolResult::error("busy");
++                }
++                *watches = Some(Watch {
++                    id: input.watch_id.clone(),
++                    owner: owner.clone(),
++                    width,
++                    height,
++                    changes: changes.clone(),
++                });
++            }
++            if !input.input_only {
++                let id = input.watch_id.clone();
++                let start =
++                    tokio::task::spawn_blocking(move || begin_stream(id, changes, width, height))
++                        .await;
++                if !matches!(start, Ok(Ok(()))) {
++                    retire_session(&owner);
++                    return ToolResult::error("capture_unavailable");
++                }
++            }
++        }
++        let watches = watches().lock().unwrap();
++        let Some(watch) = watches
++            .as_ref()
++            .filter(|w| w.id == input.watch_id && w.owner == owner)
++        else {
++            return ToolResult::error("watch_lost");
++        };
++        {
++            let mut changes = watch.changes.lock().unwrap();
++            changes.lease_until = Instant::now() + LEASE;
++            if let Some(regions) = input.regions {
++                changes.regions = regions;
++            }
++        }
++        ToolResult::text("desktop_watch").with_structured(describe(watch))
++    }
++}
++pub(super) fn register_tools(registry: &mut ToolRegistry) {
++    for name in [
++        "begin_desktop_watch",
++        "read_desktop_watch",
++        "end_desktop_watch",
++    ] {
++        registry.register(Box::new(ObservationTool { definition: ToolDef {
++            name: name.into(), description: "Host-only bounded native desktop change observation.".into(),
++            input_schema: json!({"type":"object","properties":{"watch_id":{"type":"string"},"input_only":{"type":"boolean"},"session":{"type":"string"},"regions":{"type":"array","maxItems":8,"items":{"type":"object","properties":{"x":{"type":"number"},"y":{"type":"number"},"width":{"type":"number"},"height":{"type":"number"}},"required":["x","y","width","height"],"additionalProperties":false}}},"required":["watch_id"],"additionalProperties":false}),
++            read_only: name == "read_desktop_watch", destructive: false, idempotent: name != "begin_desktop_watch", open_world: false,
++        }}));
++    }
++}
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn companion_observation_parser_accepts_transport_metadata_but_rejects_public_extras() {
++        let args = json!({"watch_id":"11111111-1111-4111-8111-111111111111",
++            "_session_id":"transport-owner", "_transport_session_id":"transport-owner"});
++        let owner = resolve_cursor_key(&args);
++        let input: WatchInput = parse_typed_input("begin_desktop_watch", args)
++            .expect("trusted ingress metadata must not break public parsing");
++        assert_eq!(owner, "transport-owner");
++        assert_eq!(input.watch_id, "11111111-1111-4111-8111-111111111111");
++        assert!(parse_typed_input::<WatchInput>(
++            "begin_desktop_watch",
++            json!({"watch_id":input.watch_id,"unreviewed_option":true})
++        )
++        .is_err());
++    }
++
++    #[test]
++    fn companion_observation_old_stream_cannot_own_restarted_lesson() {
++        fn changes() -> Arc<Mutex<Changes>> {
++            Arc::new(Mutex::new(Changes {
++                input_only: false,
++                hashes: vec![],
++                regions: vec![],
++                relevant_revision: 0,
++                columns: 24,
++                revision: 0,
++                fraction: 0.0,
++                ready: false,
++                failed: false,
++                lease_until: Instant::now() + LEASE,
++                last_input: 0,
++                input_at: Instant::now(),
++            }))
++        }
++        let old = changes();
++        let replacement = changes();
++        let watch = Watch {
++            id: "lesson".into(),
++            owner: "session".into(),
++            width: 100,
++            height: 100,
++            changes: replacement.clone(),
++        };
++        assert!(!owns_stream(&watch, "lesson", &old));
++        assert!(owns_stream(&watch, "lesson", &replacement));
++        assert!(!owns_stream(&watch, "other", &replacement));
++    }
++    #[test]
++    fn companion_observation_ignores_single_tile_and_accumulates_small_changes() {
++        let mut changes = Changes {
++            input_only: false,
++            hashes: vec![1, 1, 1],
++            regions: vec![],
++            relevant_revision: 0,
++            columns: 24,
++            revision: 1,
++            fraction: 0.0,
++            ready: true,
++            failed: false,
++            lease_until: Instant::now() + LEASE,
++            last_input: 0,
++            input_at: Instant::now(),
++        };
++        record_frame(&mut changes, vec![2, 1, 1]);
++        assert_eq!(changes.revision, 1);
++        record_frame(&mut changes, vec![2, 2, 1]);
++        assert_eq!(changes.revision, 2);
++        record_frame(&mut changes, vec![2, 2, 1]);
++        assert_eq!(changes.revision, 2);
++    }
++    #[test]
++    fn companion_observation_prioritizes_small_relevant_changes() {
++        let mut changes = Changes {
++            input_only: false,
++            hashes: vec![1; 4],
++            regions: vec![ObservationRegion {
++                x: 0.5,
++                y: 0.0,
++                width: 0.5,
++                height: 0.5,
++            }],
++            relevant_revision: 0,
++            columns: 2,
++            revision: 1,
++            fraction: 0.0,
++            ready: true,
++            failed: false,
++            lease_until: Instant::now() + LEASE,
++            last_input: 0,
++            input_at: Instant::now(),
++        };
++        record_frame(&mut changes, vec![1, 2, 1, 1]);
++        assert_eq!(changes.relevant_revision, 1);
++        assert_eq!(changes.revision, 2);
++        record_frame(&mut changes, vec![1, 2, 1, 1]);
++        assert_eq!(changes.relevant_revision, 1);
++        record_frame(&mut changes, vec![1, 2, 2, 2]);
++        assert_eq!(changes.relevant_revision, 1);
++        assert_eq!(changes.revision, 3); // Whole-screen fallback stays alive.
++    }
++    #[test]
++    fn companion_observation_hashes_ignore_padding_and_alpha() {
++        let first = hash_tiles(&[0, 0, 0, 0, 255, 255, 255, 0, 99, 99, 99, 99], 2, 1, 12);
++        let second = hash_tiles(&[0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 0], 2, 1, 12);
++        assert_eq!(first, second);
++        assert!(hash_tiles(&[], 2, 1, 12).is_empty());
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/tools/GuidanceCapture.rs b/libs/cua-driver/rust/crates/platform-windows/src/tools/GuidanceCapture.rs
+new file mode 100644
+index 0000000..24394ee
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/platform-windows/src/tools/GuidanceCapture.rs
+@@ -0,0 +1,291 @@
++//! Private regional comparison for the one version 3 presentation request.
++//! Pixels remain in the session-owned native registry; diagnostics are numeric.
++use cua_driver_contract::{
++    CaptureComparison, CueComparison, TeachingTarget, SCRIBBLE_STROKE_WIDTH_POINTS,
++};
++use cua_driver_core::capture_runtime::{CaptureTarget, PerceptionCapture};
++use cursor_overlay::scribble_renderer::{distance_to_path, ScribblePlan};
++use image::RgbImage;
++
++const STROKE_CONTEXT_POINTS: f64 = 32.0;
++fn pixel_bounds(bounds: [f64; 4], width: u32, height: u32, screen: (f64, f64)) -> [u32; 4] {
++    [
++        (bounds[0] / screen.0 * f64::from(width))
++            .floor()
++            .clamp(0.0, f64::from(width)) as u32,
++        (bounds[1] / screen.1 * f64::from(height))
++            .floor()
++            .clamp(0.0, f64::from(height)) as u32,
++        (bounds[2] / screen.0 * f64::from(width))
++            .ceil()
++            .clamp(0.0, f64::from(width)) as u32,
++        (bounds[3] / screen.1 * f64::from(height))
++            .ceil()
++            .clamp(0.0, f64::from(height)) as u32,
++    ]
++}
++fn compare_region(
++    original: &RgbImage,
++    fresh: &RgbImage,
++    region_index: usize,
++    kind: &str,
++    bounds: [u32; 4],
++    covered: impl Fn(u32, u32) -> bool,
++) -> (CueComparison, bool) {
++    let mut region = CueComparison {
++        region_index,
++        region_kind: kind.into(),
++        bounds_px: bounds,
++        compared_pixels: 0,
++        changed_pixels: 0,
++        changed_fraction: 0.0,
++        max_channel_delta: 0,
++        first_changed_pixel: None,
++    };
++    let mut significant_pixels = 0u64;
++    for y in bounds[1]..bounds[3] {
++        for x in bounds[0]..bounds[2] {
++            if !covered(x, y) {
++                continue;
++            }
++            region.compared_pixels += 1;
++            let before = original.get_pixel(x, y);
++            let after = fresh.get_pixel(x, y);
++            let delta = (0..3)
++                .map(|channel| before[channel].abs_diff(after[channel]))
++                .max()
++                .unwrap_or(0);
++            if delta > 8 {
++                significant_pixels += 1;
++            }
++            if before != after {
++                region.changed_pixels += 1;
++                region.first_changed_pixel.get_or_insert([x, y]);
++                region.max_channel_delta = region.max_channel_delta.max(delta);
++            }
++        }
++    }
++    if region.compared_pixels > 0 {
++        region.changed_fraction = region.changed_pixels as f64 / region.compared_pixels as f64;
++    }
++    // Preserve existing tolerance: small raster noise and <=0.5% significant pixels.
++    let matched = region.compared_pixels > 0
++        && significant_pixels as f64 / region.compared_pixels as f64 <= 0.005;
++    (region, matched)
++}
++/// Build a union mask around compiled segments, rather than comparing unrelated
++/// pixels inside the bounding rectangle of a long or curved stroke.
++fn stroke_mask(
++    path: &[(f64, f64)],
++    bounds: [u32; 4],
++    dimensions: (u32, u32),
++    screen: (f64, f64),
++) -> Vec<bool> {
++    let row_width = (bounds[2] - bounds[0]) as usize;
++    let mut mask = vec![false; row_width * (bounds[3] - bounds[1]) as usize];
++    let pad = STROKE_CONTEXT_POINTS + SCRIBBLE_STROKE_WIDTH_POINTS * 0.5;
++    for segment in path.windows(2) {
++        let local = pixel_bounds(
++            [
++                segment[0].0.min(segment[1].0) - pad,
++                segment[0].1.min(segment[1].1) - pad,
++                segment[0].0.max(segment[1].0) + pad,
++                segment[0].1.max(segment[1].1) + pad,
++            ],
++            dimensions.0,
++            dimensions.1,
++            screen,
++        );
++        for y in local[1].max(bounds[1])..local[3].min(bounds[3]) {
++            for x in local[0].max(bounds[0])..local[2].min(bounds[2]) {
++                let index = (y - bounds[1]) as usize * row_width + (x - bounds[0]) as usize;
++                if !mask[index] {
++                    let point = (
++                        (f64::from(x) + 0.5) * screen.0 / f64::from(dimensions.0),
++                        (f64::from(y) + 0.5) * screen.1 / f64::from(dimensions.1),
++                    );
++                    mask[index] = distance_to_path(point, segment) <= pad;
++                }
++            }
++        }
++    }
++    mask
++}
++fn compare_pixels(
++    original: &RgbImage,
++    fresh: &RgbImage,
++    targets: &[TeachingTarget],
++    plan: Option<&ScribblePlan>,
++    screen: (f64, f64),
++) -> CaptureComparison {
++    let (width, height) = original.dimensions();
++    let mut report = CaptureComparison {
++        matched: original.dimensions() == fresh.dimensions(),
++        capture_width_px: width,
++        capture_height_px: height,
++        regions: vec![],
++    };
++    if !report.matched {
++        return report;
++    }
++    for target in targets {
++        let bounds = pixel_bounds(
++            [
++                target.x * screen.0,
++                target.y * screen.1,
++                (target.x + target.width) * screen.0,
++                (target.y + target.height) * screen.1,
++            ],
++            width,
++            height,
++            screen,
++        );
++        let (region, matched) = compare_region(
++            original,
++            fresh,
++            report.regions.len(),
++            "target",
++            bounds,
++            |_, _| true,
++        );
++        report.matched &= matched;
++        report.regions.push(region);
++    }
++    if let Some(plan) = plan {
++        for stroke in &plan.strokes {
++            let mut bounds = stroke.bounds;
++            bounds[0] -= STROKE_CONTEXT_POINTS;
++            bounds[1] -= STROKE_CONTEXT_POINTS;
++            bounds[2] += STROKE_CONTEXT_POINTS;
++            bounds[3] += STROKE_CONTEXT_POINTS;
++            let bounds = pixel_bounds(bounds, width, height, screen);
++            let mask = stroke_mask(&stroke.path, bounds, (width, height), screen);
++            let row_width = (bounds[2] - bounds[0]) as usize;
++            let (region, matched) = compare_region(
++                original,
++                fresh,
++                report.regions.len(),
++                "stroke",
++                bounds,
++                |x, y| mask[(y - bounds[1]) as usize * row_width + (x - bounds[0]) as usize],
++            );
++            report.matched &= matched;
++            report.regions.push(region);
++        }
++    }
++    report
++}
++pub(super) fn compare_captures(
++    original: &PerceptionCapture,
++    fresh: &PerceptionCapture,
++    targets: &[TeachingTarget],
++    plan: Option<&ScribblePlan>,
++) -> Result<CaptureComparison, &'static str> {
++    if original.target() != &CaptureTarget::PrimaryDesktop
++        || fresh.target() != original.target()
++        || original.presentation_dimensions() != fresh.presentation_dimensions()
++        || original.encoded_dimensions() != fresh.encoded_dimensions()
++    {
++        return Err("geometry_changed");
++    }
++    let decode = |capture: &PerceptionCapture| {
++        image::load_from_memory_with_format(&capture.png_bytes(), image::ImageFormat::Png)
++            .map(|image| image.to_rgb8())
++            .map_err(|_| "capture_unavailable")
++    };
++    let dimensions = original.presentation_dimensions();
++    Ok(compare_pixels(
++        &decode(original)?,
++        &decode(fresh)?,
++        targets,
++        plan,
++        (
++            f64::from(dimensions.width()),
++            f64::from(dimensions.height()),
++        ),
++    ))
++}
++#[cfg(test)]
++mod companion_scribble_tests {
++    use super::*;
++    use cua_driver_contract::{CompanionPoint, TeachingDrawing, TeachingStroke};
++    fn plan(points: &[(f64, f64)]) -> ScribblePlan {
++        ScribblePlan::compile(
++            &TeachingDrawing {
++                strokes: vec![TeachingStroke {
++                    points: points
++                        .iter()
++                        .map(|&(x, y)| CompanionPoint { x, y })
++                        .collect(),
++                    closed: false,
++                }],
++            },
++            (0.0, 0.0),
++            200.0,
++            100.0,
++        )
++        .unwrap()
++    }
++    #[test]
++    fn companion_scribble_comparison_checks_targets_and_strokes_separately() {
++        let original = RgbImage::new(200, 100);
++        let mut fresh = original.clone();
++        let plan = plan(&[(0.1, 0.8), (0.9, 0.8)]);
++        let targets = [TeachingTarget {
++            x: 0.4,
++            y: 0.1,
++            width: 0.1,
++            height: 0.1,
++        }];
++        for y in 10..20 {
++            for x in 80..100 {
++                fresh.put_pixel(x, y, image::Rgb([255, 0, 0]));
++            }
++        }
++        let report = compare_pixels(&original, &fresh, &targets, Some(&plan), (200.0, 100.0));
++        assert!(!report.matched);
++        assert_eq!(report.regions.len(), 2);
++        assert_eq!(report.regions[0].region_kind, "target");
++        assert_eq!(report.regions[1].region_kind, "stroke");
++        assert_eq!(report.regions[0].changed_pixels, 200);
++        assert_eq!(report.regions[1].changed_pixels, 0);
++    }
++    #[test]
++    fn companion_scribble_comparison_ignores_distant_animation_inside_path_envelope() {
++        let original = RgbImage::new(200, 100);
++        let mut fresh = original.clone();
++        let plan = plan(&[(0.0, 0.0), (1.0, 1.0)]);
++        for y in 80..100 {
++            for x in 0..20 {
++                fresh.put_pixel(x, y, image::Rgb([255, 0, 0]));
++            }
++        }
++        assert!(compare_pixels(&original, &fresh, &[], Some(&plan), (200.0, 100.0)).matched);
++        for y in 45..55 {
++            for x in 90..110 {
++                fresh.put_pixel(x, y, image::Rgb([255, 0, 0]));
++            }
++        }
++        let report = compare_pixels(&original, &fresh, &[], Some(&plan), (200.0, 100.0));
++        assert!(!report.matched);
++        assert!(report.regions[0].changed_pixels >= 200);
++    }
++    #[test]
++    fn companion_scribble_comparison_preserves_noise_tolerance_and_geometry_rejection() {
++        let original = RgbImage::new(200, 100);
++        let mut fresh = original.clone();
++        fresh.put_pixel(100, 50, image::Rgb([5, 0, 0]));
++        let plan = plan(&[(0.1, 0.5), (0.9, 0.5)]);
++        assert!(compare_pixels(&original, &fresh, &[], Some(&plan), (200.0, 100.0)).matched);
++        assert!(
++            !compare_pixels(
++                &original,
++                &RgbImage::new(100, 100),
++                &[],
++                Some(&plan),
++                (200.0, 100.0)
++            )
++            .matched
++        );
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/tools/TeachingGuidance.rs b/libs/cua-driver/rust/crates/platform-windows/src/tools/TeachingGuidance.rs
+new file mode 100644
+index 0000000..1a461e0
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/platform-windows/src/tools/TeachingGuidance.rs
+@@ -0,0 +1,838 @@
++//! Host-bound version 3 scribble teaching. No desktop input executor dependency.
++use super::*;
++use cua_driver_contract::{
++    BeginCursorGuidanceTaskInput, EndCursorGuidanceTaskInput, GetCursorCompanionCapabilitiesInput,
++};
++use cua_driver_contract::{PresentedStroke, TeachingGuidanceTimings};
++use cua_driver_core::capture_runtime::CaptureTarget;
++use cursor_overlay::guidance::{
++    point_on_path, reveal_path, GuidanceFrame, GuidancePaintGeometry, StepEvidence, FADE_MS,
++    MAX_FRAME_GAP, RETURN_MS,
++};
++use cursor_overlay::scribble_renderer::ScribblePlan;
++
++fn elapsed_ms(start: Instant) -> u64 {
++    (start.elapsed().as_millis() as u64).min(120000)
++}
++
++impl CompanionSession {
++    pub(super) fn create_frame(
++        &mut self,
++        pointer: (f64, f64),
++        cue: Vec<(f64, f64)>,
++        cue_alpha: f32,
++        teaching: bool,
++        visible: bool,
++        pressed: bool,
++    ) -> GuidanceFrame {
++        self.revision = self.revision.wrapping_add(1);
++        self.pointer = Some(pointer);
++        GuidanceFrame {
++            generation: self.generation,
++            revision: self.revision,
++            fence: self.fence.clone(),
++            receipt: Arc::new(Mutex::new(None)),
++            paint_geometry: Arc::new(Mutex::new(None)),
++            pointer,
++            cue,
++            cue_alpha,
++            teaching,
++            visible,
++            pressed,
++        }
++    }
++    pub(super) fn clear_guidance(&mut self, session: &str, visible: bool) -> GuidanceFrame {
++        self.generation = self.generation.wrapping_add(1);
++        self.fence.lock().unwrap().generation = self.generation;
++        let frame = self.create_frame(
++            self.pointer.unwrap_or((0.0, 0.0)),
++            vec![],
++            0.0,
++            false,
++            visible,
++            false,
++        );
++        let _ = crate::overlay::present_guidance_frame(session, frame.clone());
++        frame
++    }
++}
++
++fn guidance_error(
++    session: &str,
++    epoch: &str,
++    sequence_id: Option<&str>,
++    reason: &'static str,
++) -> ToolResult {
++    let state = state().lock().unwrap();
++    let canceled = matches!(
++        reason,
++        "user_takeover" | "explicit_stop" | "session_lost" | "lease_expired"
++    );
++    let mut data = json!({"status":if canceled {"canceled"} else {"failed"}, "following":state.owner.as_deref()==Some(session)&&state.following, "active":false, "task_epoch":epoch,"sequence_id":sequence_id});
++    data[if canceled { "reason" } else { "code" }] = json!(reason);
++    ToolResult::error(reason).with_structured(data)
++}
++
++/// Capture validity, takeover and the monotonic generation are checked at every
++/// phase and during receipt waits. Native lease renewal never resets this latch.
++fn check_guidance(
++    session: &str,
++    generation: u64,
++    deadline: Instant,
++    capture_current: &impl Fn() -> bool,
++) -> Result<(), &'static str> {
++    if !can_continue_playback(session) {
++        return Err("session_lost");
++    }
++    let state = state().lock().unwrap();
++    if let Some(reason) = state.terminal {
++        return Err(reason);
++    }
++    if state.owner.as_deref() != Some(session) || !state.active || state.generation != generation {
++        return Err("explicit_stop");
++    }
++    if state
++        .lease_until
++        .is_some_and(|until| Instant::now() >= until)
++    {
++        return Err("lease_expired");
++    }
++    if state
++        .task_input
++        .is_some_and(|initial| read_user_input_counters() != initial)
++    {
++        return Err("user_takeover");
++    }
++    if !capture_current() {
++        return Err("target_invalidated");
++    }
++    if Instant::now() > deadline {
++        return Err("render_timeout");
++    }
++    Ok(())
++}
++
++async fn await_receipt(
++    frame: &GuidanceFrame,
++    limit: Duration,
++    check: &(impl Fn() -> Result<(), &'static str> + Sync),
++) -> Result<Instant, &'static str> {
++    let deadline = Instant::now() + limit;
++    loop {
++        if let Some(rendered_at) = *frame.receipt.lock().unwrap() {
++            return if rendered_at <= deadline {
++                Ok(rendered_at)
++            } else {
++                Err("render_timeout")
++            };
++        }
++        check()?;
++        if Instant::now() >= deadline {
++            return Err("render_timeout");
++        }
++        tokio::time::sleep(Duration::from_millis(4)).await;
++    }
++}
++
++async fn present_frame(
++    session: &str,
++    generation: u64,
++    pointer: (f64, f64),
++    cue: Vec<(f64, f64)>,
++    alpha: f32,
++    pressed: bool,
++    check: &(impl Fn() -> Result<(), &'static str> + Sync),
++) -> Result<(Instant, Option<GuidancePaintGeometry>), &'static str> {
++    check()?;
++    let frame = {
++        let mut state = state().lock().unwrap();
++        if state.generation != generation || !state.active {
++            return Err("explicit_stop");
++        }
++        let frame = state.create_frame(pointer, cue, alpha, true, true, pressed);
++        if !crate::overlay::present_guidance_frame(session, frame.clone()) {
++            return Err("transport_failed");
++        }
++        frame
++    };
++    let rendered_at = await_receipt(&frame, MAX_FRAME_GAP, check).await?;
++    check()?;
++    let geometry = frame.paint_geometry.lock().unwrap().clone();
++    Ok((rendered_at, geometry))
++}
++
++/// Only a non-degenerate installed stroke acknowledges a drawing. An approach
++/// pointer or a zero-length prefix is a rendered frame, but not a visible cue.
++fn has_visible_stroke(points: &[(f64, f64)]) -> bool {
++    points
++        .windows(2)
++        .map(|pair| (pair[1].0 - pair[0].0).hypot(pair[1].1 - pair[0].1))
++        .sum::<f64>()
++        >= 1.0
++}
++fn can_acknowledge_presentation(
++    result: Result<(), &'static str>,
++    message: bool,
++    drawing: bool,
++    text_only: bool,
++) -> bool {
++    (result.is_ok() || (result == Err("user_takeover") && !text_only))
++        && message
++        && (text_only || drawing)
++}
++
++async fn animate_phase(
++    session: &str,
++    generation: u64,
++    duration_ms: u64,
++    check: &(impl Fn() -> Result<(), &'static str> + Sync),
++    mut scene: impl FnMut(f64) -> ((f64, f64), Vec<(f64, f64)>, f32, bool) + Send,
++    mut rendered: impl FnMut(f64, Instant, Option<GuidancePaintGeometry>) -> Result<(), &'static str>
++        + Send,
++) -> Result<(), &'static str> {
++    let started = Instant::now();
++    loop {
++        let progress = if duration_ms == 0 {
++            1.0
++        } else {
++            (started.elapsed().as_secs_f64() * 1000.0 / duration_ms as f64).min(1.0)
++        };
++        let (pointer, cue, alpha, pressed) = scene(progress);
++        let receipt =
++            present_frame(session, generation, pointer, cue, alpha, pressed, check).await?;
++        rendered(progress, receipt.0, receipt.1)?;
++        if progress >= 1.0 {
++            return Ok(());
++        }
++        tokio::time::sleep(Duration::from_millis(16)).await;
++    }
++}
++
++impl TeachingGuidanceAdapter {
++    pub(super) async fn invoke_guidance_lifecycle(
++        &self,
++        name: &str,
++        session: &str,
++        args: Value,
++    ) -> ToolResult {
++        if name == "get_cursor_companion_capabilities" {
++            if let Err(error) = parse_typed_input::<GetCursorCompanionCapabilitiesInput>(name, args)
++            {
++                return error;
++            }
++            return ToolResult::text("capabilities").with_structured(json!({"presentation_versions":[3],"task_lifecycle":true,"paired_presentation":true,"display_scope":"primary","gestures":["scribble"],"max_strokes":3,"max_points_per_stroke":32,"max_duration_ms":15000}));
++        }
++        if name == "begin_cursor_guidance_task" {
++            let input = match parse_typed_input::<BeginCursorGuidanceTaskInput>(name, args) {
++                Ok(input) => input,
++                Err(error) => return error,
++            };
++            if input.presentation_version != 3 || uuid::Uuid::parse_str(&input.task_epoch).is_err()
++            {
++                return ToolResult::error("unsupported_version");
++            }
++            let mut state = state().lock().unwrap();
++            if state.active || state.owner.as_deref() != Some(session) || !state.following {
++                return ToolResult::error("busy");
++            }
++            if state.task_epoch.as_deref() == Some(&input.task_epoch) {
++                if state.terminal.is_some() {
++                    return ToolResult::error("Task is terminal; submit a new request.");
++                }
++            } else {
++                state.clear_guidance(session, true);
++                state.task_epoch = Some(input.task_epoch.clone());
++                state.task_owner = Some(session.to_owned());
++                state.terminal = None;
++                state.task_input = Some(read_user_input_counters());
++            }
++            return ToolResult::text("task_ready").with_structured(json!({"status":"task_ready","task_epoch":input.task_epoch,"following":true,"active":false}));
++        }
++        let input = match parse_typed_input::<EndCursorGuidanceTaskInput>(name, args) {
++            Ok(input) => input,
++            Err(error) => return error,
++        };
++        {
++            let state = state().lock().unwrap();
++            if !state.active
++                && state.owner.as_deref() == Some(session)
++                && state.task_epoch.is_none()
++            {
++                if let Some((epoch, reason)) = &state.ended_task {
++                    if epoch == &input.task_epoch {
++                        let reason = *reason;
++                        drop(state);
++                        return if let Some(reason) = reason {
++                            guidance_error(session, &input.task_epoch, None, reason)
++                        } else {
++                            snapshot_task(session, &input.task_epoch, "task_ended")
++                        };
++                    }
++                }
++            }
++        }
++        let (frame, terminal) = {
++            let mut state = state().lock().unwrap();
++            if state.owner.as_deref() != Some(session)
++                || state.task_epoch.as_deref() != Some(&input.task_epoch)
++            {
++                return ToolResult::error("Unknown task epoch.");
++            }
++            // Reserve the writer until the reliable clear receipt arrives.
++            state.active = true;
++            state.task_epoch = None;
++            state.task_owner = None;
++            state.task_input = None;
++            let terminal = state.terminal.take();
++            let following = state.following;
++            (state.clear_guidance(session, following), terminal)
++        };
++        let cleared = await_receipt(&frame, Duration::from_secs(2), &|| {
++            if can_continue_playback(session) {
++                Ok(())
++            } else {
++                Err("session_lost")
++            }
++        })
++        .await;
++        {
++            let mut state = state().lock().unwrap();
++            if state.owner.as_deref() == Some(session) && state.generation == frame.generation {
++                state.active = false;
++                if cleared.is_ok() {
++                    state.ended_task = Some((input.task_epoch.clone(), terminal));
++                }
++            }
++        }
++        if cleared.is_err() {
++            return ToolResult::error("render_timeout");
++        }
++        if let Some(reason) = terminal {
++            return guidance_error(session, &input.task_epoch, None, reason);
++        }
++        snapshot_task(session, &input.task_epoch, "task_ended")
++    }
++
++    pub(super) fn refuse_guidance(&self, session: &str, reason: &'static str) -> ToolResult {
++        let epoch = {
++            let mut state = state().lock().unwrap();
++            if state.owner.as_deref() != Some(session) {
++                return ToolResult::error(reason);
++            }
++            let Some(epoch) = state.task_epoch.clone() else {
++                return ToolResult::error(reason);
++            };
++            state.terminal.get_or_insert(reason);
++            state.active = false;
++            let following = state.following;
++            state.clear_guidance(session, following);
++            epoch
++        };
++        guidance_error(session, &epoch, None, reason)
++    }
++
++    pub(super) async fn present_guidance(
++        &self,
++        session: &str,
++        args: &Value,
++        input: PresentTeachingGuidanceInput,
++    ) -> ToolResult {
++        let epoch = {
++            let state = state().lock().unwrap();
++            if state.owner.as_deref() != Some(session) {
++                return ToolResult::error("busy");
++            }
++            state.task_epoch.clone()
++        };
++        let Some(epoch) = epoch else {
++            return ToolResult::error("Version 3 requires host task admission.");
++        };
++        if input.validate().is_err() {
++            return self.refuse_guidance(session, "invalid_request");
++        }
++        let operation_started = Instant::now();
++        let mut timings = TeachingGuidanceTimings::default();
++        let sequence_id = uuid::Uuid::new_v4().to_string();
++        let message_shown = AtomicBool::new(false);
++        let drawing_shown = AtomicBool::new(false);
++        let mut render_token = None;
++        let mut coordinate_trace = None;
++        let mut comparison_diagnostics = None;
++        let mut strokes_presented = Vec::new();
++        let result = self
++            .admit_and_present_guidance(
++                session,
++                args,
++                &input,
++                &message_shown,
++                &drawing_shown,
++                &mut render_token,
++                &mut coordinate_trace,
++                &mut comparison_diagnostics,
++                &mut strokes_presented,
++                operation_started,
++                &mut timings,
++            )
++            .await;
++        let interrupted = result == Err("user_takeover");
++        let fresh_required = matches!(
++            result,
++            Err("target_changed" | "geometry_changed" | "capture_unavailable")
++        );
++        if let Err(reason) = result {
++            let mut state = state().lock().unwrap();
++            if state.task_epoch.as_deref() == Some(&epoch) {
++                if !fresh_required {
++                    state.terminal.get_or_insert(reason);
++                }
++                state.active = false;
++                let following = state.following;
++                state.clear_guidance(session, following);
++            }
++        }
++        if can_acknowledge_presentation(
++            result,
++            message_shown.load(Ordering::Acquire),
++            drawing_shown.load(Ordering::Acquire),
++            input.text_only,
++        ) {
++            let state = state().lock().unwrap();
++            // Cancellation or session teardown may win after the final painted
++            // receipt but before this response is committed. Never revive it.
++            let terminal = if !can_continue_playback(session) {
++                Some("session_lost")
++            } else if state.owner.as_deref() != Some(session)
++                || state.task_epoch.as_deref() != Some(&epoch)
++            {
++                Some("explicit_stop")
++            } else {
++                state.terminal
++            };
++            if let Some(reason) =
++                terminal.filter(|reason| *reason != "user_takeover" || input.text_only)
++            {
++                drop(state);
++                if let Some(token) = render_token.as_ref() {
++                    crate::overlay::clear_companion_message(session, &input.hud_group, token);
++                }
++                return guidance_error(session, &epoch, Some(&sequence_id), reason);
++            }
++            let interrupted = interrupted || terminal == Some("user_takeover");
++            let mut output = json!({"status":"presented","following":state.following,"active":false,
++                "receipt":{"presentation_version":3,"task_epoch":epoch,"sequence_id":sequence_id,
++                    "presentation_id":input.presentation_id,"lesson_id":input.teaching_message.lesson_id,
++                    "step_id":input.teaching_message.step_id,"message_presented":true,
++                    "drawing_presented":drawing_shown.load(Ordering::Acquire),"text_only":input.text_only,
++                    "interrupted":interrupted,"strokes_presented":strokes_presented}});
++            if let Some(trace) = coordinate_trace {
++                output["coordinate_trace"] = trace;
++            }
++            if let Some(report) = comparison_diagnostics {
++                output["comparison_diagnostics"] = json!(report);
++            }
++            output["timings_ms"] = json!(timings);
++            return ToolResult::text("presentation_acknowledged").with_structured(output);
++        }
++        if let Some(token) = render_token.as_ref() {
++            crate::overlay::clear_companion_message(session, &input.hud_group, token);
++        }
++        if fresh_required {
++            let mut output = json!({"status":"refused","code":"fresh_observation_required","reason":result.unwrap_err(),"timings_ms":timings});
++            if let Some(report) = comparison_diagnostics {
++                output["comparison_diagnostics"] = json!(report);
++            }
++            return ToolResult::error("fresh_observation_required").with_structured(output);
++        }
++        guidance_error(
++            session,
++            &epoch,
++            Some(&sequence_id),
++            result.err().unwrap_or("render_timeout"),
++        )
++    }
++
++    async fn admit_and_present_guidance(
++        &self,
++        session: &str,
++        args: &Value,
++        input: &PresentTeachingGuidanceInput,
++        message_shown: &AtomicBool,
++        drawing_shown: &AtomicBool,
++        render_token: &mut Option<cua_driver_contract::CompanionRenderToken>,
++        coordinate_trace: &mut Option<Value>,
++        comparison_diagnostics: &mut Option<cua_driver_contract::CaptureComparison>,
++        strokes_presented: &mut Vec<PresentedStroke>,
++        operation_started: Instant,
++        timings: &mut TeachingGuidanceTimings,
++    ) -> Result<(), &'static str> {
++        let captures = &self.state.companion_captures;
++        let binding = captures
++            .binding_from_args(args)
++            .map_err(|_| "capture_unavailable")?;
++        let requested_capture_id = captures
++            .parse_capture_id(&input.capture_id)
++            .map_err(|_| "capture_unavailable")?;
++        let original = captures
++            .read_for_perception(requested_capture_id, &binding)
++            .map_err(|_| "capture_unavailable")?;
++        if original.target() != &CaptureTarget::PrimaryDesktop {
++            return Err("geometry_changed");
++        }
++        let (width, height, scale) = main_screen_size().ok_or("geometry_changed")?;
++        if !crate::overlay::has_primary_guidance_geometry(width, height, scale) {
++            return Err("geometry_changed");
++        }
++        let original_dimensions = original.presentation_dimensions();
++        let encoded = original.encoded_dimensions();
++        if original_dimensions.width() as i64 != width
++            || original_dimensions.height() as i64 != height
++            || ((encoded.width() as f64 / encoded.height() as f64) - (width as f64 / height as f64))
++                .abs()
++                > 0.01
++        {
++            return Err("geometry_changed");
++        }
++        let start = state()
++            .lock()
++            .unwrap()
++            .pointer
++            .or_else(cua_driver_core::cursor_sampler::read_cursor_position)
++            .ok_or("geometry_changed")?;
++        // Compile once against the bound original capture, before checking refresh.
++        let compile_started = Instant::now();
++        let plan = input
++            .drawing
++            .as_ref()
++            .map(|drawing| ScribblePlan::compile(drawing, start, width as f64, height as f64))
++            .transpose()?;
++        timings.compile_ms = elapsed_ms(compile_started);
++        let duration_ms = plan.as_ref().map_or(0, |plan| plan.duration_ms);
++        let generation = {
++            let mut state = state().lock().unwrap();
++            if let Some(reason) = state.terminal {
++                return Err(reason);
++            }
++            if state
++                .task_input
++                .is_some_and(|initial| read_user_input_counters() != initial)
++            {
++                return Err("user_takeover");
++            }
++            state.begin_sequence(session).map_err(|_| "busy")?
++        };
++        let deadline = Instant::now() + Duration::from_millis(duration_ms + 5000);
++        let admission_check = || {
++            check_guidance(session, generation, deadline, &|| {
++                main_screen_size() == Some((width, height, scale))
++                    && captures
++                        .read_for_perception(requested_capture_id, &binding)
++                        .is_ok()
++            })
++        };
++        admission_check()?;
++        // Internal capture adapter receives only capture options plus authenticated
++        // transport metadata. No screenshot is returned by this private tool.
++        let mut refresh_args = args.clone();
++        if let Some(object) = refresh_args.as_object_mut() {
++            for field in [
++                "capture_id",
++                "targets",
++                "hud_group",
++                "teaching_locale",
++                "teaching_message",
++                "presentation_id",
++                "text_only",
++                "presentation_version",
++                "drawing",
++            ] {
++                object.remove(field);
++            }
++        }
++        let refresh_started = Instant::now();
++        let refreshed = super::super::impl_::GetDesktopStateTool::new(self.state.clone())
++            .invoke(refresh_args)
++            .await;
++        timings.refresh_ms = elapsed_ms(refresh_started);
++        if refreshed.is_error == Some(true) {
++            return Err("capture_unavailable");
++        }
++        if main_screen_size() != Some((width, height, scale)) {
++            return Err("geometry_changed");
++        }
++        admission_check()?;
++        let fresh_id = refreshed
++            .structured_content
++            .as_ref()
++            .and_then(|result| result.get("capture_id"))
++            .and_then(Value::as_str)
++            .ok_or("capture_unavailable")?
++            .to_owned();
++        let capture_id = captures
++            .parse_capture_id(&fresh_id)
++            .map_err(|_| "capture_unavailable")?;
++        let fresh = captures
++            .read_for_presentation(capture_id, &binding, Duration::from_secs(5))
++            .map_err(|_| "capture_unavailable")?;
++        let targets = input.targets.clone();
++        let comparison_started = Instant::now();
++        let (plan, report) = tokio::task::spawn_blocking(move || {
++            let report = super::super::guidance_capture::compare_captures(
++                &original,
++                &fresh,
++                &targets,
++                plan.as_ref(),
++            );
++            (plan, report)
++        })
++        .await
++        .map_err(|_| "capture_unavailable")?;
++        timings.comparison_ms = elapsed_ms(comparison_started);
++        if main_screen_size() != Some((width, height, scale)) {
++            return Err("geometry_changed");
++        }
++        let report = report?;
++        let matched = report.matched;
++        *comparison_diagnostics = Some(report.clone());
++        if !matched {
++            return Err("target_changed");
++        }
++        let check = || {
++            check_guidance(session, generation, deadline, &|| {
++                main_screen_size() == Some((width, height, scale))
++                    && captures.read_for_perception(capture_id, &binding).is_ok()
++                    && captures
++                        .read_for_perception(requested_capture_id, &binding)
++                        .is_ok()
++            })
++        };
++        check()?;
++        // Preserve the existing five-second admission bound after comparison:
++        // slow local checking must not turn an old refresh into a fresh cue.
++        captures
++            .read_for_presentation(capture_id, &binding, Duration::from_secs(5))
++            .map_err(|_| "capture_unavailable")?;
++        if let Some(plan) = plan.as_ref() {
++            *coordinate_trace = Some(json!({
++                "requested_capture_id":input.capture_id,"capture_id":fresh_id,
++                "screen_size_points":[width,height],"capture_size_px":[encoded.width(),encoded.height()],"display_scale":scale,
++                "targets_normalized":input.targets,
++                "planned_strokes":plan.strokes.iter().enumerate().map(|(index,stroke)|json!({"stroke_index":index,"cue_bounds_points":stroke.bounds})).collect::<Vec<_>>(),"painted_strokes":[]
++            }));
++        }
++        // Message and drawing belong to one immutable identity. Input/display
++        // fences are checked again after refresh and immediately before install.
++        let presentation_started = Instant::now();
++        *render_token = Some(
++            crate::overlay::present_companion_message(
++                session,
++                &input.hud_group,
++                input.teaching_locale,
++                input.teaching_message.clone(),
++            )
++            .await?,
++        );
++        message_shown.store(true, Ordering::Release);
++        check()?;
++        if let Some(plan) = plan.as_ref() {
++            self.play_scribble(
++                session,
++                generation,
++                start,
++                plan,
++                &check,
++                drawing_shown,
++                coordinate_trace,
++                strokes_presented,
++                operation_started,
++                timings,
++            )
++            .await?;
++        }
++        timings.presentation_ms = Some(elapsed_ms(presentation_started));
++        check()?;
++        {
++            let mut state = state().lock().unwrap();
++            if state.generation != generation || state.terminal.is_some() {
++                return Err(state.terminal.unwrap_or("explicit_stop"));
++            }
++            state.active = false;
++        }
++        Ok(())
++    }
++
++    async fn play_scribble(
++        &self,
++        session: &str,
++        generation: u64,
++        start: (f64, f64),
++        plan: &ScribblePlan,
++        check: &(impl Fn() -> Result<(), &'static str> + Sync),
++        drawing_shown: &AtomicBool,
++        coordinate_trace: &mut Option<Value>,
++        strokes_presented: &mut Vec<PresentedStroke>,
++        operation_started: Instant,
++        timings: &mut TeachingGuidanceTimings,
++    ) -> Result<(), &'static str> {
++        let reduced = crate::overlay::companion_reduced_motion();
++        let mut previous = start;
++        for (stroke_index, stroke) in plan.strokes.iter().enumerate() {
++            let first = stroke.path[0];
++            if stroke.approach_ms > 0 {
++                animate_phase(
++                    session,
++                    generation,
++                    if reduced { 0 } else { stroke.approach_ms },
++                    check,
++                    |p| (point_on_path(&[previous, first], p), vec![], 0.0, false),
++                    |_, _, _| Ok(()),
++                )
++                .await?;
++            }
++            let mut evidence = StepEvidence::default();
++            animate_phase(session,generation,if reduced {0}else{stroke.trace_ms},check,
++                |p|{let cue=reveal_path(&stroke.path,p);let pointer=cue.last().copied().unwrap_or(first);(pointer,cue,1.0,false)},
++                |p,at,geometry|{
++                    // Only geometry stamped by an installed nonempty drawing frame
++                    // may advance drawing evidence. Pointer frames cannot qualify.
++                    if let Some(geometry)=geometry {
++                        if has_visible_stroke(&reveal_path(&stroke.path,p)) {
++                            drawing_shown.store(true,Ordering::Release);
++                            timings.first_frame_ms.get_or_insert((at.saturating_duration_since(operation_started).as_millis() as u64).min(120000));
++                            if let Some(trace)=coordinate_trace.as_mut() {
++                                let painted=trace["painted_strokes"].as_array_mut().ok_or("invalid_request")?;
++                                let entry=json!({"stroke_index":stroke_index,"trace_progress":p,"geometry":geometry});
++                                if let Some(existing)=painted.iter_mut().find(|entry|entry["stroke_index"]==stroke_index) {*existing=entry;}else{painted.push(entry);}
++                            }
++                            if let Some(existing)=strokes_presented.iter_mut().find(|stroke|stroke.stroke_index==stroke_index) {existing.trace_progress=p;}
++                            else {strokes_presented.push(PresentedStroke {stroke_index,trace_progress:p,hold_ms_observed:0});}
++                            return evidence.record_trace(p,at);
++                        }
++                    }
++                    if p>=1.0 {Err("render_timeout")}else{Ok(())}
++                }).await?;
++            let hold_started = evidence.hold_started().ok_or("render_timeout")?;
++            let last = *stroke.path.last().ok_or("invalid_request")?;
++            while hold_started.elapsed() < Duration::from_millis(stroke.hold_ms) {
++                check()?;
++                tokio::time::sleep(Duration::from_millis(16)).await;
++            }
++            let (rendered_at, geometry) = present_frame(
++                session,
++                generation,
++                last,
++                stroke.path.clone(),
++                1.0,
++                false,
++                check,
++            )
++            .await?;
++            if geometry.is_none() {
++                return Err("render_timeout");
++            }
++            evidence.finish_hold(rendered_at, stroke.hold_ms, reduced)?;
++            let receipt = strokes_presented
++                .iter_mut()
++                .find(|entry| entry.stroke_index == stroke_index)
++                .ok_or("render_timeout")?;
++            receipt.hold_ms_observed = rendered_at
++                .saturating_duration_since(hold_started)
++                .as_millis() as u64;
++            animate_phase(
++                session,
++                generation,
++                if reduced { 0 } else { FADE_MS },
++                check,
++                |p| (last, stroke.path.clone(), (1.0 - p) as f32, false),
++                |_, _, _| Ok(()),
++            )
++            .await?;
++            present_frame(session, generation, last, vec![], 0.0, false, check).await?;
++            previous = last;
++        }
++        animate_phase(
++            session,
++            generation,
++            if reduced { 0 } else { RETURN_MS },
++            check,
++            |p| {
++                let target = cua_driver_core::cursor_sampler::read_cursor_position()
++                    .map(|(x, y)| (x + 24.0, y + 24.0))
++                    .unwrap_or(previous);
++                (point_on_path(&[previous, target], p), vec![], 0.0, false)
++            },
++            |_, _, _| Ok(()),
++        )
++        .await?;
++        let frame = {
++            let mut state = state().lock().unwrap();
++            let point = state.pointer.unwrap_or(previous);
++            state.create_frame(point, vec![], 0.0, false, true, false)
++        };
++        if !crate::overlay::present_guidance_frame(session, frame.clone()) {
++            return Err("transport_failed");
++        }
++        await_receipt(&frame, MAX_FRAME_GAP, check).await?;
++        Ok(())
++    }
++}
++
++fn snapshot_task(session: &str, epoch: &str, status: &str) -> ToolResult {
++    let state = state().lock().unwrap();
++    ToolResult::text(status).with_structured(json!({"status":status,"task_epoch":epoch,"following":state.owner.as_deref()==Some(session)&&state.following,"active":false}))
++}
++
++#[cfg(test)]
++mod companion_tests {
++    use super::*;
++    #[test]
++    fn companion_paired_ack_requires_visible_cue_and_cancellation_wins() {
++        assert!(!has_visible_stroke(&[]));
++        assert!(!has_visible_stroke(&[(1.0, 1.0)]));
++        assert!(!has_visible_stroke(&[(1.0, 1.0), (1.001, 1.0)]));
++        assert!(has_visible_stroke(&[(1.0, 1.0), (10.0, 1.0)]));
++        assert!(can_acknowledge_presentation(Ok(()), true, true, false));
++        assert!(can_acknowledge_presentation(
++            Err("user_takeover"),
++            true,
++            true,
++            false
++        ));
++        assert!(!can_acknowledge_presentation(
++            Err("user_takeover"),
++            true,
++            false,
++            false
++        ));
++        assert!(!can_acknowledge_presentation(
++            Err("explicit_stop"),
++            true,
++            true,
++            false
++        ));
++        assert!(!can_acknowledge_presentation(
++            Err("session_lost"),
++            true,
++            true,
++            false
++        ));
++        assert!(can_acknowledge_presentation(Ok(()), true, false, true));
++        assert!(!can_acknowledge_presentation(
++            Err("user_takeover"),
++            true,
++            false,
++            true
++        ));
++    }
++    #[test]
++    fn companion_cancel_fences_queued_frames_and_latches_task() {
++        let mut state = CompanionSession::default();
++        state.task_epoch = Some(uuid::Uuid::new_v4().to_string());
++        state.begin_sequence("teacher").unwrap();
++        let frame = state.create_frame((10.0, 10.0), vec![(1.0, 1.0)], 1.0, true, true, false);
++        assert!(frame.is_current());
++        assert!(state.cancel_sequence("teacher"));
++        assert!(!frame.is_current());
++        assert!(state.begin_sequence("teacher").is_err());
++        assert_eq!(state.terminal, Some("explicit_stop"));
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/tools/impl_.rs b/libs/cua-driver/rust/crates/platform-windows/src/tools/impl_.rs
+index 453d2ee..9a6dce0 100644
+--- a/libs/cua-driver/rust/crates/platform-windows/src/tools/impl_.rs
++++ b/libs/cua-driver/rust/crates/platform-windows/src/tools/impl_.rs
+@@ -551,13 +551,18 @@ pub struct ToolState {
+     pub zoom_registry: Arc<ZoomRegistry>,
+     pub config: Arc<RwLock<DriverConfig>>,
+     capture_bridge: Option<Arc<crate::capture_admission::WindowsCaptureBridge>>,
++    pub(super) companion_captures: Arc<cua_driver_core::capture_runtime::CaptureService>,
++    pub(super) cursor_overlay_available: bool,
+ }
+ 
+ impl ToolState {
+     pub fn new(
+         capture_service: Option<Arc<cua_driver_core::capture_runtime::CaptureService>>,
+     ) -> Arc<Self> {
++        let companion_captures = capture_service.clone().unwrap_or_default();
+         Arc::new(Self {
++            companion_captures,
++            cursor_overlay_available: crate::overlay::is_initialized(),
+             element_cache: Arc::new(ElementCache::new()),
+             cursor_registry: Arc::new(CursorRegistry::new()),
+             zoom_registry: Arc::new(ZoomRegistry::new()),
+@@ -7790,6 +7795,11 @@ impl Tool for GetScreenSizeTool {
+ pub struct GetDesktopStateTool {
+     state: Arc<ToolState>,
+ }
++impl GetDesktopStateTool {
++    pub(super) fn new(state: Arc<ToolState>) -> Self {
++        Self { state }
++    }
++}
+ static GDS_DEF: std::sync::OnceLock<ToolDef> = std::sync::OnceLock::new();
+ 
+ #[async_trait]
+@@ -7817,6 +7827,8 @@ impl Tool for GetDesktopStateTool {
+     async fn invoke(&self, args: Value) -> ToolResult {
+         use cua_driver_core::protocol::Content;
+         let binding_args = args.clone();
++        let observation =
++            super::desktop_observation_tools::read_capture_observation(&resolve_cursor_key(&args));
+         let input = match parse_typed_input::<GetDesktopStateInput>("get_desktop_state", args) {
+             Ok(input) => input,
+             Err(error) => return error,
+@@ -7929,6 +7941,9 @@ impl Tool for GetDesktopStateTool {
+                 }
+             }
+         }
++        if let Some(observation) = observation {
++            structured["observation"] = observation;
++        }
+         if let Some(ref fp) = file_path {
+             structured["screenshot_file_path"] = json!(fp);
+         }
+@@ -10065,6 +10080,9 @@ pub fn build_registry_with_provider(
+         cua_driver_core::session::register_scoped_session_end_hook(move |session_id| {
+             zoom_registry.retire_session(session_id);
+             element_cache.retire_session_screenshots(session_id);
++            super::companion_tools::retire_session(session_id);
++            super::desktop_observation_tools::retire_session(session_id);
++            crate::overlay::retire_companion_hud(session_id, false);
+             cursor_registry.remove(session_id);
+             crate::overlay::remove_cursor(session_id.to_owned());
+         });
+@@ -10080,6 +10098,9 @@ pub fn build_registry_with_provider(
+         let prefix = format!("__cua_runtime_{runtime_scope}:");
+         let cursor_registry = state.cursor_registry.clone();
+         r.retain_runtime_cleanup(move || {
++            super::companion_tools::retire_runtime(&prefix);
++            super::desktop_observation_tools::retire_runtime(&prefix);
++            crate::overlay::retire_companion_hud(&prefix, true);
+             for cursor in cursor_registry
+                 .all_states()
+                 .into_iter()
+@@ -10245,6 +10266,9 @@ pub fn build_registry_with_provider(
+     );
+     cua_driver_core::browser::register_browser_tools(&browser_engine, &mut r);
+     r.register_recording_tools();
++    super::companion_tools::register_tools(&mut r, state.clone());
++    super::companion_hud_tools::register_tools(&mut r, state.clone());
++    super::desktop_observation_tools::register_tools(&mut r);
+     r.register_session_tools();
+     r
+ }
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/tools/mod.rs b/libs/cua-driver/rust/crates/platform-windows/src/tools/mod.rs
+index b7c4793..88ec9d4 100644
+--- a/libs/cua-driver/rust/crates/platform-windows/src/tools/mod.rs
++++ b/libs/cua-driver/rust/crates/platform-windows/src/tools/mod.rs
+@@ -5,8 +5,33 @@
+ 
+ use cua_driver_core::tool::ToolRegistry;
+ 
++#[cfg(target_os = "windows")]
++#[path = "CompanionHudTools.rs"]
++mod companion_hud_tools;
++#[cfg(target_os = "windows")]
++#[path = "CompanionTools.rs"]
++mod companion_tools;
++#[cfg(target_os = "windows")]
++#[path = "DesktopObservation.rs"]
++mod desktop_observation_tools;
++#[cfg(target_os = "windows")]
++#[path = "GuidanceCapture.rs"]
++mod guidance_capture;
+ #[cfg(target_os = "windows")]
+ mod impl_;
++
++#[cfg(target_os = "windows")]
++fn main_screen_size() -> Option<(i64, i64, f64)> {
++    use windows::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
++    let (width, height) = unsafe { (GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)) };
++    // Windows capture and overlay coordinates are physical pixels under per-monitor DPI awareness.
++    (width > 0 && height > 0).then_some((i64::from(width), i64::from(height), 1.0))
++}
++
++#[cfg(target_os = "windows")]
++fn cursor_overlay_unavailable() -> cua_driver_core::protocol::ToolResult {
++    cua_driver_core::protocol::ToolResult::error("Native cursor overlay is unavailable.")
++}
+ #[cfg(target_os = "windows")]
+ pub(crate) mod page;
+ #[cfg(target_os = "windows")]

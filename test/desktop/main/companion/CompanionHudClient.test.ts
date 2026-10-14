@@ -22,6 +22,27 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 describe('persistent HUD presentation connection', () => {
+  it('reports a bounded startup reason without exposing native errors', async () => {
+    vi.useFakeTimers();
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const unavailableDriver = {
+      start: vi
+        .fn<DesktopDriverPort['start']>()
+        .mockRejectedValue(new Error('private native error')),
+    };
+    const client = new CompanionHudClient('/worker', unavailableDriver);
+    try {
+      await client.start();
+      expect(warning).toHaveBeenCalledExactlyOnceWith('companion.presentation.failed', {
+        stage: 'start',
+        reason: 'driver_unavailable',
+      });
+    } finally {
+      client.dispose();
+      warning.mockRestore();
+    }
+  });
+
   it('replays only the latest snapshot when the connection becomes ready', async () => {
     vi.useFakeTimers();
     const child = new Child();

@@ -10,9 +10,14 @@ import { prepareCuaDriver } from './PrepareCuaDriver.js';
 const runFile = promisify(execFile);
 const digest = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
-if (process.platform !== 'darwin' || !['arm64', 'x64'].includes(process.arch)) {
-  throw new Error('Native teaching companion currently supports macOS arm64/x64 only.');
+if (!['darwin', 'win32'].includes(process.platform) || !['arm64', 'x64'].includes(process.arch)) {
+  throw new Error('Native teaching companion supports macOS and Windows arm64/x64.');
 }
+const windowsTarget =
+  process.arch === 'arm64' ? 'aarch64-pc-windows-msvc' : 'x86_64-pc-windows-msvc';
+const targetArgs = process.platform === 'win32' ? ['--target', windowsTarget] : [];
+const nativePlatform = process.platform === 'win32' ? 'platform-windows' : 'platform-macos';
+const executableName = process.platform === 'win32' ? 'cua-driver.exe' : 'cua-driver';
 const cacheRoot = join(homedir(), '.cache', 'tro');
 await mkdir(cacheRoot, { recursive: true });
 const temporary = await mkdtemp(join(tmpdir(), 'tro-cua-companion-'));
@@ -55,7 +60,7 @@ try {
         'cua-driver-contract',
         'cua-driver-core',
         'cursor-overlay',
-        'platform-macos',
+        nativePlatform,
       ],
       filter: 'companion',
     },
@@ -69,6 +74,7 @@ try {
       [
         'test',
         '--locked',
+        ...targetArgs,
         ...selection.packages.flatMap((packageName) => ['-p', packageName]),
         selection.filter,
         '--target-dir',
@@ -80,14 +86,33 @@ try {
   }
   await runFile(
     'cargo',
-    ['build', '--locked', '--release', '-p', 'cua-driver', '--target-dir', targetDirectory],
+    [
+      'build',
+      '--locked',
+      ...targetArgs,
+      '--release',
+      '-p',
+      'cua-driver',
+      '--target-dir',
+      targetDirectory,
+    ],
     { cwd: rustDirectory, maxBuffer: 16 * 1024 * 1024 },
   );
   await prepareCuaDriver(stage);
-  const executablePath = join(stage, 'cua-driver');
-  await cp(join(targetDirectory, 'release', 'cua-driver'), executablePath);
+  const executablePath = join(stage, executableName);
+  await cp(
+    join(
+      targetDirectory,
+      ...(process.platform === 'win32' ? [windowsTarget] : []),
+      'release',
+      executableName,
+    ),
+    executablePath,
+  );
   /* Local ad-hoc signature; Tro's embedded host owns macOS attribution. */
-  await runFile('/usr/bin/codesign', ['--force', '--sign', '-', executablePath]);
+  if (process.platform === 'darwin') {
+    await runFile('/usr/bin/codesign', ['--force', '--sign', '-', executablePath]);
+  }
   const executableVersion = await runFile(executablePath, ['--version'], { maxBuffer: 4096 });
   if (executableVersion.stdout.trim().split(/\s+/).at(-1) !== CuaCompanionBuild.VERSION) {
     throw new Error('Native executable version does not match the companion build contract.');
