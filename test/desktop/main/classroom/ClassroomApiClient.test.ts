@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ClassroomAdminCapability } from '#contracts/Classroom.js';
+import { ClassroomAdminCapability, ClassroomOrganizationCapability } from '#contracts/Classroom.js';
 import { StudentAccessCapability } from '#contracts/StudentAccess.js';
 import { AccountRole } from '#contracts/AccountRole.js';
 import { ClassroomApiClient } from '../../../../src/desktop/main/classroom/ClassroomApiClient.js';
@@ -30,6 +30,7 @@ describe('classroom main HTTP client', () => {
           cookie: 'synthetic-session',
           'content-type': 'application/json',
           [ClassroomAdminCapability.HEADER]: ClassroomAdminCapability.VERSION,
+          [ClassroomOrganizationCapability.HEADER]: ClassroomOrganizationCapability.VERSION,
           [StudentAccessCapability.HEADER]: StudentAccessCapability.VERSION,
         },
         body: JSON.stringify({ kind: 'home' }),

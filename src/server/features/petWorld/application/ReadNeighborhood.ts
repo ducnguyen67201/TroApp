@@ -12,11 +12,11 @@ export async function requireNeighborhoodAccess(
   classId: string,
 ): Promise<void> {
   const schoolClass = await transaction.readClassAccess(classId);
-  const role = await transaction.readAccountRole(actorId);
+  const role = await transaction.readClassRole(actorId, classId);
   if (
     schoolClass &&
     !schoolClass.deleted &&
-    schoolClass.teacherId === actorId &&
+    (schoolClass.teacherIds?.includes(actorId) ?? schoolClass.teacherId === actorId) &&
     role === AccountRole.TEACHER
   ) {
     return;

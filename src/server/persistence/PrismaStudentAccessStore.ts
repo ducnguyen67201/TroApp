@@ -18,6 +18,7 @@ async function assertClassOwner(client: Client, teacherId: string, classId: stri
   const schoolClass = await client.classroomGroup.findFirst({
     where: {
       id: classId,
+      organizationId: null,
       teacherId,
       deletedAt: null,
       teacher: { role: 'teacher', emailVerified: true },
@@ -45,6 +46,7 @@ async function readDeviceContext(
     client.classroomGroup.findFirst({
       where: {
         id: device.classId,
+        organizationId: null,
         deletedAt: null,
         teacher: { role: 'teacher', emailVerified: true },
       },

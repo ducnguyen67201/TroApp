@@ -1,9 +1,14 @@
+import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import type { Logger } from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { AccountRole } from '#contracts/AccountRole.js';
-import { ClassroomAdminCapability, ClassroomFailure } from '#contracts/Classroom.js';
+import {
+  ClassroomAdminCapability,
+  ClassroomOrganizationCapability,
+  ClassroomFailure,
+} from '#contracts/Classroom.js';
 import { ClassroomService } from '../../../../src/server/features/classroom/application/ClassroomService.js';
 import { registerClassroomRoutes } from '../../../../src/server/features/classroom/infrastructure/RegisterClassroomRoutes.js';
 import { createCourseContent, MemoryClassroomStore } from './ClassroomFixtures.js';
@@ -150,4 +155,46 @@ describe('classroom HTTP response compatibility', () => {
       await api.close();
     }
   });
+});
+
+it('negotiates teaching organizations separately from existing admin metadata', async () => {
+  const { api, store, schoolClass } = await createClassroomApi();
+  const organizationId = randomUUID();
+  store.classOrganizations.set(schoolClass.id, organizationId);
+  store.organizationMemberships.set(`${organizationId}:teacher`, {
+    organizationId,
+    name: 'Teaching team',
+    role: AccountRole.TEACHER,
+  });
+  try {
+    const oldResponse = await api.inject({
+      method: 'POST',
+      url: '/api/v1/classroom/command',
+      headers: { [ClassroomAdminCapability.HEADER]: ClassroomAdminCapability.VERSION },
+      payload: { kind: 'home' },
+    });
+    expect(oldResponse.json<unknown>()).toMatchObject({ home: { isAdmin: false } });
+    const olderAdminReplySchema = LegacyHomeReplySchema.extend({
+      home: LegacyHomeReplySchema.shape.home.extend({ isAdmin: z.boolean() }),
+    });
+    expect(olderAdminReplySchema.safeParse(oldResponse.json<unknown>()).success).toBe(true);
+    const response = await api.inject({
+      method: 'POST',
+      url: '/api/v1/classroom/command',
+      headers: {
+        [ClassroomAdminCapability.HEADER]: ClassroomAdminCapability.VERSION,
+        [ClassroomOrganizationCapability.HEADER]: ClassroomOrganizationCapability.VERSION,
+      },
+      payload: { kind: 'home' },
+    });
+    expect(response.json<unknown>()).toMatchObject({
+      home: {
+        isAdmin: false,
+        teachingOrganizations: [{ id: organizationId, name: 'Teaching team' }],
+        classes: [{ canTeach: true }],
+      },
+    });
+  } finally {
+    await api.close();
+  }
 });

@@ -49,9 +49,11 @@ import { useLocale } from './localization/UseLocale.js';
 import { useDesktopPermissions } from './UseDesktopPermissions.js';
 import { useCursorCompanion } from './UseCursorCompanion.js';
 import { DesktopWindowAppearance } from '../DesktopAppearance.js';
-import { TroIcon } from './TroIcon.js';
+import { OrganizationBrand } from './team/OrganizationBrand.js';
 import { AppUpdateButton } from './updates/AppUpdateButton.js';
 import { ClassroomPage } from './classroom/ClassroomPage.js';
+import { useOrganizationSetup } from './team/UseOrganizationSetup.js';
+import { OrganizationSetupDialog } from './team/OrganizationSetupDialog.js';
 import { AccountRole } from '#contracts/AccountRole.js';
 import { PetWorldPage } from './petWorld/PetWorldPage.js';
 
@@ -113,6 +115,10 @@ export function App(): ReactElement {
   const accountTransition =
     controller.isSigning || controller.isSwitchingAccount || controller.isSigningOut;
   const activeUserId = accountTransition ? null : (user?.id ?? null);
+  const [teamRevision, setTeamRevision] = useState(0);
+  const [logoOrganizationId, setLogoOrganizationId] = useState<string | null>(null);
+  const organizationSetup = useOrganizationSetup(user?.learner ? null : activeUserId);
+  const workspaceUserId = organizationSetup.isBlocking ? null : activeUserId;
   const analytics = useAnalytics(
     controller.isLoading || accountTransition
       ? null
@@ -120,9 +126,9 @@ export function App(): ReactElement {
         ? analyticsScreens[page]
         : AnalyticsScreen.SIGN_IN,
   );
-  const voiceUserId = user?.learner ? null : activeUserId;
+  const voiceUserId = user?.learner ? null : workspaceUserId;
   const voiceover = useVoiceover(voiceUserId);
-  const onboarding = useOnboarding(activeUserId);
+  const onboarding = useOnboarding(workspaceUserId);
   const workspaceAnchor = useRef<HTMLButtonElement>(null);
   const classesAnchor = useRef<HTMLButtonElement>(null);
   const insightsAnchor = useRef<HTMLButtonElement>(null);
@@ -155,6 +161,7 @@ export function App(): ReactElement {
 
   const microphoneTests = useMicrophoneTests(Boolean(user) && !accountTransition, microphones);
   const canTestMicrophone =
+    !organizationSetup.isBlocking &&
     Boolean(user) &&
     !accountTransition &&
     !controller.isSending &&
@@ -196,7 +203,7 @@ export function App(): ReactElement {
   }, [dialogs.state.microphone, canTestMicrophone, microphoneTests.cancelTest]);
 
   useEffect(() => {
-    if (!user || accountTransition) {
+    if (!user || accountTransition || organizationSetup.isBlocking) {
       closeDialog(DesktopDialog.MICROPHONE);
       closeDialog(DesktopDialog.SETTINGS);
       closeDialog(DesktopDialog.WHATS_NEW);
@@ -205,10 +212,17 @@ export function App(): ReactElement {
     if (voice.status.state === VoiceState.IDLE) {
       void microphones.refreshMicrophones();
     }
-  }, [user, accountTransition, voice.status.state, microphones.refreshMicrophones, closeDialog]);
+  }, [
+    user,
+    accountTransition,
+    organizationSetup.isBlocking,
+    voice.status.state,
+    microphones.refreshMicrophones,
+    closeDialog,
+  ]);
   const permissions = useDesktopPermissions(user?.id ?? null);
   const companionMessage = useCursorCompanion(
-    activeUserId,
+    workspaceUserId,
     permissions.status?.kind === 'ready' && !accountTransition,
   );
   const previousPermissionKind = useRef(permissions.status?.kind);
@@ -222,6 +236,7 @@ export function App(): ReactElement {
 
   useEffect(() => {
     const canShowTour =
+      !organizationSetup.isBlocking &&
       Boolean(activeUserId) &&
       permissions.status?.kind === 'ready' &&
       !controller.isSending &&
@@ -238,6 +253,7 @@ export function App(): ReactElement {
     }
   }, [
     activeUserId,
+    organizationSetup.isBlocking,
     permissions.status?.kind,
     controller.isSending,
     controller.isResetting,
@@ -250,6 +266,11 @@ export function App(): ReactElement {
 
   return (
     <>
+      <OrganizationSetupDialog
+        key={activeUserId ?? 'signed-out'}
+        view={organizationSetup}
+        onSignOut={controller.signOut}
+      />
       <Modal.Stack>
         <WhatsNewDialog
           {...dialogs.register(DesktopDialog.WHATS_NEW)}
@@ -265,7 +286,17 @@ export function App(): ReactElement {
               returnSettingsFocus();
             }
           }}
-          user={user}
+          user={accountTransition ? null : user}
+          onCreateOrganization={() => {
+            closeDialog(DesktopDialog.SETTINGS);
+            organizationSetup.openChoice();
+          }}
+          teamOrganizationId={logoOrganizationId}
+          onTeamChanged={() => {
+            setAccountRole(null);
+            setTeamRevision((revision) => revision + 1);
+            void organizationSetup.refresh();
+          }}
           onboarding={onboarding}
           analytics={analytics}
           microphones={microphones}
@@ -311,9 +342,20 @@ export function App(): ReactElement {
       >
         <AppShell.Header className="window-titlebar" withBorder={false} aria-hidden="true" />
         {user && (
-          <AppShell.Navbar className="desktop-sidebar" withBorder={false}>
+          <AppShell.Navbar
+            className="desktop-sidebar"
+            withBorder={false}
+            inert={organizationSetup.isBlocking}
+          >
             <Group gap={10} className="brand">
-              <TroIcon size={32} />
+              <OrganizationBrand
+                accountId={user.id}
+                organizations={accountTransition ? [] : organizationSetup.organizations}
+                onEditLogo={(organizationId) => {
+                  setLogoOrganizationId(organizationId);
+                  dialogs.open(DesktopDialog.SETTINGS);
+                }}
+              />
               <Stack gap={3}>
                 <Text fw={650} size="xl">
                   Tro
@@ -466,6 +508,7 @@ export function App(): ReactElement {
                 aria-haspopup="dialog"
                 aria-expanded={dialogs.state.settings}
                 onClick={() => {
+                  setLogoOrganizationId(null);
                   dialogs.open(DesktopDialog.SETTINGS);
                 }}
               >
@@ -495,7 +538,10 @@ export function App(): ReactElement {
               <Text size="sm">{messages.accountSwitching}</Text>
             </div>
           )}
-          <div className="main-panel" inert={accountTransition && Boolean(user)}>
+          <div
+            className="main-panel"
+            inert={(accountTransition && Boolean(user)) || organizationSetup.isBlocking}
+          >
             <div className="panel-content">
               {(controller.message || companionMessage) && (
                 <Alert
@@ -564,6 +610,7 @@ export function App(): ReactElement {
                             aria-haspopup="dialog"
                             aria-expanded={dialogs.state.settings}
                             onClick={() => {
+                              setLogoOrganizationId(null);
                               dialogs.open(DesktopDialog.SETTINGS);
                             }}
                           >
@@ -575,9 +622,10 @@ export function App(): ReactElement {
                   />
                 )}
               </div>
-              {user && !accountTransition && (
+              {user && !accountTransition && !organizationSetup.isBlocking && (
                 <ClassroomPage
                   key={user.id}
+                  refreshRevision={teamRevision}
                   userId={user.id}
                   userName={user.name}
                   navigation={navigation}
@@ -596,19 +644,25 @@ export function App(): ReactElement {
                   onRoleChange={setAccountRole}
                 />
               )}
-              {user && !accountTransition && page === DesktopPage.LESSON_VIDEOS && (
-                <LessonVideosPage key={user.id} locale={locale} />
-              )}
-              {user && !accountTransition && page === DesktopPage.PET_WORLD && (
-                <PetWorldPage
-                  key={user.id}
-                  userId={user.id}
-                  userName={user.name}
-                  initialClassId={navigation.route.classId}
-                  onChooseClass={navigation.openPetWorld}
-                  onRoleChange={setAccountRole}
-                />
-              )}
+              {user &&
+                !accountTransition &&
+                !organizationSetup.isBlocking &&
+                page === DesktopPage.LESSON_VIDEOS && (
+                  <LessonVideosPage key={user.id} locale={locale} />
+                )}
+              {user &&
+                !accountTransition &&
+                !organizationSetup.isBlocking &&
+                page === DesktopPage.PET_WORLD && (
+                  <PetWorldPage
+                    key={user.id}
+                    userId={user.id}
+                    userName={user.name}
+                    initialClassId={navigation.route.classId}
+                    onChooseClass={navigation.openPetWorld}
+                    onRoleChange={setAccountRole}
+                  />
+                )}
             </div>
           </div>
         </AppShell.Main>
@@ -619,6 +673,7 @@ export function App(): ReactElement {
         anchors={onboardingAnchors}
         role={accountRole}
         canPresent={
+          !organizationSetup.isBlocking &&
           Boolean(activeUserId) &&
           !dialogs.state.settings &&
           !dialogs.state.microphone &&

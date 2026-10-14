@@ -16,6 +16,9 @@ import type {
 /** Transaction-scoped persistence only; no nested transaction, network, or Prisma surface. */
 export interface PetWorldTransaction {
   readAccountRole(userId: string): Promise<AccountRole | null>;
+  /** New personal worlds also belong to enrolled organization students, regardless of global role. */
+  hasOrganizationStudentEnrollment(userId: string): Promise<boolean>;
+  readClassRole(userId: string, classId: string): Promise<AccountRole | null>;
   readClassAccess(classId: string): Promise<PetClassAccess | null>;
   listClassRoster(classId: string): Promise<PetRosterStudent[]>;
   isEnrolled(classId: string, studentId: string): Promise<boolean>;

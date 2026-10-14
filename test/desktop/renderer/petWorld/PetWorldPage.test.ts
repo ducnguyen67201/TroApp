@@ -18,6 +18,7 @@ import { PetWorldPage } from '../../../../src/desktop/renderer/petWorld/PetWorld
 import {
   emptyGarden,
   emptyRecognition,
+  createOwnWorld,
   petWorldClassId,
   teacherClassroom,
 } from './PetWorldFixtures.js';
@@ -107,4 +108,78 @@ it('retries the persisted original award without creating a new request ID', asy
   await waitFor(() => {
     expect(screen.queryByRole('button', { name: 'Retry original action' })).toBeNull();
   });
+});
+
+it('opens the personal home when a teacher selects a class they attend as a student', async () => {
+  const joinedClassId = '66666666-6666-4666-8666-666666666666';
+  const bridge = {
+    executePetWorld: vi
+      .fn<NonNullable<DesktopBridge['executePetWorld']>>()
+      .mockImplementation((command) => {
+        if (command.kind === PetWorldCommandKind.OWN_WORLD) {
+          return Promise.resolve({ kind: 'world', world: createOwnWorld('teacher') });
+        }
+        if (command.kind === PetWorldCommandKind.CLASS_RECOGNITION) {
+          return Promise.resolve(emptyRecognition);
+        }
+        if (command.kind === PetWorldCommandKind.CLASS_NEIGHBORHOOD) {
+          return Promise.resolve({
+            kind: 'neighborhood',
+            classId: command.classId,
+            homes: [],
+            garden: emptyGarden,
+          });
+        }
+        return Promise.resolve({ kind: 'catalog', catalog: { revision: 'one', items: [] } });
+      }),
+    controlClassroom: vi.fn<NonNullable<DesktopBridge['controlClassroom']>>().mockResolvedValue({
+      kind: 'home',
+      home: {
+        ...teacherClassroom,
+        classes: [
+          ...teacherClassroom.classes.map((entry) => ({ ...entry, canTeach: true })),
+          ...teacherClassroom.classes.map((entry) => ({
+            ...entry,
+            canTeach: false,
+            schoolClass: {
+              ...entry.schoolClass,
+              id: joinedClassId,
+              name: 'Joined class',
+              teacherId: 'another-teacher',
+            },
+          })),
+        ],
+      },
+    }),
+  } satisfies Pick<DesktopBridge, 'executePetWorld' | 'controlClassroom'>;
+  Object.defineProperty(window, 'tro', { configurable: true, value: bridge });
+  const page = (classId: string) =>
+    createElement(MantineProvider, {
+      env: 'test',
+      children: createElement(LocaleProvider, {
+        children: createElement(PetWorldPage, {
+          userId: 'teacher',
+          userName: 'Ms Linh',
+          initialClassId: classId,
+          onChooseClass: vi.fn(),
+          onRoleChange: vi.fn(),
+        }),
+      }),
+    });
+  const rendered = render(page(petWorldClassId));
+  await screen.findByRole('tab', { name: 'Teacher recognition' });
+  rendered.rerender(page(joinedClassId));
+  await screen.findByRole('heading', { name: 'Welcome home, Ms Linh.' });
+  await waitFor(() => {
+    expect(screen.getByRole('tab', { name: 'My home & shop' }).getAttribute('aria-selected')).toBe(
+      'true',
+    );
+  });
+  expect(screen.queryByRole('tab', { name: 'Teacher recognition' })).toBeNull();
+  expect(
+    bridge.executePetWorld.mock.calls.filter(
+      ([command]) =>
+        command.kind === PetWorldCommandKind.CLASS_RECOGNITION && command.classId === joinedClassId,
+    ),
+  ).toEqual([]);
 });

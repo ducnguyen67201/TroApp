@@ -1,5 +1,12 @@
 import { StudentAccessKind } from '#contracts/StudentAccess.js';
 import { ClassroomViewAsController } from './classroom/ClassroomViewAsController.js';
+import {
+  DesktopWindowSource,
+  loadDesktopWindow,
+  readDesktopChildFailure,
+} from './LoadDesktopWindow.js';
+import { OrganizationApiClient } from './organizations/OrganizationApiClient.js';
+import { registerOrganizationsHandlers } from './organizations/RegisterOrganizations.js';
 import { StudentAccessCommandSchema, type StudentAccessReply } from '#contracts/StudentAccess.js';
 import { StudentDeviceLimits } from '#contracts/StudentIdentity.js';
 import { isStudentCameraAllowed } from './accounts/StudentCameraPermission.js';
@@ -156,8 +163,23 @@ let voiceKeysReleased = true;
 const permissions = new DesktopPermissions();
 const desktopDriver = new EmbeddedDesktopDriver();
 let isQuitting = false;
+let networkServiceFailureVersion = 0;
 let updates: AppUpdateController | undefined;
 let updateCheckTimer: ReturnType<typeof setInterval> | undefined;
+
+app.on('child-process-gone', (_event, details) => {
+  if (isQuitting) {
+    return;
+  }
+  const diagnostic = readDesktopChildFailure(details);
+  if (!diagnostic) {
+    return;
+  }
+  if (diagnostic.isNetworkService) {
+    networkServiceFailureVersion += 1;
+  }
+  console.warn(diagnostic.event, diagnostic);
+});
 
 async function startDesktop(): Promise<void> {
   /* Vite embeds this public URL when packaging the desktop app. The validator
@@ -570,6 +592,11 @@ async function startDesktop(): Promise<void> {
           voice.readStatus().state !== VoiceState.IDLE &&
           voice.readStatus().state !== VoiceState.DISABLED),
       ),
+  );
+  registerOrganizationsHandlers(
+    ipcMain,
+    { isTrustedSender, readSession: () => auth.readSession(), gate: accountGate },
+    new OrganizationApiClient(environment.API_BASE_URL, () => auth.readCookie()),
   );
   registerOnboardingHandlers(
     ipcMain,
@@ -1634,11 +1661,19 @@ async function startDesktop(): Promise<void> {
       }
     });
 
-    if (developmentUrl) {
-      await window.loadURL(developmentUrl);
-    } else {
-      await window.loadFile(rendererFile);
-    }
+    await loadDesktopWindow({
+      source: developmentUrl ? DesktopWindowSource.DEVELOPMENT : DesktopWindowSource.PACKAGED,
+      load: () => (developmentUrl ? window.loadURL(developmentUrl) : window.loadFile(rendererFile)),
+      readNetworkFailureVersion: () => networkServiceFailureVersion,
+      canContinue: () => !isQuitting && !window.isDestroyed(),
+      log: (diagnostic) => {
+        if (diagnostic.event === 'desktop.renderer.load.recovered') {
+          console.info(diagnostic.event, diagnostic);
+        } else {
+          console.warn(diagnostic.event, diagnostic);
+        }
+      },
+    });
   }
 
   await openWindow();

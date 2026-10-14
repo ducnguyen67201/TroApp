@@ -17,6 +17,7 @@ import {
   emptyRecognition,
   installPetWorldBridge,
   petWorldClassId,
+  teacherClassroom,
 } from './PetWorldFixtures.js';
 
 const period = { from: '2026-10-01T00:00:00.000Z', to: '2026-10-31T23:59:59.999Z' };
@@ -182,7 +183,16 @@ it('refreshes the current class when an award finishes after the teacher switche
       }
       return Promise.resolve({ kind: 'catalog', catalog: { revision: 'one', items: [] } });
     });
-  installPetWorldBridge(execute, AccountRole.TEACHER);
+  installPetWorldBridge(
+    execute,
+    AccountRole.TEACHER,
+    [petWorldClassId, nextClassId].flatMap((classId) =>
+      teacherClassroom.classes.map((entry) => ({
+        ...entry,
+        schoolClass: { ...entry.schoolClass, id: classId },
+      })),
+    ),
+  );
   const rendered = renderHook(({ classId }) => usePetWorld('teacher', classId, period), {
     initialProps: { classId: petWorldClassId },
   });
@@ -315,4 +325,54 @@ it('keeps the last confirmed wallet when a purchase result is unknown and expose
   });
   expect(rendered.result.current.world?.wallet.balance).toBe('20');
   expect(rendered.result.current.pendingCommands).toEqual([command]);
+});
+
+it('reads recognition only for the selected assigned teacher class in a mixed-role home', async () => {
+  const joinedClassId = '66666666-6666-4666-8666-666666666666';
+  const execute = vi
+    .fn<NonNullable<DesktopBridge['executePetWorld']>>()
+    .mockImplementation((command) => {
+      if (command.kind === PetWorldCommandKind.OWN_WORLD) {
+        return Promise.resolve({ kind: 'world', world: createOwnWorld('teacher') });
+      }
+      if (command.kind === PetWorldCommandKind.CLASS_NEIGHBORHOOD) {
+        return Promise.resolve({
+          kind: 'neighborhood',
+          classId: command.classId,
+          homes: [],
+          garden: { classroomMoments: 0, gardenMilestone: 0 },
+        });
+      }
+      if (command.kind === PetWorldCommandKind.CLASS_RECOGNITION) {
+        return Promise.resolve({ ...emptyRecognition, classId: command.classId });
+      }
+      return Promise.resolve({ kind: 'catalog', catalog: { revision: 'one', items: [] } });
+    });
+  installPetWorldBridge(execute, AccountRole.TEACHER, [
+    ...teacherClassroom.classes.map((entry) => ({ ...entry, canTeach: true })),
+    ...teacherClassroom.classes.map((entry) => ({
+      ...entry,
+      canTeach: false,
+      schoolClass: { ...entry.schoolClass, id: joinedClassId, teacherId: 'another-teacher' },
+    })),
+  ]);
+  const rendered = renderHook(({ classId }) => usePetWorld('teacher', classId, period), {
+    initialProps: { classId: petWorldClassId },
+  });
+  await waitFor(() => {
+    expect(rendered.result.current.recognition?.classId).toBe(petWorldClassId);
+  });
+  rendered.rerender({ classId: joinedClassId });
+  await waitFor(() => {
+    expect(rendered.result.current.neighborhood?.classId).toBe(joinedClassId);
+  });
+  expect(rendered.result.current.recognition).toBeNull();
+  expect(rendered.result.current.world?.studentId).toBe('teacher');
+  expect(rendered.result.current.failure).toBeNull();
+  expect(
+    execute.mock.calls.filter(
+      ([command]) =>
+        command.kind === PetWorldCommandKind.CLASS_RECOGNITION && command.classId === joinedClassId,
+    ),
+  ).toEqual([]);
 });

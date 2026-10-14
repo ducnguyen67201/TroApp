@@ -19,6 +19,7 @@ import {
   emptyRecognition,
   installPetWorldBridge,
   petWorldClassId,
+  teacherClassroom,
 } from './PetWorldFixtures.js';
 
 const period = { from: emptyRecognition.from, to: emptyRecognition.to };
@@ -36,6 +37,7 @@ type PageCommand = Extract<
 function installPaginationBridge(
   role: AccountRole,
   readPage: (command: PageCommand) => PetWorldReply | Promise<PetWorldReply>,
+  readTeacherId: () => string = () => 'teacher',
 ): ReturnType<typeof vi.fn<NonNullable<DesktopBridge['executePetWorld']>>> {
   const execute = vi
     .fn<NonNullable<DesktopBridge['executePetWorld']>>()
@@ -60,6 +62,24 @@ function installPaginationBridge(
       return { kind: 'catalog', catalog: { revision: 'one', items: [] } };
     });
   installPetWorldBridge(execute, role);
+  window.tro.controlClassroom = vi
+    .fn<NonNullable<DesktopBridge['controlClassroom']>>()
+    .mockImplementation(() =>
+      Promise.resolve({
+        kind: 'home',
+        home: {
+          ...teacherClassroom,
+          role,
+          classes: [petWorldClassId, secondId].flatMap((classId) =>
+            teacherClassroom.classes.map((entry) => ({
+              ...entry,
+              canTeach: role === AccountRole.TEACHER,
+              schoolClass: { ...entry.schoolClass, id: classId, teacherId: readTeacherId() },
+            })),
+          ),
+        },
+      }),
+    );
   return execute;
 }
 
@@ -291,26 +311,31 @@ it('recovers an expired teacher cursor by reading the latest first page without 
 it.each(['class', 'period', 'account'] as const)(
   'discards an older teacher page after the %s changes',
   async (selection) => {
+    let currentTeacherId = 'teacher';
     let finishPage: ((reply: PetWorldReply) => void) | undefined;
-    installPaginationBridge(AccountRole.TEACHER, (command) => {
-      if (command.kind !== PetWorldCommandKind.CLASS_RECOGNITION) {
-        throw new Error('Expected a teacher page request.');
-      }
-      if (command.cursor) {
-        return new Promise((resolve) => {
-          finishPage = resolve;
-        });
-      }
-      return {
-        ...createRecognitionPage(
-          command.classId === secondId || command.from !== period.from ? thirdId : firstId,
-          'second',
-        ),
-        classId: command.classId,
-        from: command.from,
-        to: command.to,
-      };
-    });
+    installPaginationBridge(
+      AccountRole.TEACHER,
+      (command) => {
+        if (command.kind !== PetWorldCommandKind.CLASS_RECOGNITION) {
+          throw new Error('Expected a teacher page request.');
+        }
+        if (command.cursor) {
+          return new Promise((resolve) => {
+            finishPage = resolve;
+          });
+        }
+        return {
+          ...createRecognitionPage(
+            command.classId === secondId || command.from !== period.from ? thirdId : firstId,
+            'second',
+          ),
+          classId: command.classId,
+          from: command.from,
+          to: command.to,
+        };
+      },
+      () => currentTeacherId,
+    );
     const rendered = renderHook(
       ({ userId, classId, selectedPeriod }) => usePetWorld(userId, classId, selectedPeriod),
       {
@@ -324,8 +349,9 @@ it.each(['class', 'period', 'account'] as const)(
     act(() => {
       page = rendered.result.current.readOlderRecognitions();
     });
+    currentTeacherId = selection === 'account' ? 'other-teacher' : 'teacher';
     rendered.rerender({
-      userId: selection === 'account' ? 'other-teacher' : 'teacher',
+      userId: currentTeacherId,
       classId: selection === 'class' ? secondId : petWorldClassId,
       selectedPeriod:
         selection === 'period' ? { ...period, from: '2026-10-02T00:00:00.000Z' } : period,

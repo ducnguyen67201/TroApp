@@ -3,6 +3,7 @@ import type { PracticeShortcutEvent } from '#contracts/PracticeShortcut.js';
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
 import { AnalyticsScreen } from '#contracts/Analytics.js';
+import { OrganizationAction, OrganizationFailure } from '#contracts/Organizations.js';
 
 const electron = vi.hoisted(() => ({
   expose: vi.fn<(name: string, bridge: DesktopBridge) => void>(),
@@ -19,6 +20,37 @@ vi.mock('electron', () => ({
     removeListener: electron.removeListener,
   },
 }));
+
+it('pins organization commands to an expected account and rejects owner roles or secret-bearing replies', async () => {
+  await import('../../../src/desktop/preload/Preload.js');
+  electron.invoke.mockClear();
+  const bridge = electron.expose.mock.calls[0]?.[1];
+  if (!bridge?.controlOrganizations) {
+    throw new Error('Missing organization bridge');
+  }
+  const home = { kind: 'home', organizations: [], isAdmin: false };
+  const request = { expectedAccountId: 'current', command: { kind: OrganizationAction.HOME } };
+  electron.invoke.mockResolvedValue(home);
+  expect(await bridge.controlOrganizations(request)).toEqual(home);
+  expect(electron.invoke).toHaveBeenCalledExactlyOnceWith('tro:organizations', request);
+  const invalidRequest: unknown = {
+    expectedAccountId: 'current',
+    command: {
+      kind: OrganizationAction.CHANGE_ROLE,
+      organizationId: '11111111-1111-4111-8111-111111111111',
+      userId: 'student',
+      role: 'owner',
+    },
+  };
+  const raw: unknown = Reflect.apply(bridge.controlOrganizations, bridge, [invalidRequest]);
+  expect(await raw).toEqual({ kind: 'failed', code: OrganizationFailure.UNAVAILABLE });
+  expect(electron.invoke).toHaveBeenCalledOnce();
+  electron.invoke.mockResolvedValue({ ...home, cookie: 'private' });
+  expect(await bridge.controlOrganizations(request)).toEqual({
+    kind: 'failed',
+    code: OrganizationFailure.UNAVAILABLE,
+  });
+});
 
 it('exposes consent and fixed screen names without a generic analytics payload', async () => {
   await import('../../../src/desktop/preload/Preload.js');

@@ -61,6 +61,7 @@ export interface PetWorldReceipt {
 export interface PetClassAccess {
   readonly id: string;
   readonly teacherId: string;
+  readonly teacherIds?: readonly string[];
   readonly deleted: boolean;
 }
 

@@ -29,7 +29,10 @@ export async function readOwnedWallet(
   if (wallet) {
     return wallet;
   }
-  if ((await transaction.readAccountRole(actorId)) !== AccountRole.STUDENT) {
+  if (
+    (await transaction.readAccountRole(actorId)) !== AccountRole.STUDENT &&
+    !(await transaction.hasOrganizationStudentEnrollment(actorId))
+  ) {
     throw new PetWorldError(PetWorldFailure.FORBIDDEN);
   }
   return { studentId: actorId, balance: 0n, revision: 0 };
@@ -66,7 +69,7 @@ export async function requireOwnedClass(
 ): Promise<void> {
   requireTeacherClassAccess(
     actorId,
-    await transaction.readAccountRole(actorId),
+    await transaction.readClassRole(actorId, classId),
     await transaction.readClassAccess(classId),
   );
 }

@@ -1,3 +1,4 @@
+import { readClassroomRole, canTeachClassroom } from './OrganizationClassroomAccess.js';
 import { runClassroomTransactionWithRetries } from './RetryClassroomTransaction.js';
 import {
   encodeSourceCursor,
@@ -56,14 +57,28 @@ class PrismaClassroomInsightStore implements ClassroomInsightStore {
     if (!row) {
       return null;
     }
+    const role = await readClassroomRole(this.client, userId, row.organizationId);
+    if (row.organizationId !== null && role === null) {
+      return null;
+    }
+    const activeStudentIds: string[] = [];
+    for (const enrollment of row.enrollments) {
+      if (
+        enrollment.active &&
+        (row.organizationId === null ||
+          (await readClassroomRole(this.client, enrollment.studentId, row.organizationId)) !== null)
+      ) {
+        activeStudentIds.push(enrollment.studentId);
+      }
+    }
     return {
       classId,
       teacherId: row.teacherId,
       deleted: row.deletedAt !== null,
-      isTeacher: row.teacherId === userId,
+      isTeacher: await canTeachClassroom(this.client, userId, classId),
       courseRevisionId: row.courseRevisionId,
       historicalStudentIds: row.enrollments.map((item) => item.studentId),
-      studentIds: row.enrollments.filter((item) => item.active).map((item) => item.studentId),
+      studentIds: activeStudentIds,
       activities: CourseContentSchema.parse(row.courseRevision.content).modules.flatMap((module) =>
         module.lessons.flatMap((lesson) => lesson.activities),
       ),
@@ -98,6 +113,9 @@ class PrismaClassroomInsightStore implements ClassroomInsightStore {
       !row ||
       row.studentId !== userId ||
       row.meeting.schoolClass.deletedAt ||
+      (row.meeting.schoolClass.organizationId !== null &&
+        (await readClassroomRole(this.client, userId, row.meeting.schoolClass.organizationId)) ===
+          null) ||
       !row.meeting.schoolClass.enrollments.some((item) => item.active && item.studentId === userId)
     ) {
       return null;

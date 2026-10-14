@@ -5,6 +5,8 @@ import type {
   LessonMediaReply,
 } from './LessonVideos.js';
 import type { WhatsNewReply } from './WhatsNew.js';
+import type { DesktopOrganizationRequest } from './DesktopOrganizations.js';
+import type { OrganizationReply } from './Organizations.js';
 import type { AnalyticsReply, AnalyticsScreen } from './Analytics.js';
 import type {
   OnboardingRead,
@@ -51,6 +53,7 @@ import type { ClassroomCommand, ClassroomReply } from './Classroom.js';
  * turns and controls the worker lifecycle.
  */
 export interface DesktopBridge {
+  controlOrganizations?: (request: DesktopOrganizationRequest) => Promise<OrganizationReply>;
   readAnalyticsStatus?: () => Promise<AnalyticsReply>;
   setAnalyticsEnabled?: (enabled: boolean) => Promise<AnalyticsReply>;
   trackScreenView?: (screen: AnalyticsScreen) => Promise<void>;

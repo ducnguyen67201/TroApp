@@ -1,6 +1,17 @@
+import { canTeachClass } from './ClassroomAuthority.js';
 import { PracticeTeacherResults } from './PracticeTeacherResults.js';
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
-import { Button, Group, Modal, Select, Stack, Tabs, Text, TextInput } from '@mantine/core';
+import {
+  Button,
+  Group,
+  Modal,
+  NativeSelect,
+  Select,
+  Stack,
+  Tabs,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import {
   ClassroomPacing,
@@ -53,9 +64,16 @@ export function TeacherClassroomPanel({
   const [preparationSidebar, setPreparationSidebar] = useState<HTMLDivElement | null>(null);
   const [className, setClassName] = useState('');
   const [createOpened, setCreateOpened] = useState(false);
+  const [organizationId, setOrganizationId] = useState('');
+  const teachingOrganizations = home.teachingOrganizations ?? [];
+  const selectedOrganizationId = teachingOrganizations.some(
+    (organization) => organization.id === organizationId,
+  )
+    ? organizationId
+    : teachingOrganizations[0]?.id;
   const classId =
     navigation.route.classId ??
-    home.classes.find((entry) => entry.schoolClass.teacherId === userId)?.schoolClass.id ??
+    home.classes.find((entry) => canTeachClass(home, entry, userId))?.schoolClass.id ??
     null;
   const isClassPage = navigation.route.classId !== null;
   const tab = isClassPage ? navigation.route.classView : ClassView.OVERVIEW;
@@ -63,8 +81,8 @@ export function TeacherClassroomPanel({
   const [activityId, setActivityId] = useState<string | null>(null);
   const [pacing, setPacing] = useState<string>(ClassroomPacing.TEACHER);
   const ownedClasses = useMemo(
-    () => home.classes.filter((entry) => entry.schoolClass.teacherId === userId),
-    [home.classes, userId],
+    () => home.classes.filter((entry) => canTeachClass(home, entry, userId)),
+    [home, userId],
   );
   const selectedClass = ownedClasses.find((entry) => entry.schoolClass.id === classId);
   const selectedCourse = home.courses.find(
@@ -152,12 +170,30 @@ export function TeacherClassroomPanel({
             if (!className.trim() || busy) {
               return;
             }
-            void send({ kind: 'create-class', name: className }).then(() => {
+            void send({
+              kind: 'create-class',
+              name: className,
+              ...(selectedOrganizationId ? { organizationId: selectedOrganizationId } : {}),
+            }).then(() => {
               setCreateOpened(false);
             });
           }}
         >
           <Stack gap="md">
+            {teachingOrganizations.length > 0 && (
+              <NativeSelect
+                label={t('Organization', 'Tổ chức')}
+                value={selectedOrganizationId}
+                disabled={busy}
+                data={teachingOrganizations.map((organization) => ({
+                  value: organization.id,
+                  label: organization.name,
+                }))}
+                onChange={(event) => {
+                  setOrganizationId(event.currentTarget.value);
+                }}
+              />
+            )}
             <TextInput
               label={t('Class name', 'Tên lớp')}
               data-autofocus
@@ -524,6 +560,7 @@ export function TeacherClassroomPanel({
               <ClassSettings
                 key={selectedClass.schoolClass.id}
                 classId={selectedClass.schoolClass.id}
+                supportsStudentQr={selectedClass.supportsStudentQr ?? true}
                 name={selectedClass.schoolClass.name}
                 live={Boolean(liveMeeting)}
                 busy={busy}

@@ -1,3 +1,4 @@
+import { canTeachClass } from './ClassroomAuthority.js';
 import { DesktopPage } from '../navigation/DesktopRoute.js';
 import { ClassroomInsightsPage } from './ClassroomInsightsPage.js';
 import { usePracticeShortcut } from './UsePracticeShortcut.js';
@@ -43,6 +44,7 @@ type ClassroomList = (typeof ClassroomList)[keyof typeof ClassroomList];
 interface ClassroomPageProps {
   userId: string;
   active: boolean;
+  refreshRevision?: number;
   userName?: string;
   navigation: DesktopNavigation;
   onOpenWorkspace?: (message?: string) => void;
@@ -67,6 +69,7 @@ function ClassroomViewer(props: ClassroomPageProps): ReactElement {
 function ClassroomWorkspace({
   userId: signedInUserId,
   active,
+  refreshRevision = 0,
   userName,
   navigation,
   onRoleChange,
@@ -270,7 +273,7 @@ function ClassroomWorkspace({
 
   useEffect(() => {
     void refresh();
-  }, [userId, refresh]);
+  }, [userId, refresh, refreshRevision]);
 
   async function send(command: ClassroomCommand): Promise<void> {
     if (busy) {
@@ -336,27 +339,28 @@ function ClassroomWorkspace({
 
   const showsInsights = navigation.route.page === DesktopPage.INSIGHTS;
   const canViewAllClasses = home?.isAdmin === true && homeUserId === userId;
-  const participantClasses =
-    home?.classes.filter((entry) => entry.schoolClass.teacherId !== userId) ?? [];
+  const participantClasses = home
+    ? home.classes.filter((entry) => !canTeachClass(home, entry, userId))
+    : [];
   const routeClass = home?.classes.find(
     (entry) => entry.schoolClass.id === navigation.route.classId,
   );
   const showsTeacherClasses =
     home?.role === AccountRole.TEACHER &&
     (routeClass
-      ? routeClass.schoolClass.teacherId === userId
+      ? canTeachClass(home, routeClass, userId)
       : classList === ClassroomList.TEACHING || participantClasses.length === 0);
 
   // Returning from a class keeps the list that owns it, including enrolled deep links.
   useEffect(() => {
     if (routeClass) {
       setClassList(
-        routeClass.schoolClass.teacherId === userId
+        home && canTeachClass(home, routeClass, userId)
           ? ClassroomList.TEACHING
           : ClassroomList.ENROLLED,
       );
     }
-  }, [routeClass, userId]);
+  }, [home, routeClass, userId]);
 
   const enrollment = (
     <Card withBorder radius="md" padding="lg">

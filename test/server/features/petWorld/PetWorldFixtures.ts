@@ -85,6 +85,19 @@ export class MemoryPetWorldStore implements PetWorldStore, PetWorldTransaction {
   readAccountRole(userId: string): Promise<AccountRole | null> {
     return Promise.resolve(this.roles.get(userId) ?? null);
   }
+  readonly organizationStudents = new Set<string>();
+  hasOrganizationStudentEnrollment(userId: string) {
+    return Promise.resolve(
+      this.organizationStudents.has(userId) &&
+        [...this.classes.values()].some(
+          (schoolClass) =>
+            !schoolClass.deleted && this.enrollments.has(`${schoolClass.id}:${userId}`),
+        ),
+    );
+  }
+  readClassRole(userId: string) {
+    return this.readAccountRole(userId);
+  }
   readClassAccess(classId: string): Promise<PetClassAccess | null> {
     return Promise.resolve(this.classes.get(classId) ?? null);
   }

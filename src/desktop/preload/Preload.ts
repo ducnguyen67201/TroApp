@@ -17,6 +17,8 @@ import {
   OnboardingReplySchema,
 } from '#contracts/Onboarding.js';
 import { OnboardingFailure } from '#contracts/OnboardingValues.js';
+import { DesktopOrganizationRequestSchema } from '#contracts/DesktopOrganizations.js';
+import { OrganizationFailure, OrganizationReplySchema } from '#contracts/Organizations.js';
 import {
   WhatsNewCommand,
   WhatsNewReplyKind,
@@ -117,6 +119,17 @@ import {
 /* Expose named session operations, not generic IPC or direct computer tools.
    Validate IPC data before it enters the renderer. */
 const bridge: DesktopBridge = {
+  async controlOrganizations(request) {
+    try {
+      const raw: unknown = await ipcRenderer.invoke(
+        'tro:organizations',
+        DesktopOrganizationRequestSchema.parse(request),
+      );
+      return OrganizationReplySchema.parse(raw);
+    } catch {
+      return { kind: 'failed', code: OrganizationFailure.UNAVAILABLE };
+    }
+  },
   async readAnalyticsStatus() {
     try {
       const reply: unknown = await ipcRenderer.invoke('tro:analytics-status');

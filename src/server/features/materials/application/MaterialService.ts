@@ -1,7 +1,6 @@
 import { projectMaterialReply } from './MaterialCompatibility.js';
 import { MaterialFailure } from '#contracts/ClassroomMaterials.js';
 import { createHash, randomUUID } from 'node:crypto';
-import { AccountRole } from '#contracts/AccountRole.js';
 import {
   ClassroomFailure,
   ClassroomStatus,
@@ -64,9 +63,7 @@ export class MaterialService {
       if (!schoolClass) {
         throw new ClassroomError(ClassroomFailure.FORBIDDEN);
       }
-      const isTeacher =
-        schoolClass.teacherId === userId &&
-        (await store.readAccountRole(userId)) === AccountRole.TEACHER;
+      const isTeacher = await store.canTeachClass(userId, schoolClass.id);
       if (command.kind === 'download') {
         if (!isTeacher) {
           const publication = await store.readMaterialPublication(schoolClass.courseRevisionId);
@@ -312,7 +309,12 @@ export class MaterialService {
             },
           ],
         });
-        const course = await store.saveCourse(userId, schoolClass.name, content);
+        const course = await store.saveCourse(
+          userId,
+          schoolClass.name,
+          content,
+          await store.readClassOrganizationId(schoolClass.id),
+        );
         await store.saveMaterialPublication({
           courseId: course.id,
           classId: schoolClass.id,
@@ -355,10 +357,7 @@ export class MaterialService {
       return true;
     }
     const schoolClass = await this.store.readClass(pending.classId);
-    if (
-      !schoolClass ||
-      (await this.store.readAccountRole(schoolClass.teacherId)) !== AccountRole.TEACHER
-    ) {
+    if (!schoolClass || (await this.store.listClassTeacherIds(schoolClass.id)).length === 0) {
       await this.store.runAtomically((store) =>
         store.saveMaterialCollection(
           {

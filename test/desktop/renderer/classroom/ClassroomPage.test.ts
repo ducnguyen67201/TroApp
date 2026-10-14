@@ -71,19 +71,22 @@ const student: ClassroomPerson = {
   role: AccountRole.STUDENT,
 };
 
-function RoutedPage(): ReactElement {
+function RoutedPage({ refreshRevision = 0 }: { refreshRevision?: number }): ReactElement {
   return createElement(ClassroomPage, {
     userId: 'admin',
     active: true,
+    refreshRevision,
     navigation: useDesktopNavigation(),
     onRoleChange,
   });
 }
 
-function page(): ReactElement {
+function page(refreshRevision = 0): ReactElement {
   return createElement(MantineProvider, {
     env: 'test',
-    children: createElement(LocaleProvider, { children: createElement(RoutedPage) }),
+    children: createElement(LocaleProvider, {
+      children: createElement(RoutedPage, { refreshRevision }),
+    }),
   });
 }
 
@@ -149,6 +152,24 @@ it.each([AccountRole.STUDENT, AccountRole.TEACHER])(
     expect(send.mock.calls.some(([command]) => command.kind.startsWith('admin-'))).toBe(false);
   },
 );
+
+it('refreshes classroom permissions after a Settings team change', async () => {
+  let role: AccountRole = AccountRole.STUDENT;
+  const send = vi
+    .fn<NonNullable<DesktopBridge['controlClassroom']>>()
+    .mockImplementation((command) =>
+      Promise.resolve(
+        command.kind === 'home' ? { kind: 'home', home: home(role, false) } : { kind: 'ok' },
+      ),
+    );
+  vi.stubGlobal('tro', { controlClassroom: send });
+  const view = render(page());
+  await screen.findByText('Student classes: admin');
+  role = AccountRole.TEACHER;
+  view.rerender(page(1));
+  await screen.findByText('Teacher classes: admin');
+  expect(onRoleChange).toHaveBeenLastCalledWith(AccountRole.TEACHER);
+});
 
 it('switches existing teacher and student screens, permits actions, and returns to the admin', async () => {
   let selected: ClassroomPerson | null = null;
@@ -297,4 +318,26 @@ it('clears selected data after access is revoked and still allows returning to s
   fireEvent.click(await screen.findByRole('button', { name: 'Return to my account' }));
   await screen.findByText('Student classes: admin');
   expect(screen.queryByRole('button', { name: /View as/ })).toBeNull();
+});
+
+it('uses the enrolled screen when a retained teacher assignment has no current teaching authority', async () => {
+  const classes = teacherClasses('admin').map((entry) => ({
+    ...entry,
+    canTeach: entry.schoolClass.id !== joinedClassId,
+    schoolClass: { ...entry.schoolClass, teacherId: 'admin' },
+  }));
+  const send = vi
+    .fn<NonNullable<DesktopBridge['controlClassroom']>>()
+    .mockImplementation((command) =>
+      Promise.resolve(
+        command.kind === 'home'
+          ? { kind: 'home', home: { ...home(AccountRole.TEACHER, false), classes } }
+          : { kind: 'ok' },
+      ),
+    );
+  vi.stubGlobal('tro', { controlClassroom: send });
+  window.location.hash = `#/classroom/${joinedClassId}/activities`;
+  render(page());
+  await screen.findByText('Student classes: admin');
+  expect(screen.queryByText('Teacher classes: admin')).toBeNull();
 });

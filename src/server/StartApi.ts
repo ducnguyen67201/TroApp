@@ -63,6 +63,9 @@ import { registerClassroomRoutes } from './features/classroom/infrastructure/Reg
 import { PetWorldService } from './features/petWorld/application/PetWorldService.js';
 import { registerPetWorldRoutes } from './features/petWorld/infrastructure/RegisterPetWorldRoutes.js';
 import { createPrismaPetWorldStore } from './persistence/PrismaPetWorldStore.js';
+import { createPrismaOrganizationStore } from './persistence/PrismaOrganizationStore.js';
+import { OrganizationService } from './features/organizations/application/OrganizationService.js';
+import { registerOrganizationRoutes } from './features/organizations/infrastructure/RegisterOrganizationRoutes.js';
 
 async function startApi(): Promise<void> {
   const environment = readServerEnv(process.env);
@@ -75,6 +78,13 @@ async function startApi(): Promise<void> {
   const database = createPrismaDatabaseStatus(environment.DATABASE_URL, logger);
   const authentication = createAuthDatabase(environment);
   const api = createApi(database);
+  const organizations = createPrismaOrganizationStore(environment.DATABASE_URL);
+  registerOrganizationRoutes(
+    api,
+    authentication.readSignedInUserId,
+    new OrganizationService(organizations.store),
+    logger,
+  );
   const studentStore = createPrismaStudentAccessStore(environment.DATABASE_URL);
   const studentAccess = registerStudentAccessRoutes(
     api,
@@ -275,6 +285,7 @@ async function startApi(): Promise<void> {
     await materialRunner.close();
     await database.close();
     await authentication.close();
+    await organizations.close();
     await studentStore.close();
     await transcriptionAllowance.close();
     await voiceoverAllowance.close();

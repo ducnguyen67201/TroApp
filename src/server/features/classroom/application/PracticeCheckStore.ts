@@ -10,6 +10,8 @@ import type {
 export interface PracticeAccess {
   studentId: string;
   teacherId: string;
+  teacherAuthorized: boolean;
+  authorizedTeacherIds?: string[];
   classId: string;
   deleted: boolean;
   enrolled: boolean;
@@ -40,7 +42,15 @@ export interface PracticeCheckStore {
   readAccess(participationId: string, activityId: string): Promise<PracticeAccess | null>;
   readEvidenceAccess(
     attemptId: string,
-  ): Promise<Pick<PracticeAccess, 'studentId' | 'teacherId' | 'deleted' | 'enrolled'> | null>;
+  ): Promise<Pick<
+    PracticeAccess,
+    | 'studentId'
+    | 'teacherId'
+    | 'teacherAuthorized'
+    | 'authorizedTeacherIds'
+    | 'deleted'
+    | 'enrolled'
+  > | null>;
   readCheck(id: string): Promise<StoredPracticeCheck | null>;
   findCheck(studentId: string, requestId: string): Promise<StoredPracticeCheck | null>;
   countChecks(studentId: string, since: Date): Promise<number>;

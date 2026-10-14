@@ -65,12 +65,13 @@ export const emptyRecognition: Extract<PetWorldReply, { kind: 'class-recognition
 export function installPetWorldBridge(
   executePetWorld: NonNullable<DesktopBridge['executePetWorld']>,
   role: AccountRole = AccountRole.STUDENT,
+  classes: ClassroomHome['classes'] = [],
 ): void {
   const bridge = {
     executePetWorld,
     controlClassroom: vi.fn<NonNullable<DesktopBridge['controlClassroom']>>().mockResolvedValue({
       kind: 'home',
-      home: { role, isAdmin: false, courses: [], classes: [] },
+      home: { role, isAdmin: false, courses: [], classes },
     }),
     readPetWorldPending: vi
       .fn<NonNullable<DesktopBridge['readPetWorldPending']>>()
