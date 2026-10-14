@@ -214,7 +214,9 @@ export class OrganizationService {
       }
       const now = this.now();
       /* A stale invitation must never reverse a later role change or removal. */
-      await store.revokeInvitations(organization.id, memberAccount.email.toLowerCase(), now);
+      if (memberAccount.email) {
+        await store.revokeInvitations(organization.id, memberAccount.email.toLowerCase(), now);
+      }
       if (command.kind === OrganizationAction.CHANGE_ROLE) {
         await store.saveMembership({ ...membership, role: command.role });
         return { kind: 'ok' };
@@ -262,7 +264,7 @@ export class OrganizationService {
     email: string,
   ): Promise<OrganizationAccount> {
     const owner = await store.readVerifiedAccountByEmail(email);
-    if (!owner) {
+    if (!owner || owner.email === null) {
       throw new OrganizationError(OrganizationFailure.NOT_FOUND);
     }
     return owner;
@@ -286,7 +288,9 @@ export class OrganizationService {
       joinedAt: this.now(),
       removedAt: null,
     });
-    await store.revokeInvitations(organization.id, owner.email.toLowerCase(), this.now());
+    if (owner.email) {
+      await store.revokeInvitations(organization.id, owner.email.toLowerCase(), this.now());
+    }
   }
 
   private async requireMemberCapacity(
@@ -357,7 +361,7 @@ export class OrganizationService {
     if (
       !account.emailVerified ||
       !invitation ||
-      invitation.email !== account.email.toLowerCase() ||
+      invitation.email !== account.email?.toLowerCase() ||
       invitation.revokedAt !== null ||
       invitation.acceptedAt !== null ||
       invitation.expiresAt.getTime() <= now.getTime()
@@ -389,7 +393,9 @@ export class OrganizationService {
       removedAt: null,
     });
     await store.acceptInvitation(invitation.id, now);
-    await store.revokeInvitations(organization.id, account.email.toLowerCase(), now);
+    if (account.email) {
+      await store.revokeInvitations(organization.id, account.email.toLowerCase(), now);
+    }
     return { kind: 'ok' };
   }
 

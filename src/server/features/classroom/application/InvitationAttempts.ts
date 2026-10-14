@@ -4,6 +4,8 @@ const InvitationLimits = { WINDOW_MS: 60_000, ATTEMPTS: 10, ACCOUNTS: 1000 } as 
 export class InvitationAttempts {
   private readonly windows = new Map<string, { since: number; attempts: number }>();
 
+  constructor(private readonly maxAttempts: number = InvitationLimits.ATTEMPTS) {}
+
   canAttempt(userId: string, nowMs: number): boolean {
     for (const [id, window] of this.windows) {
       if (nowMs - window.since >= InvitationLimits.WINDOW_MS) {
@@ -12,7 +14,7 @@ export class InvitationAttempts {
     }
     const window = this.windows.get(userId);
     if (window) {
-      if (window.attempts >= InvitationLimits.ATTEMPTS) {
+      if (window.attempts >= this.maxAttempts) {
         return false;
       }
       window.attempts += 1;

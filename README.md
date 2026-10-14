@@ -66,6 +66,27 @@ containing real data. `pnpm db:migrate` authors a new reviewed migration;
 `pnpm db:deploy` applies existing ones. Integration tests use their own disposable
 container, not the development database.
 
+## Student QR access
+
+After applying the committed migrations through the normal development setup,
+an authenticated teacher opens a class's settings and creates a **Student QR
+access** setup code. Choose personal devices for remembered logins, or one shared
+computer for temporary learner sessions. Activate shared computers in a clean app
+profile without saved personal accounts; staff keep their login on their own
+device. The signed-out student screen offers **Student · Use QR card**. Enter the
+setup code once, then scan a plain student-ID QR or enter the ID manually and add a
+display name. No student email is required.
+
+On personal devices, use the sidebar account icon to add/select saved students or
+sign out the current account. On shared computers, start the teacher's live class
+before onboarding; **Change student** ends the current learner session. Teachers
+can paste two tab-separated roster columns (ID and name), preview matches and
+apply metadata later. QR IDs do not recover private accounts; duplicate claims
+remain separate. This initial flow supports typed lessons. See
+[Architecture](docs/Architecture.md#email-free-student-access) for access boundaries,
+session policy ownership and limitations. Setup codes and credentials must not be
+posted in issues or logs.
+
 ## Lesson video development
 
 `pnpm dev` (or `doppler run -- pnpm dev`) starts the lesson rendering worker
@@ -519,7 +540,8 @@ class and select **Save teachers**. Only active Teacher members are eligible. Ea
 class supports multiple teachers. Adding a teacher keeps the others; unchecking a
 teacher removes their class access. Keep at least one assigned teacher.
 End any live session before changing the assignment. Teachers see only their assigned
-classes, and students see only enrolled classes. Organization ownership alone exposes
+classes, and students see only enrolled classes. QR student sign-in currently supports
+personal classes; organization students must first join the team and enroll by email. Organization ownership alone exposes
 class names and assignment controls, without classroom content or progress. Removal
 revokes organization resource access on subsequent backend requests while preserving
 historical work and personal pet entitlements.

@@ -138,6 +138,8 @@ class PrismaOrganizationStore implements OrganizationStore {
       where: { classId },
       data: { revoked: true },
     });
+    await this.client.studentAdmission.updateMany({ where: { classId }, data: { revoked: true } });
+    await this.client.studentDevice.updateMany({ where: { classId }, data: { revoked: true } });
   }
 
   async saveOwnerApproval(userId: string, approved: boolean): Promise<void> {
@@ -326,7 +328,7 @@ class PrismaOrganizationStore implements OrganizationStore {
       OrganizationMemberSchema.parse({
         userId: row.userId,
         name: row.user.name,
-        email: row.user.email.toLowerCase(),
+        email: row.user.email?.toLowerCase() ?? null,
         role: row.role,
         joinedAt: row.joinedAt.toISOString(),
       }),

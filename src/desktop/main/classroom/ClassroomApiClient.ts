@@ -1,3 +1,4 @@
+import { StudentAccessCapability } from '#contracts/StudentAccess.js';
 import {
   ClassroomAdminCapability,
   ClassroomOrganizationCapability,
@@ -75,6 +76,7 @@ export class ClassroomApiClient {
           'content-type': 'application/json',
           [ClassroomAdminCapability.HEADER]: ClassroomAdminCapability.VERSION,
           [ClassroomOrganizationCapability.HEADER]: ClassroomOrganizationCapability.VERSION,
+          [StudentAccessCapability.HEADER]: StudentAccessCapability.VERSION,
         },
         body: JSON.stringify(ClassroomCommandSchema.parse(command)),
         signal: AbortSignal.timeout(10_000),

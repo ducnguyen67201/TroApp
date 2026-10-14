@@ -152,3 +152,28 @@ it('withholds private replies if the trusted document changes while HTTP is in f
   });
   expect(await pending).toEqual({ kind: 'failed', code: OrganizationFailure.UNAVAILABLE });
 });
+
+it('does not expose organization operations to a QR learner session', async () => {
+  const { invoke, access, client } = createHandlers();
+  access.readSession.mockResolvedValue({
+    kind: 'signed-in',
+    user: {
+      id: 'current',
+      name: 'Learner',
+      email: null,
+      isAdmin: false,
+      learner: {
+        schoolId: '11111111-1111-4111-8111-111111111111',
+        schoolName: 'School',
+        classId: '22222222-2222-4222-8222-222222222222',
+        externalId: 'ST-001',
+        mode: 'personal',
+        provisional: true,
+      },
+    },
+  });
+  expect(
+    await invoke({ expectedAccountId: 'current', command: { kind: OrganizationAction.HOME } }),
+  ).toEqual({ kind: 'failed', code: OrganizationFailure.UNAVAILABLE });
+  expect(client.execute).not.toHaveBeenCalled();
+});

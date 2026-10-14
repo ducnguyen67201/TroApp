@@ -14,6 +14,7 @@ import { createElement } from 'react';
 import { MantineProvider } from '@mantine/core';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { StudentDeviceMode } from '#contracts/StudentIdentity.js';
 import { AccountRole } from '#contracts/AccountRole.js';
 import { OrganizationAction, type OrganizationReply } from '#contracts/Organizations.js';
 import { createTeachingContext } from '../../server/features/classroom/ClassroomFixtures.js';
@@ -35,12 +36,12 @@ import {
 import { LocaleProvider } from '../../../src/desktop/renderer/localization/LocaleProvider.js';
 import { desktopTheme, resolveDesktopCssVariables } from '../../../src/desktop/renderer/Theme.js';
 
-const testUser: AuthUser = {
+const testUser = {
   id: 'test-user',
   name: 'Alex Example',
   email: 'alex@example.test',
   isAdmin: false,
-};
+} satisfies AuthUser;
 const sessionId = 'a8f6d44a-5c18-4ce3-9237-44624549f63f';
 
 const microphonePreviews = vi.hoisted(() => ({
@@ -2332,12 +2333,12 @@ it.each([MaterialState.COLLECTING, MaterialState.QUEUED, MaterialState.PREPARING
 
 function createSavedAccountBridge() {
   const bridge = createDesktopBridge();
-  const student: AuthUser = {
+  const student = {
     id: 'student-user',
     name: 'Minh Nguyen',
     email: 'minh@example.test',
     isAdmin: false,
-  };
+  } satisfies AuthUser;
   const teacherId = '11111111-1111-4111-8111-111111111111';
   const studentId = '22222222-2222-4222-8222-222222222222';
   const readSavedAccounts = vi
@@ -2932,4 +2933,37 @@ it('lets unapproved users continue personally without offering organization owne
     expect(document.querySelector('.main-panel')?.hasAttribute('inert')).toBe(false);
   });
   expect(screen.queryByRole('dialog', { name: 'How will you use Tro?' })).toBeNull();
+});
+
+it('lets a QR learner reach their class without requesting organization setup or team controls', async () => {
+  const bridge = createDesktopBridge();
+  bridge.readAuthSession.mockResolvedValue({
+    kind: 'signed-in',
+    user: {
+      id: 'qr-learner',
+      name: 'QR learner',
+      email: null,
+      isAdmin: false,
+      learner: {
+        schoolId: '11111111-1111-4111-8111-111111111111',
+        schoolName: 'Personal school',
+        classId: '22222222-2222-4222-8222-222222222222',
+        externalId: 'ST-001',
+        mode: StudentDeviceMode.PERSONAL,
+        provisional: true,
+      },
+    },
+  });
+  const controlOrganizations = vi
+    .fn<NonNullable<DesktopBridge['controlOrganizations']>>()
+    .mockResolvedValue({ kind: 'failed', code: 'forbidden' });
+  window.tro = { ...bridge, controlOrganizations };
+  renderDesktop();
+  await waitFor(() => {
+    expect(bridge.controlClassroom).toHaveBeenCalled();
+  });
+  expect(controlOrganizations).not.toHaveBeenCalled();
+  expect(screen.queryByRole('dialog', { name: 'How will you use Tro?' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+  expect(screen.queryByRole('tab', { name: 'Team' })).toBeNull();
 });

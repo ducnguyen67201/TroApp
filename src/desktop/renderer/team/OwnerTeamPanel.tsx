@@ -41,11 +41,16 @@ function MemberRow({ member, team, view }: MemberRowProps): ReactElement {
   const isOwner = team.organization.ownerUserId === member.userId;
   const isBusy = view.isSaving || view.isLoading;
   return (
-    <Paper withBorder p="sm" component="section" aria-label={member.name || member.email}>
+    <Paper
+      withBorder
+      p="sm"
+      component="section"
+      aria-label={member.name || member.email || member.userId}
+    >
       <Stack gap="sm">
         <Group justify="space-between" align="flex-start">
           <div>
-            <Text fw={500}>{member.name || member.email}</Text>
+            <Text fw={500}>{member.name || member.email || member.userId}</Text>
             <Text size="sm" c="dimmed">
               {member.email}
             </Text>
@@ -54,7 +59,7 @@ function MemberRow({ member, team, view }: MemberRowProps): ReactElement {
         </Group>
         <Group align="flex-end">
           <NativeSelect
-            aria-label={`${messages.role}: ${member.name || member.email}`}
+            aria-label={`${messages.role}: ${member.name || member.email || member.userId}`}
             w={150}
             value={member.role}
             disabled={isBusy}

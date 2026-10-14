@@ -9,6 +9,7 @@ import { resolveBridgeError } from './localization/BridgeErrors.js';
 import type { TranslationKey } from './localization/English.js';
 import type { AuthResult, AuthUser } from '#contracts/AuthSession.js';
 import type { AgentCompletion } from '#contracts/TaskOutcome.js';
+import type { StudentEnrollment, StudentAccessReply } from '#contracts/StudentAccess.js';
 
 export const MessageRole = { USER: 'user', AGENT: 'agent' } as const;
 
@@ -33,6 +34,7 @@ export interface ComputerUseController {
   refreshAccounts: () => Promise<void>;
   switchAccount: (accountId: string) => Promise<void>;
   addGoogleAccount: () => Promise<void>;
+  enrollStudent?: (command: StudentEnrollment) => Promise<StudentAccessReply>;
   cancelAccountSignIn: () => Promise<void>;
   isSending: boolean;
   isResetting: boolean;
@@ -84,6 +86,17 @@ export function useComputerUse(): ComputerUseController {
   const [isVoiceLessonActive, setIsVoiceLessonActive] = useState(false);
   const [isVoiceBusy, setIsVoiceBusy] = useState(false);
   const voiceCaptureId = useRef<string | null>(null);
+
+  useEffect(
+    () =>
+      window.tro.subscribeStudentSessionEnded?.(() => {
+        accountGeneration.current += 1;
+        setUser(null);
+        clearAccountTask();
+        void refreshAccounts();
+      }),
+    [],
+  );
 
   useEffect(() => {
     const sessionId = currentSessionId.current;
@@ -359,6 +372,33 @@ export function useComputerUse(): ComputerUseController {
 
   function addGoogleAccount(): Promise<void> {
     return openGoogleAccount(true);
+  }
+
+  async function enrollStudent(command: StudentEnrollment): Promise<StudentAccessReply> {
+    if (!canChangeAccount() || !window.tro.controlStudentAccess) {
+      return { kind: 'failed', message: 'Finish active work before changing accounts.' };
+    }
+    accountOperation.current = true;
+    accountGeneration.current += 1;
+    setIsSwitchingAccount(true);
+    const generation = accountGeneration.current;
+    try {
+      const result = await window.tro.controlStudentAccess(command);
+      if (generation !== accountGeneration.current) {
+        return { kind: 'failed', message: 'The student session changed. Please retry.' };
+      }
+      if (result.kind === 'signed-in') {
+        clearAccountTask();
+        setUser(result.user);
+        await refreshAccounts();
+      }
+      return result;
+    } catch {
+      return { kind: 'failed', message: 'Could not finish student sign-in. Please retry.' };
+    } finally {
+      accountOperation.current = false;
+      setIsSwitchingAccount(false);
+    }
   }
 
   async function cancelAccountSignIn(): Promise<void> {
@@ -754,6 +794,7 @@ export function useComputerUse(): ComputerUseController {
     refreshAccounts,
     switchAccount,
     addGoogleAccount,
+    enrollStudent,
     cancelAccountSignIn,
     isSending: isSending || isVoiceBusy || isVoiceLessonActive,
     isResetting,

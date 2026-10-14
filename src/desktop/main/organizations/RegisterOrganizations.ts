@@ -43,6 +43,7 @@ export function registerOrganizationsHandlers<Event>(
         if (
           !access.isTrustedSender(event) ||
           session.kind !== 'signed-in' ||
+          session.user.learner !== undefined ||
           session.user.id !== parsed.data.expectedAccountId
         ) {
           return unavailable;

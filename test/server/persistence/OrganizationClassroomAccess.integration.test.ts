@@ -1,3 +1,6 @@
+import { StudentAccessKind } from '#contracts/StudentAccess.js';
+import { StudentDeviceMode } from '#contracts/StudentIdentity.js';
+import { createPrismaStudentAccessStore } from '../../../src/server/persistence/PrismaStudentAccessStore.js';
 import { randomUUID } from 'node:crypto';
 import { afterAll, expect, it } from 'vitest';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -550,4 +553,43 @@ it('shares a scoped class with multiple assigned teachers while keeping unassign
       classId: schoolClass.id,
     }),
   ).rejects.toMatchObject({ code: PetWorldFailure.FORBIDDEN });
+});
+
+it('keeps QR admissions within personal classes and revokes their codes when an owner links the class', async () => {
+  const { ownerId, organizationId } = await createOrganizationClassroom();
+  await client.organization.update({
+    where: { id: organizationId },
+    data: { nameSetAt: new Date() },
+  });
+  const qr = createPrismaStudentAccessStore(environment.DATABASE_URL);
+  try {
+    const course = await classrooms.store.saveCourse(
+      ownerId,
+      'Personal QR course',
+      createCourseContent(),
+    );
+    const personal = await classrooms.store.saveClass(ownerId, 'Personal QR class', course.id);
+    const command = {
+      kind: StudentAccessKind.CREATE_ADMISSION,
+      classId: personal.id,
+      schoolName: 'Personal QR school',
+      mode: StudentDeviceMode.PERSONAL,
+    };
+    const digest = randomUUID();
+    await qr.store.createAdmission(ownerId, command, digest, new Date());
+    await organizationService.execute(ownerId, {
+      kind: OrganizationAction.LINK_CLASS,
+      organizationId,
+      classId: personal.id,
+    });
+    expect(
+      (await client.studentAdmission.findUniqueOrThrow({ where: { codeDigest: digest } })).revoked,
+    ).toBe(true);
+    await expect(
+      qr.store.createAdmission(ownerId, command, randomUUID(), new Date()),
+    ).rejects.toThrow();
+    expect(await client.studentAdmission.count({ where: { classId: personal.id } })).toBe(1);
+  } finally {
+    await qr.close();
+  }
 });

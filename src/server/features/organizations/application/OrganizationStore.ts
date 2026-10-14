@@ -10,7 +10,7 @@ import type {
 
 export interface OrganizationAccount {
   id: string;
-  email: string;
+  email: string | null;
   emailVerified: boolean;
   role: AccountRole;
   isAdmin: boolean;

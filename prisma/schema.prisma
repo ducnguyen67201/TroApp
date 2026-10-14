@@ -28,7 +28,7 @@ enum AccountRole {
 model User {
   id            String    @id
   name          String
-  email         String    @unique
+  email         String?   @unique
   role          AccountRole @default(student)
   isAdmin       Boolean   @default(false)
   canCreateOrganization Boolean @default(false)
@@ -37,6 +37,7 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  learnerProfile StudentLearnerProfile?
   sessions      Session[]
   accounts      Account[]
   modelUsage    ModelUsage[]
@@ -65,6 +66,95 @@ model User {
   issuedOrganizationInvitations OrganizationInvitation[] @relation("OrganizationInviter")
 
   @@map("user")
+}
+
+model StudentSchool {
+  id String @id @db.Uuid
+  ownerId String @unique
+  name String
+  rosterRevision Int @default(0)
+  createdAt DateTime @default(now())
+}
+
+model StudentAdmission {
+  id String @id @db.Uuid
+  schoolId String @db.Uuid
+  classId String @db.Uuid
+  codeDigest String @unique
+  mode String
+  uses Int @default(0)
+  revoked Boolean @default(false)
+  expiresAt DateTime
+  @@index([classId, revoked])
+}
+
+model StudentDevice {
+  id String @id @db.Uuid
+  schoolId String @db.Uuid
+  classId String @db.Uuid
+  admissionId String @db.Uuid
+  requestId String @unique @db.Uuid
+  credentialDigest String @unique
+  mode String
+  revoked Boolean @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([classId])
+}
+
+model StudentLearnerProfile {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  schoolId String @db.Uuid
+  source String @default("school-card")
+  externalId String
+  rosterName String?
+  createdAt DateTime @default(now())
+  @@index([schoolId, source, externalId])
+}
+
+model StudentLearnerSession {
+  id String @id @db.Uuid
+  userId String
+  deviceId String @db.Uuid
+  requestId String @db.Uuid
+  payloadDigest String
+  credentialDigest String @unique
+  meetingId String? @db.Uuid
+  revoked Boolean @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@unique([deviceId, requestId])
+  @@index([userId])
+}
+
+model StudentAccessUsage {
+  id String @id
+  count Int @default(0)
+}
+
+model StudentRosterRecord {
+  schoolId String @db.Uuid
+  source String @default("school-card")
+  externalId String
+  name String
+  @@id([schoolId, source, externalId])
+}
+
+model StudentRosterBatch {
+  schoolId String @db.Uuid
+  revision Int
+  payloadDigest String
+  @@id([schoolId, revision, payloadDigest])
+}
+
+model StudentAccessAudit {
+  id String @id @db.Uuid
+  schoolId String @db.Uuid
+  actorId String
+  operation String
+  createdAt DateTime @default(now())
+  @@index([schoolId, createdAt])
 }
 
 model ClassroomCourseRevision {

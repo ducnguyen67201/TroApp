@@ -78,7 +78,7 @@ export type OrganizationSummary = z.infer<typeof OrganizationSummarySchema>;
 export const OrganizationMemberSchema = z.strictObject({
   userId: UserIdSchema,
   name: z.string().max(256),
-  email: OrganizationEmailSchema,
+  email: OrganizationEmailSchema.nullable(),
   role: AccountRoleSchema,
   joinedAt: z.iso.datetime(),
 });

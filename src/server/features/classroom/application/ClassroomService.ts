@@ -254,6 +254,7 @@ export class ClassroomService {
               ...((await store.readClassOrganizationId(schoolClass.id)) !== null
                 ? {
                     canTeach: await store.canTeachClass(userId, schoolClass.id),
+                    supportsStudentQr: false,
                   }
                 : {}),
               meetings: await store.listMeetings(schoolClass.id),

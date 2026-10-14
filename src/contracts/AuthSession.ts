@@ -1,11 +1,22 @@
 import { z } from 'zod';
+import { StudentIdentitySchema } from './StudentIdentity.js';
 
-export const AuthUserSchema = z.strictObject({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  email: z.email(),
-  isAdmin: z.boolean().default(false),
-});
+export const AuthUserSchema = z
+  .strictObject({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    email: z.email().nullable(),
+    isAdmin: z.boolean().default(false),
+    learner: StudentIdentitySchema.optional(),
+  })
+  .superRefine((user, context) => {
+    if (
+      (user.email === null && !user.learner) ||
+      (user.learner && (user.isAdmin || user.email !== null))
+    ) {
+      context.addIssue({ code: 'custom', message: 'Invalid account identity.' });
+    }
+  });
 
 export type AuthUser = z.infer<typeof AuthUserSchema>;
 

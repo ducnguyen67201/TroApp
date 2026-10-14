@@ -126,7 +126,11 @@ export function SettingsDialog({
     >
       <Tabs
         key={teamOrganizationId ?? SettingsSection.GENERAL}
-        defaultValue={teamOrganizationId && user ? SettingsSection.TEAM : SettingsSection.GENERAL}
+        defaultValue={
+          teamOrganizationId && user && !user.learner
+            ? SettingsSection.TEAM
+            : SettingsSection.GENERAL
+        }
         orientation="vertical"
         variant="pills"
         keepMounted={false}
@@ -167,7 +171,7 @@ export function SettingsDialog({
             >
               {messages.account}
             </Tabs.Tab>
-            {user && (
+            {user && !user.learner && (
               <Tabs.Tab
                 value={SettingsSection.TEAM}
                 leftSection={<IconUsers size={18} stroke={1.7} aria-hidden="true" />}
@@ -366,7 +370,7 @@ export function SettingsDialog({
         <Tabs.Panel value={SettingsSection.PETS}>
           <PetGallery accountId={user?.id ?? null} />
         </Tabs.Panel>
-        {user && (
+        {user && !user.learner && (
           <Tabs.Panel value={SettingsSection.TEAM}>
             <TeamPanel
               key={user.id}
@@ -384,8 +388,10 @@ export function SettingsDialog({
               <>
                 <SettingsRow label={messages.name} description={user.name} />
                 <SettingsRow
-                  label={messages.email}
-                  description={<span className="account-email">{user.email}</span>}
+                  label={user.learner ? 'Student ID' : messages.email}
+                  description={
+                    <span className="account-email">{user.learner?.externalId ?? user.email}</span>
+                  }
                 />
                 <Text size="sm" c="dimmed" className="settings-account-hint">
                   {messages.signOutHint}

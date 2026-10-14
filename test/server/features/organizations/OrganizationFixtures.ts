@@ -144,7 +144,7 @@ export class MemoryOrganizationStore implements OrganizationStore {
 
   readVerifiedAccountByEmail(email: string): Promise<OrganizationAccount | null> {
     const matches = [...this.accounts.values()].filter(
-      (account) => account.email.toLowerCase() === email.toLowerCase() && account.emailVerified,
+      (account) => account.email?.toLowerCase() === email.toLowerCase() && account.emailVerified,
     );
     return Promise.resolve(matches.length === 1 ? (matches[0] ?? null) : null);
   }
@@ -325,34 +325,34 @@ export class MemoryOrganizationStore implements OrganizationStore {
 export async function createOrganizationFixture() {
   const store = new MemoryOrganizationStore();
   const now = new Date('2026-10-14T12:00:00.000Z');
-  const admin: OrganizationAccount = {
+  const admin = {
     id: 'admin',
     email: 'admin@example.test',
     emailVerified: true,
     role: AccountRole.STUDENT,
     isAdmin: true,
-  };
-  const owner: OrganizationAccount = {
+  } satisfies OrganizationAccount;
+  const owner = {
     id: 'owner',
     email: 'owner@example.test',
     emailVerified: true,
     role: AccountRole.STUDENT,
     isAdmin: false,
-  };
-  const member: OrganizationAccount = {
+  } satisfies OrganizationAccount;
+  const member = {
     id: 'member',
     email: 'member@example.test',
     emailVerified: true,
     role: AccountRole.TEACHER,
     isAdmin: false,
-  };
-  const stranger: OrganizationAccount = {
+  } satisfies OrganizationAccount;
+  const stranger = {
     id: 'stranger',
     email: 'stranger@example.test',
     emailVerified: true,
     role: AccountRole.STUDENT,
     isAdmin: false,
-  };
+  } satisfies OrganizationAccount;
   for (const account of [admin, owner, member, stranger]) {
     store.accounts.set(account.id, account);
   }

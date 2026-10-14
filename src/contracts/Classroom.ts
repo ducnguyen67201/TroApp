@@ -277,6 +277,7 @@ export const ClassroomHomeSchema = z.strictObject({
         schoolClass: ClassSchema,
         meetings: z.array(ClassMeetingSchema).max(100),
         canTeach: z.boolean().optional(),
+        supportsStudentQr: z.boolean().optional(),
       }),
     )
     .max(100),

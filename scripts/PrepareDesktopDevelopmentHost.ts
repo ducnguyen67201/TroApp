@@ -38,7 +38,12 @@ export async function prepareDesktopDevelopmentHost(
       name: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
       devDependencies: z.object({ electron: z.string() }),
       build: z.object({
-        mac: z.object({ extendInfo: z.object({ NSMicrophoneUsageDescription: z.string() }) }),
+        mac: z.object({
+          extendInfo: z.object({
+            NSMicrophoneUsageDescription: z.string(),
+            NSCameraUsageDescription: z.string(),
+          }),
+        }),
       }),
     })
     .parse(metadata);
@@ -59,6 +64,7 @@ export async function prepareDesktopDevelopmentHost(
     .update(devDependencies.electron)
     .update(bundleId)
     .update(build.mac.extendInfo.NSMicrophoneUsageDescription)
+    .update(build.mac.extendInfo.NSCameraUsageDescription)
     .update(icon)
     .digest('hex');
   const developmentDirectory = join(projectRoot, '.tro-development');
@@ -88,6 +94,7 @@ export async function prepareDesktopDevelopmentHost(
       CFBundleDisplayName: 'Tro',
       CFBundleIconFile: 'TroIcon.icns',
       NSMicrophoneUsageDescription: build.mac.extendInfo.NSMicrophoneUsageDescription,
+      NSCameraUsageDescription: build.mac.extendInfo.NSCameraUsageDescription,
     })) {
       await runFile('/usr/bin/plutil', ['-replace', key, '-string', value, plist]);
     }

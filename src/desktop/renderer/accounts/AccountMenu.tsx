@@ -1,5 +1,6 @@
 import {
   Avatar,
+  Alert,
   Badge,
   Button,
   Group,
@@ -23,6 +24,8 @@ import { useEffect, useState, type ReactElement } from 'react';
 import { AccountRole } from '#contracts/AccountRole.js';
 import type { ComputerUseController } from '../UseComputerUse.js';
 import { useLocale } from '../localization/UseLocale.js';
+import { StudentAccessForm } from './StudentAccessForm.js';
+import { StudentDeviceMode } from '#contracts/StudentIdentity.js';
 
 interface AccountMenuProps {
   controller: ComputerUseController;
@@ -32,11 +35,19 @@ interface AccountMenuProps {
 
 /** Shows metadata only; session selection and browser authentication stay in main. */
 export function AccountMenu({ controller, roleLabel, disabled }: AccountMenuProps): ReactElement {
-  const { messages } = useLocale();
+  const { messages, locale } = useLocale();
   const [opened, setOpened] = useState(false);
   const [adding, setAdding] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [expiredStudent, setExpiredStudent] = useState(false);
   const { user, savedAccounts, isSigning, isSwitchingAccount } = controller;
+  const shared =
+    user?.learner?.mode === StudentDeviceMode.SHARED ||
+    savedAccounts?.deviceMode === StudentDeviceMode.SHARED;
+  const identityLabel = (identity: NonNullable<typeof user>): string =>
+    identity.learner
+      ? `${locale === 'vi' ? 'Mã học sinh' : 'Student ID'} · ${identity.learner.externalId}`
+      : (identity.email ?? '');
 
   useEffect(() => {
     if (!isSigning && !starting) {
@@ -106,8 +117,8 @@ export function AccountMenu({ controller, roleLabel, disabled }: AccountMenuProp
                   {user?.name ?? messages.accountChoose}
                 </Text>
                 {user && (
-                  <Text size="xs" c="dimmed" truncate title={user.email}>
-                    {user.email}
+                  <Text size="xs" c="dimmed" truncate title={identityLabel(user)}>
+                    {identityLabel(user)}
                   </Text>
                 )}
               </Stack>
@@ -161,6 +172,7 @@ export function AccountMenu({ controller, roleLabel, disabled }: AccountMenuProp
                   onClick={() => {
                     setOpened(false);
                     if (account.requiresSignIn) {
+                      setExpiredStudent(Boolean(account.user.learner));
                       openAddAccount();
                     } else {
                       void controller.switchAccount(account.id);
@@ -179,8 +191,8 @@ export function AccountMenu({ controller, roleLabel, disabled }: AccountMenuProp
                         {accountRole}
                       </Badge>
                     </Group>
-                    <Text size="xs" c="dimmed" truncate title={account.user.email}>
-                      {account.user.email}
+                    <Text size="xs" c="dimmed" truncate title={identityLabel(account.user)}>
+                      {identityLabel(account.user)}
                     </Text>
                     {account.requiresSignIn && (
                       <Text size="xs" c="dimmed">
@@ -198,14 +210,19 @@ export function AccountMenu({ controller, roleLabel, disabled }: AccountMenuProp
             })}
           </Stack>
           <div className="account-menu-actions">
-            <UnstyledButton
-              className="account-menu-action"
-              disabled={disabled}
-              onClick={openAddAccount}
-            >
-              <IconPlus size={17} />
-              <span>{messages.addAccount}</span>
-            </UnstyledButton>
+            {!shared && (
+              <UnstyledButton
+                className="account-menu-action"
+                disabled={disabled}
+                onClick={() => {
+                  setExpiredStudent(false);
+                  openAddAccount();
+                }}
+              >
+                <IconPlus size={17} />
+                <span>{messages.addAccount}</span>
+              </UnstyledButton>
+            )}
             {user && (
               <UnstyledButton
                 className="account-menu-action"
@@ -216,12 +233,22 @@ export function AccountMenu({ controller, roleLabel, disabled }: AccountMenuProp
                 }}
               >
                 <IconLogout size={17} />
-                <span>{messages.signOutCurrentAccount}</span>
+                <span>
+                  {shared
+                    ? locale === 'vi'
+                      ? 'Đổi học sinh'
+                      : 'Change student'
+                    : messages.signOutCurrentAccount}
+                </span>
               </UnstyledButton>
             )}
           </div>
           <Text size="xs" c="dimmed" mt="sm">
-            {messages.accountStorageHint}
+            {shared
+              ? locale === 'vi'
+                ? 'Phiên học tạm thời trên máy dùng chung.'
+                : 'Temporary lesson on a shared device.'
+              : messages.accountStorageHint}
           </Text>
         </Popover.Dropdown>
       </Popover>
@@ -232,8 +259,25 @@ export function AccountMenu({ controller, roleLabel, disabled }: AccountMenuProp
         centered
         size="sm"
         closeButtonProps={{ 'aria-label': messages.accountCancel }}
+        closeOnClickOutside={!isSwitchingAccount}
+        closeOnEscape={!isSwitchingAccount}
       >
         <Stack>
+          {expiredStudent && (
+            <Alert role="alert">
+              {locale === 'vi'
+                ? 'Đăng nhập đã hết hạn. Tiếp tục bằng thẻ QR sẽ tạo hồ sơ mới và không mở lại bài làm cũ.'
+                : 'This saved login expired. Continuing with a QR creates a new profile and will not reopen previous work.'}
+            </Alert>
+          )}
+          {window.tro.controlStudentAccess && (
+            <StudentAccessForm
+              controller={controller}
+              onSuccess={() => {
+                setAdding(false);
+              }}
+            />
+          )}
           <Text size="sm" c="dimmed">
             {messages.accountSignInDescription}
           </Text>

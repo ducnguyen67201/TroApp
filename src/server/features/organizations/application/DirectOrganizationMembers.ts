@@ -51,7 +51,7 @@ export async function applyEmailMemberships(
   account: OrganizationAccount,
   now: Date,
 ): Promise<void> {
-  if (!account.emailVerified) {
+  if (!account.emailVerified || account.email === null) {
     return;
   }
   const email = account.email.toLowerCase();

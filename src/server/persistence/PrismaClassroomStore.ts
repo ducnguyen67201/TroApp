@@ -413,7 +413,7 @@ class PrismaClassroomStore implements ClassroomStore {
       where: { id: userId },
       select: { email: true, emailVerified: true },
     });
-    return user?.emailVerified ? user.email.toLowerCase() : null;
+    return user?.emailVerified && user.email ? user.email.toLowerCase() : null;
   }
 
   async saveInvitation(invitation: StoredClassroomInvitation) {
@@ -814,6 +814,7 @@ class PrismaClassroomStore implements ClassroomStore {
           select: {
             id: true,
             name: true,
+            learnerProfile: { select: { externalId: true } },
             classParticipations: {
               where: { classSessionId },
               include: {
@@ -834,7 +835,9 @@ class PrismaClassroomStore implements ClassroomStore {
     const rows = await this.client.classroomParticipation.findMany({
       where: { classSessionId, meeting: { classId } },
       include: {
-        student: { select: { id: true, name: true } },
+        student: {
+          select: { id: true, name: true, learnerProfile: { select: { externalId: true } } },
+        },
         attempts: {
           include: { submissions: { take: 100, orderBy: { submittedAt: 'desc' } } },
         },
@@ -848,7 +851,9 @@ class PrismaClassroomStore implements ClassroomStore {
 
 /** Both roster reads validate the same retained progress without changing their membership rules. */
 function buildRosterStudent(
-  student: Prisma.UserGetPayload<{ select: { id: true; name: true } }>,
+  student: Prisma.UserGetPayload<{
+    select: { id: true; name: true; learnerProfile: { select: { externalId: true } } };
+  }>,
   participation:
     | Prisma.ClassroomParticipationGetPayload<{
         include: { attempts: { include: { submissions: true } } };
@@ -857,7 +862,7 @@ function buildRosterStudent(
 ): Awaited<ReturnType<ClassroomStore['readRoster']>>[number] {
   return {
     studentId: student.id,
-    name: student.name,
+    name: student.learnerProfile ? `${student.name} (chưa xác minh / unverified)` : student.name,
     participation: participation
       ? ParticipationSchema.parse({
           id: participation.id,
