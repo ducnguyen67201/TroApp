@@ -229,6 +229,7 @@ export function createMacSigningConfig(
   }
   return {
     forceCodeSigning: true,
+    buildDependenciesFromSource: true,
     mac: {
       type: 'distribution',
       identity: settings.identity,
@@ -357,6 +358,34 @@ export async function verifyMacSignature(
   }
 }
 
+/** Read literal Mach-O paths and enforce the advertised macOS 13.0 deployment target. */
+export async function readMacMinimumVersions(
+  path: string,
+  run: MacCommand = runMacCommand,
+): Promise<readonly string[]> {
+  // Parentheses in Electron helper names must not be interpreted as archive-member syntax.
+  const commands = await run('/usr/bin/otool', ['-m', '-l', path]);
+  const minimumVersions = [
+    ...commands.stdout.matchAll(
+      /(?:cmd LC_BUILD_VERSION[\s\S]*?\bminos|cmd LC_VERSION_MIN_MACOSX[\s\S]*?\bversion)\s+(\d+\.\d+(?:\.\d+)?)/g,
+    ),
+  ].map((match) => match[1] ?? '');
+  if (
+    minimumVersions.length === 0 ||
+    minimumVersions.some(
+      (value) =>
+        !value ||
+        Number(value.split('.')[0]) > 13 ||
+        (Number(value.split('.')[0]) === 13 && Number(value.split('.')[1]) > 0),
+    )
+  ) {
+    throw new Error(
+      'macOS native minimum version exceeds the advertised macOS 13.0 requirement or is unknown.',
+    );
+  }
+  return minimumVersions;
+}
+
 /** Sign extra resources before electron-builder seals the bundle. */
 export async function signMacResources(
   appPath: string,
@@ -365,21 +394,14 @@ export async function signMacResources(
 ): Promise<void> {
   const resources = join(appPath, 'Contents', 'Resources');
   await readMacNativeFiles(resources);
-  const prebuilds = join(
-    resources,
-    'app.asar.unpacked',
-    'node_modules',
-    'uiohook-napi',
-    'prebuilds',
-  );
-  // Installed Mac packages need only the matching hook; remove unused cross-platform binaries.
-  const expectedPrebuild = `darwin-${settings.architecture}`;
-  await access(join(prebuilds, expectedPrebuild, 'uiohook-napi.node'));
-  for (const name of await readdir(prebuilds)) {
-    if (name !== expectedPrebuild) {
-      await rm(join(prebuilds, name), { recursive: true, force: true });
-    }
-  }
+  const shortcutDirectory = join(resources, 'app.asar.unpacked', 'node_modules', 'uiohook-napi');
+  const rebuiltShortcut = join(shortcutDirectory, 'build', 'Release', 'uiohook_napi.node');
+  await access(rebuiltShortcut);
+  await verifyMacArchitecture(rebuiltShortcut, settings.architecture, run);
+  await readMacMinimumVersions(rebuiltShortcut, run);
+  /* node-gyp-build loads build/Release first. The dependency's shipped Mac prebuilds
+   * require 13.5, so keep only the verified source build for our 13.0 release. */
+  await rm(join(shortcutDirectory, 'prebuilds'), { recursive: true, force: true });
   for (const path of await readMacNativeFiles(resources)) {
     await verifyMacArchitecture(path, settings.architecture, run);
     await run('/usr/bin/codesign', [
