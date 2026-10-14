@@ -57,6 +57,7 @@ it('opens the student class route without joining and returns to the list', () =
 function createHome(context: TeachingContext): ClassroomHome {
   return {
     role: AccountRole.STUDENT,
+    isAdmin: false,
     courses: [
       {
         id: context.courseRevisionId,

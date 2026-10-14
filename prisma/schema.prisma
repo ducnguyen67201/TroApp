@@ -30,6 +30,7 @@ model User {
   name          String
   email         String    @unique
   role          AccountRole @default(student)
+  isAdmin       Boolean   @default(false)
   emailVerified Boolean   @default(false)
   image         String?
   createdAt     DateTime  @default(now())

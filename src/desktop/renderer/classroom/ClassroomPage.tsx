@@ -24,6 +24,7 @@ import {
 } from '#contracts/Classroom.js';
 import { TeacherClassroomPanel } from './TeacherClassroomPanel.js';
 import { StudentClassroomPanel } from './StudentClassroomPanel.js';
+import { AdminClassroomPanel } from './AdminClassroomPanel.js';
 import { IconArrowLeft, IconRefresh, IconSearch } from '@tabler/icons-react';
 import type { z } from 'zod';
 import { AccountRole } from '#contracts/AccountRole.js';
@@ -59,6 +60,8 @@ export function ClassroomPage({
     { kind: 'invitation' }
   > | null>(null);
   const [home, setHome] = useState<ClassroomHome | null>(null);
+  const [homeUserId, setHomeUserId] = useState<string | null>(null);
+  const [adminView, setAdminView] = useState(false);
   const [context, setContext] = useState<TeachingContext | null>(null);
   const contextRef = useRef<TeachingContext | null>(null);
   const [preparation, setPreparation] = useState<Extract<
@@ -76,12 +79,17 @@ export function ClassroomPage({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ classId: string; text: string } | null>(null);
   const generation = useRef(0);
+  const homeRequest = useRef(0);
   const practiceReview = usePracticeShortcut(context, navigation.openClass);
 
   const accept = useCallback(
     (reply: ClassroomReply, rosterSessionId?: string): void => {
       if (reply.kind === 'home') {
         setHome(reply.home);
+        setHomeUserId(userId);
+        if (!reply.home.isAdmin) {
+          setAdminView(false);
+        }
         onRoleChange(reply.home.role);
       }
       if (reply.kind === 'context') {
@@ -115,20 +123,44 @@ export function ClassroomPage({
         setRoster({ sessionId: rosterSessionId, students: reply.roster });
       }
     },
-    [onRoleChange],
+    [onRoleChange, userId],
   );
+
+  const dismissAdminAccess = useCallback((): void => {
+    homeRequest.current += 1;
+    setAdminView(false);
+    setHome((current) => (current ? { ...current, isAdmin: false } : null));
+    setError(t('Admin access is no longer available.', 'Quyền quản trị viên không còn khả dụng.'));
+  }, [t]);
 
   const refresh = useCallback(async (): Promise<void> => {
     const currentGeneration = generation.current;
+    const currentHomeRequest = ++homeRequest.current;
     const bridge = window.tro.controlClassroom;
     if (!bridge) {
       return;
     }
-    const reply = await bridge({ kind: 'home' });
-    if (currentGeneration !== generation.current) {
+    let reply: ClassroomReply;
+    try {
+      reply = await bridge({ kind: 'home' });
+    } catch {
+      if (currentGeneration === generation.current && currentHomeRequest === homeRequest.current) {
+        setAdminView(false);
+        setError(t('Classroom service is unavailable.', 'Dịch vụ lớp học chưa sẵn sàng.'));
+      }
+      return;
+    }
+    if (currentGeneration !== generation.current || currentHomeRequest !== homeRequest.current) {
       return;
     }
     if (reply.kind === 'failed') {
+      setAdminView(false);
+      if (
+        reply.code === ClassroomFailure.UNAUTHORIZED ||
+        reply.code === ClassroomFailure.FORBIDDEN
+      ) {
+        setHome(null);
+      }
       setError(
         t(
           'Could not load your classes. Check your connection and sign-in, then refresh.',
@@ -184,6 +216,8 @@ export function ClassroomPage({
     contextRef.current = null;
     setContext(null);
     setHome(null);
+    setHomeUserId(null);
+    setAdminView(false);
     setPreparation(null);
     setReceipt(null);
     return () => {
@@ -271,6 +305,8 @@ export function ClassroomPage({
   }
 
   const showsInsights = navigation.route.page === DesktopPage.INSIGHTS;
+  const canViewAllClasses = home?.isAdmin === true && homeUserId === userId;
+  const showsAdmin = !showsInsights && canViewAllClasses && adminView;
   const participantClasses =
     home?.classes.filter((entry) => entry.schoolClass.teacherId !== userId) ?? [];
   const enrollment = (
@@ -308,10 +344,10 @@ export function ClassroomPage({
       hidden={!active}
       aria-label={t('Classroom', 'Lớp học')}
       className="classroom-page"
-      data-class-page={navigation.route.classId !== null}
+      data-class-page={!showsAdmin && navigation.route.classId !== null}
     >
       <div className="classroom-toolbar">
-        {navigation.route.classId !== null && (
+        {!showsAdmin && navigation.route.classId !== null && (
           <Tooltip label={t('All classes', 'Tất cả lớp học')}>
             <ActionIcon
               variant="subtle"
@@ -327,15 +363,17 @@ export function ClassroomPage({
         )}
         <header className="classroom-page-heading">
           <h1>
-            {showsInsights
-              ? t('Learning insights', 'Tiến độ học tập')
-              : home?.role === AccountRole.TEACHER
-                ? (home.classes.find((entry) => entry.schoolClass.id === navigation.route.classId)
-                    ?.schoolClass.name ?? t('Your classroom', 'Lớp học của bạn'))
-                : `${t('Welcome', 'Chào bạn')}${userName ? `, ${userName.trim().split(' ')[0] ?? ''}` : ''}`}
+            {showsAdmin
+              ? t('All classes', 'Tất cả lớp học')
+              : showsInsights
+                ? t('Learning insights', 'Tiến độ học tập')
+                : home?.role === AccountRole.TEACHER
+                  ? (home.classes.find((entry) => entry.schoolClass.id === navigation.route.classId)
+                      ?.schoolClass.name ?? t('Your classroom', 'Lớp học của bạn'))
+                  : `${t('Welcome', 'Chào bạn')}${userName ? `, ${userName.trim().split(' ')[0] ?? ''}` : ''}`}
           </h1>
         </header>
-        {!showsInsights && navigation.route.classId === null && (
+        {!showsInsights && !showsAdmin && navigation.route.classId === null && (
           <TextInput
             className="classroom-search"
             aria-label={t('Find a class', 'Tìm lớp học')}
@@ -347,16 +385,30 @@ export function ClassroomPage({
             }}
           />
         )}
-        <Button
-          variant="subtle"
-          leftSection={<IconRefresh size={16} />}
-          loading={busy}
-          onClick={() => {
-            void refresh();
-          }}
-        >
-          {t('Refresh', 'Cập nhật')}
-        </Button>
+        {!showsInsights && canViewAllClasses && (
+          <Button
+            variant={showsAdmin ? 'filled' : 'default'}
+            aria-pressed={showsAdmin}
+            onClick={() => {
+              setAdminView(!showsAdmin);
+              navigation.openClassroom();
+            }}
+          >
+            {showsAdmin ? t('My classes', 'Lớp của tôi') : t('Admin view', 'Chế độ quản trị viên')}
+          </Button>
+        )}
+        {!showsAdmin && (
+          <Button
+            variant="subtle"
+            leftSection={<IconRefresh size={16} />}
+            loading={busy}
+            onClick={() => {
+              void refresh();
+            }}
+          >
+            {t('Refresh', 'Cập nhật')}
+          </Button>
+        )}
       </div>
       {notice?.classId === navigation.route.classId && (
         <Text role="status" size="sm" mb="md">
@@ -369,7 +421,10 @@ export function ClassroomPage({
         </Alert>
       )}
       {!home && <Text c="dimmed">{t('Loading your classroom…', 'Đang tải lớp học…')}</Text>}
-      {!showsInsights && home?.role === AccountRole.TEACHER && (
+      {showsAdmin && active && (
+        <AdminClassroomPanel userId={userId} onAccessLost={dismissAdminAccess} t={t} />
+      )}
+      {!showsInsights && !showsAdmin && home?.role === AccountRole.TEACHER && (
         <TeacherClassroomPanel
           refresh={refresh}
           error={error}
@@ -397,7 +452,7 @@ export function ClassroomPage({
           t={t}
         />
       )}
-      {!showsInsights && home && home.role !== AccountRole.TEACHER && (
+      {!showsInsights && !showsAdmin && home && home.role !== AccountRole.TEACHER && (
         <StudentClassroomPanel
           home={home}
           navigation={navigation}
@@ -424,7 +479,9 @@ export function ClassroomPage({
       )}
       <details
         hidden={
-          showsInsights || (home?.role === AccountRole.TEACHER && navigation.route.classId !== null)
+          showsInsights ||
+          showsAdmin ||
+          (home?.role === AccountRole.TEACHER && navigation.route.classId !== null)
         }
         className="classroom-disclosure classroom-enrollment"
         open={(home?.role === AccountRole.STUDENT && participantClasses.length === 0) || undefined}
@@ -436,23 +493,26 @@ export function ClassroomPage({
         </summary>
         {enrollment}
       </details>
-      {!showsInsights && home?.role === AccountRole.TEACHER && participantClasses.length > 0 && (
-        <div className="classroom-enrolled-activity">
-          <StudentClassroomPanel
-            home={home}
-            userId={userId}
-            context={context}
-            practiceReview={practiceReview}
-            search=""
-            busy={busy}
-            send={send}
-            preparation={preparation}
-            receipt={receipt}
-            t={t}
-            {...(onOpenWorkspace ? { onAskForHelp: onOpenWorkspace } : {})}
-          />
-        </div>
-      )}
+      {!showsInsights &&
+        !showsAdmin &&
+        home?.role === AccountRole.TEACHER &&
+        participantClasses.length > 0 && (
+          <div className="classroom-enrolled-activity">
+            <StudentClassroomPanel
+              home={home}
+              userId={userId}
+              context={context}
+              practiceReview={practiceReview}
+              search=""
+              busy={busy}
+              send={send}
+              preparation={preparation}
+              receipt={receipt}
+              t={t}
+              {...(onOpenWorkspace ? { onAskForHelp: onOpenWorkspace } : {})}
+            />
+          </div>
+        )}
     </section>
   );
 }

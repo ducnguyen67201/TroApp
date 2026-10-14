@@ -26,7 +26,7 @@ function createHarness() {
       .mockResolvedValue(),
     readSession: vi.fn<VoiceDependencies['readSession']>().mockResolvedValue({
       kind: 'signed-in',
-      user: { id: 'user', name: 'Test', email: 'test@example.test' },
+      user: { id: 'user', name: 'Test', email: 'test@example.test', isAdmin: false },
     }),
     fetchCredential: vi.fn<VoiceDependencies['fetchCredential']>().mockResolvedValue({
       token: 'synthetic',

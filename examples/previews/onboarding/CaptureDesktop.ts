@@ -11,9 +11,10 @@ import { PetAction, createPetPreferences, type PetSnapshot } from '#contracts/Pe
    microphone capture, model or native desktop capabilities are connected. */
 const classId = '11111111-1111-4111-8111-111111111111';
 const courseId = '22222222-2222-4222-8222-222222222222';
-const user = { id: 'demo-minh', name: 'Minh', email: 'minh@example.test' };
+const user = { id: 'demo-minh', name: 'Minh', email: 'minh@example.test', isAdmin: false };
 const home: ClassroomHome = {
   role: 'student',
+  isAdmin: false,
   courses: [],
   classes: [
     {

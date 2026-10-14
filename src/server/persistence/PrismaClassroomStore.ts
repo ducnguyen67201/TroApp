@@ -26,6 +26,8 @@ import { randomUUID } from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Prisma } from '../generated/prisma/client.js';
 import {
+  AdminClassroomLimits,
+  AdminClassroomSummarySchema,
   ClassSchema,
   ClassMeetingSchema,
   CourseRevisionSchema,
@@ -247,6 +249,69 @@ class PrismaClassroomStore implements ClassroomStore {
       throw new ClassroomError(ClassroomFailure.UNAUTHORIZED);
     }
     return AccountRoleSchema.parse(user.role);
+  }
+
+  async readIsAdmin(userId: string): Promise<boolean> {
+    const user = await this.client.user.findUnique({
+      where: { id: userId },
+      select: { isAdmin: true },
+    });
+    return user?.isAdmin ?? false;
+  }
+
+  async listClassesForAdmin(search: string, offset: number) {
+    const rows = await this.client.classroomGroup.findMany({
+      where: {
+        deletedAt: null,
+        ...(search
+          ? {
+              OR: [
+                { name: { contains: search, mode: Prisma.QueryMode.insensitive } },
+                { teacher: { name: { contains: search, mode: Prisma.QueryMode.insensitive } } },
+                { teacher: { email: { contains: search, mode: Prisma.QueryMode.insensitive } } },
+              ],
+            }
+          : {}),
+      },
+      include: { teacher: { select: { name: true, email: true } } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      skip: offset,
+      take: AdminClassroomLimits.PAGE_SIZE + 1,
+    });
+    return {
+      classes: rows.slice(0, AdminClassroomLimits.PAGE_SIZE).map((row) =>
+        AdminClassroomSummarySchema.parse({
+          schoolClass: {
+            id: row.id,
+            teacherId: row.teacherId,
+            name: row.name,
+            courseRevisionId: row.courseRevisionId,
+          },
+          teacherName: row.teacher.name,
+          teacherEmail: row.teacher.email,
+        }),
+      ),
+      hasMore: rows.length > AdminClassroomLimits.PAGE_SIZE,
+    };
+  }
+
+  async readClassForAdmin(classId: string) {
+    const row = await this.client.classroomGroup.findFirst({
+      where: { id: classId, deletedAt: null },
+      include: { teacher: { select: { name: true, email: true } } },
+    });
+    return row
+      ? AdminClassroomSummarySchema.parse({
+          schoolClass: {
+            id: row.id,
+            teacherId: row.teacherId,
+            name: row.name,
+            courseRevisionId: row.courseRevisionId,
+          },
+          teacherName: row.teacher.name,
+          teacherEmail: row.teacher.email,
+        })
+      : null;
   }
 
   async readVerifiedEmail(userId: string) {
@@ -630,50 +695,74 @@ class PrismaClassroomStore implements ClassroomStore {
       },
       take: 200,
     });
-    return rows.map(({ student }) => {
-      const participation = student.classParticipations[0];
-      return {
-        studentId: student.id,
-        name: student.name,
-        participation: participation
-          ? ParticipationSchema.parse({
-              id: participation.id,
-              classSessionId,
-              studentId: student.id,
-              deviceId: participation.deviceId,
-              leaseUntil: participation.leaseUntil.toISOString(),
-              left: participation.left,
-            })
-          : null,
-        attempts:
-          participation?.attempts.map((attempt) =>
-            StudentAttemptSchema.parse({
-              id: attempt.id,
-              participationId: attempt.participationId,
-              activityId: attempt.activityId,
-              progressVersion: attempt.progressVersion,
-              workspaceUrl: attempt.workspaceUrl,
-              evidence: attempt.evidence,
-              declaredComplete: attempt.declaredComplete,
-              helpSummary: attempt.helpSummary,
-            }),
-          ) ?? [],
-        submissions:
-          participation?.attempts
-            .flatMap((attempt) =>
-              attempt.submissions.map((submission) =>
-                SubmissionReceiptSchema.parse({
-                  id: submission.id,
-                  attemptId: attempt.id,
-                  url: submission.url,
-                  submittedAt: submission.submittedAt.toISOString(),
-                }),
-              ),
-            )
-            .slice(0, 100) ?? [],
-      };
-    });
+    return rows.map(({ student }) => buildRosterStudent(student, student.classParticipations[0]));
   }
+
+  async readSessionParticipants(classSessionId: string, classId: string) {
+    const rows = await this.client.classroomParticipation.findMany({
+      where: { classSessionId, meeting: { classId } },
+      include: {
+        student: { select: { id: true, name: true } },
+        attempts: {
+          include: { submissions: { take: 100, orderBy: { submittedAt: 'desc' } } },
+        },
+      },
+      orderBy: { studentId: 'asc' },
+      take: 200,
+    });
+    return rows.map((participation) => buildRosterStudent(participation.student, participation));
+  }
+}
+
+/** Both roster reads validate the same retained progress without changing their membership rules. */
+function buildRosterStudent(
+  student: Prisma.UserGetPayload<{ select: { id: true; name: true } }>,
+  participation:
+    | Prisma.ClassroomParticipationGetPayload<{
+        include: { attempts: { include: { submissions: true } } };
+      }>
+    | undefined,
+): Awaited<ReturnType<ClassroomStore['readRoster']>>[number] {
+  return {
+    studentId: student.id,
+    name: student.name,
+    participation: participation
+      ? ParticipationSchema.parse({
+          id: participation.id,
+          classSessionId: participation.classSessionId,
+          studentId: student.id,
+          deviceId: participation.deviceId,
+          leaseUntil: participation.leaseUntil.toISOString(),
+          left: participation.left,
+        })
+      : null,
+    attempts:
+      participation?.attempts.map((attempt) =>
+        StudentAttemptSchema.parse({
+          id: attempt.id,
+          participationId: attempt.participationId,
+          activityId: attempt.activityId,
+          progressVersion: attempt.progressVersion,
+          workspaceUrl: attempt.workspaceUrl,
+          evidence: attempt.evidence,
+          declaredComplete: attempt.declaredComplete,
+          helpSummary: attempt.helpSummary,
+        }),
+      ) ?? [],
+    submissions:
+      participation?.attempts
+        .flatMap((attempt) =>
+          attempt.submissions.map((submission) =>
+            SubmissionReceiptSchema.parse({
+              id: submission.id,
+              attemptId: attempt.id,
+              url: submission.url,
+              submittedAt: submission.submittedAt.toISOString(),
+            }),
+          ),
+        )
+        .slice(0, 100) ?? [],
+  };
 }
 
 export function createPrismaClassroomStore(

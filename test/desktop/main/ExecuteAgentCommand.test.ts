@@ -26,7 +26,7 @@ function createPorts() {
       readSession: () =>
         Promise.resolve({
           kind: 'signed-in',
-          user: { id: 'test', name: 'Test', email: 'test@example.test' },
+          user: { id: 'test', name: 'Test', email: 'test@example.test', isAdmin: false },
         }),
       signInWithGoogle: () => Promise.resolve({ kind: 'signed-out' }),
       signOut: () => Promise.resolve({ kind: 'signed-out' }),

@@ -35,7 +35,7 @@ function createHandlers() {
     isTrustedSender: (event: TestEvent) => event.trusted,
     readSession: vi.fn<OnboardingAccess<TestEvent>['readSession']>().mockResolvedValue({
       kind: 'signed-in',
-      user: { id: 'current', name: 'Sample', email: 'sample@example.test' },
+      user: { id: 'current', name: 'Sample', email: 'sample@example.test', isAdmin: false },
     }),
   } satisfies OnboardingAccess<TestEvent>;
   const handlers = new Map<string, (event: TestEvent, raw: unknown) => Promise<OnboardingReply>>();
@@ -136,7 +136,7 @@ it('rechecks the sender after session verification and holds account changes thr
   event.trusted = false;
   completeSession?.({
     kind: 'signed-in',
-    user: { id: 'current', name: 'Sample', email: 'sample@example.test' },
+    user: { id: 'current', name: 'Sample', email: 'sample@example.test', isAdmin: false },
   });
   expect(await request).toEqual({ kind: 'failed', reason: OnboardingFailure.UNAVAILABLE });
   expect(store.readProgress).not.toHaveBeenCalled();

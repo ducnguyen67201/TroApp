@@ -472,6 +472,18 @@ its section, stage and pacing. Sign in as an enrolled student and explicitly joi
 Account switching permits sequential teacher/student checks on one device; it does
 not establish simultaneous two-device behavior.
 
+Accounts also have a separate `User.isAdmin` boolean, defaulting to false. After
+applying the committed migration, an operator can set it in the backend database
+for the intended account (the Prisma `User` model maps to the `user` table).
+Refresh Classroom to pick up a change, then select **Admin view** to search and
+switch between other teachers' classes. This view shows published course content,
+sessions and student progress without changing enrollment or teacher ownership.
+Setting the field back to false revokes admin viewing on the next request. No
+account is granted admin access by the migration. Apply it with `pnpm db:deploy`
+against the intended backend before deploying the updated API. Existing desktop
+releases retain their original classroom response; admin viewing requires the
+updated desktop.
+
 Enable and approve a practice checkpoint before testing **Check my work**. In a
 joined Practice activity, choose a work window, then use **Check current window**,
 Command + K on macOS, or Alt + K on Windows to capture and review it. Captures stay

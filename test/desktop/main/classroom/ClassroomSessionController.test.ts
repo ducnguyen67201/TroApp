@@ -14,6 +14,36 @@ import type {
 } from '#contracts/ClassroomInsights.js';
 
 describe('desktop classroom binding', () => {
+  it('browses admin classes without changing the joined student participation', async () => {
+    const context = createTeachingContext();
+    const execute = vi
+      .fn<ClassroomApi['execute']>()
+      .mockResolvedValue({ kind: 'context', context });
+    const invalidate = vi.fn<() => void>();
+    const contextChanged = vi.fn<(context: TeachingContext | null) => void>();
+    const controller = new ClassroomSessionController({ execute }, invalidate, contextChanged);
+    try {
+      await controller.execute({
+        kind: 'join',
+        classSessionId: context.meeting.id,
+        deviceId: randomUUID(),
+      });
+      execute.mockClear();
+      invalidate.mockClear();
+      contextChanged.mockClear();
+      const page: ClassroomReply = { kind: 'admin-classes', classes: [], hasMore: false };
+      execute.mockResolvedValueOnce(page);
+
+      expect(await controller.execute({ kind: 'admin-classes', offset: 0 })).toEqual(page);
+      expect(execute).toHaveBeenCalledExactlyOnceWith({ kind: 'admin-classes', offset: 0 });
+      expect(controller.isContextCurrent(context)).toBe(true);
+      expect(invalidate).not.toHaveBeenCalled();
+      expect(contextChanged).not.toHaveBeenCalled();
+    } finally {
+      controller.dispose();
+    }
+  });
+
   it('binds insight help to main’s current device and rejects another activity or stale replies', async () => {
     const context = createTeachingContext();
     const execute = vi

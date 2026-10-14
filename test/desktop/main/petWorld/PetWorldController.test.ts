@@ -112,7 +112,7 @@ function createHarness(savedState = createPetWorldLocalState()) {
   };
   const readSession = vi.fn<() => Promise<AuthResult>>().mockResolvedValue({
     kind: 'signed-in',
-    user: { id: 'student', name: 'Student', email: 'student@example.test' },
+    user: { id: 'student', name: 'Student', email: 'student@example.test', isAdmin: false },
   });
   const controller = new PetWorldController(
     api,
@@ -269,7 +269,7 @@ describe('pet world desktop synchronization', () => {
     harness.controller.dispose();
     completeSession?.({
       kind: 'signed-in',
-      user: { id: 'student', name: 'Student', email: 'student@example.test' },
+      user: { id: 'student', name: 'Student', email: 'student@example.test', isAdmin: false },
     });
     expect(await request).toEqual({ kind: 'failed', code: PetWorldFailure.STALE });
     expect(harness.pets.setAccount).not.toHaveBeenCalled();

@@ -44,7 +44,7 @@ function createController(
   const auth = {
     readSession: vi.fn<AgentChatAuth['readSession']>().mockResolvedValue({
       kind: 'signed-in',
-      user: { id: 'student', name: 'Student', email: 'student@example.test' },
+      user: { id: 'student', name: 'Student', email: 'student@example.test', isAdmin: false },
     }),
     signInWithGoogle: vi
       .fn<AgentChatAuth['signInWithGoogle']>()
@@ -771,7 +771,7 @@ it.each([
 it('disposes the old worker before switching credentials without signing the old user out', async () => {
   const { controller, worker, auth } = createController();
   worker.isRunning.mockReturnValue(true);
-  const nextUser = { id: 'other-user', name: 'Other', email: 'other@example.test' };
+  const nextUser = { id: 'other-user', name: 'Other', email: 'other@example.test', isAdmin: false };
   const switchIdentity = vi
     .fn<() => Promise<import('#contracts/AuthSession.js').AuthResult>>()
     .mockImplementation(() => {

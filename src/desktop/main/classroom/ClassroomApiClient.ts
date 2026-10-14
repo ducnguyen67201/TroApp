@@ -1,4 +1,5 @@
 import {
+  ClassroomAdminCapability,
   ClassroomCommandSchema,
   ClassroomReplySchema,
   ClassroomFailure,
@@ -68,7 +69,11 @@ export class ClassroomApiClient {
     try {
       const response = await this.request(`${this.baseUrl}/api/v1/classroom/command`, {
         method: 'POST',
-        headers: { cookie, 'content-type': 'application/json' },
+        headers: {
+          cookie,
+          'content-type': 'application/json',
+          [ClassroomAdminCapability.HEADER]: ClassroomAdminCapability.VERSION,
+        },
         body: JSON.stringify(ClassroomCommandSchema.parse(command)),
         signal: AbortSignal.timeout(10_000),
       });

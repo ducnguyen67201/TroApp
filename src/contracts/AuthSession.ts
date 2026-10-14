@@ -4,6 +4,7 @@ export const AuthUserSchema = z.strictObject({
   id: z.string().min(1),
   name: z.string().min(1),
   email: z.email(),
+  isAdmin: z.boolean().default(false),
 });
 
 export type AuthUser = z.infer<typeof AuthUserSchema>;

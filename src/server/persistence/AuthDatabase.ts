@@ -22,6 +22,12 @@ export function createAuthDatabase(environment: ServerEnv) {
           defaultValue: AccountRole.STUDENT,
           input: false,
         },
+        isAdmin: {
+          type: 'boolean',
+          required: true,
+          defaultValue: false,
+          input: false,
+        },
       },
     },
     secret: environment.AUTH_SECRET,
