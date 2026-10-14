@@ -1,9 +1,11 @@
 import type { execFile, ExecFileOptions } from 'node:child_process';
+import type { setTimeout } from 'node:timers/promises';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { runMacCommand, type MacCommand } from '../../scripts/MacSigning.js';
 
 const doubles = vi.hoisted(() => ({
+  wait: vi.fn<typeof setTimeout>(),
   execute:
     vi.fn<
       (
@@ -13,6 +15,12 @@ const doubles = vi.hoisted(() => ({
       ) => ReturnType<MacCommand>
     >(),
 }));
+
+vi.mock('node:timers/promises', async () => {
+  const original =
+    await vi.importActual<typeof import('node:timers/promises')>('node:timers/promises');
+  return { ...original, setTimeout: doubles.wait };
+});
 
 vi.mock('node:child_process', async () => {
   const original = await vi.importActual<typeof import('node:child_process')>('node:child_process');
@@ -46,6 +54,18 @@ const FailureEventSchema = z.strictObject({
   reason: z.string(),
 });
 
+const RetryEventSchema = z.strictObject({
+  event: z.literal('mac.release.command.retry'),
+  tool: z.literal('xcrun'),
+  operation: z.literal('stapler.validate'),
+  exitCode: z.literal(68),
+  reason: z.literal('network-error'),
+  attempt: z.union([z.literal(1), z.literal(2)]),
+  nextAttempt: z.union([z.literal(2), z.literal(3)]),
+  maxAttempts: z.literal(3),
+  delayMs: z.union([z.literal(5000), z.literal(10000)]),
+});
+
 function readFailureEvent(): z.infer<typeof FailureEventSchema> {
   const calls = vi.mocked(console.error).mock.calls;
   expect(calls).toHaveLength(1);
@@ -56,9 +76,22 @@ function readFailureEvent(): z.infer<typeof FailureEventSchema> {
   return FailureEventSchema.parse(raw);
 }
 
+function readRetryEvents(): z.infer<typeof RetryEventSchema>[] {
+  return vi.mocked(console.warn).mock.calls.map((call) => {
+    expect(call).toHaveLength(1);
+    const message = z.string().parse(call[0]);
+    const raw: unknown = JSON.parse(message);
+    expect(message).not.toContain(privateMarker);
+    return RetryEventSchema.parse(raw);
+  });
+}
+
 beforeEach(() => {
   doubles.execute.mockReset();
+  doubles.wait.mockReset();
+  doubles.wait.mockResolvedValue(undefined);
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 });
 
 afterEach(() => {
@@ -210,10 +243,176 @@ describe('Mac command failure diagnostics', () => {
       runMacCommand('/usr/bin/xcrun', ['stapler', 'validate', '/fixture.app']),
     ).resolves.toEqual(output);
     expect(console.error).not.toHaveBeenCalled();
+    expect(console.warn).not.toHaveBeenCalled();
+    expect(doubles.wait).not.toHaveBeenCalled();
     expect(doubles.execute).toHaveBeenCalledWith(
       '/usr/bin/xcrun',
       ['stapler', 'validate', '/fixture.app'],
       expect.objectContaining({ timeout: 120_000, maxBuffer: 4 * 1024 * 1024 }),
     );
+  });
+});
+
+describe('Mac stapler validation retries', () => {
+  const arguments_ = ['stapler', 'validate', `/private/${privateMarker}/Tro.app`];
+  const transientFailure = {
+    code: 68,
+    signal: null,
+    killed: false,
+    message: privateMarker,
+    stdout: `/private/${privateMarker}/Tro.app`,
+    stderr: `NSURLErrorDomain https://user:${privateMarker}@private.example.test`,
+  };
+  const expectedRetries = [
+    {
+      event: 'mac.release.command.retry',
+      tool: 'xcrun',
+      operation: 'stapler.validate',
+      exitCode: 68,
+      reason: 'network-error',
+      attempt: 1,
+      nextAttempt: 2,
+      maxAttempts: 3,
+      delayMs: 5000,
+    },
+    {
+      event: 'mac.release.command.retry',
+      tool: 'xcrun',
+      operation: 'stapler.validate',
+      exitCode: 68,
+      reason: 'network-error',
+      attempt: 2,
+      nextAttempt: 3,
+      maxAttempts: 3,
+      delayMs: 10000,
+    },
+  ];
+
+  it.each([1, 2])(
+    'recovers after %i network failures without logging a terminal error',
+    async (failures) => {
+      for (let index = 0; index < failures; index += 1) {
+        doubles.execute.mockRejectedValueOnce(transientFailure);
+      }
+      const output = { stdout: 'validated', stderr: '' };
+      doubles.execute.mockResolvedValueOnce(output);
+      doubles.wait.mockImplementation(() => {
+        expect(console.error).not.toHaveBeenCalled();
+        return Promise.resolve();
+      });
+
+      await expect(runMacCommand('/usr/bin/xcrun', arguments_)).resolves.toEqual(output);
+      expect(doubles.execute).toHaveBeenCalledTimes(failures + 1);
+      for (const call of doubles.execute.mock.calls) {
+        expect(call).toEqual([
+          '/usr/bin/xcrun',
+          arguments_,
+          expect.objectContaining({ timeout: 120_000, maxBuffer: 4 * 1024 * 1024 }),
+        ]);
+      }
+      expect(doubles.wait.mock.calls).toEqual([[5000], [10000]].slice(0, failures));
+      expect(readRetryEvents()).toEqual(expectedRetries.slice(0, failures));
+      expect(console.error).not.toHaveBeenCalled();
+    },
+  );
+
+  it('fails closed after three attempts with two safe retry events and one final failure', async () => {
+    doubles.execute.mockRejectedValue(transientFailure);
+    doubles.wait.mockImplementation(() => {
+      expect(console.error).not.toHaveBeenCalled();
+      return Promise.resolve();
+    });
+    await expect(runMacCommand('/usr/bin/xcrun', arguments_)).rejects.toThrow(
+      /^macOS release command failed: xcrun\.$/,
+    );
+    expect(doubles.execute).toHaveBeenCalledTimes(3);
+    expect(doubles.wait.mock.calls).toEqual([[5000], [10000]]);
+    expect(readRetryEvents()).toEqual(expectedRetries);
+    expect(readFailureEvent()).toMatchObject({
+      tool: 'xcrun',
+      operation: 'stapler.validate',
+      exitCode: 68,
+      signal: null,
+      reason: 'network-error',
+    });
+  });
+
+  it.each([
+    ['/usr/bin/xcrun', ['stapler', 'staple'], 'stapler.staple'],
+    ['/usr/bin/xcrun', ['notarytool', 'submit'], 'notarytool.submit'],
+    ['/usr/bin/xcrun', ['notarytool', 'info'], 'notarytool.info'],
+    ['/usr/bin/codesign', ['--verify'], 'codesign.verify'],
+    ['/usr/bin/other', ['stapler', 'validate'], 'other'],
+  ] as const)(
+    'never repeats other commands: %s %s',
+    async (executable, commandArguments, operation) => {
+      doubles.execute.mockRejectedValue(transientFailure);
+      await expect(
+        runMacCommand(executable, [...commandArguments, privateMarker]),
+      ).rejects.toThrow();
+      expect(doubles.execute).toHaveBeenCalledTimes(1);
+      expect(doubles.wait).not.toHaveBeenCalled();
+      expect(console.warn).not.toHaveBeenCalled();
+      expect(readFailureEvent()).toMatchObject({ operation });
+    },
+  );
+
+  it.each([
+    { name: 'other exit code', overrides: { code: 65 }, reason: 'network-error' },
+    { name: 'missing-input exit code', overrides: { code: 66 }, reason: 'network-error' },
+    { name: 'revoked-ticket exit code', overrides: { code: 77 }, reason: 'network-error' },
+    { name: 'string exit code', overrides: { code: '68' }, reason: 'network-error' },
+    { name: 'unknown failure', overrides: { stderr: privateMarker }, reason: 'unknown' },
+    { name: 'termination', overrides: { killed: true }, reason: 'terminated' },
+    { name: 'termination signal', overrides: { signal: 'SIGTERM' }, reason: 'network-error' },
+    { name: 'unrecognized signal', overrides: { signal: privateMarker }, reason: 'network-error' },
+    {
+      name: 'missing ticket',
+      overrides: { stderr: `Record not found ${privateMarker}` },
+      reason: 'ticket-not-found',
+    },
+  ])('does not retry $name', async ({ overrides, reason }) => {
+    doubles.execute.mockRejectedValue({ ...transientFailure, ...overrides });
+    await expect(runMacCommand('/usr/bin/xcrun', arguments_)).rejects.toThrow();
+    expect(doubles.execute).toHaveBeenCalledTimes(1);
+    expect(doubles.wait).not.toHaveBeenCalled();
+    expect(console.warn).not.toHaveBeenCalled();
+    expect(readFailureEvent()).toMatchObject({ reason });
+  });
+
+  it.each([
+    ['Record not found', 'ticket-not-found'],
+    ['does not have a ticket stapled', 'ticket-not-stapled'],
+  ] as const)(
+    'gives permanent ticket evidence precedence over network text: %s',
+    async (phrase, reason) => {
+      doubles.execute.mockRejectedValue({
+        ...transientFailure,
+        stdout: `NSURLErrorDomain ${privateMarker}`,
+        stderr: `${phrase} ${privateMarker}`,
+      });
+      await expect(runMacCommand('/usr/bin/xcrun', arguments_)).rejects.toThrow();
+      expect(doubles.execute).toHaveBeenCalledTimes(1);
+      expect(doubles.wait).not.toHaveBeenCalled();
+      expect(console.warn).not.toHaveBeenCalled();
+      expect(readFailureEvent()).toMatchObject({ reason });
+    },
+  );
+
+  it('retries network failure accompanied by generic ticket-validation text', async () => {
+    doubles.execute
+      .mockRejectedValueOnce({
+        ...transientFailure,
+        stdout: `Could not validate ticket ${privateMarker}`,
+      })
+      .mockResolvedValueOnce({ stdout: 'validated', stderr: '' });
+    await expect(runMacCommand('/usr/bin/xcrun', arguments_)).resolves.toEqual({
+      stdout: 'validated',
+      stderr: '',
+    });
+    expect(doubles.execute).toHaveBeenCalledTimes(2);
+    expect(doubles.wait.mock.calls).toEqual([[5000]]);
+    expect(readRetryEvents()).toEqual(expectedRetries.slice(0, 1));
+    expect(console.error).not.toHaveBeenCalled();
   });
 });

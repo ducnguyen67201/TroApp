@@ -678,7 +678,13 @@ numeric exit code, termination signal, elapsed milliseconds and a fixed failure
 category. It never includes raw command arguments, paths, tool output or errors.
 For `stapler.validate`, distinguish `ticket-not-found`, `ticket-not-stapled`,
 `ticket-validation-failed` and `network-error`; `unknown` requires further
-diagnosis, not a guessed retry or a relaxed verification gate. A prior
+diagnosis, not a guessed retry or a relaxed verification gate. Ticket validation
+retries only exit 68 with a network-error marker, at most three attempts with
+5-second then 10-second delays. Missing-ticket messages, invalid/revoked ticket
+exit codes and terminated commands are not retried. `mac.release.command.retry` records the
+attempt, next attempt, limit and delay without raw tool output. A persistent
+network or TLS error still fails the release; other commands are not retried by
+this policy. A prior
 `notarization successful` message does not replace the separate ticket check.
 `mac.release.verified` is emitted only after the inventory is written. No inventory
 is uploaded if any preceding step fails.
