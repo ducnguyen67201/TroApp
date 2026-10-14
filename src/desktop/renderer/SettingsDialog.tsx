@@ -1,4 +1,6 @@
 import type { OnboardingView } from './onboarding/UseOnboarding.js';
+import { AnalyticsPreferenceFailure, type AnalyticsView } from './analytics/UseAnalytics.js';
+import { analyticsMessages } from './analytics/AnalyticsMessages.js';
 import { onboardingMessages } from './onboarding/OnboardingMessages.js';
 import { PetGallery } from './pets/PetGallery.js';
 import { petMessages } from './pets/PetMessages.js';
@@ -33,6 +35,7 @@ interface SettingsDialogProps {
   voiceover?: VoiceoverView;
   onChooseMicrophone: () => void;
   onboarding?: OnboardingView;
+  analytics?: AnalyticsView;
 }
 
 interface SettingsRowProps {
@@ -69,9 +72,12 @@ export function SettingsDialog({
   voiceover,
   onChooseMicrophone,
   onboarding,
+  analytics,
 }: SettingsDialogProps): ReactElement {
   const { locale, messages, changeLocale, isLocaleSaved } = useLocale();
   const languageDescriptionId = useId();
+  const analyticsDescriptionId = useId();
+  const analyticsCopy = analyticsMessages[locale];
   const onboardingCopy = onboardingMessages[locale];
   const selectedMicrophone = microphones.microphones.find(
     (microphone) => microphone.deviceId === microphones.selectedDeviceId,
@@ -226,6 +232,52 @@ export function SettingsDialog({
                   {messages.voiceoverStop}
                 </Button>
               </SettingsRow>
+            )}
+            {analytics && (
+              <SettingsRow
+                label={analyticsCopy.title}
+                description={
+                  <span id={analyticsDescriptionId}>
+                    {analyticsCopy.description} {analyticsCopy.scope}
+                    {analytics.status?.configured === false && ` ${analyticsCopy.unavailable}`}
+                  </span>
+                }
+              >
+                <Switch
+                  aria-label={analyticsCopy.title}
+                  aria-describedby={analyticsDescriptionId}
+                  checked={analytics.status?.enabled ?? false}
+                  disabled={
+                    !analytics.status?.configured || analytics.isLoading || analytics.isSaving
+                  }
+                  onChange={(event) => {
+                    void analytics.changeEnabled(event.currentTarget.checked);
+                  }}
+                />
+              </SettingsRow>
+            )}
+            {(analytics?.isLoading || analytics?.isSaving) && (
+              <Text size="sm" c="dimmed" role="status">
+                {analytics.isSaving ? analyticsCopy.saving : analyticsCopy.loading}
+              </Text>
+            )}
+            {analytics?.failure && (
+              <div role="alert">
+                <Text size="sm">
+                  {analytics.failure === AnalyticsPreferenceFailure.LOAD
+                    ? analyticsCopy.loadFailed
+                    : analyticsCopy.saveFailed}
+                </Text>
+                <Button
+                  variant="subtle"
+                  disabled={analytics.isLoading || analytics.isSaving}
+                  onClick={() => {
+                    void analytics.retry();
+                  }}
+                >
+                  {analyticsCopy.retry}
+                </Button>
+              </div>
             )}
             {onboarding && (
               <SettingsRow

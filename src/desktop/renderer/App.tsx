@@ -1,4 +1,6 @@
 import { LessonVideosPage } from './lessonVideos/LessonVideosPage.js';
+import { AnalyticsScreen } from '#contracts/Analytics.js';
+import { useAnalytics } from './analytics/UseAnalytics.js';
 import { OnboardingStep } from '#contracts/OnboardingValues.js';
 import { useOnboarding } from './onboarding/UseOnboarding.js';
 import { OnboardingFlow, type OnboardingAnchors } from './onboarding/OnboardingFlow.js';
@@ -53,6 +55,15 @@ import { PetWorldPage } from './petWorld/PetWorldPage.js';
 
 import { DesktopPage } from './navigation/DesktopRoute.js';
 import { useDesktopNavigation } from './navigation/UseDesktopNavigation.js';
+
+const analyticsScreens = {
+  [DesktopPage.WORKSPACE]: AnalyticsScreen.WORKSPACE,
+  [DesktopPage.CLASSROOM]: AnalyticsScreen.CLASSROOM,
+  [DesktopPage.INSIGHTS]: AnalyticsScreen.INSIGHTS,
+  [DesktopPage.LESSON_VIDEOS]: AnalyticsScreen.LESSON_VIDEOS,
+  [DesktopPage.PET_WORLD]: AnalyticsScreen.PET_WORLD,
+} satisfies Record<(typeof DesktopPage)[keyof typeof DesktopPage], AnalyticsScreen>;
+
 const DesktopDialog = {
   SETTINGS: 'settings',
   MICROPHONE: 'microphone',
@@ -100,6 +111,13 @@ export function App(): ReactElement {
   const accountTransition =
     controller.isSigning || controller.isSwitchingAccount || controller.isSigningOut;
   const activeUserId = accountTransition ? null : (user?.id ?? null);
+  const analytics = useAnalytics(
+    controller.isLoading || accountTransition
+      ? null
+      : user
+        ? analyticsScreens[page]
+        : AnalyticsScreen.SIGN_IN,
+  );
   const voiceover = useVoiceover(activeUserId);
   const onboarding = useOnboarding(activeUserId);
   const workspaceAnchor = useRef<HTMLButtonElement>(null);
@@ -218,6 +236,7 @@ export function App(): ReactElement {
           }}
           user={user}
           onboarding={onboarding}
+          analytics={analytics}
           microphones={microphones}
           voiceStatus={voice.status}
           voiceover={voiceover}
