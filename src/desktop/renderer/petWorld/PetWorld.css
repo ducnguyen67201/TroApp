@@ -1,6 +1,8 @@
 .pet-world-page {
-  max-width: 1240px;
-  margin: 0 auto;
+  /* Fill the column flex parent instead of shrinking around the active tab's content. */
+  width: 100%;
+  min-width: 0;
+  margin: 0;
   padding: 28px 34px 48px;
   color: var(--mantine-color-charcoal-9);
 }
@@ -234,10 +236,21 @@
 }
 
 .pet-world-neighbor {
+  min-width: 0;
   padding: 16px;
   border: 1px solid #dfe5d7;
   border-radius: 16px;
   background: #f5f7ed;
+  overflow-wrap: anywhere;
+}
+
+.pet-world-neighbor-preview {
+  display: grid;
+  place-items: center;
+  height: 120px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  background: radial-gradient(ellipse at center, #e2ebd4, #f0f4e9);
 }
 
 .pet-world-table {

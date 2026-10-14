@@ -10,6 +10,7 @@ import {
   PetWorldCommandKind,
   PetWorldFailure,
   PetWorldLimits,
+  PetWorldReplySchema,
   type PetWorldCommand,
 } from '#contracts/PetWorld.js';
 import { PrismaClient } from '../../../src/server/generated/prisma/client.js';
@@ -42,7 +43,7 @@ async function createFixture() {
   await client.user.createMany({
     data: [teacher, first, second, stranger].map((id) => ({
       id,
-      name: id === teacher ? 'Teacher' : 'Student',
+      name: id === teacher ? 'Teacher' : id === first ? 'An' : id === second ? 'Bao' : 'Student',
       email: `${id}@example.test`,
       emailVerified: true,
       role: id === teacher ? AccountRole.TEACHER : AccountRole.STUDENT,
@@ -415,23 +416,127 @@ describe('Pet World PostgreSQL accounting and ownership', () => {
   });
 });
 
-describe('Pet World PostgreSQL sharing lifecycle and integrity constraints', () => {
-  it('projects shared enrolled homes in bulk and counts distinct nonvoided award batches', async () => {
+describe('Pet World PostgreSQL class visibility and integrity constraints', () => {
+  it('identifies different owners of same-named pets and refreshes account names in neighborhoods and visits', async () => {
+    const fixture = await createFixture();
+    await initializeWorld(fixture.first);
+    await initializeWorld(fixture.second);
+    const command = {
+      kind: PetWorldCommandKind.CLASS_NEIGHBORHOOD,
+      classId: fixture.classId,
+    } as const;
+    const neighborhood = await service.execute(fixture.teacher, command);
+    expect(neighborhood).toMatchObject({
+      homes: [
+        { studentId: fixture.first, displayName: 'An', profile: { names: { fox: 'Saved Maple' } } },
+        {
+          studentId: fixture.second,
+          displayName: 'Bao',
+          profile: { names: { fox: 'Saved Maple' } },
+        },
+      ],
+    });
+    const ownerName = 'Nguyễn Minh Anh Nguyễn Minh Anh Nguyễn Minh Anh';
+    await client.user.update({ where: { id: fixture.first }, data: { name: ownerName } });
+    const refreshed = PetWorldReplySchema.parse(await service.execute(fixture.teacher, command));
+    expect(refreshed).toMatchObject({
+      homes: [{ displayName: ownerName }, { displayName: 'Bao' }],
+    });
+    const visit = PetWorldReplySchema.parse(
+      await service.execute(fixture.second, {
+        kind: PetWorldCommandKind.VISIT_HOME,
+        classId: fixture.classId,
+        studentId: fixture.first,
+      }),
+    );
+    expect(visit).toMatchObject({
+      kind: 'home',
+      home: { displayName: ownerName, profile: { names: { fox: 'Saved Maple' } } },
+    });
+    expect(JSON.stringify(visit)).not.toMatch(/email|wallet|inventory|recognitions|note|teacherId/);
+  });
+
+  it('shows the same pet in every enrolled class without creating sharing records', async () => {
+    const fixture = await createFixture();
+    await initializeWorld(fixture.stranger);
+    const visit = {
+      kind: PetWorldCommandKind.VISIT_HOME,
+      classId: fixture.classId,
+      studentId: fixture.stranger,
+    } as const;
+    await expect(service.execute(fixture.second, visit)).rejects.toMatchObject({
+      code: PetWorldFailure.HOME_UNAVAILABLE,
+    });
+    await expect(
+      classroom.store.runAtomically(async (transaction) => {
+        await transaction.enrollStudent(fixture.classId, fixture.stranger, true);
+        throw new Error('Synthetic enrollment rollback');
+      }),
+    ).rejects.toThrow('Synthetic enrollment rollback');
+    expect(await classroom.store.isEnrolled(fixture.classId, fixture.stranger)).toBe(false);
+    await expect(service.execute(fixture.second, visit)).rejects.toMatchObject({
+      code: PetWorldFailure.HOME_UNAVAILABLE,
+    });
+    await classroom.store.enrollStudent(fixture.classId, fixture.stranger, true);
+    const firstVisit = await service.execute(fixture.second, visit);
+    expect(firstVisit).toMatchObject({ kind: 'home' });
+
+    const schoolClass = await classroom.store.readClass(fixture.classId);
+    if (!schoolClass) {
+      throw new Error('Missing fixture class.');
+    }
+    const otherClass = await classroom.store.saveClass(
+      fixture.teacher,
+      'Another neighborhood',
+      schoolClass.courseRevisionId,
+    );
+    await classroom.store.enrollStudent(otherClass.id, fixture.stranger, true);
+    expect(await service.execute(fixture.teacher, { ...visit, classId: otherClass.id })).toEqual(
+      firstVisit,
+    );
+    await expect(
+      service.execute(fixture.second, { ...visit, classId: otherClass.id }),
+    ).rejects.toMatchObject({ code: PetWorldFailure.FORBIDDEN });
+    expect(await client.petHomeShare.count({ where: { studentId: fixture.stranger } })).toBe(0);
+  });
+
+  it('shows a home initialized after enrollment without another enrollment action', async () => {
+    const fixture = await createFixture();
+    await classroom.store.enrollStudent(fixture.classId, fixture.stranger, true);
+    expect(
+      await service.execute(fixture.second, {
+        kind: PetWorldCommandKind.CLASS_NEIGHBORHOOD,
+        classId: fixture.classId,
+      }),
+    ).toMatchObject({ homes: [] });
+    await initializeWorld(fixture.stranger);
+    expect(
+      await service.execute(fixture.second, {
+        kind: PetWorldCommandKind.CLASS_NEIGHBORHOOD,
+        classId: fixture.classId,
+      }),
+    ).toMatchObject({ homes: [{ studentId: fixture.stranger }] });
+  });
+
+  it('projects all enrolled homes despite retired sharing settings and counts distinct award batches', async () => {
     const fixture = await createFixture();
     await initializeWorld(fixture.first);
     await initializeWorld(fixture.second);
     await initializeWorld(fixture.stranger);
-    await service.execute(fixture.first, {
-      kind: PetWorldCommandKind.SET_HOME_SHARING,
-      requestId: randomUUID(),
-      classId: fixture.classId,
-      enabled: true,
-      expectedShareRevision: 0,
+    /* Retired opt-outs and stale settings must not influence enrollment-based visibility. */
+    await client.petHomeShare.createMany({
+      data: [
+        { studentId: fixture.first, classId: fixture.classId, enabled: false, revision: 1 },
+        { studentId: fixture.stranger, classId: fixture.classId, enabled: true, revision: 1 },
+      ],
     });
-    /* A stale consent row must never admit an unenrolled owner into the bulk projection. */
-    await client.petHomeShare.create({
-      data: { studentId: fixture.stranger, classId: fixture.classId, enabled: true, revision: 1 },
-    });
+    expect(
+      await service.execute(fixture.second, {
+        kind: PetWorldCommandKind.VISIT_HOME,
+        classId: fixture.classId,
+        studentId: fixture.first,
+      }),
+    ).toMatchObject({ kind: 'home' });
     const group = await service.execute(
       fixture.teacher,
       createGrant(fixture.classId, [fixture.first, fixture.second]),
@@ -472,13 +577,13 @@ describe('Pet World PostgreSQL sharing lifecycle and integrity constraints', () 
     });
     expect(neighborhood).toMatchObject({
       kind: 'neighborhood',
-      homes: [{ studentId: fixture.first }],
+      homes: [{ studentId: fixture.first }, { studentId: fixture.second }],
       garden: { classroomMoments: 5, gardenMilestone: 1 },
     });
     if (neighborhood.kind !== 'neighborhood') {
       throw new Error('Expected neighborhood projection.');
     }
-    expect(neighborhood.homes).toHaveLength(1);
+    expect(neighborhood.homes).toHaveLength(2);
     expect(JSON.stringify(neighborhood)).not.toMatch(/wallet|recognitions|note|teacherId/);
     await classroom.store.enrollStudent(fixture.classId, fixture.first, false);
     expect(
@@ -486,7 +591,11 @@ describe('Pet World PostgreSQL sharing lifecycle and integrity constraints', () 
         kind: PetWorldCommandKind.CLASS_NEIGHBORHOOD,
         classId: fixture.classId,
       }),
-    ).toMatchObject({ kind: 'neighborhood', homes: [], garden: { classroomMoments: 5 } });
+    ).toMatchObject({
+      kind: 'neighborhood',
+      homes: [{ studentId: fixture.second }],
+      garden: { classroomMoments: 5 },
+    });
     await service.execute(fixture.teacher, {
       kind: PetWorldCommandKind.VOID_RECOGNITION,
       requestId: randomUUID(),
@@ -565,23 +674,15 @@ describe('Pet World PostgreSQL sharing lifecycle and integrity constraints', () 
     ).rejects.toThrow();
   });
 
-  it('disables class consent in the enrollment/delete transaction and does not restore it on re-enrollment', async () => {
+  it('removes homes on withdrawal, restores them on re-enrollment and refuses deleted classes', async () => {
     const fixture = await createFixture();
     await initializeWorld(fixture.first);
-    await service.execute(fixture.first, {
-      kind: PetWorldCommandKind.SET_HOME_SHARING,
-      requestId: randomUUID(),
+    const visit = {
+      kind: PetWorldCommandKind.VISIT_HOME,
       classId: fixture.classId,
-      enabled: true,
-      expectedShareRevision: 0,
-    });
-    expect(
-      await service.execute(fixture.second, {
-        kind: PetWorldCommandKind.VISIT_HOME,
-        classId: fixture.classId,
-        studentId: fixture.first,
-      }),
-    ).toMatchObject({ kind: 'home' });
+      studentId: fixture.first,
+    } as const;
+    expect(await service.execute(fixture.second, visit)).toMatchObject({ kind: 'home' });
 
     await expect(
       classroom.store.runAtomically(async (transaction) => {
@@ -589,50 +690,22 @@ describe('Pet World PostgreSQL sharing lifecycle and integrity constraints', () 
         throw new Error('Synthetic rollback');
       }),
     ).rejects.toThrow('Synthetic rollback');
-    expect(
-      await client.petHomeShare.findUnique({
-        where: { studentId_classId: { studentId: fixture.first, classId: fixture.classId } },
-      }),
-    ).toMatchObject({ enabled: true, revision: 1n });
+    expect(await service.execute(fixture.second, visit)).toMatchObject({ kind: 'home' });
 
     await classroom.store.enrollStudent(fixture.classId, fixture.first, false);
-    expect(
-      await client.petHomeShare.findUnique({
-        where: { studentId_classId: { studentId: fixture.first, classId: fixture.classId } },
-      }),
-    ).toMatchObject({ enabled: false, revision: 2n });
-    await classroom.store.enrollStudent(fixture.classId, fixture.first, true);
-    await expect(
-      service.execute(fixture.second, {
-        kind: PetWorldCommandKind.VISIT_HOME,
-        classId: fixture.classId,
-        studentId: fixture.first,
-      }),
-    ).rejects.toMatchObject({ code: PetWorldFailure.HOME_UNAVAILABLE });
-
-    await service.execute(fixture.first, {
-      kind: PetWorldCommandKind.SET_HOME_SHARING,
-      requestId: randomUUID(),
-      classId: fixture.classId,
-      enabled: true,
-      expectedShareRevision: 2,
+    await expect(service.execute(fixture.second, visit)).rejects.toMatchObject({
+      code: PetWorldFailure.HOME_UNAVAILABLE,
     });
+    await classroom.store.enrollStudent(fixture.classId, fixture.first, true);
+    expect(await service.execute(fixture.second, visit)).toMatchObject({ kind: 'home' });
     await classroom.store.deleteClass(fixture.classId, new Date());
-    expect(
-      await client.petHomeShare.findUnique({
-        where: { studentId_classId: { studentId: fixture.first, classId: fixture.classId } },
-      }),
-    ).toMatchObject({ enabled: false, revision: 4n });
-    await expect(
-      service.execute(fixture.teacher, {
-        kind: PetWorldCommandKind.VISIT_HOME,
-        classId: fixture.classId,
-        studentId: fixture.first,
-      }),
-    ).rejects.toMatchObject({ code: PetWorldFailure.FORBIDDEN });
+    await expect(service.execute(fixture.teacher, visit)).rejects.toMatchObject({
+      code: PetWorldFailure.FORBIDDEN,
+    });
     expect(
       await client.petWorld.findUnique({ where: { studentId: fixture.first } }),
     ).not.toBeNull();
+    expect(await client.petHomeShare.count({ where: { studentId: fixture.first } })).toBe(0);
   });
 
   it('rejects negative/unbacked balances, incorrect entry signs, unmatched sources and ledger edits', async () => {

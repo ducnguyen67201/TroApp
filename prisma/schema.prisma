@@ -725,6 +725,7 @@ model PetWorld {
   document Json
 }
 
+/** Retired sharing settings are retained as historical data; runtime visibility follows enrollment. */
 model PetHomeShare {
   studentId String
   student User @relation(fields: [studentId], references: [id], onDelete: Restrict)

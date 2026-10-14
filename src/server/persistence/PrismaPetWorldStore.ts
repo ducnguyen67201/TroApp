@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { CourseContentSchema } from '#contracts/Classroom.js';
 import {
-  PetHomeShareSchema,
   PetInventoryItemSchema,
   PetPointAmountSchema,
   PetPointBalanceSchema,
@@ -19,7 +18,6 @@ import type { PetWorldStore } from '../features/petWorld/application/PetWorldSto
 import type { PetWorldTransaction } from '../features/petWorld/application/PetWorldTransaction.js';
 import { PetWorldError } from '../features/petWorld/domain/PetWorldError.js';
 import type {
-  PetHomeShareState,
   PetInventoryState,
   PetPurchaseState,
   PetRecognitionState,
@@ -32,7 +30,6 @@ import { runClassroomTransactionWithRetries } from './RetryClassroomTransaction.
 import {
   PetReceiptScope,
   readPetAccountRole,
-  readPetHomeShareRow,
   readPetInventoryRow,
   readPetReceiptRow,
   readPetRecognitionRow,
@@ -306,17 +303,28 @@ class PrismaPetWorldTransaction implements PetWorldTransaction {
     return row ? readPetWorldRow(row) : null;
   }
 
-  async listSharedWorlds(classId: string) {
+  async listClassWorlds(classId: string) {
     const rows = await this.client.petWorld.findMany({
       where: {
         student: {
           classEnrollments: { some: { classId, active: true } },
-          petHomeShares: { some: { classId, enabled: true } },
         },
       },
+      include: { student: { select: { name: true } } },
       orderBy: { studentId: 'asc' },
     });
-    return rows.map(readPetWorldRow);
+    return rows.map((row) => ({ ...readPetWorldRow(row), ownerName: row.student.name }));
+  }
+
+  async readClassWorld(classId: string, studentId: string) {
+    const row = await this.client.petWorld.findFirst({
+      where: {
+        studentId,
+        student: { classEnrollments: { some: { classId, active: true } } },
+      },
+      include: { student: { select: { name: true } } },
+    });
+    return row ? { ...readPetWorldRow(row), ownerName: row.student.name } : null;
   }
 
   async createWorldIfMissing(world: PetWorldState) {
@@ -382,46 +390,6 @@ class PrismaPetWorldTransaction implements PetWorldTransaction {
         acquiredAt: new Date(validated.acquiredAt),
       },
     });
-  }
-
-  async readHomeShare(studentId: string, classId: string) {
-    const row = await this.client.petHomeShare.findUnique({
-      where: { studentId_classId: { studentId, classId } },
-    });
-    return row ? readPetHomeShareRow(row) : null;
-  }
-
-  async listHomeShares(studentId: string) {
-    const rows = await this.client.petHomeShare.findMany({
-      where: { studentId },
-      orderBy: { classId: 'asc' },
-    });
-    return rows.map(readPetHomeShareRow);
-  }
-
-  async saveHomeShare(share: PetHomeShareState, expectedRevision: number) {
-    const validated = PetHomeShareSchema.parse({
-      classId: share.classId,
-      enabled: share.enabled,
-      revision: share.revision,
-    });
-    requireNextRevision(validated.revision, expectedRevision);
-    const where = { studentId_classId: { studentId: share.studentId, classId: validated.classId } };
-    if (expectedRevision === 0 && !(await this.client.petHomeShare.findUnique({ where }))) {
-      await this.client.petHomeShare.create({
-        data: { ...validated, studentId: share.studentId, revision: BigInt(validated.revision) },
-      });
-      return;
-    }
-    const result = await this.client.petHomeShare.updateMany({
-      where: {
-        studentId: share.studentId,
-        classId: validated.classId,
-        revision: BigInt(expectedRevision),
-      },
-      data: { enabled: validated.enabled, revision: BigInt(validated.revision) },
-    });
-    requireUpdatedRow(result.count);
   }
 }
 

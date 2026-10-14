@@ -15,7 +15,7 @@ afterEach(async () => {
 });
 
 describe('account-scoped pet world intent persistence', () => {
-  it('survives restart, isolates accounts, and never uses the account ID as a path', async () => {
+  it('preserves current and retired intents across restart and isolates account paths', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'tro-pet-world-'));
     directories.push(directory);
     const store = new PetWorldPreferences(directory);
@@ -29,6 +29,13 @@ describe('account-scoped pet world intent persistence', () => {
           studentIds: ['student'],
           pointsPerStudent: '123',
           category: PetRecognitionCategory.CURIOSITY,
+        },
+        {
+          kind: PetWorldCommandKind.SET_HOME_SHARING,
+          requestId: 'ea73db43-ec47-4fb8-975c-54eabfef9e20',
+          classId: 'da73db43-ec47-4fb8-975c-54eabfef9e20',
+          enabled: false,
+          expectedShareRevision: 1,
         },
       ],
     };

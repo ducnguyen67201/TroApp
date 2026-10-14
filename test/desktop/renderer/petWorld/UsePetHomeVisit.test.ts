@@ -12,7 +12,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('removes the visited cosmetic projection when sharing is revoked on refresh', async () => {
+it('removes the visited cosmetic projection when class membership is revoked on refresh', async () => {
   vi.useFakeTimers();
   const profile = createOwnWorld('student').profile;
   if (!profile) {

@@ -13,6 +13,7 @@ export const PetWorldCommandKind = {
   PLACE_ITEM: 'place-item',
   REVERSE_GRANT: 'reverse-grant',
   VOID_RECOGNITION: 'void-recognition',
+  /* Kept parsable for saved intents from older desktops; new writes are rejected. */
   SET_HOME_SHARING: 'set-home-sharing',
   CLASS_RECOGNITION: 'class-recognition',
   CLASS_NEIGHBORHOOD: 'class-neighborhood',
@@ -148,6 +149,7 @@ export const PetInventoryItemSchema = z.strictObject({
 
 export type PetInventoryItem = z.infer<typeof PetInventoryItemSchema>;
 
+/** Legacy wire shape retained for saved receipts and older desktop consumers. */
 export const PetHomeShareSchema = z.strictObject({
   classId: z.uuid(),
   enabled: z.boolean(),
@@ -194,6 +196,7 @@ export const PetOwnWorldSchema = z.strictObject({
   inventory: z.array(PetInventoryItemSchema).max(200),
   entries: z.array(PetWalletEntrySchema).max(50),
   recognitions: z.array(PetRecognitionSchema).max(50),
+  /* Always empty on current servers; class enrollment owns home visibility. */
   shares: z.array(PetHomeShareSchema).max(1000),
 });
 
@@ -222,7 +225,7 @@ export type PetCatalog = z.infer<typeof PetCatalogSchema>;
 
 export const PetSharedHomeSchema = z.strictObject({
   studentId: accountId,
-  displayName: name,
+  displayName: z.string().min(1).max(200),
   profile: PetWorldProfileSchema,
 });
 

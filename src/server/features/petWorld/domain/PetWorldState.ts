@@ -1,6 +1,5 @@
 import type { AccountRole } from '#contracts/AccountRole.js';
 import type {
-  PetHomeShare,
   PetInventoryItem,
   PetRecognition,
   PetWorldMutationReply,
@@ -16,6 +15,11 @@ export interface PetWalletState {
 
 export interface PetWorldState extends PetWorldProfile {
   readonly studentId: string;
+}
+
+/** Classmate-visible identity and cosmetics; wallet and recognition fields stay private. */
+export interface PetClassWorld extends PetWorldState {
+  readonly ownerName: string;
 }
 
 export interface PetWalletEntryState {
@@ -40,10 +44,6 @@ export interface PetPurchaseState {
   readonly catalogRevision: string;
   readonly requestId: string;
   readonly createdAt: string;
-}
-
-export interface PetHomeShareState extends PetHomeShare {
-  readonly studentId: string;
 }
 
 export interface PetInventoryState extends PetInventoryItem {

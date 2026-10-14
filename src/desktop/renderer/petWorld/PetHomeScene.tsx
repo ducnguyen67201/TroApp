@@ -13,7 +13,7 @@ interface PetHomeSceneProps {
   t: PetWorldTranslate;
 }
 
-/** The same cosmetic projection renders an owner's home and an explicitly shared visit. */
+/** The same cosmetic projection renders an owner's home and a classmate's visit. */
 export function PetHomeScene({ profile, catalog, ownerName, t }: PetHomeSceneProps): ReactElement {
   const backdrop = catalog?.items.find((item) => item.id === profile.backdropItemId)?.assetId;
   const backdropId = Object.values(PetBackdropId).find((value) => value === backdrop) ?? null;

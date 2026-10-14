@@ -1,13 +1,8 @@
 import type { ReactElement } from 'react';
-import { Alert, Badge, Button, Group, Loader, Modal, Stack, Switch, Text } from '@mantine/core';
+import { Alert, Badge, Button, Group, Loader, Modal, Stack, Text } from '@mantine/core';
 import { IconPlant2 } from '@tabler/icons-react';
-import {
-  PetWorldCommandKind,
-  type PetCatalog,
-  type PetOwnWorld,
-  type PetWorldCommand,
-  type PetWorldReply,
-} from '#contracts/PetWorld.js';
+import type { PetCatalog, PetWorldReply } from '#contracts/PetWorld.js';
+import { PetMascot } from '../pets/PetMascot.js';
 import { PetHomeScene } from './PetHomeScene.js';
 import { usePetHomeVisit } from './UsePetHomeVisit.js';
 import type { PetWorldTranslate } from './PetWorldLabels.js';
@@ -16,26 +11,19 @@ interface PetNeighborhoodPanelProps {
   userId: string;
   className: string;
   neighborhood: Extract<PetWorldReply, { kind: 'neighborhood' }>;
-  world: PetOwnWorld | null;
   catalog: PetCatalog | null;
-  isSaving: boolean;
   t: PetWorldTranslate;
-  sendCommand: (command: PetWorldCommand) => Promise<boolean>;
 }
 
-/** Sharing belongs to the student and this class; visitors never receive wallet data. */
+/** Every enrolled account with a pet profile appears in its class neighborhood. */
 export function PetNeighborhoodPanel({
   userId,
   className,
   neighborhood,
-  world,
   catalog,
-  isSaving,
   t,
-  sendCommand,
 }: PetNeighborhoodPanelProps): ReactElement {
   const visit = usePetHomeVisit(userId, neighborhood.classId);
-  const share = world?.shares.find((entry) => entry.classId === neighborhood.classId);
   return (
     <Stack gap="lg">
       <section className="pet-world-panel" aria-label={t('Class garden', 'Khu vườn của lớp')}>
@@ -78,68 +66,55 @@ export function PetNeighborhoodPanel({
           )}
         </Text>
       </section>
-      {world?.profile && (
-        <section className="pet-world-panel" aria-label={t('Home sharing', 'Chia sẻ ngôi nhà')}>
-          <Group justify="space-between" align="start">
-            <div>
-              <h2>{t('Invite your classmates in.', 'Mời các bạn ghé thăm.')}</h2>
-              <Text size="sm" c="dimmed">
-                {t(
-                  'Only this class can visit your pet and decorations. Your points and teacher notes stay private.',
-                  'Chỉ lớp này được xem thú cưng và đồ trang trí. Điểm và lời thầy cô nhận xét luôn riêng tư.',
-                )}
-              </Text>
-            </div>
-            <Switch
-              label={t('Share my home with this class', 'Chia sẻ nhà với lớp này')}
-              checked={share?.enabled ?? false}
-              disabled={isSaving}
-              onChange={(event) => {
-                void sendCommand({
-                  kind: PetWorldCommandKind.SET_HOME_SHARING,
-                  requestId: crypto.randomUUID(),
-                  classId: neighborhood.classId,
-                  enabled: event.currentTarget.checked,
-                  expectedShareRevision: share?.revision ?? 0,
-                });
-              }}
-            />
-          </Group>
-        </section>
-      )}
       <section className="pet-world-panel" aria-label={t('Class neighborhood', 'Khu phố của lớp')}>
         <h2>{t('Around the neighborhood.', 'Ghé thăm hàng xóm.')}</h2>
         <Text size="sm" c="dimmed" mb="lg">
           {t(
-            'Homes appear when their owners choose to share with this class.',
-            'Ngôi nhà xuất hiện khi chủ nhà chọn chia sẻ với lớp.',
+            'Every student in this class appears here once their pet’s home is set up. See classmates’ names, pets and decorations; points and teacher notes stay private.',
+            'Nhà của mọi học sinh trong lớp xuất hiện tại đây khi thú cưng đã sẵn sàng. Bạn có thể xem tên bạn học, thú cưng và đồ trang trí; điểm và lời thầy cô nhận xét luôn riêng tư.',
           )}
         </Text>
         <div className="pet-world-neighbors">
-          {neighborhood.homes.map((home) => (
-            <article className="pet-world-neighbor" key={home.studentId}>
-              <Text fw={600}>{home.displayName}</Text>
-              <Text size="sm" c="dimmed" mt={4}>
-                {home.profile.names[home.profile.activePetId]}
-              </Text>
-              <Button
-                variant="default"
-                size="xs"
-                mt="md"
-                onClick={() => {
-                  void visit.visitHome(home.studentId);
-                }}
-              >
-                {t('Visit home', 'Ghé thăm nhà')}
-              </Button>
-            </article>
-          ))}
+          {neighborhood.homes.map((home) => {
+            const petName = home.profile.names[home.profile.activePetId];
+            return (
+              <article className="pet-world-neighbor" key={home.studentId}>
+                <div className="pet-world-neighbor-preview">
+                  {/* Still portraits keep large class neighborhoods light to render. */}
+                  <PetMascot
+                    petId={home.profile.activePetId}
+                    label={t(`Pet ${petName}`, `Thú cưng ${petName}`)}
+                    reducedMotion
+                  />
+                </div>
+                <Text fw={600}>{petName}</Text>
+                <Text size="sm" c="dimmed" mt={4}>
+                  {t(`Owned by ${home.displayName}`, `Chủ nhân: ${home.displayName}`)}
+                </Text>
+                <Button
+                  variant="default"
+                  size="xs"
+                  mt="md"
+                  fullWidth
+                  aria-label={t(
+                    `Visit ${home.displayName}'s home`,
+                    `Ghé thăm nhà của ${home.displayName}`,
+                  )}
+                  onClick={() => {
+                    void visit.visitHome(home.studentId);
+                  }}
+                >
+                  {t('Visit home', 'Ghé thăm nhà')}
+                </Button>
+              </article>
+            );
+          })}
         </div>
         {!neighborhood.homes.length && (
           <Text className="pet-world-empty">
             {t(
-              'A quiet neighborhood for now. Sharing a home is always a choice.',
-              'Khu phố hiện còn yên tĩnh. Chia sẻ ngôi nhà luôn là lựa chọn của bạn.',
+              'No pet homes yet. Classmates appear here once their companions are set up.',
+              'Chưa có nhà thú cưng. Các bạn sẽ xuất hiện tại đây khi thú cưng đã sẵn sàng.',
             )}
           </Text>
         )}
@@ -159,8 +134,8 @@ export function PetNeighborhoodPanel({
         {visit.isUnavailable && (
           <Alert role="status">
             {t(
-              'This home is not available to visit right now. The owner may have changed their sharing choice.',
-              'Hiện chưa thể ghé thăm nhà này. Chủ nhà có thể đã thay đổi lựa chọn chia sẻ.',
+              'This home is not available to visit right now. Class membership may have changed.',
+              'Hiện chưa thể ghé thăm nhà này. Thành viên của lớp có thể đã thay đổi.',
             )}
           </Alert>
         )}
