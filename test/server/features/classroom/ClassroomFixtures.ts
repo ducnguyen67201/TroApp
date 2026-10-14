@@ -152,6 +152,35 @@ export class MemoryClassroomStore implements ClassroomStore {
   readIsAdmin(userId: string) {
     return Promise.resolve(this.admins.has(userId));
   }
+  readClassroomPerson(userId: string) {
+    const role = this.roles.get(userId);
+    return Promise.resolve(
+      role
+        ? {
+            id: userId,
+            name: this.names.get(userId) ?? userId,
+            email: this.emails.get(userId) ?? `${userId}@example.test`,
+            role,
+          }
+        : null,
+    );
+  }
+  async listClassroomPeople(search: string, offset: number) {
+    const people = (
+      await Promise.all([...this.roles.keys()].map((id) => this.readClassroomPerson(id)))
+    )
+      .filter((person) => person !== null)
+      .filter((person) =>
+        `${person.name} ${person.email}`.toLowerCase().includes(search.toLowerCase()),
+      )
+      .sort(
+        (left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id),
+      );
+    return {
+      people: people.slice(offset, offset + AdminClassroomLimits.PAGE_SIZE),
+      hasMore: people.length > offset + AdminClassroomLimits.PAGE_SIZE,
+    };
+  }
   async listClassesForAdmin(search: string, offset: number) {
     const summaries = await Promise.all(
       [...this.classes.keys()].map((classId) => this.readClassForAdmin(classId)),

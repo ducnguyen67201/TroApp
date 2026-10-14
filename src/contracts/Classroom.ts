@@ -7,6 +7,11 @@ import { MaterialLessonContextSchema, MaterialPageSchema } from './ClassroomMate
 import { z } from 'zod';
 import { PracticeCheckpointSchema } from './PracticeCheck.js';
 import { AccountRoleSchema } from './AccountRole.js';
+import {
+  ClassroomPeoplePageSchema,
+  ClassroomPersonIdSchema,
+  ClassroomPersonSchema,
+} from './ClassroomViewAs.js';
 
 export const ClassroomPhase = {
   EXPLANATION: 'explanation',
@@ -243,6 +248,7 @@ export const ClassroomAdminCapability = {
 } as const;
 
 export const ClassroomHomeSchema = z.strictObject({
+  viewingAs: ClassroomPersonSchema.nullable().optional(),
   isAdmin: z.boolean().default(false),
   role: AccountRoleSchema,
   courses: z
@@ -269,6 +275,12 @@ const mutation = {
   progressVersion: z.number().int().nonnegative(),
 };
 export const ClassroomCommandSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('admin-people'),
+    search: z.string().trim().max(200).default(''),
+    offset: z.number().int().nonnegative().max(1_000_000).default(0),
+  }),
+  z.strictObject({ kind: z.literal('admin-view-as'), userId: ClassroomPersonIdSchema.nullable() }),
   z.strictObject({ kind: z.literal('home') }),
   z.strictObject({
     kind: z.literal('admin-classes'),
@@ -420,6 +432,8 @@ export const AdminClassroomDetailSchema = z.strictObject({
 export type AdminClassroomDetail = z.infer<typeof AdminClassroomDetailSchema>;
 
 export const ClassroomReplySchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('admin-people'), ...ClassroomPeoplePageSchema.shape }),
+  z.strictObject({ kind: z.literal('admin-view-as'), person: ClassroomPersonSchema.nullable() }),
   z.strictObject({ kind: z.literal('admin-classes'), ...AdminClassroomPageSchema.shape }),
   z.strictObject({ kind: z.literal('admin-class'), ...AdminClassroomDetailSchema.shape }),
   z.strictObject({ kind: z.literal('home'), home: ClassroomHomeSchema }),

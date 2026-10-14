@@ -1,3 +1,4 @@
+import { ClassroomViewAsController } from './classroom/ClassroomViewAsController.js';
 import { LessonVideoApiClient } from './lessonVideos/LessonVideoApiClient.js';
 import { AnalyticsEvent, AnalyticsRendererFailure } from '#contracts/Analytics.js';
 import { createDesktopAnalytics } from './analytics/CreateDesktopAnalytics.js';
@@ -579,8 +580,21 @@ async function startDesktop(): Promise<void> {
   const practiceCapture = new PracticeCaptureController(new ElectronPracticeWindowCapture(), () =>
     classroomController.readPracticeContext(),
   );
-  const classroomController: ClassroomSessionController = new ClassroomSessionController(
+  const classroomViewAs = new ClassroomViewAsController(
     new ClassroomApiClient(environment.API_BASE_URL, () => auth.readCookie()),
+    () => auth.readCookie(),
+    () => {
+      classroomController.dispose();
+      insightController.dispose();
+      reportExports.dispose();
+    },
+  );
+  const classroomController: ClassroomSessionController = new ClassroomSessionController(
+    new ClassroomApiClient(
+      environment.API_BASE_URL,
+      () => auth.readCookie(),
+      classroomViewAs.fetch,
+    ),
     () => {
       chat?.cancelClassroomTask();
       desktopCompanion?.reset();
@@ -677,8 +691,10 @@ async function startDesktop(): Promise<void> {
     (event) => isTrustedSender(event) && practiceShortcut.isAvailable(),
   );
   classroom = classroomController;
-  const insightApi = new ClassroomInsightApiClient(environment.API_BASE_URL, () =>
-    auth.readCookie(),
+  const insightApi = new ClassroomInsightApiClient(
+    environment.API_BASE_URL,
+    () => auth.readCookie(),
+    classroomViewAs.fetch,
   );
   const insightController = new ClassroomInsightController(
     insightApi,
@@ -758,7 +774,7 @@ async function startDesktop(): Promise<void> {
   const materialApi = new MaterialApiClient(
     environment.API_BASE_URL,
     () => auth.readCookie(),
-    fetch,
+    classroomViewAs.fetch,
     (event) => {
       console.warn('classroom.materials.request.failed', event);
     },
@@ -813,7 +829,11 @@ async function startDesktop(): Promise<void> {
       }
     }, false);
   });
-  const practiceApi = new PracticeCheckApiClient(environment.API_BASE_URL, () => auth.readCookie());
+  const practiceApi = new PracticeCheckApiClient(
+    environment.API_BASE_URL,
+    () => auth.readCookie(),
+    classroomViewAs.fetch,
+  );
   ipcMain.handle('tro:practice-check', async (event, raw: unknown): Promise<PracticeReply> => {
     if (!isTrustedSender(event)) {
       return { kind: 'failed', code: PracticeFailure.FORBIDDEN };
@@ -875,10 +895,18 @@ async function startDesktop(): Promise<void> {
       return { kind: 'failed', code: ClassroomFailure.INVALID };
     }
     const startedAt = performance.now();
-    const reply = await accountGate.runRequest(() => classroomController.execute(parsed.data), {
-      kind: 'failed',
-      code: ClassroomFailure.UNAVAILABLE,
-    });
+    const command = parsed.data;
+    const unavailable: ClassroomReply = { kind: 'failed', code: ClassroomFailure.UNAVAILABLE };
+    const reply =
+      command.kind === 'admin-view-as'
+        ? await accountGate.changeContext(
+            () => classroomViewAs.selectPerson(command.userId),
+            unavailable,
+          )
+        : await accountGate.runRequest(
+            () => classroomViewAs.execute(command, classroomController),
+            unavailable,
+          );
     recordClassroomUsage(
       (usage) => {
         productAnalytics.capture(usage);
@@ -1167,7 +1195,7 @@ async function startDesktop(): Promise<void> {
       worldController.dispose();
       petController.dispose();
       overlay.closePet();
-      classroomController.dispose();
+      classroomViewAs.reset();
       practiceCapture.dispose();
       insightController.dispose();
       reportExports.dispose();

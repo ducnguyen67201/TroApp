@@ -22,6 +22,7 @@ import {
 } from '#contracts/ClassroomMaterials.js';
 import type { MaterialFile } from '../features/materials/application/MaterialPreparation.js';
 import { AccountRoleSchema } from '#contracts/AccountRole.js';
+import { ClassroomViewAs, ClassroomPersonSchema } from '#contracts/ClassroomViewAs.js';
 import { randomUUID } from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Prisma } from '../generated/prisma/client.js';
@@ -257,6 +258,37 @@ class PrismaClassroomStore implements ClassroomStore {
       select: { isAdmin: true },
     });
     return user?.isAdmin ?? false;
+  }
+
+  async readClassroomPerson(userId: string) {
+    const person = await this.client.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, email: true, role: true },
+    });
+    return person ? ClassroomPersonSchema.parse(person) : null;
+  }
+
+  async listClassroomPeople(search: string, offset: number) {
+    const people = await this.client.user.findMany({
+      where: search
+        ? {
+            OR: [
+              { name: { contains: search, mode: Prisma.QueryMode.insensitive } },
+              { email: { contains: search, mode: Prisma.QueryMode.insensitive } },
+            ],
+          }
+        : {},
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      skip: offset,
+      take: ClassroomViewAs.PAGE_SIZE + 1,
+    });
+    return {
+      people: people
+        .slice(0, ClassroomViewAs.PAGE_SIZE)
+        .map((person) => ClassroomPersonSchema.parse(person)),
+      hasMore: people.length > ClassroomViewAs.PAGE_SIZE,
+    };
   }
 
   async listClassesForAdmin(search: string, offset: number) {

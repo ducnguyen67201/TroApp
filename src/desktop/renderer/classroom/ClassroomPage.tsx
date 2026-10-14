@@ -8,6 +8,7 @@ import {
   Button,
   Card,
   Group,
+  Select,
   Stack,
   Text,
   TextInput,
@@ -24,12 +25,19 @@ import {
 } from '#contracts/Classroom.js';
 import { TeacherClassroomPanel } from './TeacherClassroomPanel.js';
 import { StudentClassroomPanel } from './StudentClassroomPanel.js';
-import { AdminClassroomPanel } from './AdminClassroomPanel.js';
+import { ClassroomPersonPicker } from './ClassroomPersonPicker.js';
+import type { ClassroomPerson } from '#contracts/ClassroomViewAs.js';
 import { IconArrowLeft, IconRefresh, IconSearch } from '@tabler/icons-react';
 import type { z } from 'zod';
 import { AccountRole } from '#contracts/AccountRole.js';
 import type { DesktopNavigation } from '../navigation/UseDesktopNavigation.js';
 import { useLocale } from '../localization/UseLocale.js';
+
+const ClassroomList = {
+  TEACHING: 'teaching',
+  ENROLLED: 'enrolled',
+} as const;
+type ClassroomList = (typeof ClassroomList)[keyof typeof ClassroomList];
 
 /** Owns existing classroom commands and polling; presentation selects no authority. */
 interface ClassroomPageProps {
@@ -40,14 +48,37 @@ interface ClassroomPageProps {
   onOpenWorkspace?: (message?: string) => void;
   onRoleChange: (role: AccountRole) => void;
 }
-export function ClassroomPage({
-  userId,
+export function ClassroomPage(props: ClassroomPageProps): ReactElement {
+  return <ClassroomViewer key={props.userId} {...props} />;
+}
+
+function ClassroomViewer(props: ClassroomPageProps): ReactElement {
+  const [person, setPerson] = useState<ClassroomPerson | null>(null);
+  return (
+    <ClassroomWorkspace
+      key={person?.id ?? props.userId}
+      {...props}
+      viewingPerson={person}
+      onViewingPersonChange={setPerson}
+    />
+  );
+}
+
+function ClassroomWorkspace({
+  userId: signedInUserId,
   active,
   userName,
   navigation,
   onRoleChange,
   onOpenWorkspace,
-}: ClassroomPageProps): ReactElement {
+  viewingPerson,
+  onViewingPersonChange,
+}: ClassroomPageProps & {
+  viewingPerson: ClassroomPerson | null;
+  onViewingPersonChange: (person: ClassroomPerson | null) => void;
+}): ReactElement {
+  const userId = viewingPerson?.id ?? signedInUserId;
+  const displayName = viewingPerson?.name ?? userName;
   const { locale } = useLocale();
   const t = useCallback(
     (english: string, vietnamese: string): string => (locale === 'vi' ? vietnamese : english),
@@ -55,13 +86,13 @@ export function ClassroomPage({
   );
   const [joinCode, setJoinCode] = useState('');
   const [search, setSearch] = useState('');
+  const [classList, setClassList] = useState<ClassroomList>(ClassroomList.TEACHING);
   const [invitation, setInvitation] = useState<Extract<
     ClassroomReply,
     { kind: 'invitation' }
   > | null>(null);
   const [home, setHome] = useState<ClassroomHome | null>(null);
   const [homeUserId, setHomeUserId] = useState<string | null>(null);
-  const [adminView, setAdminView] = useState(false);
   const [context, setContext] = useState<TeachingContext | null>(null);
   const contextRef = useRef<TeachingContext | null>(null);
   const [preparation, setPreparation] = useState<Extract<
@@ -87,10 +118,9 @@ export function ClassroomPage({
       if (reply.kind === 'home') {
         setHome(reply.home);
         setHomeUserId(userId);
-        if (!reply.home.isAdmin) {
-          setAdminView(false);
+        if (!viewingPerson) {
+          onRoleChange(reply.home.role);
         }
-        onRoleChange(reply.home.role);
       }
       if (reply.kind === 'context') {
         const previous = contextRef.current;
@@ -123,15 +153,8 @@ export function ClassroomPage({
         setRoster({ sessionId: rosterSessionId, students: reply.roster });
       }
     },
-    [onRoleChange, userId],
+    [onRoleChange, userId, viewingPerson],
   );
-
-  const dismissAdminAccess = useCallback((): void => {
-    homeRequest.current += 1;
-    setAdminView(false);
-    setHome((current) => (current ? { ...current, isAdmin: false } : null));
-    setError(t('Admin access is no longer available.', 'Quyền quản trị viên không còn khả dụng.'));
-  }, [t]);
 
   const refresh = useCallback(async (): Promise<void> => {
     const currentGeneration = generation.current;
@@ -145,7 +168,6 @@ export function ClassroomPage({
       reply = await bridge({ kind: 'home' });
     } catch {
       if (currentGeneration === generation.current && currentHomeRequest === homeRequest.current) {
-        setAdminView(false);
         setError(t('Classroom service is unavailable.', 'Dịch vụ lớp học chưa sẵn sàng.'));
       }
       return;
@@ -154,7 +176,6 @@ export function ClassroomPage({
       return;
     }
     if (reply.kind === 'failed') {
-      setAdminView(false);
       if (
         reply.code === ClassroomFailure.UNAUTHORIZED ||
         reply.code === ClassroomFailure.FORBIDDEN
@@ -170,18 +191,28 @@ export function ClassroomPage({
       return;
     }
     setError(null);
+    if (
+      reply.kind === 'home' &&
+      (reply.home.viewingAs?.id ?? null) !== (viewingPerson?.id ?? null)
+    ) {
+      onViewingPersonChange(reply.home.viewingAs ?? null);
+      return;
+    }
     accept(reply);
     const current = contextRef.current;
-    const updated = await bridge(
-      current
-        ? {
-            kind: 'context',
-            participationId: current.participation.id,
-            deviceId: current.participation.deviceId,
-            activityId: current.activity.id,
-          }
-        : { kind: 'resume', deviceId: crypto.randomUUID() },
-    );
+    const updated: ClassroomReply =
+      viewingPerson && !current
+        ? { kind: 'ok' }
+        : await bridge(
+            current
+              ? {
+                  kind: 'context',
+                  participationId: current.participation.id,
+                  deviceId: current.participation.deviceId,
+                  activityId: current.activity.id,
+                }
+              : { kind: 'resume', deviceId: crypto.randomUUID() },
+          );
     if (currentGeneration !== generation.current) {
       return;
     }
@@ -209,7 +240,7 @@ export function ClassroomPage({
     if (currentGeneration === generation.current) {
       setPreparation(prepared?.kind === 'prepared' ? prepared : null);
     }
-  }, [accept, t]);
+  }, [accept, t, viewingPerson, onViewingPersonChange]);
 
   useEffect(() => {
     generation.current += 1;
@@ -217,7 +248,6 @@ export function ClassroomPage({
     setContext(null);
     setHome(null);
     setHomeUserId(null);
-    setAdminView(false);
     setPreparation(null);
     setReceipt(null);
     return () => {
@@ -306,9 +336,28 @@ export function ClassroomPage({
 
   const showsInsights = navigation.route.page === DesktopPage.INSIGHTS;
   const canViewAllClasses = home?.isAdmin === true && homeUserId === userId;
-  const showsAdmin = !showsInsights && canViewAllClasses && adminView;
   const participantClasses =
     home?.classes.filter((entry) => entry.schoolClass.teacherId !== userId) ?? [];
+  const routeClass = home?.classes.find(
+    (entry) => entry.schoolClass.id === navigation.route.classId,
+  );
+  const showsTeacherClasses =
+    home?.role === AccountRole.TEACHER &&
+    (routeClass
+      ? routeClass.schoolClass.teacherId === userId
+      : classList === ClassroomList.TEACHING || participantClasses.length === 0);
+
+  // Returning from a class keeps the list that owns it, including enrolled deep links.
+  useEffect(() => {
+    if (routeClass) {
+      setClassList(
+        routeClass.schoolClass.teacherId === userId
+          ? ClassroomList.TEACHING
+          : ClassroomList.ENROLLED,
+      );
+    }
+  }, [routeClass, userId]);
+
   const enrollment = (
     <Card withBorder radius="md" padding="lg">
       <Stack gap="sm">
@@ -344,10 +393,10 @@ export function ClassroomPage({
       hidden={!active}
       aria-label={t('Classroom', 'Lớp học')}
       className="classroom-page"
-      data-class-page={!showsAdmin && navigation.route.classId !== null}
+      data-class-page={navigation.route.classId !== null}
     >
       <div className="classroom-toolbar">
-        {!showsAdmin && navigation.route.classId !== null && (
+        {navigation.route.classId !== null && (
           <Tooltip label={t('All classes', 'Tất cả lớp học')}>
             <ActionIcon
               variant="subtle"
@@ -363,17 +412,37 @@ export function ClassroomPage({
         )}
         <header className="classroom-page-heading">
           <h1>
-            {showsAdmin
-              ? t('All classes', 'Tất cả lớp học')
-              : showsInsights
-                ? t('Learning insights', 'Tiến độ học tập')
+            {showsInsights
+              ? t('Learning insights', 'Tiến độ học tập')
+              : viewingPerson
+                ? (routeClass?.schoolClass.name ??
+                  t(`Classes for ${viewingPerson.name}`, `Lớp học của ${viewingPerson.name}`))
                 : home?.role === AccountRole.TEACHER
                   ? (home.classes.find((entry) => entry.schoolClass.id === navigation.route.classId)
                       ?.schoolClass.name ?? t('Your classroom', 'Lớp học của bạn'))
-                  : `${t('Welcome', 'Chào bạn')}${userName ? `, ${userName.trim().split(' ')[0] ?? ''}` : ''}`}
+                  : `${t('Welcome', 'Chào bạn')}${displayName ? `, ${displayName.trim().split(' ')[0] ?? ''}` : ''}`}
           </h1>
         </header>
-        {!showsInsights && !showsAdmin && navigation.route.classId === null && (
+        {!showsInsights &&
+          home?.role === AccountRole.TEACHER &&
+          participantClasses.length > 0 &&
+          navigation.route.classId === null && (
+            <Select
+              aria-label={t('Class list', 'Danh sách lớp')}
+              value={showsTeacherClasses ? ClassroomList.TEACHING : ClassroomList.ENROLLED}
+              allowDeselect={false}
+              data={[
+                { value: ClassroomList.TEACHING, label: t('Classes taught', 'Lớp giảng dạy') },
+                { value: ClassroomList.ENROLLED, label: t('Classes joined', 'Lớp đã tham gia') },
+              ]}
+              onChange={(value) => {
+                if (value === ClassroomList.TEACHING || value === ClassroomList.ENROLLED) {
+                  setClassList(value);
+                }
+              }}
+            />
+          )}
+        {!showsInsights && navigation.route.classId === null && (
           <TextInput
             className="classroom-search"
             aria-label={t('Find a class', 'Tìm lớp học')}
@@ -385,30 +454,45 @@ export function ClassroomPage({
             }}
           />
         )}
-        {!showsInsights && canViewAllClasses && (
-          <Button
-            variant={showsAdmin ? 'filled' : 'default'}
-            aria-pressed={showsAdmin}
-            onClick={() => {
-              setAdminView(!showsAdmin);
-              navigation.openClassroom();
+        {(canViewAllClasses || viewingPerson) && (
+          <ClassroomPersonPicker
+            person={viewingPerson}
+            t={t}
+            onSelect={async (personId) => {
+              const nextId = personId === signedInUserId ? null : personId;
+              if (nextId === (viewingPerson?.id ?? null)) {
+                return true;
+              }
+              const reply = await window.tro.controlClassroom?.({
+                kind: 'admin-view-as',
+                userId: nextId,
+              });
+              if (reply?.kind !== 'admin-view-as') {
+                setError(
+                  t(
+                    'Could not switch views. Finish active work, then try again.',
+                    'Chưa thể chuyển chế độ xem. Hoàn tất thao tác đang chạy rồi thử lại.',
+                  ),
+                );
+                return false;
+              }
+              generation.current += 1;
+              navigation.openClassroom(showsInsights);
+              onViewingPersonChange(reply.person);
+              return true;
             }}
-          >
-            {showsAdmin ? t('My classes', 'Lớp của tôi') : t('Admin view', 'Chế độ quản trị viên')}
-          </Button>
+          />
         )}
-        {!showsAdmin && (
-          <Button
-            variant="subtle"
-            leftSection={<IconRefresh size={16} />}
-            loading={busy}
-            onClick={() => {
-              void refresh();
-            }}
-          >
-            {t('Refresh', 'Cập nhật')}
-          </Button>
-        )}
+        <Button
+          variant="subtle"
+          leftSection={<IconRefresh size={16} />}
+          loading={busy}
+          onClick={() => {
+            void refresh();
+          }}
+        >
+          {t('Refresh', 'Cập nhật')}
+        </Button>
       </div>
       {notice?.classId === navigation.route.classId && (
         <Text role="status" size="sm" mb="md">
@@ -421,10 +505,7 @@ export function ClassroomPage({
         </Alert>
       )}
       {!home && <Text c="dimmed">{t('Loading your classroom…', 'Đang tải lớp học…')}</Text>}
-      {showsAdmin && active && (
-        <AdminClassroomPanel userId={userId} onAccessLost={dismissAdminAccess} t={t} />
-      )}
-      {!showsInsights && !showsAdmin && home?.role === AccountRole.TEACHER && (
+      {!showsInsights && home && showsTeacherClasses && (
         <TeacherClassroomPanel
           refresh={refresh}
           error={error}
@@ -452,7 +533,7 @@ export function ClassroomPage({
           t={t}
         />
       )}
-      {!showsInsights && !showsAdmin && home && home.role !== AccountRole.TEACHER && (
+      {!showsInsights && home && !showsTeacherClasses && (
         <StudentClassroomPanel
           home={home}
           navigation={navigation}
@@ -479,9 +560,7 @@ export function ClassroomPage({
       )}
       <details
         hidden={
-          showsInsights ||
-          showsAdmin ||
-          (home?.role === AccountRole.TEACHER && navigation.route.classId !== null)
+          showsInsights || (home?.role === AccountRole.TEACHER && navigation.route.classId !== null)
         }
         className="classroom-disclosure classroom-enrollment"
         open={(home?.role === AccountRole.STUDENT && participantClasses.length === 0) || undefined}
@@ -493,26 +572,6 @@ export function ClassroomPage({
         </summary>
         {enrollment}
       </details>
-      {!showsInsights &&
-        !showsAdmin &&
-        home?.role === AccountRole.TEACHER &&
-        participantClasses.length > 0 && (
-          <div className="classroom-enrolled-activity">
-            <StudentClassroomPanel
-              home={home}
-              userId={userId}
-              context={context}
-              practiceReview={practiceReview}
-              search=""
-              busy={busy}
-              send={send}
-              preparation={preparation}
-              receipt={receipt}
-              t={t}
-              {...(onOpenWorkspace ? { onAskForHelp: onOpenWorkspace } : {})}
-            />
-          </div>
-        )}
     </section>
   );
 }

@@ -481,10 +481,15 @@ not establish simultaneous two-device behavior.
 Accounts also have a separate `User.isAdmin` boolean, defaulting to false. After
 applying the committed migration, an operator can set it in the backend database
 for the intended account (the Prisma `User` model maps to the `user` table).
-Refresh Classroom to pick up a change, then select **Admin view** to search and
-switch between other teachers' classes. This view shows published course content,
-sessions and student progress without changing enrollment or teacher ownership.
-Setting the field back to false revokes admin viewing on the next request. No
+Refresh Classroom to pick up a change, then use **View as: Me** to search teachers
+and students by name or email. Selecting a person opens their existing classroom
+screens with full classroom permissions: actions save real changes for that person.
+Use **Return to my account** to leave the selected view. Finish active work before
+switching. The admin remains signed in; other product areas keep the admin identity.
+Selecting a student does not join a session until you choose **Join session**.
+Setting the field back to false revokes delegated access on the next request.
+Backend `classroom.view_as.completed` events record the admin ID, selected person
+ID, operation, request ID and result without logging submitted classroom content. No
 account is granted admin access by the migration. Apply it with `pnpm db:deploy`
 against the intended backend before deploying the updated API. Existing desktop
 releases retain their original classroom response; admin viewing requires the

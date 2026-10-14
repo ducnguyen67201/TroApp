@@ -1,3 +1,4 @@
+import { registerClassroomViewAs } from './features/classroom/infrastructure/RegisterClassroomViewAs.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { readLessonVideoConfig } from './config/Index.js';
 import { createPrismaLessonVideoStore } from './persistence/PrismaLessonVideoStore.js';
@@ -93,6 +94,12 @@ async function startApi(): Promise<void> {
     ...insightConfig,
   };
   const classroom = createPrismaClassroomStore(environment.DATABASE_URL, capturePolicy);
+  const readClassroomUserId = registerClassroomViewAs(
+    api,
+    authentication.readSignedInUserId,
+    classroom.store,
+    logger,
+  );
   const lessonStore = createPrismaLessonVideoStore(environment.DATABASE_URL);
   const lessonContent = new OpenAiLessonContent(environment.OPENAI_API_KEY);
   const lessonSpeech = new OpenAiLessonSpeech(environment.OPENAI_API_KEY);
@@ -147,7 +154,7 @@ async function startApi(): Promise<void> {
   });
   registerClassroomInsightRoutes(
     api,
-    authentication.readSignedInUserId,
+    readClassroomUserId,
     new ClassroomInsightService(insights.store, capturePolicy),
     logger,
   );
@@ -158,12 +165,7 @@ async function startApi(): Promise<void> {
       logger.warn({ operation: 'purge-expired-insights' }, 'classroom.insights.retention.failed');
     },
   );
-  registerClassroomRoutes(
-    api,
-    authentication.readSignedInUserId,
-    new ClassroomService(classroom.store),
-    logger,
-  );
+  registerClassroomRoutes(api, readClassroomUserId, new ClassroomService(classroom.store), logger);
   const petWorld = createPrismaPetWorldStore(environment.DATABASE_URL);
   registerPetWorldRoutes(
     api,
@@ -181,7 +183,7 @@ async function startApi(): Promise<void> {
   const practice = createPrismaPracticeCheckStore(environment.DATABASE_URL, capturePolicy);
   registerPracticeCheckRoutes(
     api,
-    authentication.readSignedInUserId,
+    readClassroomUserId,
     new PracticeCheckService(
       practice.store,
       new PracticeAssessmentService(
@@ -236,7 +238,7 @@ async function startApi(): Promise<void> {
       logger.warn(event, 'classroom.materials.preparation.failed');
     },
   );
-  registerMaterialRoutes(api, authentication.readSignedInUserId, materials, logger);
+  registerMaterialRoutes(api, readClassroomUserId, materials, logger);
   const materialRunner = new MaterialPreparationRunner(materials, () => {
     logger.warn({ event: 'material.runner.failed' }, 'Material preparation runner failed.');
   });

@@ -30,13 +30,26 @@ export class AccountTransitionGate {
     action: () => Promise<AuthResult>,
     canCancelSignIn = false,
   ): Promise<AuthResult> {
+    return this.changeContext(
+      action,
+      { kind: 'failed', message: 'An account change cannot start during active work.' },
+      canCancelSignIn,
+    );
+  }
+
+  /** Classroom delegation changes share the same exclusion as signed-in account changes. */
+  async changeContext<Result>(
+    action: () => Promise<Result>,
+    unavailable: Result,
+    canCancelSignIn = false,
+  ): Promise<Result> {
     if (
       this.changing ||
       this.requests > 0 ||
       this.isTaskBusy() ||
       (this.isAddingAccount() && !canCancelSignIn)
     ) {
-      return { kind: 'failed', message: 'An account change cannot start during active work.' };
+      return unavailable;
     }
     this.changing = true;
     try {

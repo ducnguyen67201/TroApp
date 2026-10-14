@@ -19,6 +19,7 @@ import type {
   ClassroomRosterSchema,
 } from '#contracts/Classroom.js';
 import type { z } from 'zod';
+import type { ClassroomPeoplePage, ClassroomPerson } from '#contracts/ClassroomViewAs.js';
 
 /** Persistence port; transaction scopes never expose Prisma to application workflows. */
 export interface StoredClassroomInvitation {
@@ -52,6 +53,8 @@ export interface ClassroomStore {
   readAccountRole(userId: string): Promise<AccountRole>;
   /** Reads the persisted flag; missing users have no admin authority. */
   readIsAdmin(userId: string): Promise<boolean>;
+  listClassroomPeople(search: string, offset: number): Promise<ClassroomPeoplePage>;
+  readClassroomPerson(userId: string): Promise<ClassroomPerson | null>;
   listClassesForAdmin(search: string, offset: number): Promise<AdminClassroomPage>;
   readClassForAdmin(classId: string): Promise<AdminClassroomSummary | null>;
   readVerifiedEmail(userId: string): Promise<string | null>;
