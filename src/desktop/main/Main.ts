@@ -1,4 +1,8 @@
+import { StudentAccessKind } from '#contracts/StudentAccess.js';
 import { ClassroomViewAsController } from './classroom/ClassroomViewAsController.js';
+import { StudentAccessCommandSchema, type StudentAccessReply } from '#contracts/StudentAccess.js';
+import { StudentDeviceLimits } from '#contracts/StudentIdentity.js';
+import { isStudentCameraAllowed } from './accounts/StudentCameraPermission.js';
 import { LessonVideoApiClient } from './lessonVideos/LessonVideoApiClient.js';
 import { AnalyticsEvent, AnalyticsRendererFailure } from '#contracts/Analytics.js';
 import { createDesktopAnalytics } from './analytics/CreateDesktopAnalytics.js';
@@ -198,6 +202,9 @@ async function startDesktop(): Promise<void> {
   const documentUrl = developmentUrl ?? pathToFileURL(rendererFile).href;
 
   const auth = new AuthClient(environment.API_BASE_URL, app.getPath('userData'));
+  let cameraAllowedUntil = 0;
+  let lastStudentActivityMs = Date.now();
+  let endingSharedStudent = false;
   /* The OAuth protocol must be registered before Electron becomes ready. */
   auth.registerDeepLink(() => mainWindow);
   await app.whenReady();
@@ -1226,26 +1233,129 @@ async function startDesktop(): Promise<void> {
     return parsed.success ? voice.appendVoiceAudio(parsed.data) : { kind: 'failed' };
   });
 
+  function clearAccountContext(): void {
+    cameraAllowedUntil = 0;
+    petAccessGeneration += 1;
+    worldController.dispose();
+    petController.dispose();
+    overlay.closePet();
+    classroomViewAs.reset();
+    practiceCapture.dispose();
+    insightController.dispose();
+    reportExports.dispose();
+    disableVoice();
+  }
+
   async function changeActiveAccount(
     action: () => Promise<AuthResult>,
     canCancelSignIn = false,
   ): Promise<AuthResult> {
     return accountGate.changeAccount(async () => {
-      petAccessGeneration += 1;
-      worldController.dispose();
-      petController.dispose();
-      overlay.closePet();
-      classroomViewAs.reset();
-      practiceCapture.dispose();
-      insightController.dispose();
-      reportExports.dispose();
-      disableVoice();
+      clearAccountContext();
       if (!chat) {
         return { kind: 'failed', message: 'The sign-in request is invalid.' };
       }
       return chat.changeAccount(action);
     }, canCancelSignIn);
   }
+
+  ipcMain.handle('tro:student-access', async (event, raw: unknown): Promise<StudentAccessReply> => {
+    if (!isTrustedSender(event)) {
+      return { kind: 'failed', message: 'This window cannot access student sign-in.' };
+    }
+    const parsed = StudentAccessCommandSchema.safeParse(raw);
+    if (!parsed.success) {
+      return { kind: 'failed', message: 'Invalid student access request.' };
+    }
+    const command = parsed.data;
+    if (
+      endingSharedStudent &&
+      command.kind !== StudentAccessKind.STATUS &&
+      command.kind !== StudentAccessKind.CAMERA_STOP
+    ) {
+      return { kind: 'failed', message: 'Finishing the previous lesson. Please retry.' };
+    }
+    if (command.kind === StudentAccessKind.CAMERA_STOP) {
+      cameraAllowedUntil = 0;
+      return { kind: 'done' };
+    }
+    if (command.kind === StudentAccessKind.CAMERA_START) {
+      const device = await auth.controlStudentAccess({ kind: StudentAccessKind.STATUS });
+      if (device.kind !== 'ready' || accountGate.isChanging() || auth.isAddingAccount()) {
+        return { kind: 'failed', message: 'Enter a valid class code before scanning.' };
+      }
+      cameraAllowedUntil = Date.now() + StudentDeviceLimits.CAMERA_MS;
+      return { kind: 'done' };
+    }
+    if (command.kind === StudentAccessKind.ENROLL) {
+      return accountGate.changeContext(
+        async () => {
+          const result = await auth.controlStudentAccess(command, async () => {
+            clearAccountContext();
+            if (!chat) {
+              throw new Error('Student account transition is unavailable.');
+            }
+            await chat.changeAccount(() => Promise.resolve({ kind: 'pending' }));
+          });
+          if (result.kind === 'signed-in') {
+            lastStudentActivityMs = Date.now();
+          }
+          return result;
+        },
+        { kind: 'failed', message: 'Finish active work before changing accounts.' },
+      );
+    }
+    if (command.kind === StudentAccessKind.ACTIVATE) {
+      return accountGate.changeContext(() => auth.controlStudentAccess(command), {
+        kind: 'failed',
+        message: 'Finish active work before configuring this device.',
+      });
+    }
+    return accountGate.runRequest(() => auth.controlStudentAccess(command), {
+      kind: 'failed',
+      message: 'An account change is in progress.',
+    });
+  });
+
+  const studentSessionTimer = setInterval(() => {
+    if (!auth.isSharedStudent() || endingSharedStudent || isQuitting) {
+      return;
+    }
+    endingSharedStudent = true;
+    void (async () => {
+      const session = await auth.readSession();
+      if (
+        session.kind === 'signed-out' ||
+        Date.now() - lastStudentActivityMs >= StudentDeviceLimits.SHARED_IDLE_MS
+      ) {
+        /* Remove local access and clear the screen before awaiting shutdown/network work. */
+        const signOut = auth.signOut();
+        mainWindow?.webContents.send('tro:student-session-ended');
+        try {
+          clearAccountContext();
+        } finally {
+          try {
+            await chat?.changeAccount(() => signOut);
+          } catch {
+            chat?.dispose();
+            console.warn('student.session.cleanup.failed', { reason: 'worker' });
+          } finally {
+            await signOut;
+          }
+        }
+      }
+    })()
+      .catch(() => {
+        console.warn('student.session.cleanup.failed', { reason: 'service' });
+      })
+      .finally(() => {
+        endingSharedStudent = false;
+      });
+  }, StudentDeviceLimits.SESSION_CHECK_MS);
+  studentSessionTimer.unref();
+  app.once('will-quit', () => {
+    clearInterval(studentSessionTimer);
+  });
 
   ipcMain.handle('tro:account-command', async (event, raw: unknown): Promise<AccountReply> => {
     if (!isTrustedSender(event)) {
@@ -1437,36 +1547,72 @@ async function startDesktop(): Promise<void> {
       contents: Electron.WebContents | null,
       url: string,
     ): boolean => contents === window.webContents && isTrustedFrameUrl(url, documentUrl);
+    window.webContents.on('before-input-event', () => {
+      lastStudentActivityMs = Date.now();
+    });
+    window.webContents.on('input-event', () => {
+      lastStudentActivityMs = Date.now();
+    });
+    const isCameraAllowed = (
+      permission: string,
+      contents: Electron.WebContents | null,
+      url: string,
+      mainFrame: boolean,
+      types: readonly string[],
+    ): boolean =>
+      isStudentCameraAllowed({
+        permission,
+        trustedFrame: isTrustedMicrophoneFrame(contents, url),
+        mainFrame,
+        mediaTypes: types,
+        leaseUntilMs: cameraAllowedUntil,
+        nowMs: Date.now(),
+      });
 
     /* Enumeration requires audio permission while voice is enabled. Chromium can
        reuse that permission for streams; the trusted renderer owns held-key capture.
        New requests require an active voice capture or authorized local test lease. */
-    window.webContents.session.setPermissionCheckHandler((contents, permission, _origin, details) =>
-      isMicrophonePermissionAllowed({
-        permission,
-        isTrustedFrame: isTrustedMicrophoneFrame(contents, details.requestingUrl ?? ''),
-        isMainFrame: details.isMainFrame,
-        mediaTypes: [details.mediaType ?? 'unknown'],
-        isAudioAuthorized: Boolean(
-          (voice && voice.readStatus().state !== VoiceState.DISABLED) ||
-          microphoneTests?.isAuthorized(),
-        ),
-      }),
+    window.webContents.session.setPermissionCheckHandler(
+      (contents, permission, _origin, details) =>
+        isCameraAllowed(permission, contents, details.requestingUrl ?? '', details.isMainFrame, [
+          details.mediaType ?? 'unknown',
+        ]) ||
+        isMicrophonePermissionAllowed({
+          permission,
+          isTrustedFrame: isTrustedMicrophoneFrame(contents, details.requestingUrl ?? ''),
+          isMainFrame: details.isMainFrame,
+          mediaTypes: [details.mediaType ?? 'unknown'],
+          isAudioAuthorized: Boolean(
+            (voice && voice.readStatus().state !== VoiceState.DISABLED) ||
+            microphoneTests?.isAuthorized(),
+          ),
+        }),
     );
     window.webContents.session.setPermissionRequestHandler(
       (contents, permission, callback, details) => {
         callback(
-          isMicrophonePermissionAllowed({
+          isCameraAllowed(
             permission,
-            isTrustedFrame: isTrustedMicrophoneFrame(contents, details.requestingUrl),
-            isMainFrame: details.isMainFrame,
-            mediaTypes: 'mediaTypes' in details ? details.mediaTypes : [],
-            isAudioAuthorized: Boolean(voice?.isCapturing() || microphoneTests?.isAuthorized()),
-          }),
+            contents,
+            details.requestingUrl,
+            details.isMainFrame,
+            'mediaTypes' in details ? details.mediaTypes : [],
+          ) ||
+            isMicrophonePermissionAllowed({
+              permission,
+              isTrustedFrame: isTrustedMicrophoneFrame(contents, details.requestingUrl),
+              isMainFrame: details.isMainFrame,
+              mediaTypes: 'mediaTypes' in details ? details.mediaTypes : [],
+              isAudioAuthorized: Boolean(voice?.isCapturing() || microphoneTests?.isAuthorized()),
+            }),
         );
       },
     );
     window.on('closed', () => {
+      cameraAllowedUntil = 0;
+      if (auth.isSharedStudent()) {
+        void auth.signOut();
+      }
       petAccessGeneration += 1;
       worldController.dispose();
       petController.dispose();

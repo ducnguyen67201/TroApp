@@ -15,7 +15,7 @@ export const ClassroomPersonIdSchema = z
 export const ClassroomPersonSchema = z.strictObject({
   id: ClassroomPersonIdSchema,
   name: z.string().min(1),
-  email: z.email(),
+  email: z.email().nullable(),
   role: AccountRoleSchema,
 });
 

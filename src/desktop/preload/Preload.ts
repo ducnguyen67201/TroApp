@@ -1,3 +1,4 @@
+import { StudentAccessCommandSchema, StudentAccessReplySchema } from '#contracts/StudentAccess.js';
 import {
   LessonVideoCommandSchema,
   LessonVideoReplySchema,
@@ -466,6 +467,26 @@ const bridge: DesktopBridge = {
     };
   },
   readSavedAccounts: () => requestAccountCommand({ kind: AccountCommandKind.LIST }),
+  subscribeStudentSessionEnded(listener) {
+    const receive = (): void => {
+      listener();
+    };
+    ipcRenderer.on('tro:student-session-ended', receive);
+    return () => {
+      ipcRenderer.removeListener('tro:student-session-ended', receive);
+    };
+  },
+  async controlStudentAccess(command) {
+    try {
+      const raw: unknown = await ipcRenderer.invoke(
+        'tro:student-access',
+        StudentAccessCommandSchema.parse(command),
+      );
+      return StudentAccessReplySchema.parse(raw);
+    } catch {
+      return { kind: 'failed', message: 'Student access is unavailable.' };
+    }
+  },
   addGoogleAccount: () => requestAccountAuth({ kind: AccountCommandKind.ADD_GOOGLE }),
   switchAccount: (accountId) => requestAccountAuth({ kind: AccountCommandKind.SWITCH, accountId }),
   cancelAccountSignIn: () => requestAccountAuth({ kind: AccountCommandKind.CANCEL_ADD }),

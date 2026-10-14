@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { AuthResultSchema, AuthUserSchema } from './AuthSession.js';
 import { AccountRoleSchema } from './AccountRole.js';
+import { StudentDeviceMode } from './StudentIdentity.js';
 
 export const DesktopAccountLimits = { MAX_ACCOUNTS: 10, SIGN_IN_TIMEOUT_MS: 120_000 } as const;
 
@@ -18,6 +19,7 @@ export const SavedAccountsSchema = z.strictObject({
   kind: z.literal('accounts'),
   accounts: z.array(SavedAccountSchema).max(DesktopAccountLimits.MAX_ACCOUNTS),
   activeAccountId: z.uuid().nullable(),
+  deviceMode: z.enum(StudentDeviceMode).optional(),
 });
 
 export type SavedAccounts = z.infer<typeof SavedAccountsSchema>;

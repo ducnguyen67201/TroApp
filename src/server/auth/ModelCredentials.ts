@@ -17,6 +17,7 @@ interface ModelCredential {
 interface ModelCredentials {
   issueModelCredential(userId: string): Promise<ModelCredential>;
   isModelCredentialValid(token: string): Promise<boolean>;
+  readModelSubject(token: string): Promise<string | null>;
 }
 
 /** Issue and verify short-lived model-only credentials using the existing signing format. */
@@ -25,6 +26,20 @@ export function createModelCredentials(secret: string): ModelCredentials {
     .update(ModelCredentialPolicy.keyNamespace)
     .update(secret)
     .digest();
+
+  async function readModelSubject(token: string): Promise<string | null> {
+    try {
+      const verified = await jwtVerify(token, signingKey, {
+        issuer: ModelCredentialPolicy.issuer,
+        audience: ModelCredentialPolicy.audience,
+      });
+      return verified.payload.scope === ModelCredentialPolicy.scope && verified.payload.sub
+        ? verified.payload.sub
+        : null;
+    } catch {
+      return null;
+    }
+  }
 
   return {
     async issueModelCredential(userId: string): Promise<ModelCredential> {
@@ -39,18 +54,9 @@ export function createModelCredentials(secret: string): ModelCredentials {
       return { token, expiresAt: expiresAt.toISOString() };
     },
 
+    readModelSubject,
     async isModelCredentialValid(token: string): Promise<boolean> {
-      try {
-        const verified = await jwtVerify(token, signingKey, {
-          issuer: ModelCredentialPolicy.issuer,
-          audience: ModelCredentialPolicy.audience,
-        });
-        return (
-          verified.payload.scope === ModelCredentialPolicy.scope && Boolean(verified.payload.sub)
-        );
-      } catch {
-        return false;
-      }
+      return (await readModelSubject(token)) !== null;
     },
   };
 }

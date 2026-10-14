@@ -8,6 +8,11 @@ import { ModelRequestSchema, limitModelOutputTokens } from './ModelRequest.js';
 import { forwardModelResponse } from './ForwardModelResponse.js';
 import { ModelGatewayEvent, ModelGatewayFailure } from './ModelGatewayDiagnostics.js';
 import { ModelRequestTraceHeader, ModelRequestTraceSchema } from '#contracts/ModelGatewayError.js';
+import {
+  hasStudentCookie,
+  StudentModelSubjectPrefix,
+  type StudentAccessService,
+} from '../features/studentAccess/application/StudentAccessService.js';
 
 type ReadSignedInUserId = ReturnType<typeof createAuthDatabase>['readSignedInUserId'];
 
@@ -17,6 +22,7 @@ export function registerModelGateway(
   readSignedInUserId: ReadSignedInUserId,
   environment: ServerEnv,
   logger: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'> = api.log,
+  studentAccess?: StudentAccessService,
 ): void {
   const credentials = createModelCredentials(environment.AUTH_SECRET);
   const receivedAt = new WeakMap<object, number>();
@@ -37,7 +43,15 @@ export function registerModelGateway(
     if (!userId) {
       return reply.code(401).send({ message: 'Sign in to use the assistant.' });
     }
-    const credential = await credentials.issueModelCredential(userId);
+    const learner = hasStudentCookie(request.headers)
+      ? await studentAccess?.readPrincipal(request.headers)
+      : null;
+    if (hasStudentCookie(request.headers) && !learner) {
+      return reply.code(401).send({ message: 'Your student session has ended.' });
+    }
+    const credential = await credentials.issueModelCredential(
+      learner ? `${StudentModelSubjectPrefix}${learner.sessionId}` : userId,
+    );
     return reply.header('cache-control', 'no-store').send(credential);
   });
 
@@ -128,7 +142,8 @@ export function registerModelGateway(
           'A model credential is required.',
         );
       }
-      if (!(await credentials.isModelCredentialValid(authorization.slice(7)))) {
+      const subject = await credentials.readModelSubject(authorization.slice(7));
+      if (!subject) {
         return rejectRequest(
           401,
           ModelGatewayFailure.CREDENTIAL_INVALID,
@@ -141,6 +156,19 @@ export function registerModelGateway(
           400,
           ModelGatewayFailure.REQUEST_INVALID,
           'The model request is invalid.',
+        );
+      }
+      if (
+        subject.startsWith(StudentModelSubjectPrefix) &&
+        !(await studentAccess?.store.reserveModelRequest(
+          subject.slice(StudentModelSubjectPrefix.length),
+          new Date(),
+        ))
+      ) {
+        return rejectRequest(
+          403,
+          ModelGatewayFailure.CREDENTIAL_INVALID,
+          'This student session has ended or reached its usage allowance.',
         );
       }
       logger.debug(

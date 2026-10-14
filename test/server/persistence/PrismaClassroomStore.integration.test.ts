@@ -527,7 +527,7 @@ describe('persisted admin classroom browsing', () => {
     await fixture.service.execute(fixture.teacher, {
       kind: 'enroll',
       classId: fixture.schoolClass.id,
-      email: newcomer.email,
+      email: z.email().parse(newcomer.email),
     });
     await client.user.update({ where: { id: fixture.teacher }, data: { isAdmin: true } });
 
