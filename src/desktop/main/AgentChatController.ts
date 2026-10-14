@@ -5,6 +5,7 @@ import { AgentTaskMode, GuidanceReason, TeachingOutcome } from '#contracts/Curso
 import { AgentProgressPhase, type AgentProgress } from '#contracts/CompanionHud.js';
 import { randomUUID } from 'node:crypto';
 import type { AgentResult } from '#contracts/AgentSession.js';
+import { AnalyticsEvent, type AnalyticsEventInput } from '#contracts/Analytics.js';
 import type { ClassroomTaskContext } from './classroom/ClassroomSessionController.js';
 import type { DesktopLocale } from '#contracts/DesktopLocale.js';
 import type { AuthResult } from '#contracts/AuthSession.js';
@@ -139,6 +140,7 @@ export class AgentChatController {
     private readonly cancelShortcut?: AgentCancelShortcut,
     private readonly voiceover?: VoiceoverController,
     private readonly classroom?: ClassroomTaskContext,
+    private readonly recordUsage?: (event: AnalyticsEventInput) => void,
   ) {}
 
   cancelClassroomTask(): void {
@@ -237,6 +239,38 @@ export class AgentChatController {
       }
       return { kind: 'failed', message: 'Wait for the current task to finish.' };
     }
+    const startedAt = performance.now();
+    this.captureUsage({ event: AnalyticsEvent.AGENT_TASK_STARTED, mode, locale });
+    const result = await this.runTaskMessage(sessionId, message, locale, mode);
+    this.captureUsage({
+      event: AnalyticsEvent.AGENT_TASK_FINISHED,
+      mode,
+      locale,
+      result: result.kind,
+      ...(result.kind === 'completed' && result.completion.kind === 'task'
+        ? { outcome: result.completion.outcome.status }
+        : {}),
+      ...(result.kind === 'teaching' ? { teachingOutcome: result.result.outcome } : {}),
+      durationMs: Math.round(performance.now() - startedAt),
+    });
+    return result;
+  }
+
+  /** Usage contains only fixed result categories, never instructions or model answers. */
+  private captureUsage(event: AnalyticsEventInput): void {
+    try {
+      this.recordUsage?.(event);
+    } catch {
+      // Optional analytics must not change task admission or completion.
+    }
+  }
+
+  private async runTaskMessage(
+    sessionId: string,
+    message: string,
+    locale: DesktopLocale,
+    mode: AgentTaskMode,
+  ): Promise<AgentResult> {
     this.voiceover?.startTask(sessionId, locale);
     this.turnInProgress = true;
     this.pendingSessionId = sessionId;

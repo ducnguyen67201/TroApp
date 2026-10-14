@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { AgentChatController } from '../../../src/desktop/main/AgentChatController.js';
+import { AnalyticsEvent, type AnalyticsEventInput } from '#contracts/Analytics.js';
 import type {
   AgentChatAuth,
   AgentChatWorker,
@@ -38,6 +39,7 @@ function createController(
   cancelShortcut?: AgentCancelShortcut,
   classroom?: ClassroomTaskContext,
   voiceover?: VoiceoverController,
+  recordUsage?: (event: AnalyticsEventInput) => void,
 ) {
   const auth = {
     readSession: vi.fn<AgentChatAuth['readSession']>().mockResolvedValue({
@@ -85,9 +87,71 @@ function createController(
     cancelShortcut,
     voiceover,
     classroom,
+    recordUsage,
   );
   return { auth, worker, permissions, controller };
 }
+
+it('records typed and voice task outcomes without instruction, profile or response content', async () => {
+  const recordUsage = vi.fn<(event: AnalyticsEventInput) => void>();
+  const { auth, worker, controller } = createController(
+    undefined,
+    undefined,
+    undefined,
+    recordUsage,
+  );
+  auth.fetchModelCredential.mockResolvedValue({
+    token: 'private-model-token',
+    expiresAt: '2099-01-01T00:00:00.000Z',
+  });
+  worker.sendMessage.mockResolvedValue({
+    kind: 'teaching',
+    result: { outcome: TeachingOutcome.CANCELED, reason: GuidanceReason.EXPLICIT_STOP },
+  });
+  expect(
+    await controller.sendMessage(
+      'private-session',
+      'Private student speech or typed work',
+      DesktopLocale.VIETNAMESE,
+      AgentTaskMode.TEACH,
+    ),
+  ).toMatchObject({ kind: 'teaching' });
+  expect(recordUsage).toHaveBeenCalledTimes(2);
+  expect(recordUsage.mock.calls[0]?.[0]).toEqual({
+    event: AnalyticsEvent.AGENT_TASK_STARTED,
+    mode: AgentTaskMode.TEACH,
+    locale: DesktopLocale.VIETNAMESE,
+  });
+  expect(recordUsage.mock.calls[1]?.[0]).toMatchObject({
+    event: AnalyticsEvent.AGENT_TASK_FINISHED,
+    mode: AgentTaskMode.TEACH,
+    locale: DesktopLocale.VIETNAMESE,
+    result: 'teaching',
+    teachingOutcome: TeachingOutcome.CANCELED,
+  });
+  const finished = recordUsage.mock.calls[1]?.[0];
+  if (finished?.event !== AnalyticsEvent.AGENT_TASK_FINISHED) {
+    throw new Error('Missing task completion usage.');
+  }
+  expect(finished.durationMs).toBeGreaterThanOrEqual(0);
+  expect(JSON.stringify(recordUsage.mock.calls)).not.toMatch(/private|student@example|Student/);
+  controller.dispose();
+});
+
+it('preserves task results when optional analytics fails', async () => {
+  const { auth, controller } = createController(undefined, undefined, undefined, () => {
+    throw new Error('analytics unavailable');
+  });
+  auth.fetchModelCredential.mockResolvedValue({
+    token: 'test-token',
+    expiresAt: '2099-01-01T00:00:00.000Z',
+  });
+  expect(await controller.sendMessage('session', 'Hello', DesktopLocale.ENGLISH)).toMatchObject({
+    kind: 'completed',
+    answer: 'Done',
+  });
+  controller.dispose();
+});
 
 it('does not start an agent after Stop while its model credential is loading', async () => {
   const { auth, worker, controller } = createController();

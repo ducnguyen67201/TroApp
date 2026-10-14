@@ -9,6 +9,41 @@ const desktopEnvSource = {
 };
 
 describe('desktop configuration boundary', () => {
+  it('keeps analytics unconfigured without a public project token and ingestion host', () => {
+    const environment = readDesktopEnv({ ...desktopEnvSource, bundledApiUrl: undefined });
+    expect(environment.POSTHOG_PROJECT_TOKEN).toBeUndefined();
+    expect(environment.POSTHOG_HOST).toBeUndefined();
+  });
+
+  it('requires a public ingestion token paired with the intended PostHog cloud region', () => {
+    const source = { ...desktopEnvSource, bundledApiUrl: undefined };
+    for (const host of ['https://us.i.posthog.com', 'https://eu.i.posthog.com']) {
+      expect(
+        readDesktopEnv({
+          ...source,
+          bundledPostHogToken: 'phc_testProject',
+          bundledPostHogHost: host,
+        }).POSTHOG_HOST,
+      ).toBe(host);
+    }
+    for (const settings of [
+      { bundledPostHogToken: 'phc_testProject' },
+      { bundledPostHogHost: 'https://us.i.posthog.com' },
+      { bundledPostHogToken: 'phx_private', bundledPostHogHost: 'https://us.i.posthog.com' },
+      { bundledPostHogToken: 'phc_testProject', bundledPostHogHost: 'http://us.i.posthog.com' },
+      { bundledPostHogToken: 'phc_testProject', bundledPostHogHost: 'https://other.test' },
+      {
+        bundledPostHogToken: 'phc_testProject',
+        bundledPostHogHost: 'https://us.i.posthog.com/?secret=1',
+      },
+      { bundledPostHogToken: 123, bundledPostHogHost: 'https://us.i.posthog.com' },
+    ]) {
+      expect(() => readDesktopEnv({ ...source, ...settings })).toThrow(
+        'Desktop configuration is invalid.',
+      );
+    }
+  });
+
   it('accepts only public HTTPS update feeds and leaves updates off without one', () => {
     const source = { ...desktopEnvSource, bundledApiUrl: undefined };
     expect(readDesktopEnv(source).UPDATE_FEED_URL).toBeUndefined();

@@ -26,6 +26,7 @@ import { AppUpdateState, type AppUpdateSnapshot } from '#contracts/AppUpdate.js'
 import { CompletionMode, TaskOutcomeStatus } from '#contracts/TaskOutcome.js';
 import { microphoneStorageKey } from '../../../src/desktop/renderer/voice/Microphones.js';
 import { App } from '../../../src/desktop/renderer/App.js';
+import { AnalyticsScreen } from '#contracts/Analytics.js';
 import {
   DesktopLocale,
   localeStorageKey,
@@ -149,6 +150,131 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   window.localStorage.clear();
+});
+
+describe('optional usage sharing', () => {
+  function createAnalyticsBridge(configured = true) {
+    return {
+      ...createDesktopBridge(),
+      readAnalyticsStatus: vi
+        .fn<NonNullable<DesktopBridge['readAnalyticsStatus']>>()
+        .mockResolvedValue({ kind: 'ok', status: { configured, enabled: false } }),
+      setAnalyticsEnabled: vi
+        .fn<NonNullable<DesktopBridge['setAnalyticsEnabled']>>()
+        .mockImplementation((enabled) =>
+          Promise.resolve({ kind: 'ok', status: { configured, enabled } }),
+        ),
+      trackScreenView: vi.fn<NonNullable<DesktopBridge['trackScreenView']>>().mockResolvedValue(),
+    } satisfies DesktopBridge;
+  }
+
+  it('explains installation sharing and keeps it unavailable without a project', async () => {
+    const bridge = createAnalyticsBridge(false);
+    window.tro = bridge;
+    renderDesktop();
+    await screen.findByText(testUser.email);
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(screen.getByRole('switch', { name: 'Share app usage' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    expect(screen.getByText(/Names, emails, screenshots, audio and student work/)).toHaveProperty(
+      'textContent',
+      expect.stringContaining('all accounts on this installation'),
+    );
+    expect(bridge.trackScreenView).not.toHaveBeenCalled();
+  });
+
+  it('tracks the enabled default without opening settings or a first-launch sharing prompt', async () => {
+    const bridge = createAnalyticsBridge();
+    bridge.readAnalyticsStatus.mockResolvedValue({
+      kind: 'ok',
+      status: { configured: true, enabled: true },
+    });
+    window.tro = bridge;
+    renderDesktop();
+    await screen.findByText(testUser.email);
+    await waitFor(() => {
+      expect(bridge.trackScreenView).toHaveBeenCalledExactlyOnceWith(AnalyticsScreen.WORKSPACE);
+    });
+    expect(bridge.setAnalyticsEnabled).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull();
+    expect(screen.queryByRole('switch', { name: 'Share app usage' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(screen.getByRole('switch', { name: 'Share app usage' })).toHaveProperty('checked', true);
+    expect(screen.getByText(/On by default/)).toBeTruthy();
+  });
+
+  it('tracks only fixed screen names after re-enabling and stops after opt-out', async () => {
+    const bridge = createAnalyticsBridge();
+    window.tro = bridge;
+    renderDesktop();
+    await screen.findByText(testUser.email);
+    expect(bridge.trackScreenView).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Share app usage' }));
+    await waitFor(() => {
+      expect(bridge.trackScreenView).toHaveBeenCalledExactlyOnceWith(AnalyticsScreen.WORKSPACE);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Close settings' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Classroom' }));
+    await waitFor(() => {
+      expect(bridge.trackScreenView).toHaveBeenLastCalledWith(AnalyticsScreen.CLASSROOM);
+    });
+    act(() => {
+      window.location.hash = '#/classroom/11111111-1111-4111-8111-111111111111';
+    });
+    await waitFor(() => {
+      expect(window.location.hash).toContain('11111111');
+    });
+    expect(bridge.trackScreenView.mock.calls).toEqual([
+      [AnalyticsScreen.WORKSPACE],
+      [AnalyticsScreen.CLASSROOM],
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Share app usage' }));
+    await waitFor(() => {
+      expect(screen.getByRole('switch', { name: 'Share app usage' })).toHaveProperty(
+        'checked',
+        false,
+      );
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Close settings' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+    expect(bridge.trackScreenView).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows and retries a save error in Vietnamese without silently enabling sharing', async () => {
+    window.localStorage.setItem(localeStorageKey, DesktopLocale.VIETNAMESE);
+    const bridge = createAnalyticsBridge();
+    bridge.setAnalyticsEnabled.mockResolvedValueOnce({ kind: 'failed' });
+    window.tro = bridge;
+    renderDesktop();
+    await screen.findByText(testUser.email);
+    fireEvent.click(screen.getByRole('button', { name: 'Cài đặt' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Chia sẻ dữ liệu sử dụng' }));
+    await screen.findByText(/Không thể lưu tùy chọn này/);
+    expect(screen.getByRole('switch', { name: 'Chia sẻ dữ liệu sử dụng' })).toHaveProperty(
+      'checked',
+      false,
+    );
+    expect(bridge.trackScreenView).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /^Thử lại$/ }));
+    await waitFor(() => {
+      expect(screen.getByRole('switch', { name: 'Chia sẻ dữ liệu sử dụng' })).toHaveProperty(
+        'checked',
+        true,
+      );
+    });
+    expect(bridge.setAnalyticsEnabled).toHaveBeenLastCalledWith(true);
+    expect(screen.queryByText(/Không thể lưu tùy chọn này/)).toBeNull();
+  });
 });
 
 describe('startup sign-in checks', () => {

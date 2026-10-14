@@ -1,6 +1,10 @@
 import { expect, it, vi } from 'vitest';
 import type { OnboardingReply } from '#contracts/Onboarding.js';
-import { OnboardingAction, OnboardingFailure } from '#contracts/OnboardingValues.js';
+import {
+  OnboardingAction,
+  OnboardingFailure,
+  OnboardingStatus,
+} from '#contracts/OnboardingValues.js';
 import {
   registerOnboardingHandlers,
   type OnboardingAccess,
@@ -15,6 +19,7 @@ interface TestEvent {
 }
 
 function createHandlers() {
+  const recordProgress = vi.fn<(action: OnboardingAction, status: OnboardingStatus) => void>();
   const store = {
     readProgress: vi
       .fn<OnboardingStore['readProgress']>()
@@ -42,9 +47,11 @@ function createHandlers() {
     },
     access,
     new OnboardingService(store),
+    recordProgress,
   );
   return {
     store,
+    recordProgress,
     access,
     gate,
     invoke: async (channel: string, raw: unknown, event: TestEvent = { trusted: true }) => {
@@ -83,6 +90,31 @@ it('checks sender and active identity before disk access and rejects injected ca
   });
   await invoke('tro:onboarding-restart', { ...request, expectedRevision: 0 });
   expect(store.saveProgress).toHaveBeenCalledTimes(2);
+});
+
+it('reports only successful onboarding transitions and ignores analytics failures', async () => {
+  const { invoke, recordProgress } = createHandlers();
+  await invoke('tro:onboarding-read', { expectedAccountId: 'current' });
+  await invoke('tro:onboarding-update', {
+    expectedAccountId: 'current',
+    expectedRevision: 5,
+    action: OnboardingAction.START,
+  });
+  expect(recordProgress).not.toHaveBeenCalled();
+  recordProgress.mockImplementation(() => {
+    throw new Error('analytics unavailable');
+  });
+  expect(
+    await invoke('tro:onboarding-update', {
+      expectedAccountId: 'current',
+      expectedRevision: 0,
+      action: OnboardingAction.START,
+    }),
+  ).toMatchObject({ kind: 'ok' });
+  expect(recordProgress).toHaveBeenCalledExactlyOnceWith(
+    OnboardingAction.START,
+    OnboardingStatus.IN_PROGRESS,
+  );
 });
 
 it('rechecks the sender after session verification and holds account changes through the operation', async () => {

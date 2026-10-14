@@ -1,4 +1,9 @@
 import { LessonVideoApiClient } from './lessonVideos/LessonVideoApiClient.js';
+import { AnalyticsEvent, AnalyticsRendererFailure } from '#contracts/Analytics.js';
+import { createDesktopAnalytics } from './analytics/CreateDesktopAnalytics.js';
+import type { AnalyticsController } from './analytics/AnalyticsController.js';
+import { registerAnalyticsHandlers } from './RegisterAnalytics.js';
+import { recordClassroomUsage } from './RecordProductUsage.js';
 import {
   LessonVideoCommandSchema,
   LessonMediaRequestSchema,
@@ -129,6 +134,7 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 const mainDirectory = dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | undefined;
+let analytics: AnalyticsController | undefined;
 let pets: PetController | undefined;
 let petWorld: PetWorldController | undefined;
 let petWindow: PetWindow | undefined;
@@ -156,6 +162,8 @@ async function startDesktop(): Promise<void> {
     bundledApiUrl: import.meta.env['MAIN_VITE_API_BASE_URL'],
     bundledAppEnvironment: import.meta.env['MAIN_VITE_APP_ENV'],
     bundledUpdateUrl: import.meta.env['MAIN_VITE_UPDATE_FEED_URL'] || undefined,
+    bundledPostHogToken: import.meta.env['MAIN_VITE_POSTHOG_PROJECT_TOKEN'] || undefined,
+    bundledPostHogHost: import.meta.env['MAIN_VITE_POSTHOG_HOST'] || undefined,
     isPackaged: app.isPackaged,
   });
   const hudClient = new CompanionHudClient(
@@ -192,6 +200,17 @@ async function startDesktop(): Promise<void> {
   /* The OAuth protocol must be registered before Electron becomes ready. */
   auth.registerDeepLink(() => mainWindow);
   await app.whenReady();
+  const productAnalytics = createDesktopAnalytics({
+    directory: join(app.getPath('userData'), 'analytics'),
+    projectToken: environment.POSTHOG_PROJECT_TOKEN,
+    host: environment.POSTHOG_HOST,
+    appVersion: app.getVersion(),
+    appEnvironment: environment.APP_ENV,
+    platform: process.platform,
+  });
+  analytics = productAnalytics;
+  await productAnalytics.initialize();
+  registerAnalyticsHandlers(ipcMain, isTrustedSender, productAnalytics);
   let petAccessGeneration = 0;
   const petRendererFile = join(mainDirectory, '../renderer/Pet.html');
   const petDevelopmentUrl = developmentUrl ? new URL('Pet.html', developmentUrl).href : undefined;
@@ -531,6 +550,9 @@ async function startDesktop(): Promise<void> {
     ipcMain,
     { isTrustedSender, readSession: () => auth.readSession(), gate: accountGate },
     new OnboardingService(new OnboardingPreferences(join(app.getPath('userData'), 'onboarding'))),
+    (action, status) => {
+      productAnalytics.capture({ event: AnalyticsEvent.ONBOARDING_UPDATED, action, status });
+    },
   );
 
   const worldController = new PetWorldController(
@@ -800,8 +822,9 @@ async function startDesktop(): Promise<void> {
     if (!parsed.success) {
       return { kind: 'failed', code: PracticeFailure.INVALID };
     }
-    return accountGate.runRequest(
-      async () => {
+    const startedAt = performance.now();
+    const reply = await accountGate.runRequest(
+      async (): Promise<PracticeReply> => {
         const command = parsed.data;
         if (command.kind === 'check' && !practiceCapture.validatesEvidence(command.evidence)) {
           return { kind: 'failed', code: PracticeFailure.STALE };
@@ -833,6 +856,15 @@ async function startDesktop(): Promise<void> {
       },
       { kind: 'failed', code: PracticeFailure.UNAVAILABLE },
     );
+    recordClassroomUsage(
+      (usage) => {
+        productAnalytics.capture(usage);
+      },
+      parsed.data.kind,
+      reply.kind,
+      performance.now() - startedAt,
+    );
+    return reply;
   });
   ipcMain.handle('tro:classroom-command', async (event, raw: unknown): Promise<ClassroomReply> => {
     if (!isTrustedSender(event)) {
@@ -842,10 +874,20 @@ async function startDesktop(): Promise<void> {
     if (!parsed.success) {
       return { kind: 'failed', code: ClassroomFailure.INVALID };
     }
-    return accountGate.runRequest(() => classroomController.execute(parsed.data), {
+    const startedAt = performance.now();
+    const reply = await accountGate.runRequest(() => classroomController.execute(parsed.data), {
       kind: 'failed',
       code: ClassroomFailure.UNAVAILABLE,
     });
+    recordClassroomUsage(
+      (usage) => {
+        productAnalytics.capture(usage);
+      },
+      parsed.data.kind,
+      reply.kind,
+      performance.now() - startedAt,
+    );
+    return reply;
   });
   ipcMain.handle('tro:classroom-preparation', (event): ClassroomReply => {
     return isTrustedSender(event)
@@ -860,6 +902,9 @@ async function startDesktop(): Promise<void> {
     cancelShortcut,
     narration,
     classroomController,
+    (usage) => {
+      productAnalytics.capture(usage);
+    },
   );
 
   const companionChat = chat;
@@ -1294,7 +1339,13 @@ async function startDesktop(): Promise<void> {
       },
     });
     mainWindow = window;
-    window.webContents.on('render-process-gone', () => {
+    window.webContents.on('render-process-gone', (_event, details) => {
+      if (!isQuitting && details.reason !== AnalyticsRendererFailure.CLEAN_EXIT) {
+        productAnalytics.capture({
+          event: AnalyticsEvent.DESKTOP_RENDERER_FAILED,
+          reason: details.reason,
+        });
+      }
       petAccessGeneration += 1;
       worldController.dispose();
       petController.dispose();
@@ -1419,16 +1470,13 @@ app.on('before-quit', (event) => {
   classroomInsights?.dispose();
   parentReportExports?.dispose();
   chat?.dispose();
-  void desktopDriver
-    .stop()
-    .catch(() => {})
-    .finally(() => {
-      if (updates?.readStatus().status.state === AppUpdateState.RESTARTING) {
-        updates.installAfterShutdown();
-      } else {
-        app.quit();
-      }
-    });
+  void Promise.allSettled([desktopDriver.stop(), analytics?.shutdown()]).finally(() => {
+    if (updates?.readStatus().status.state === AppUpdateState.RESTARTING) {
+      updates.installAfterShutdown();
+    } else {
+      app.quit();
+    }
+  });
 });
 
 app.on('will-quit', () => {
