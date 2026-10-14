@@ -171,18 +171,31 @@ export function readDesktopChildEnv(environment: NodeJS.ProcessEnv): NodeJS.Proc
   };
 }
 
+export const MacNotarizationMethod = {
+  API_KEY: 'api-key',
+  KEYCHAIN_PROFILE: 'keychain-profile',
+} as const;
+
 export type MacSigningEnv =
   | { enabled: false }
-  | {
+  | ({
       enabled: true;
       architecture: 'arm64' | 'x64';
       identity: string;
       teamId: string;
       keychain: string;
-      apiKey: string;
-      apiKeyId: string;
-      apiIssuer: string;
-    };
+    } & (
+      | {
+          notarizationMethod: typeof MacNotarizationMethod.API_KEY;
+          apiKey: string;
+          apiKeyId: string;
+          apiIssuer: string;
+        }
+      | {
+          notarizationMethod: typeof MacNotarizationMethod.KEYCHAIN_PROFILE;
+          keychainProfile: string;
+        }
+    ));
 
 /** Apple credentials belong to release tooling, never the packaged application. */
 export function readMacSigningEnv(
@@ -203,13 +216,9 @@ export function readMacSigningEnv(
     (architecture !== 'arm64' && architecture !== 'x64') ||
     environment['TRO_SIGN_WINDOWS'] === 'true' ||
     environment['MAIN_VITE_UPDATE_FEED_URL']?.trim() ||
-    [
-      'APPLE_ID',
-      'APPLE_APP_SPECIFIC_PASSWORD',
-      'APPLE_KEYCHAIN_PROFILE',
-      'CSC_LINK',
-      'CSC_NAME',
-    ].some((name) => Boolean(environment[name]?.trim()))
+    ['APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'CSC_LINK', 'CSC_NAME'].some((name) =>
+      Boolean(environment[name]),
+    )
   ) {
     return fail();
   }
@@ -219,9 +228,17 @@ export function readMacSigningEnv(
       MACOS_SIGNING_IDENTITY_SHA1: z.string().regex(/^[A-Fa-f0-9]{40}$/),
       APPLE_TEAM_ID: z.string().regex(/^[A-Z0-9]{10}$/),
       CSC_KEYCHAIN: absolutePath,
-      APPLE_API_KEY: absolutePath,
-      APPLE_API_KEY_ID: z.string().regex(/^[A-Z0-9]{10}$/),
-      APPLE_API_ISSUER: z.uuid(),
+      APPLE_API_KEY: absolutePath.optional(),
+      APPLE_API_KEY_ID: z
+        .string()
+        .regex(/^[A-Z0-9]{10}$/)
+        .optional(),
+      APPLE_API_ISSUER: z.uuid().optional(),
+      APPLE_KEYCHAIN: absolutePath.optional(),
+      APPLE_KEYCHAIN_PROFILE: z
+        .string()
+        .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/)
+        .optional(),
       MAIN_VITE_API_BASE_URL: AppUpdateUrlSchema,
       MAIN_VITE_APP_ENV: z.literal('prod'),
     },
@@ -234,12 +251,43 @@ export function readMacSigningEnv(
   ) {
     return fail();
   }
-  return {
+  const settings = {
     enabled: true,
     architecture,
     identity: validated.MACOS_SIGNING_IDENTITY_SHA1.toUpperCase(),
     teamId: validated.APPLE_TEAM_ID,
     keychain: validated.CSC_KEYCHAIN,
+  } as const;
+  const hasApiSettings =
+    validated.APPLE_API_KEY !== undefined ||
+    validated.APPLE_API_KEY_ID !== undefined ||
+    validated.APPLE_API_ISSUER !== undefined;
+  const hasProfileSettings =
+    validated.APPLE_KEYCHAIN_PROFILE !== undefined || validated.APPLE_KEYCHAIN !== undefined;
+  if (hasProfileSettings) {
+    if (
+      hasApiSettings ||
+      validated.APPLE_KEYCHAIN_PROFILE === undefined ||
+      validated.APPLE_KEYCHAIN !== settings.keychain
+    ) {
+      return fail();
+    }
+    return {
+      ...settings,
+      notarizationMethod: MacNotarizationMethod.KEYCHAIN_PROFILE,
+      keychainProfile: validated.APPLE_KEYCHAIN_PROFILE,
+    };
+  }
+  if (
+    validated.APPLE_API_KEY === undefined ||
+    validated.APPLE_API_KEY_ID === undefined ||
+    validated.APPLE_API_ISSUER === undefined
+  ) {
+    return fail();
+  }
+  return {
+    ...settings,
+    notarizationMethod: MacNotarizationMethod.API_KEY,
     apiKey: validated.APPLE_API_KEY,
     apiKeyId: validated.APPLE_API_KEY_ID,
     apiIssuer: validated.APPLE_API_ISSUER,

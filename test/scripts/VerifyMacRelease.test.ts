@@ -9,7 +9,12 @@ import {
   verifyMacRelease,
 } from '../../scripts/VerifyMacRelease.js';
 import type { MacCommand } from '../../scripts/MacSigning.js';
-import { createMacFixture, macCommand, macSettings } from './MacReleaseFixtures.js';
+import {
+  createMacFixture,
+  macCommand,
+  macProfileSettings,
+  macSettings,
+} from './MacReleaseFixtures.js';
 
 const submissionId = '52890475-5477-40f8-8a06-107611206472';
 const temporary: string[] = [];
@@ -65,9 +70,78 @@ describe('Mac notarization', () => {
     );
     expect(run.mock.calls.filter(([, args]) => args.includes('submit'))).toHaveLength(1);
     expect(run.mock.calls.filter(([, args]) => args.includes('info'))).toHaveLength(2);
+    expect(run).toHaveBeenCalledWith('/usr/bin/xcrun', [
+      'notarytool',
+      'submit',
+      '/fixture.dmg',
+      '--key',
+      macSettings.apiKey,
+      '--key-id',
+      macSettings.apiKeyId,
+      '--issuer',
+      macSettings.apiIssuer,
+      '--output-format',
+      'json',
+    ]);
     expect(wait).toHaveBeenCalledWith(15_000);
     expect(run.mock.calls.at(-1)?.[1]).toEqual(['stapler', 'validate', '/fixture.dmg']);
   });
+
+  it.each(['Accepted', 'Invalid'] as const)(
+    'uses only the temporary keychain profile through a %s submission',
+    async (status) => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      try {
+        const run = vi.fn<MacCommand>((exe, args) => {
+          if (args[0] === 'notarytool') {
+            return Promise.resolve({
+              stdout: JSON.stringify(
+                args.includes('log') ? { issues: [] } : { id: submissionId, status },
+              ),
+              stderr: '',
+            });
+          }
+          return macCommand(exe, args);
+        });
+        const result = notarizeMacDmg('/fixture.dmg', macProfileSettings, {
+          run,
+          wait: () => Promise.resolve(),
+          now: () => 0,
+        });
+        if (status === 'Accepted') {
+          await expect(result).resolves.toBe(submissionId);
+        } else {
+          await expect(result).rejects.toThrow('Apple rejected');
+        }
+        const notaryCalls = run.mock.calls
+          .map(([, args]) => args)
+          .filter((args) => args[0] === 'notarytool');
+        const auth = [
+          '--keychain-profile',
+          macProfileSettings.keychainProfile,
+          '--keychain',
+          macProfileSettings.keychain,
+        ];
+        expect(notaryCalls).toEqual([
+          ['notarytool', 'submit', '/fixture.dmg', ...auth, '--output-format', 'json'],
+          ['notarytool', 'info', submissionId, ...auth, '--output-format', 'json'],
+          ...(status === 'Invalid' ? [['notarytool', 'log', submissionId, ...auth]] : []),
+        ]);
+        const arguments_ = notaryCalls.flat();
+        for (const secretArgument of [
+          '--password',
+          '--apple-id',
+          '--key',
+          '--key-id',
+          '--issuer',
+        ]) {
+          expect(arguments_).not.toContain(secretArgument);
+        }
+      } finally {
+        error.mockRestore();
+      }
+    },
+  );
 
   it('rejects Apple failures and logs only a safe issue count', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);

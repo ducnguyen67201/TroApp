@@ -585,28 +585,38 @@ presence does not mean a signed Mac release has passed hardware acceptance.
    password-protected P12. A `.cer` alone cannot sign. DMG/ZIP distribution does
    not need a Developer ID Installer certificate or an App Store provisioning
    profile for the current capabilities.
-2. Create an App Store Connect **team API key** with App Manager access for
-   notarization. Keep its P8, key ID and issuer ID. Do not use an issuer-less
-   individual key with this pinned electron-builder version.
-3. Create GitHub environment `release-macos`, restrict it to `main`, and configure
+2. Create an **app-specific password** in the Apple Account's Sign-In and Security
+   settings for Tro CI notarization. Save it and the P12 export password in your
+   password manager. Use the Apple account email authorized for the same team.
+3. Configure GitHub environment `release`, restrict it to `main`, and configure
    the following secrets/variables. Do not paste private keys into chat or commit
    them. Base64 encodes transport bytes; it does not encrypt them.
 
-| Setting                        | GitHub environment storage                                    |
-| ------------------------------ | ------------------------------------------------------------- |
-| `MACOS_CERTIFICATE_P12_BASE64` | Secret: exported Developer ID Application P12, base64 encoded |
-| `MACOS_CERTIFICATE_PASSWORD`   | Secret: P12 password                                          |
-| `APPLE_NOTARY_KEY_P8_BASE64`   | Secret: notarization team API private key, base64 encoded     |
-| `MACOS_SIGNING_IDENTITY_SHA1`  | Variable: exact 40-hex certificate fingerprint                |
-| `APPLE_TEAM_ID`                | Variable: expected 10-character Apple Team ID                 |
-| `APPLE_API_KEY_ID`             | Variable: team API key ID                                     |
-| `APPLE_API_ISSUER`             | Variable: team API issuer UUID                                |
-| `MAIN_VITE_API_BASE_URL`       | Variable: production public HTTPS API URL                     |
+| Setting                       | GitHub environment storage                                    |
+| ----------------------------- | ------------------------------------------------------------- |
+| `CSC_LINK`                    | Secret: exported Developer ID Application P12, base64 encoded |
+| `CSC_KEY_PASSWORD`            | Secret: P12 export password                                   |
+| `APPLE_ID`                    | Secret: Apple account email                                   |
+| `APPLE_APP_SPECIFIC_PASSWORD` | Secret: app-specific password for Tro CI notarization         |
+| `MACOS_SIGNING_IDENTITY_SHA1` | Variable: exact 40-hex certificate fingerprint                |
+| `APPLE_TEAM_ID`               | Variable: expected 10-character Apple Team ID                 |
+| `MAIN_VITE_API_BASE_URL`      | Variable: production public HTTPS API URL                     |
+
+Enter both passwords directly into the corresponding GitHub environment secret
+fields. Do not send passwords in chat, put them in source, or place them in
+`MAIN_VITE_*` values. To prepare the certificate for `CSC_LINK` on macOS, pipe
+`base64 -i /absolute/path/TroDeveloperId.p12 | tr -d '\n' | pbcopy`, paste into its
+secret field, then clear the clipboard. Keep the export outside the checkout.
 
 The certificate fingerprint selects an identity; release artifact integrity uses
 SHA-256. Find the usable identity with `security find-identity -v -p codesigning`.
-The workflow imports its key into an isolated temporary keychain, restores the
-runner's prior search list, and removes credentials in an always-run cleanup.
+The workflow downloads the Developer ID G2 intermediate from [Apple PKI](https://www.apple.com/certificateauthority/),
+checks its pinned SHA-256, and imports it without changing certificate trust.
+It imports the signing key into an isolated temporary keychain and stores the
+notarization password there as the `tro-ci-notary` profile. Only this credential
+installation step receives GitHub secrets. Packaging and DMG notarization use
+`APPLE_KEYCHAIN` and `APPLE_KEYCHAIN_PROFILE` to read the stored profile. Cleanup
+restores the runner's prior search list and removes credentials even on failure.
 Certificate/key values are absent from the application configuration and uploaded
 artifact allowlist. Native dependency compilation happens before credentials are
 installed. Standard build/test/local packaging needs no Apple account.
@@ -662,9 +672,12 @@ messages. `mac.release.command.failed` names the failed tool without arguments.
 is uploaded if any preceding step fails.
 
 For missing identities, check P12 private-key export, fingerprint, Team ID and
-certificate validity. For notary authorization failures, check team API access and
-key/issuer pairing. Inspect Apple's detailed log privately using the recorded ID;
-do not paste credentials or raw logs into public issues. The DMG verifier submits
+certificate validity. For notary authorization failures, check the Apple account's
+team membership, app-specific password and stored keychain profile. The tooling
+also supports team API keys for separately configured local release environments;
+do not mix API-key and keychain-profile credentials in one invocation. Inspect
+Apple's detailed log privately using the recorded ID; do not paste credentials or
+raw logs into public issues. The DMG verifier submits
 once and polls that ID for up to 30 minutes. After a timeout or network failure,
 check that ID before creating another candidate. App notarization runs through
 builder's pinned integration and is also bounded by the job timeout. Rejection,

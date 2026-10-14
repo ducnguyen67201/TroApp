@@ -66,7 +66,7 @@ try {
     publish: 'never',
     config: {
       ...signingConfig,
-      ...createMacSigningConfig(macSettings),
+      ...createMacSigningConfig(macSettings, join(appDirectory, 'DesktopEntitlements.plist')),
       afterPack: async (context) => {
         const resourcesPath = context.packager.getResourcesDir(context.appOutDir);
         /* electron-builder skips a node_modules directory at a resource
