@@ -138,6 +138,7 @@ export type CourseRevision = z.infer<typeof CourseRevisionSchema>;
 
 export const ClassSchema = z.strictObject({
   id: z.uuid(),
+  /* Legacy primary teacher; scoped teaching permission comes from class assignments. */
   teacherId: z.string().min(1),
   name: shortText,
   courseRevisionId: z.uuid(),
@@ -247,10 +248,20 @@ export const ClassroomAdminCapability = {
   VERSION: '1',
 } as const;
 
+/** Negotiates organization selectors without changing authority or legacy responses. */
+export const ClassroomOrganizationCapability = {
+  HEADER: 'x-tro-classroom-organization',
+  VERSION: '1',
+} as const;
+
 export const ClassroomHomeSchema = z.strictObject({
   viewingAs: ClassroomPersonSchema.nullable().optional(),
   isAdmin: z.boolean().default(false),
   role: AccountRoleSchema,
+  teachingOrganizations: z
+    .array(z.strictObject({ id: z.uuid(), name: shortText }))
+    .max(100)
+    .optional(),
   courses: z
     .array(
       z.strictObject({
@@ -262,7 +273,11 @@ export const ClassroomHomeSchema = z.strictObject({
     .max(100),
   classes: z
     .array(
-      z.strictObject({ schoolClass: ClassSchema, meetings: z.array(ClassMeetingSchema).max(100) }),
+      z.strictObject({
+        schoolClass: ClassSchema,
+        meetings: z.array(ClassMeetingSchema).max(100),
+        canTeach: z.boolean().optional(),
+      }),
     )
     .max(100),
 });
@@ -302,11 +317,13 @@ export const ClassroomCommandSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('accept-invitation'), code: ClassroomInviteCodeSchema }),
   z.strictObject({
     kind: z.literal('publish-course'),
+    organizationId: z.uuid().optional(),
     title: shortText,
     content: CourseContentSchema,
   }),
   z.strictObject({
     kind: z.literal('create-class'),
+    organizationId: z.uuid().optional(),
     name: shortText,
     courseRevisionId: z.uuid().optional(),
   }),

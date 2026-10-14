@@ -50,7 +50,11 @@ export class PracticeCheckService {
         !stored ||
         !access ||
         access.deleted ||
-        (userId !== access.teacherId && (userId !== access.studentId || !access.enrolled))
+        (!(
+          access.authorizedTeacherIds?.includes(userId) ??
+          (userId === access.teacherId && access.teacherAuthorized)
+        ) &&
+          (userId !== access.studentId || !access.enrolled))
       ) {
         throw new PracticeError(PracticeFailure.FORBIDDEN);
       }

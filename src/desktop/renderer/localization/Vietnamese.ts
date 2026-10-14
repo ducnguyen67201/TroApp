@@ -146,6 +146,7 @@ export const vietnamese = {
   signIn: 'Đăng nhập',
   attention: 'Có vấn đề cần xử lý',
   settingsGeneral: 'Chung',
+  settingsPreferences: 'Tùy chỉnh',
   settingsNavigation: 'Nhóm cài đặt',
   settingsClose: 'Đóng cài đặt',
   settingsShortcut: 'Phím tắt nói',

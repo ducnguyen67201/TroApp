@@ -1,3 +1,9 @@
+import { AccountRole } from '#contracts/AccountRole.js';
+import {
+  readClassroomRole,
+  readAuthorizedClassTeacherIds,
+  canTeachClassroom,
+} from './OrganizationClassroomAccess.js';
 import { hasClassroomLearningCapture } from '../features/classroom/application/ClassroomInsightPolicy.js';
 import { runClassroomTransactionWithRetries } from './RetryClassroomTransaction.js';
 import { InsightRecordKind } from '#contracts/ClassroomInsights.js';
@@ -73,6 +79,7 @@ function readAccessRow(row: AccessRow | null): PracticeAccess | null {
   return {
     studentId: participation.studentId,
     teacherId: schoolClass.teacherId,
+    teacherAuthorized: true,
     classId: schoolClass.id,
     deleted: schoolClass.deletedAt !== null,
     enrolled: schoolClass.enrollments.some(
@@ -185,14 +192,36 @@ class PrismaPracticeCheckStore implements PracticeCheckStore {
       include: accessInclude,
     });
     const access = readAccessRow(row);
-    return access && row && (await this.hasRemovedSources(row.id))
-      ? { ...access, enrolled: false }
-      : access;
+    if (!access || !row) {
+      return null;
+    }
+    const organizationId = row.participation.meeting.schoolClass.organizationId;
+    return {
+      ...access,
+      authorizedTeacherIds: await readAuthorizedClassTeacherIds(this.client, access.classId),
+      teacherAuthorized:
+        organizationId === null ||
+        (await readClassroomRole(this.client, access.teacherId, organizationId)) ===
+          AccountRole.TEACHER,
+      enrolled:
+        access.enrolled &&
+        !(await this.hasRemovedSources(row.id)) &&
+        (organizationId === null ||
+          (await readClassroomRole(this.client, access.studentId, organizationId)) !== null),
+    };
   }
   /** Historical evidence authorization depends on class membership, not today's course content. */
   async readEvidenceAccess(
     attemptId: string,
-  ): Promise<Pick<PracticeAccess, 'studentId' | 'teacherId' | 'deleted' | 'enrolled'> | null> {
+  ): Promise<Pick<
+    PracticeAccess,
+    | 'studentId'
+    | 'teacherId'
+    | 'teacherAuthorized'
+    | 'authorizedTeacherIds'
+    | 'deleted'
+    | 'enrolled'
+  > | null> {
     const row = await this.client.classroomAttempt.findUnique({
       where: { id: attemptId },
       select: {
@@ -203,7 +232,9 @@ class PrismaPracticeCheckStore implements PracticeCheckStore {
               select: {
                 schoolClass: {
                   select: {
+                    id: true,
                     teacherId: true,
+                    organizationId: true,
                     deletedAt: true,
                     enrollments: { select: { studentId: true, active: true } },
                   },
@@ -220,9 +251,23 @@ class PrismaPracticeCheckStore implements PracticeCheckStore {
     const schoolClass = row.participation.meeting.schoolClass;
     return {
       studentId: row.participation.studentId,
+      authorizedTeacherIds: await readAuthorizedClassTeacherIds(this.client, schoolClass.id),
       teacherId: schoolClass.teacherId,
+      teacherAuthorized:
+        schoolClass.organizationId === null ||
+        (await readClassroomRole(
+          this.client,
+          schoolClass.teacherId,
+          schoolClass.organizationId,
+        )) === AccountRole.TEACHER,
       deleted: schoolClass.deletedAt !== null,
       enrolled:
+        (schoolClass.organizationId === null ||
+          (await readClassroomRole(
+            this.client,
+            row.participation.studentId,
+            schoolClass.organizationId,
+          )) !== null) &&
         !(await this.hasRemovedSources(attemptId)) &&
         schoolClass.enrollments.some(
           (enrollment) => enrollment.studentId === row.participation.studentId && enrollment.active,
@@ -516,8 +561,9 @@ class PrismaPracticeCheckStore implements PracticeCheckStore {
     sessionId: string,
   ): Promise<Extract<PracticeReply, { kind: 'teacher-history' }> | null> {
     const meeting = await this.client.classroomMeeting.findFirst({
-      where: { id: sessionId, schoolClass: { teacherId: userId, deletedAt: null } },
+      where: { id: sessionId, schoolClass: { deletedAt: null } },
       include: {
+        schoolClass: { select: { organizationId: true } },
         participations: {
           where: {
             student: {
@@ -531,11 +577,27 @@ class PrismaPracticeCheckStore implements PracticeCheckStore {
         },
       },
     });
-    if (!meeting) {
+    if (
+      !meeting ||
+      !(await canTeachClassroom(this.client, userId, meeting.classId)) ||
+      (meeting.schoolClass.organizationId !== null &&
+        (await readClassroomRole(this.client, userId, meeting.schoolClass.organizationId)) !==
+          AccountRole.TEACHER)
+    ) {
       return null;
     }
     const students = [];
     for (const participation of meeting.participations) {
+      if (
+        meeting.schoolClass.organizationId !== null &&
+        (await readClassroomRole(
+          this.client,
+          participation.studentId,
+          meeting.schoolClass.organizationId,
+        )) === null
+      ) {
+        continue;
+      }
       if (
         await this.client.classroomInsightRecord.findFirst({
           where: {

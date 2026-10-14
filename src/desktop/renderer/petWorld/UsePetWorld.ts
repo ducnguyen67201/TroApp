@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ClassroomHome } from '#contracts/Classroom.js';
-import { AccountRole } from '#contracts/AccountRole.js';
+import { canTeachClass } from '../classroom/ClassroomAuthority.js';
 import {
   PetWorldCommandKind,
   PetWorldCommandSchema,
@@ -148,8 +148,18 @@ export function usePetWorld(
       const commands: PetWorldCommand[] = [
         { kind: PetWorldCommandKind.CLASS_NEIGHBORHOOD, classId },
       ];
-      if (classroomReply?.kind === 'home' && classroomReply.home.role === AccountRole.TEACHER) {
+      const selectedClass =
+        classroomReply?.kind === 'home'
+          ? classroomReply.home.classes.find((entry) => entry.schoolClass.id === classId)
+          : undefined;
+      if (
+        classroomReply?.kind === 'home' &&
+        selectedClass &&
+        canTeachClass(classroomReply.home, selectedClass, userId)
+      ) {
         commands.push({ kind: PetWorldCommandKind.CLASS_RECOGNITION, classId, ...period });
+      } else {
+        resetRecognition();
       }
       const replies = await Promise.all(commands.map((command) => bridge(command)));
       if (!isCurrent()) {
@@ -193,7 +203,7 @@ export function usePetWorld(
         setLoading(false);
       }
     }
-  }, [classId, period, acceptWorld, resetRecognition]);
+  }, [userId, classId, period, acceptWorld, resetRecognition]);
   const latestRefresh = useRef(refresh);
 
   useEffect(() => {

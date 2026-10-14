@@ -121,6 +121,35 @@ afterEach(() => {
 });
 
 describe('teacher classroom cards', () => {
+  it('creates a class in the selected teaching organization', async () => {
+    const firstOrganizationId = '77777777-7777-4777-8777-777777777777';
+    const secondOrganizationId = '88888888-8888-4888-8888-888888888888';
+    const props = createProps({
+      ...createHome(),
+      teachingOrganizations: [
+        { id: firstOrganizationId, name: 'First school' },
+        { id: secondOrganizationId, name: 'Second school' },
+      ],
+    });
+    render(createPanel(props));
+    fireEvent.click(screen.getByRole('button', { name: 'Create a class' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Create a class' }));
+    fireEvent.change(dialog.getByRole('combobox', { name: 'Organization' }), {
+      target: { value: secondOrganizationId },
+    });
+    fireEvent.change(dialog.getByRole('textbox', { name: 'Class name' }), {
+      target: { value: 'Robotics' },
+    });
+    fireEvent.click(dialog.getByRole('button', { name: 'Create class' }));
+    await waitFor(() => {
+      expect(props.send).toHaveBeenCalledExactlyOnceWith({
+        kind: 'create-class',
+        name: 'Robotics',
+        organizationId: secondOrganizationId,
+      });
+    });
+  });
+
   it('returns inaccessible class routes to the list without exposing management actions', () => {
     window.location.hash = '#/classroom/99999999-9999-4999-8999-999999999999/settings';
     const props = createProps(createHome());

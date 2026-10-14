@@ -35,6 +35,15 @@ during startup. PostgreSQL and renderer containers stay running. The API default
 If startup fails before service output, `development.startup.failed` reports the
 failed stage and a safe reason. It excludes command arguments, environment values
 and raw child-process errors, which can contain credentials.
+If Electron reports `ERR_FAILED` while opening the development renderer, inspect
+`desktop.child_process.failed` for the process type, reason, exit code and Network
+Service classification. `desktop.renderer.load.failed` reports the navigation
+code, attempt, elapsed milliseconds and whether recovery will run; no URL or
+profile contents are logged. An observed Network Service failure during the first
+development load permits a bounded retry of the same document after a short delay.
+`desktop.renderer.load.recovered` confirms success. Persistent failures, ordinary
+connection failures and shutdown still propagate. Killing another server does not
+repair an Electron helper crash; check which event failed before changing ports.
 For process-list parsing failures, `processMetadata` identifies the failing
 snapshot (`processes` or `executables`), record number, character count, numeric
 PID when available, and whether a start-time shape was present. These fields help
@@ -462,10 +471,77 @@ Studio currently warns that the application's Zod version differs from its
 recommended Zod version. These compositions use no Zod props editor; do not
 downgrade the application's shared validation dependency just to silence the warning.
 
+## Organizations and team
+
+Apply the committed migration through normal startup. Sign in with Google before
+an administrator appoints an owner, so the owner has a verified account. Platform
+administration uses the existing backend-owned `User.isAdmin` flag; organization
+owners never receive that flag automatically.
+
+After login, accounts without a team choose how to use Tro. **Continue on my own**
+saves a personal-use choice across devices; no organization is created. Only a
+platform admin or an admin-approved owner can choose **Create organization**.
+Admins approve a verified account in **Settings → Team → Owner approvals**. This
+approval lets that person name and create their organization after login; it does
+not make them a platform admin. Approved owners can choose personal use and create
+later from Team. Existing provisioned owners can defer unfinished setup.
+
+Owners review the name before confirming it. The name stays permanent, including
+after ownership transfer. Existing names remain preserved and locked. Owners use
+**Add member**, enter an email and select Teacher or Student permissions. Existing
+verified users join immediately. New email addresses are added to the team and join
+automatically on their first verified sign-in. No code, invitation acceptance or
+invitation email is needed. Owners can change permissions and remove members,
+including emails whose users have not signed in yet. Current unexpired legacy
+invitations are migrated to direct additions; expired/revoked invitations are not
+restored. Rejoining never restores previous classroom enrollments automatically.
+
+**Organization logo** is collapsed below the member list. Owners can upload, replace
+or remove it, or click the sidebar logo to open its controls directly. PNG, JPEG and
+WebP files up to 2 MB and 4096 × 4096 pixels are supported. The sidebar keeps a Tro
+badge, and the assistant stays Tro. Multi-organization accounts can select branding
+for the current session from the sidebar logo menu. Admin ownership transfer is in
+Owner approvals, separate from teacher/student permissions. Ownership grants no
+classroom access. Ordinary members see their own organization and permissions,
+without the member directory. Organization limits are owned by the
+[contract](src/contracts/Organizations.ts).
+
+Teacher/student roles belong to each organization. When creating a class, choose
+the organization where you teach. Existing classes and courses keep their original
+access rules and are not assigned to an organization by the migration. Moving
+historical classes is explicit: open **Settings → Team → Class assignments**, select
+**Link existing class**, choose your own personal class and confirm. End live
+sessions and add all enrolled students to the team first. The class must have its
+own unscoped course revision. Shared-course cases require a separate reviewed mapping.
+
+In **Class assignments**, owners select all assigned teachers for each organization
+class and select **Save teachers**. Only active Teacher members are eligible. Each
+class supports multiple teachers. Adding a teacher keeps the others; unchecking a
+teacher removes their class access. Keep at least one assigned teacher.
+End any live session before changing the assignment. Teachers see only their assigned
+classes, and students see only enrolled classes. Organization ownership alone exposes
+class names and assignment controls, without classroom content or progress. Removal
+revokes organization resource access on subsequent backend requests while preserving
+historical work and personal pet entitlements.
+
+For a local smoke check, use an admin, owner, teacher and student account: create an
+organization after approving its owner, confirm its permanent name, add members
+directly, change permissions and remove a member. Link a personal class and assign two
+teachers; verify that both can manage it, then remove one and verify their access ends.
+Test both an existing verified
+account and a new email that joins on first sign-in. Reopen Tro and confirm naming is not requested
+again; verify that ownership transfer does not allow a name change.
+Confirm a non-admin cannot appoint an owner, a non-owner cannot manage members, and
+an owner cannot open another teacher's class without classroom access. Confirm an
+outsider cannot accept a classroom invitation into an organization they have not
+joined, and a removed member loses access even through a saved class route.
+
 ## Classroom pilot
 
-Apply committed migrations through normal startup. Accounts default to Student;
-a backend operator can grant/revoke a role by verified email:
+Apply committed migrations through normal startup. Legacy accounts default to
+Student; a backend operator can grant/revoke their global role by verified email.
+This command applies to unscoped legacy classes; organization roles are managed
+in Settings → Team:
 
 ```sh
 doppler run -- pnpm account:role teacher@example.com teacher

@@ -1,3 +1,4 @@
+import { canTeachClass } from './ClassroomAuthority.js';
 import { Select, Stack, Text } from '@mantine/core';
 import type { ReactElement } from 'react';
 import type { ClassroomHome, TeachingContext } from '#contracts/Classroom.js';
@@ -43,7 +44,7 @@ export function ClassroomInsightsPage({
           key={`${userId}:${selected.schoolClass.id}`}
           userId={userId}
           classId={selected.schoolClass.id}
-          teacher={selected.schoolClass.teacherId === userId}
+          teacher={canTeachClass(home, selected, userId)}
           context={context?.meeting.classId === selected.schoolClass.id ? context : null}
         />
       ) : (

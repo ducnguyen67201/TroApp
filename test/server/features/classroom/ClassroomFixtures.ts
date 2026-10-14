@@ -58,6 +58,68 @@ export function createCourseContent(): CourseContent {
 
 /** Typed test persistence; concurrency and isolation are checked against PostgreSQL. */
 export class MemoryClassroomStore implements ClassroomStore {
+  readonly classOrganizations = new Map<string, string>();
+  readonly teacherAssignments = new Map<string, string[]>();
+  readonly courseOrganizations = new Map<string, string>();
+  readonly organizationMemberships = new Map<
+    string,
+    { organizationId: string; role: AccountRole; name: string }
+  >();
+
+  readOrganizationRole(userId: string, organizationId: string) {
+    return Promise.resolve(
+      this.organizationMemberships.get(`${organizationId}:${userId}`)?.role ?? null,
+    );
+  }
+  async canTeachClass(userId: string, classId: string): Promise<boolean> {
+    const schoolClass = await this.readClass(classId);
+    if (!schoolClass || (await this.readClassRole(userId, classId)) !== AccountRole.TEACHER) {
+      return false;
+    }
+    return this.classOrganizations.has(classId)
+      ? (this.teacherAssignments.get(classId) ?? [schoolClass.teacherId]).includes(userId)
+      : schoolClass.teacherId === userId;
+  }
+
+  async listClassTeacherIds(classId: string): Promise<string[]> {
+    const schoolClass = await this.readClass(classId);
+    const ids = schoolClass
+      ? (this.teacherAssignments.get(classId) ?? [schoolClass.teacherId])
+      : [];
+    const authorized = [];
+    for (const userId of ids) {
+      if (await this.canTeachClass(userId, classId)) {
+        authorized.push(userId);
+      }
+    }
+    return authorized;
+  }
+
+  async readClassRole(userId: string, classId: string) {
+    const organizationId = this.classOrganizations.get(classId);
+    return organizationId
+      ? this.readOrganizationRole(userId, organizationId)
+      : this.readAccountRole(userId);
+  }
+  listOrganizationMemberships(userId: string) {
+    return Promise.resolve(
+      [...this.organizationMemberships.entries()]
+        .filter(([key]) => key.endsWith(`:${userId}`))
+        .map(([, membership]) => membership),
+    );
+  }
+  async listTeachingOrganizations(userId: string) {
+    return (await this.listOrganizationMemberships(userId))
+      .filter((membership) => membership.role === AccountRole.TEACHER)
+      .map((membership) => ({ id: membership.organizationId, name: membership.name }));
+  }
+  readClassOrganizationId(classId: string) {
+    return Promise.resolve(this.classOrganizations.get(classId) ?? null);
+  }
+  readCourseOrganizationId(courseId: string) {
+    return Promise.resolve(this.courseOrganizations.get(courseId) ?? null);
+  }
+
   readonly deletedClasses = new Set<string>();
   readonly materialDerivations = new Map<string, MaterialDerivation>();
   readMaterialDerivation(classId: string, key: string) {
@@ -249,27 +311,47 @@ export class MemoryClassroomStore implements ClassroomStore {
       [...this.courses.values()].filter((course) => course.ownerId === ownerId),
     );
   }
-  saveCourse(ownerId: string, title: string, content: CourseContent) {
+  saveCourse(
+    ownerId: string,
+    title: string,
+    content: CourseContent,
+    organizationId: string | null = null,
+  ) {
     const course = { id: randomUUID(), ownerId, title, content };
     this.courses.set(course.id, course);
+    if (organizationId) {
+      this.courseOrganizations.set(course.id, organizationId);
+    }
     return Promise.resolve(course);
   }
   readCourse(id: string) {
     return Promise.resolve(this.courses.get(id) ?? null);
   }
-  saveClass(teacherId: string, name: string, courseRevisionId: string) {
+  saveClass(
+    teacherId: string,
+    name: string,
+    courseRevisionId: string,
+    organizationId: string | null = null,
+  ) {
     const schoolClass = { id: randomUUID(), teacherId, name, courseRevisionId };
     this.classes.set(schoolClass.id, schoolClass);
+    if (organizationId) {
+      this.classOrganizations.set(schoolClass.id, organizationId);
+    }
     return Promise.resolve(schoolClass);
   }
-  listClasses(userId: string) {
-    return Promise.resolve(
-      [...this.classes.values()].filter(
-        (schoolClass) =>
-          !this.deletedClasses.has(schoolClass.id) &&
-          (schoolClass.teacherId === userId || this.enrollments.has(`${schoolClass.id}:${userId}`)),
-      ),
-    );
+  async listClasses(userId: string) {
+    const visible: SchoolClass[] = [];
+    for (const schoolClass of this.classes.values()) {
+      if (
+        !this.deletedClasses.has(schoolClass.id) &&
+        ((await this.canTeachClass(userId, schoolClass.id)) ||
+          (await this.isEnrolled(schoolClass.id, userId)))
+      ) {
+        visible.push(schoolClass);
+      }
+    }
+    return visible;
   }
   readClass(id: string) {
     return Promise.resolve(this.deletedClasses.has(id) ? null : (this.classes.get(id) ?? null));
@@ -289,8 +371,12 @@ export class MemoryClassroomStore implements ClassroomStore {
     }
     return Promise.resolve();
   }
-  isEnrolled(classId: string, studentId: string) {
-    return Promise.resolve(this.enrollments.has(`${classId}:${studentId}`));
+  async isEnrolled(classId: string, studentId: string) {
+    return (
+      this.enrollments.has(`${classId}:${studentId}`) &&
+      (!this.classOrganizations.has(classId) ||
+        (await this.readClassRole(studentId, classId)) !== null)
+    );
   }
   listMeetings(classId: string) {
     return Promise.resolve(

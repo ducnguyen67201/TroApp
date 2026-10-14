@@ -51,6 +51,16 @@ export interface ClassroomStore {
   readMaterialPublication(courseId: string): Promise<MaterialPublication | null>;
   updateClassCourse(classId: string, courseId: string): Promise<void>;
   readAccountRole(userId: string): Promise<AccountRole>;
+  canTeachClass(userId: string, classId: string): Promise<boolean>;
+  listClassTeacherIds(classId: string): Promise<string[]>;
+  readClassRole(userId: string, classId: string): Promise<AccountRole | null>;
+  readOrganizationRole(userId: string, organizationId: string): Promise<AccountRole | null>;
+  listOrganizationMemberships(
+    userId: string,
+  ): Promise<{ organizationId: string; role: AccountRole }[]>;
+  listTeachingOrganizations(userId: string): Promise<{ id: string; name: string }[]>;
+  readClassOrganizationId(classId: string): Promise<string | null>;
+  readCourseOrganizationId(courseId: string): Promise<string | null>;
   /** Reads the persisted flag; missing users have no admin authority. */
   readIsAdmin(userId: string): Promise<boolean>;
   listClassroomPeople(search: string, offset: number): Promise<ClassroomPeoplePage>;
@@ -63,9 +73,19 @@ export interface ClassroomStore {
   revokeInvitations(classId: string): Promise<void>;
   runAtomically<T>(operation: (store: ClassroomStore) => Promise<T>): Promise<T>;
   listCourses(ownerId: string): Promise<CourseRevision[]>;
-  saveCourse(ownerId: string, title: string, content: CourseContent): Promise<CourseRevision>;
+  saveCourse(
+    ownerId: string,
+    title: string,
+    content: CourseContent,
+    organizationId?: string | null,
+  ): Promise<CourseRevision>;
   readCourse(id: string): Promise<CourseRevision | null>;
-  saveClass(teacherId: string, name: string, courseRevisionId: string): Promise<SchoolClass>;
+  saveClass(
+    teacherId: string,
+    name: string,
+    courseRevisionId: string,
+    organizationId?: string | null,
+  ): Promise<SchoolClass>;
   listClasses(userId: string): Promise<SchoolClass[]>;
   readClass(id: string): Promise<SchoolClass | null>;
   /** Removes a class from active use while retaining its submissions and history. */

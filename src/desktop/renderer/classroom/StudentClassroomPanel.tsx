@@ -11,6 +11,7 @@ import {
 } from '#contracts/Classroom.js';
 import { ClassView } from '../navigation/DesktopRoute.js';
 import type { DesktopNavigation } from '../navigation/UseDesktopNavigation.js';
+import { canTeachClass } from './ClassroomAuthority.js';
 import { ClassArtwork } from './ClassArtwork.js';
 import { ClassSessionBadge } from './ClassSessionBadge.js';
 import { StudentActivityPanel } from './StudentActivityPanel.js';
@@ -61,7 +62,7 @@ export function StudentClassroomPanel({
         ? StudentClassroomView.MATERIALS
         : StudentClassroomView.ACTIVITIES
       : localView;
-  const classes = home.classes.filter((entry) => entry.schoolClass.teacherId !== userId);
+  const classes = home.classes.filter((entry) => !canTeachClass(home, entry, userId));
   const selected = isClassPage
     ? classes.find((entry) => entry.schoolClass.id === navigation?.route.classId)
     : (classes.find((entry) => entry.schoolClass.id === selectedId) ??

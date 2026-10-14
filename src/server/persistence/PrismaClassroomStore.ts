@@ -1,4 +1,9 @@
 import {
+  readClassroomRole,
+  canTeachClassroom,
+  readAuthorizedClassTeacherIds,
+} from './OrganizationClassroomAccess.js';
+import {
   canCaptureClassroomLearning,
   hasClassroomLearningCapture,
 } from '../features/classroom/application/ClassroomInsightPolicy.js';
@@ -21,7 +26,7 @@ import {
   type MaterialPublication,
 } from '#contracts/ClassroomMaterials.js';
 import type { MaterialFile } from '../features/materials/application/MaterialPreparation.js';
-import { AccountRoleSchema } from '#contracts/AccountRole.js';
+import { AccountRole, AccountRoleSchema } from '#contracts/AccountRole.js';
 import { ClassroomViewAs, ClassroomPersonSchema } from '#contracts/ClassroomViewAs.js';
 import { randomUUID } from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -252,6 +257,63 @@ class PrismaClassroomStore implements ClassroomStore {
     return AccountRoleSchema.parse(user.role);
   }
 
+  canTeachClass(userId: string, classId: string): Promise<boolean> {
+    return canTeachClassroom(this.client, userId, classId);
+  }
+
+  listClassTeacherIds(classId: string): Promise<string[]> {
+    return readAuthorizedClassTeacherIds(this.client, classId);
+  }
+
+  async readClassRole(userId: string, classId: string) {
+    const row = await this.client.classroomGroup.findFirst({
+      where: { id: classId, deletedAt: null },
+      select: { organizationId: true },
+    });
+    return row ? readClassroomRole(this.client, userId, row.organizationId) : null;
+  }
+
+  readOrganizationRole(userId: string, organizationId: string) {
+    return readClassroomRole(this.client, userId, organizationId);
+  }
+
+  async listOrganizationMemberships(userId: string) {
+    const rows = await this.client.organizationMembership.findMany({
+      where: { userId, removedAt: null },
+      select: { organizationId: true, role: true },
+    });
+    return rows.map((row) => ({
+      organizationId: row.organizationId,
+      role: AccountRoleSchema.parse(row.role),
+    }));
+  }
+
+  async listTeachingOrganizations(userId: string) {
+    const rows = await this.client.organizationMembership.findMany({
+      where: { userId, removedAt: null, role: AccountRole.TEACHER },
+      select: { organization: { select: { id: true, name: true } } },
+      orderBy: { organization: { name: 'asc' } },
+      take: 100,
+    });
+    return rows.map((row) => row.organization);
+  }
+
+  async readClassOrganizationId(classId: string) {
+    const row = await this.client.classroomGroup.findUnique({
+      where: { id: classId },
+      select: { organizationId: true },
+    });
+    return row?.organizationId ?? null;
+  }
+
+  async readCourseOrganizationId(courseId: string) {
+    const row = await this.client.classroomCourseRevision.findUnique({
+      where: { id: courseId },
+      select: { organizationId: true },
+    });
+    return row?.organizationId ?? null;
+  }
+
   async readIsAdmin(userId: string): Promise<boolean> {
     const user = await this.client.user.findUnique({
       where: { id: userId },
@@ -378,7 +440,15 @@ class PrismaClassroomStore implements ClassroomStore {
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    return rows.map((row) =>
+    const visible = [];
+    for (const row of rows) {
+      if (
+        (await readClassroomRole(this.client, ownerId, row.organizationId)) === AccountRole.TEACHER
+      ) {
+        visible.push(row);
+      }
+    }
+    return visible.map((row) =>
       CourseRevisionSchema.parse({
         id: row.id,
         ownerId: row.ownerId,
@@ -388,9 +458,14 @@ class PrismaClassroomStore implements ClassroomStore {
     );
   }
 
-  async saveCourse(ownerId: string, title: string, content: CourseContent) {
+  async saveCourse(
+    ownerId: string,
+    title: string,
+    content: CourseContent,
+    organizationId: string | null = null,
+  ) {
     const row = await this.client.classroomCourseRevision.create({
-      data: { id: randomUUID(), ownerId, title, content },
+      data: { id: randomUUID(), ownerId, title, content, organizationId },
     });
     return CourseRevisionSchema.parse({ id: row.id, ownerId, title, content: row.content });
   }
@@ -407,9 +482,21 @@ class PrismaClassroomStore implements ClassroomStore {
       : null;
   }
 
-  async saveClass(teacherId: string, name: string, courseRevisionId: string) {
+  async saveClass(
+    teacherId: string,
+    name: string,
+    courseRevisionId: string,
+    organizationId: string | null = null,
+  ) {
     const row = await this.client.classroomGroup.create({
-      data: { id: randomUUID(), teacherId, name, courseRevisionId },
+      data: {
+        id: randomUUID(),
+        teacherId,
+        name,
+        courseRevisionId,
+        organizationId,
+        teachers: { create: { userId: teacherId } },
+      },
     });
     return ClassSchema.parse({ id: row.id, teacherId, name, courseRevisionId });
   }
@@ -418,12 +505,28 @@ class PrismaClassroomStore implements ClassroomStore {
     const rows = await this.client.classroomGroup.findMany({
       where: {
         deletedAt: null,
-        OR: [{ teacherId: userId }, { enrollments: { some: { studentId: userId, active: true } } }],
+        OR: [
+          { teacherId: userId },
+          { organizationId: { not: null }, teachers: { some: { userId } } },
+          { enrollments: { some: { studentId: userId, active: true } } },
+        ],
       },
+      include: { enrollments: { where: { studentId: userId, active: true } } },
       take: 100,
       orderBy: { createdAt: 'desc' },
     });
-    return rows.map((row) =>
+    const visible = [];
+    for (const row of rows) {
+      const role = await readClassroomRole(this.client, userId, row.organizationId);
+      if (
+        row.organizationId === null ||
+        (role === AccountRole.TEACHER && (await this.canTeachClass(userId, row.id))) ||
+        (role !== null && row.enrollments.length > 0)
+      ) {
+        visible.push(row);
+      }
+    }
+    return visible.map((row) =>
       ClassSchema.parse({
         id: row.id,
         teacherId: row.teacherId,
@@ -490,6 +593,13 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async isEnrolled(classId: string, studentId: string) {
+    const organizationId = await this.readClassOrganizationId(classId);
+    if (
+      organizationId !== null &&
+      (await this.readOrganizationRole(studentId, organizationId)) === null
+    ) {
+      return false;
+    }
     return (
       (
         await this.client.classroomEnrollment.findUnique({

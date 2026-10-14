@@ -46,6 +46,7 @@ export function createPracticeAccess(): PracticeAccess {
   return {
     studentId: 'student',
     teacherId: 'teacher',
+    teacherAuthorized: true,
     classId: context.meeting.classId,
     deleted: false,
     enrolled: true,

@@ -9,6 +9,7 @@ not requirements or evidence that a capability exists.
 
 - [System and process boundaries](#system-and-process-boundaries)
 - [Authentication and account lifetime](#authentication-and-account-lifetime)
+- [Organizations and teams](#organizations-and-teams)
 - [Agent requests and model gateway](#agent-requests-and-model-gateway)
 - [Teaching](#teaching)
 - [Native companion and HUD](#native-companion-and-hud)
@@ -27,6 +28,15 @@ The desktop uses Electron and React; the API uses Fastify and Prisma/PostgreSQL.
 The bundled Cua dependency uses native Rust and platform adapters. It owns screen
 capture, desktop tools, input observation and the macOS compositor. Its native
 presentation fence cannot be replaced by asynchronous TypeScript messages.
+
+Main records bounded unexpected child-process exit diagnostics without child names,
+URLs, profile data or credentials. [LoadDesktopWindow](../src/desktop/main/LoadDesktopWindow.ts)
+retries only development renderer startup when `ERR_FAILED` coincides with a newly
+observed Network Service exit. It reloads the same validated document with bounded
+attempts and checks shutdown/window lifetime before retrying. Packaged loads and
+renderer sandbox settings retain their existing behavior. Navigation failures and
+successful recovery have distinct event-driven diagnostics; reading them is
+documented in README.
 
 ```mermaid
 flowchart TB
@@ -139,6 +149,122 @@ child exit state before returning. Missing/replaced
 connections and read failures invalidate subscribers once. Stop clears the timer
 before releasing the host. This avoids the pinned SDK's long-lived asynchronous
 exit watcher, whose repeated native callback registrations accumulate memory.
+
+## Organizations and teams
+
+Organizations are backend-owned membership boundaries. Only a persisted platform
+admin can approve new owners or transfer ownership. Approval is stored separately
+from platform administration and from membership: an approved account can create
+its own organization, but cannot appoint other owners. The first-login choice is
+owned by [UseOrganizationSetup](../src/desktop/renderer/team/UseOrganizationSetup.ts).
+Accounts without a team can continue personally, with that decision saved on the
+backend; approved owners can instead create their organization and confirm its
+permanent name. Approval is consumed on creation. Repeated creation with the same
+owned name reconciles a lost reply instead of creating duplicates. Existing named
+members skip the choice; legacy unfinished owners can defer setup and finish later.
+Workspace/classroom admission and voice/tours wait for this account-scoped check,
+and late replies cannot cross account boundaries. A failed initial check offers
+retry/sign-out. A conditional write and database trigger protect permanent names,
+including ownership transfers and the legacy rename command.
+
+Settings → Team centers on direct additions and member permissions, with logo and
+admin ownership controls collapsed. Only the current active owner can add people,
+change teacher/student permissions or remove members. Verified existing accounts
+join immediately; unknown/unverified emails reserve a place in
+`OrganizationEmailMember`. Authenticated organization HOME reconciles those records
+only with an unambiguous verified account email. Claiming and membership writes
+share a serializable transaction; removal or later role edits cannot be undone by
+replaying an addition. Owner transfers preserve direct additions as team membership
+intent. Owners can edit or remove unclaimed email entries. Active and unclaimed
+members share the membership capacity limit. Membership grants no classroom
+enrollment or platform authority. The owner must remain an active member.
+
+The additive direct-members migration preserves existing organizations, marks
+existing named members' setup as chosen, and converts current unexpired invitations
+issued by the current owner into direct email additions. It revokes old unaccepted
+codes; expired/revoked invitations remain inactive. Legacy invitation commands are
+retained for API compatibility but are absent from current UI. New UI sends no mail
+or invitation code. Existing admin provisioning/one-time naming commands also remain
+compatible; current owner approval creates no organization until its owner chooses.
+
+Owners can replace/remove their organization's logo after name setup. A local file
+picker prepares a static 128-pixel PNG from PNG/JPEG/WebP input before the narrow
+organization bridge sends it. The backend independently bounds dimensions, decoded
+pixel bytes, PNG checksums and filters, then re-encodes without metadata; SVGs and
+remote image URLs are excluded. Prisma stores the image with the organization.
+Only the current active owner can write it; members receive it through authenticated
+organization reads. The compact sidebar shows organization artwork with a Tro badge;
+the assistant and app retain Tro branding. Accounts in multiple organizations can
+choose sidebar branding independently of classroom access. Platform admin directory
+entries without membership do not affect branding. Account changes discard stale
+artwork, and logo/membership changes refresh when the window regains focus or the
+account signs in again.
+
+[Organizations.ts](../src/contracts/Organizations.ts) owns the strict versioned HTTP
+command/reply schemas and limits. [OrganizationService](../src/server/features/organizations/application/OrganizationService.ts)
+authorizes operations inside transactions through its store port; the Prisma
+adapter owns memberships, email additions and database constraints. Membership
+changes are checked against persisted authority on subsequent organization/classroom
+requests. Removal preserves history.
+It deactivates scoped enrollments and ends the removed member's participations, so
+rejoining requires fresh enrollment. Teacher assignments remain historical; restoring
+teacher membership restores authority over those assigned classes. Demotion or
+removal can interrupt a live class; restoring the assigned teacher's authority is
+the recovery path, rather than granting the organization owner classroom powers.
+
+Organization-scoped classes and course revisions store their organization ID.
+[OrganizationClassAssignments](../src/server/features/organizations/application/OrganizationClassAssignments.ts)
+owns teacher-assignment updates and personal-class linking checks. OrganizationService verifies
+ownership and name setup before calling either operation in the same transaction.
+The owner-only Team response includes class names, assigned teacher IDs and whether a
+session is live, without class content or student progress. Settings → Team → Class
+assignments lets the current organization owner select multiple active teacher members
+for a class, keeping at least one. `ClassTeacherAssignment` stores the many-to-many
+relationship. The additive migration preserves each class's prior teacher, including
+personal and historical classes. New classes assign their creator in the same write.
+The command checks the organization, current memberships and complete expected teacher
+set inside the serializable transaction. Live sessions block assignment changes; old
+classroom invitation codes are revoked. Legacy single-teacher commands cannot replace
+a class with multiple assignments. The legacy `teacherId` remains a primary-teacher
+compatibility field and is not the scoped authorization source. All classroom,
+materials, insights, practice and pet permissions check active teacher assignments,
+so an unassigned teacher or organization owner gains no content access.
+
+The same panel can explicitly move the owner's own unscoped personal class into the
+organization. Its current teacher must be a teacher member, all active enrolled users
+must be current team members, no session may be live, and its current course revision
+must be unscoped and used by only that class, including historical classes. The class
+and course scope change together and prior classroom codes are revoked; enrollment
+and history remain. No class is moved automatically, and other organizations' classes
+cannot be moved through this command.
+Their materials, practice evidence, insights and class-based pet views retain the
+class boundary. Access requires active membership as well as explicit teacher
+assignment or enrollment. Teachers can create classes only for organizations where
+they hold a teacher role; multiple teaching organizations require a selected scope.
+Organization membership alone exposes no classes, submissions or student progress.
+Personal accounts and pet entitlements remain personal. Platform admin classroom
+delegation continues through its separately authorized path.
+
+The additive migration leaves existing classes and courses unscoped, preserving
+their global account-role and ownership/enrollment rules. It creates no organizations,
+owners or memberships implicitly and does not infer tenant membership from existing
+class relationships. Moving historical classes requires the explicit owner flow above; shared-course cases require a separately reviewed mapping.
+The renderer has no organization invitation-code state or copy. Direct additions
+are the current Team flow; legacy organization invitation commands remain backend
+compatibility paths with their existing validation and revocation rules. Classroom
+invitations are a separate enrollment workflow and remain unchanged.
+
+The global `User.role` and operator role command remain for those legacy resources;
+organization owners change membership roles only. Classroom home metadata negotiates
+teaching-organization choices and class teaching permissions separately so older
+strict clients retain their shape. Classroom and Pet World controls use the selected
+class's permission, rather than applying an aggregate teacher role to every class.
+
+Electron main owns organization HTTP cookies. [RegisterOrganizations](../src/desktop/main/organizations/RegisterOrganizations.ts)
+checks the IPC sender, verified session and expected account ID while holding the
+account transition gate. Preload exposes only the validated organization command
+capability. Settings requests use the actual signed-in identity, independently of
+Classroom View as, and the renderer discards replies from stale account generations.
 
 ## Agent requests and model gateway
 
@@ -583,7 +709,7 @@ context is reported rather than silently shortened. Legacy publications use a
 compatibility adapter. Preparation limits and provider settings belong in backend
 `Env.ts` and the owning preparation modules.
 
-An owning teacher can delete an inactive class through a confirmed command. The
+An assigned teacher can delete an inactive class through a confirmed command. The
 serializable transaction rechecks that no live session exists, tombstones the class,
 revokes invitation access and preserves work/history. Removing a material deletes
 unused originals but preserves files referenced by immutable approved revisions.
@@ -643,7 +769,7 @@ review and the Insights work gallery offer original-file downloads for PDF and s
 
 [ClassroomInsights.ts](../src/contracts/ClassroomInsights.ts) owns strict source,
 command, read and report schemas. [ClassroomInsightService](../src/server/features/classroom/application/ClassroomInsightService.ts)
-authorizes the versioned insights endpoint. An owning teacher can read retained
+authorizes the versioned insights endpoint. An assigned teacher can read retained
 class history and approve plans, comparable tasks, observations and parent reports.
 Student reads require current enrollment and return that student's progress and
 assigned plans. Help requests additionally require main's private joined-device
@@ -773,7 +899,10 @@ retries, including commit conflicts.
 Each student owns one account-wide wallet and home across classes and devices.
 Wallets begin at zero; initializing the free home and pet creates no point award
 or purchased inventory. Leaving a class preserves the student's wallet and items.
-Only a current teacher owning a nondeleted class can issue positive points to its
+An enrolled organization student can initialize a personal wallet even when their
+legacy global account role is Teacher. Existing wallet ownership survives later
+role changes and organization removal; class visibility still checks membership.
+Only a current teacher assigned to a nondeleted class can issue positive points to its
 currently enrolled student-role accounts. Amounts have no teacher budget or product
 quota; the owning contract rejects values beyond database storage capacity. Wire
 amounts are canonical decimal strings and persistence uses bigint. A grant batch,
@@ -1193,6 +1322,7 @@ never enter this integration. README owns setup and release configuration.
 | Companion presentation           | [DesktopCompanion.ts](../src/desktop/main/companion/DesktopCompanion.ts), [CompanionHudPublisher.ts](../src/desktop/worker/companion/CompanionHudPublisher.ts)                                                                                                                                                                                               |
 | Voice and microphones            | [VoiceInputController.ts](../src/desktop/main/voice/VoiceInputController.ts), [VoiceoverController.ts](../src/desktop/main/voiceover/VoiceoverController.ts), [Microphones.ts](../src/desktop/renderer/voice/Microphones.ts)                                                                                                                                 |
 | Model gateway                    | [RegisterModelGateway.ts](../src/server/auth/RegisterModelGateway.ts), [ModelGatewayConfig.ts](../src/server/auth/ModelGatewayConfig.ts), [ForwardModelResponse.ts](../src/server/auth/ForwardModelResponse.ts)                                                                                                                                              |
+| Organizations and team           | [Organizations.ts](../src/contracts/Organizations.ts), [OrganizationService.ts](../src/server/features/organizations/application/OrganizationService.ts), [PrismaOrganizationStore.ts](../src/server/persistence/PrismaOrganizationStore.ts), [TeamPanel.tsx](../src/desktop/renderer/team/TeamPanel.tsx)                                                    |
 | Classroom and practice           | [ClassroomService.ts](../src/server/features/classroom/application/ClassroomService.ts), [PracticeCheckService.ts](../src/server/features/classroom/application/PracticeCheckService.ts), [ClassroomSessionController.ts](../src/desktop/main/classroom/ClassroomSessionController.ts)                                                                       |
 | Learning insights and reports    | [ClassroomInsightService.ts](../src/server/features/classroom/application/ClassroomInsightService.ts), [ClassroomInsights.ts](../src/contracts/ClassroomInsights.ts), [ClassroomInsightsPanel.tsx](../src/desktop/renderer/classroom/ClassroomInsightsPanel.tsx), [PrismaClassroomInsightStore.ts](../src/server/persistence/PrismaClassroomInsightStore.ts) |
 | Materials and retrieval          | [MaterialService.ts](../src/server/features/materials/application/MaterialService.ts), [PrepareMaterialCollection.ts](../src/server/features/materials/application/PrepareMaterialCollection.ts), [ReadMaterialSources.ts](../src/server/features/materials/application/ReadMaterialSources.ts)                                                              |

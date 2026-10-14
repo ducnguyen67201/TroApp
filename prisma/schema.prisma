@@ -31,6 +31,8 @@ model User {
   email         String    @unique
   role          AccountRole @default(student)
   isAdmin       Boolean   @default(false)
+  canCreateOrganization Boolean @default(false)
+  hasChosenOrganization Boolean @default(false)
   emailVerified Boolean   @default(false)
   image         String?
   createdAt     DateTime  @default(now())
@@ -57,11 +59,17 @@ model User {
   petPurchases PetPurchase[]
   petHomeShares PetHomeShare[]
   petWorldReceipts PetWorldReceipt[]
+  classTeacherAssignments ClassTeacherAssignment[]
+  ownedOrganizations Organization[] @relation("OrganizationOwner")
+  organizationMemberships OrganizationMembership[]
+  issuedOrganizationInvitations OrganizationInvitation[] @relation("OrganizationInviter")
 
   @@map("user")
 }
 
 model ClassroomCourseRevision {
+  organizationId String? @db.Uuid
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   id String @id @db.Uuid
   ownerId String
   owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
@@ -72,9 +80,22 @@ model ClassroomCourseRevision {
   materialPublication ClassroomMaterialPublication?
   workSnapshots ClassroomWorkSnapshot[]
   @@index([ownerId, createdAt])
+  @@index([organizationId])
+}
+
+model ClassTeacherAssignment {
+  classId String @db.Uuid
+  userId String
+  schoolClass ClassroomGroup @relation(fields: [classId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  @@id([classId, userId])
+  @@index([userId])
 }
 
 model ClassroomGroup {
+  teachers ClassTeacherAssignment[]
+  organizationId String? @db.Uuid
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   guidedLessons GuidedLessonRecord[]
   materialDerivations ClassroomMaterialDerivation[]
   id String @id @db.Uuid
@@ -94,6 +115,7 @@ model ClassroomGroup {
   meetings ClassroomMeeting[]
   invitations ClassroomInvitation[]
   @@index([teacherId])
+  @@index([organizationId])
   materialCollection ClassroomMaterialCollection?
   materialFiles ClassroomMaterialFile[]
   petRecognitions PetRecognition[]
@@ -797,4 +819,69 @@ model LessonVideoAllowance {
   reservedMicroUsd Int
   characters Int
   @@id([scope, day])
+}
+
+/** Ownership is separate from the member's teaching/student role and platform administration. */
+model Organization {
+  id String @id @db.Uuid
+  name String
+  nameSetAt DateTime?
+  logoDataUrl String?
+  ownerUserId String
+  owner User @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  memberships OrganizationMembership[]
+  invitations OrganizationInvitation[]
+  emailMembers OrganizationEmailMember[]
+  classes ClassroomGroup[]
+  courses ClassroomCourseRevision[]
+  @@index([ownerUserId])
+  @@map("organization")
+}
+
+/** Revoked membership is retained; rejoining never restores classroom access by itself. */
+model OrganizationMembership {
+  organizationId String @db.Uuid
+  userId String
+  role AccountRole
+  joinedAt DateTime @default(now())
+  removedAt DateTime?
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  @@id([organizationId, userId])
+  @@index([userId, removedAt])
+  @@map("organization_membership")
+}
+
+/** Only the digest is durable. Invitations require the matching verified account email. */
+model OrganizationInvitation {
+  id String @id @db.Uuid
+  organizationId String @db.Uuid
+  email String
+  role AccountRole
+  codeDigest String @unique @db.VarChar(64)
+  invitedByUserId String
+  expiresAt DateTime
+  acceptedAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  invitedBy User @relation("OrganizationInviter", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+  @@index([organizationId, email])
+  @@index([organizationId, expiresAt])
+  @@map("organization_invitation")
+}
+
+
+/** Owner-added emails become memberships on their first verified sign-in. */
+model OrganizationEmailMember {
+  organizationId String @db.Uuid
+  email String
+  role AccountRole
+  addedAt DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@id([organizationId, email])
+  @@index([email])
+  @@map("organization_email_member")
 }

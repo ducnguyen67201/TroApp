@@ -137,7 +137,7 @@ export class ClassroomService {
       };
     }
     if (command.kind === 'delete-class') {
-      await this.readOwnedClass(store, userId, command.classId);
+      await this.readTeachingClass(store, userId, command.classId);
       if (
         (await store.listMeetings(command.classId)).some(
           (meeting) => meeting.status === ClassroomStatus.LIVE,
@@ -150,7 +150,7 @@ export class ClassroomService {
       return { kind: 'ok' };
     }
     if (command.kind === 'create-invitation') {
-      await this.readOwnedClass(store, userId, command.classId);
+      await this.readTeachingClass(store, userId, command.classId);
       const code = randomBytes(6).toString('hex').toUpperCase();
       const invitation = {
         id: randomUUID(),
@@ -170,7 +170,7 @@ export class ClassroomService {
       return { kind: 'invitation', invitation };
     }
     if (command.kind === 'revoke-invitations') {
-      await this.readOwnedClass(store, userId, command.classId);
+      await this.readTeachingClass(store, userId, command.classId);
       await store.revokeInvitations(command.classId);
       return { kind: 'ok' };
     }
@@ -192,20 +192,36 @@ export class ClassroomService {
       if (!schoolClass) {
         throw new ClassroomError(ClassroomFailure.FORBIDDEN);
       }
-      await this.requireTeacher(store, schoolClass.teacherId);
+      if ((await store.listClassTeacherIds(schoolClass.id)).length === 0) {
+        throw new ClassroomError(ClassroomFailure.FORBIDDEN);
+      }
+      await this.requireClassMembership(store, userId, schoolClass.id);
       await store.enrollStudent(invitation.classId, userId, true);
       return { kind: 'ok' };
     }
     if (command.kind === 'home') {
       const classes = await store.listClasses(userId);
-      const role = await store.readAccountRole(userId);
-      const canTeach = role === AccountRole.TEACHER;
+      const teachingClasses = [];
+      for (const schoolClass of classes) {
+        if (await store.canTeachClass(userId, schoolClass.id)) {
+          teachingClasses.push(schoolClass);
+        }
+      }
+      const accountRole = await store.readAccountRole(userId);
+      const teachingOrganizations = await store.listTeachingOrganizations(userId);
+      const memberships = await store.listOrganizationMemberships(userId);
+      const ownedOrganizations = await Promise.all(
+        teachingClasses.map((schoolClass) => store.readClassOrganizationId(schoolClass.id)),
+      );
+      const canTeach =
+        teachingOrganizations.length > 0 ||
+        (accountRole === AccountRole.TEACHER &&
+          (memberships.length === 0 || ownedOrganizations.includes(null)));
+      const role = canTeach ? AccountRole.TEACHER : AccountRole.STUDENT;
       const referencedCourses = canTeach
         ? (
             await Promise.all(
-              classes
-                .filter((schoolClass) => schoolClass.teacherId === userId)
-                .map((schoolClass) => store.readCourse(schoolClass.courseRevisionId)),
+              teachingClasses.map((schoolClass) => store.readCourse(schoolClass.courseRevisionId)),
             )
           ).filter((course) => course !== null)
         : [];
@@ -230,10 +246,16 @@ export class ClassroomService {
         home: {
           isAdmin: await store.readIsAdmin(userId),
           role,
+          ...(teachingOrganizations.length > 0 ? { teachingOrganizations } : {}),
           courses,
           classes: await Promise.all(
             classes.map(async (schoolClass) => ({
               schoolClass,
+              ...((await store.readClassOrganizationId(schoolClass.id)) !== null
+                ? {
+                    canTeach: await store.canTeachClass(userId, schoolClass.id),
+                  }
+                : {}),
               meetings: await store.listMeetings(schoolClass.id),
             })),
           ),
@@ -241,58 +263,77 @@ export class ClassroomService {
       };
     }
     if (command.kind === 'publish-course') {
-      await this.requireTeacher(store, userId);
-      await store.saveCourse(userId, command.title, command.content);
+      const organizationId = await this.selectTeachingOrganization(
+        store,
+        userId,
+        command.organizationId,
+      );
+      await store.saveCourse(userId, command.title, command.content, organizationId);
       return { kind: 'ok' };
     }
     if (command.kind === 'create-class') {
-      await this.requireTeacher(store, userId);
+      const organizationId = await this.selectTeachingOrganization(
+        store,
+        userId,
+        command.organizationId,
+      );
       const course = command.courseRevisionId
         ? await store.readCourse(command.courseRevisionId)
-        : await store.saveCourse(userId, command.name, {
-            modules: [
-              {
-                title: command.name,
-                lessons: [
-                  {
-                    title: command.name,
-                    activities: [
-                      {
-                        id: randomUUID(),
-                        title: 'Class activity',
-                        objective: 'Follow the teacher’s current activity.',
-                        instructions:
-                          'No reviewed materials are available yet. Ask the teacher what to practice.',
-                        prerequisites: [],
-                        criteria: [
-                          {
-                            id: randomUUID(),
-                            description: 'Teacher confirms the activity is finished.',
-                          },
-                        ],
-                        materials: [],
-                        submission: SubmissionRequirement.NONE,
-                      },
-                    ],
-                  },
-                ],
-              },
-            ],
-          });
-      if (course?.ownerId !== userId) {
+        : await store.saveCourse(
+            userId,
+            command.name,
+            {
+              modules: [
+                {
+                  title: command.name,
+                  lessons: [
+                    {
+                      title: command.name,
+                      activities: [
+                        {
+                          id: randomUUID(),
+                          title: 'Class activity',
+                          objective: 'Follow the teacher’s current activity.',
+                          instructions:
+                            'No reviewed materials are available yet. Ask the teacher what to practice.',
+                          prerequisites: [],
+                          criteria: [
+                            {
+                              id: randomUUID(),
+                              description: 'Teacher confirms the activity is finished.',
+                            },
+                          ],
+                          materials: [],
+                          submission: SubmissionRequirement.NONE,
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+            organizationId,
+          );
+      if (
+        course?.ownerId !== userId ||
+        (await store.readCourseOrganizationId(course.id)) !== organizationId
+      ) {
         throw new ClassroomError(ClassroomFailure.FORBIDDEN);
       }
-      await store.saveClass(userId, command.name, course.id);
+      await store.saveClass(userId, command.name, course.id, organizationId);
       return { kind: 'ok' };
     }
     if (command.kind === 'enroll' || command.kind === 'revoke') {
-      await this.readOwnedClass(store, userId, command.classId);
+      await this.readTeachingClass(store, userId, command.classId);
       const studentId =
         command.kind === 'enroll'
           ? await store.readStudentByEmail(command.email.trim().toLowerCase())
           : command.studentId;
       if (!studentId) {
         throw new ClassroomError(ClassroomFailure.NOT_FOUND);
+      }
+      if (command.kind === 'enroll') {
+        await this.requireClassMembership(store, studentId, command.classId);
       }
       if (command.kind === 'revoke' && !(await store.isEnrolled(command.classId, studentId))) {
         throw new ClassroomError(ClassroomFailure.NOT_FOUND);
@@ -301,7 +342,7 @@ export class ClassroomService {
       return { kind: 'ok' };
     }
     if (command.kind === 'start-session') {
-      const schoolClass = await this.readOwnedClass(store, userId, command.classId);
+      const schoolClass = await this.readTeachingClass(store, userId, command.classId);
       const course = await store.readCourse(schoolClass.courseRevisionId);
       if (!course) {
         throw new ClassroomError(ClassroomFailure.NOT_FOUND);
@@ -331,7 +372,7 @@ export class ClassroomService {
       command.kind === 'session-roster'
     ) {
       const meeting = await this.readMeeting(store, command.classSessionId);
-      const schoolClass = await this.readOwnedClass(store, userId, meeting.classId);
+      const schoolClass = await this.readTeachingClass(store, userId, meeting.classId);
       if (command.kind === 'session-roster') {
         return { kind: 'roster', roster: await store.readRoster(meeting.id, schoolClass.id) };
       }
@@ -590,20 +631,53 @@ export class ClassroomService {
     }
   }
 
-  private async requireTeacher(store: ClassroomStore, userId: string): Promise<void> {
-    if ((await store.readAccountRole(userId)) !== AccountRole.TEACHER) {
+  private async selectTeachingOrganization(
+    store: ClassroomStore,
+    userId: string,
+    requestedOrganizationId?: string,
+  ): Promise<string | null> {
+    if (requestedOrganizationId !== undefined) {
+      if (
+        (await store.readOrganizationRole(userId, requestedOrganizationId)) !== AccountRole.TEACHER
+      ) {
+        throw new ClassroomError(ClassroomFailure.FORBIDDEN);
+      }
+      return requestedOrganizationId;
+    }
+    const memberships = await store.listOrganizationMemberships(userId);
+    const teaching = memberships.filter((membership) => membership.role === AccountRole.TEACHER);
+    if (teaching.length === 1 && teaching[0]) {
+      return teaching[0].organizationId;
+    }
+    if (memberships.length > 0 || (await store.readAccountRole(userId)) !== AccountRole.TEACHER) {
+      throw new ClassroomError(
+        teaching.length > 1 ? ClassroomFailure.INVALID : ClassroomFailure.FORBIDDEN,
+      );
+    }
+    return null;
+  }
+
+  private async requireClassMembership(
+    store: ClassroomStore,
+    userId: string,
+    classId: string,
+  ): Promise<void> {
+    const organizationId = await store.readClassOrganizationId(classId);
+    if (
+      organizationId !== null &&
+      (await store.readOrganizationRole(userId, organizationId)) === null
+    ) {
       throw new ClassroomError(ClassroomFailure.FORBIDDEN);
     }
   }
 
-  private async readOwnedClass(
+  private async readTeachingClass(
     store: ClassroomStore,
     userId: string,
     classId: string,
   ): Promise<SchoolClass> {
-    await this.requireTeacher(store, userId);
     const schoolClass = await store.readClass(classId);
-    if (!schoolClass || schoolClass.teacherId !== userId) {
+    if (!schoolClass || !(await store.canTeachClass(userId, classId))) {
       throw new ClassroomError(ClassroomFailure.FORBIDDEN);
     }
     return schoolClass;

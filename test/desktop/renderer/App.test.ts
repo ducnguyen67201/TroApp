@@ -15,6 +15,7 @@ import { MantineProvider } from '@mantine/core';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AccountRole } from '#contracts/AccountRole.js';
+import { OrganizationAction, type OrganizationReply } from '#contracts/Organizations.js';
 import { createTeachingContext } from '../../server/features/classroom/ClassroomFixtures.js';
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
 import type { AccountReply } from '#contracts/DesktopAccounts.js';
@@ -598,7 +599,15 @@ describe('desktop scaffold', () => {
     );
     expect(within(dialog).getByText('Light')).toBeTruthy();
     expect(within(dialog).queryByText(testUser.email)).toBeNull();
-    fireEvent.click(within(dialog).getByRole('tab', { name: 'Account' }));
+    const petsTab = within(dialog).getByRole('tab', { name: 'Pets' });
+    act(() => {
+      petsTab.focus();
+    });
+    fireEvent.keyDown(petsTab, { key: 'ArrowDown' });
+    expect(within(dialog).getByRole('tab', { name: 'Account' }).getAttribute('aria-selected')).toBe(
+      'true',
+    );
+    expect(document.activeElement).toBe(within(dialog).getByRole('tab', { name: 'Account' }));
     expect(within(dialog).getByText(testUser.email)).toBeTruthy();
     expect(within(dialog).queryByRole('combobox')).toBeNull();
     fireEvent.click(within(dialog).getByRole('tab', { name: 'General' }));
@@ -2706,4 +2715,221 @@ it('defers first-time onboarding until pending release highlights close', async 
   fireEvent.click(within(releaseDialog).getByRole('button', { name: 'Close introduction' }));
   await screen.findByRole('dialog', { name: 'A little help getting started.' });
   expect(screen.queryByRole('dialog', { name: 'What’s new' })).toBeNull();
+});
+
+it('lets an appointed owner review and save a permanent organization name before continuing', async () => {
+  const bridge = createDesktopBridge();
+  const organizationId = '11111111-1111-4111-8111-111111111111';
+  let savedName: string | null = null;
+  const controlOrganizations = vi
+    .fn<NonNullable<DesktopBridge['controlOrganizations']>>()
+    .mockImplementation(({ command }): Promise<OrganizationReply> => {
+      if (command.kind === OrganizationAction.SET_NAME) {
+        savedName = command.name;
+        return Promise.resolve({ kind: 'ok' });
+      }
+      return Promise.resolve({
+        kind: 'home',
+        isAdmin: false,
+        organizations: [
+          {
+            id: organizationId,
+            name: savedName ?? 'Organization',
+            isNameSet: savedName !== null,
+            ownerUserId: testUser.id,
+            isOwner: true,
+            role: AccountRole.STUDENT,
+          },
+        ],
+      });
+    });
+  window.tro = { ...bridge, controlOrganizations };
+  renderDesktop();
+  const dialog = await screen.findByRole('dialog', { name: 'Name your organization' });
+  await within(dialog).findByRole('textbox', { name: 'Organization name' });
+  expect(document.querySelector('.main-panel')?.hasAttribute('inert')).toBe(true);
+  expect(bridge.controlVoiceInput.mock.calls.some(([command]) => command.kind === 'enable')).toBe(
+    false,
+  );
+  fireEvent.keyDown(dialog, { key: 'Escape' });
+  expect(screen.getByRole('dialog', { name: 'Name your organization' })).toBeTruthy();
+  fireEvent.change(within(dialog).getByRole('textbox', { name: 'Organization name' }), {
+    target: { value: '  Our school  ' },
+  });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Review name' }));
+  expect(
+    controlOrganizations.mock.calls.some(
+      ([request]) => request.command.kind === OrganizationAction.SET_NAME,
+    ),
+  ).toBe(false);
+  expect(within(dialog).getByRole('textbox', { name: 'Organization name' })).toHaveProperty(
+    'readOnly',
+    true,
+  );
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Edit name' }));
+  expect(within(dialog).getByRole('textbox', { name: 'Organization name' })).toHaveProperty(
+    'readOnly',
+    false,
+  );
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Review name' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm permanent name' }));
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog', { name: 'Name your organization' })).toBeNull();
+  });
+  expect(controlOrganizations).toHaveBeenCalledWith({
+    expectedAccountId: testUser.id,
+    command: { kind: OrganizationAction.SET_NAME, organizationId, name: 'Our school' },
+  });
+  expect(document.querySelector('.main-panel')?.hasAttribute('inert')).toBe(false);
+  cleanup();
+  renderDesktop();
+  await screen.findByText(testUser.email);
+  await waitFor(() => {
+    expect(document.querySelector('.main-panel')?.hasAttribute('inert')).toBe(false);
+  });
+  expect(screen.queryByRole('dialog', { name: 'Name your organization' })).toBeNull();
+});
+
+it('opens the selected owner organization logo controls from the sidebar shortcut', async () => {
+  const firstId = '11111111-1111-4111-8111-111111111111';
+  const ownerId = '22222222-2222-4222-8222-222222222222';
+  const owned = { id: ownerId, name: 'Owner school', ownerUserId: testUser.id, isNameSet: true };
+  const controlOrganizations = vi
+    .fn<NonNullable<DesktopBridge['controlOrganizations']>>()
+    .mockImplementation(({ command }): Promise<OrganizationReply> =>
+      Promise.resolve(
+        command.kind === OrganizationAction.TEAM
+          ? {
+              kind: 'team',
+              organization: owned,
+              members: [],
+              invitations: [],
+            }
+          : {
+              kind: 'home',
+              isAdmin: false,
+              organizations: [
+                {
+                  id: firstId,
+                  name: 'Member school',
+                  ownerUserId: 'other-owner',
+                  isNameSet: true,
+                  isOwner: false,
+                  role: AccountRole.STUDENT,
+                },
+                { ...owned, isOwner: true, role: AccountRole.STUDENT },
+              ],
+            },
+      ),
+    );
+  window.tro = { ...createDesktopBridge(), controlOrganizations };
+  renderDesktop();
+  fireEvent.click(
+    await screen.findByRole('button', {
+      name: 'Choose organization branding: Member school · Tro',
+    }),
+  );
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Owner school' }));
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Choose organization branding: Owner school · Tro' }),
+  );
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Change organization logo' }));
+  expect(await screen.findByRole('region', { name: 'Organization logo' })).toBeTruthy();
+  expect(screen.getByRole('tab', { name: 'Team' }).getAttribute('aria-selected')).toBe('true');
+  expect(controlOrganizations).toHaveBeenCalledWith({
+    expectedAccountId: testUser.id,
+    command: { kind: OrganizationAction.TEAM, organizationId: ownerId },
+  });
+});
+
+it('offers approved owners organization creation after sign-in and creates only after name confirmation', async () => {
+  const bridge = createDesktopBridge();
+  let name: string | null = null;
+  const controlOrganizations = vi
+    .fn<NonNullable<DesktopBridge['controlOrganizations']>>()
+    .mockImplementation(({ command }): Promise<OrganizationReply> => {
+      if (command.kind === OrganizationAction.CREATE_OWN_ORGANIZATION) {
+        name = command.name;
+        return Promise.resolve({ kind: 'ok' });
+      }
+      return Promise.resolve({
+        kind: 'home',
+        isAdmin: false,
+        canCreateOrganization: name === null,
+        hasChosenOrganization: name !== null,
+        organizations: name
+          ? [
+              {
+                id: '11111111-1111-4111-8111-111111111111',
+                name,
+                ownerUserId: testUser.id,
+                isOwner: true,
+                isNameSet: true,
+                role: AccountRole.STUDENT,
+              },
+            ]
+          : [],
+      });
+    });
+  window.tro = { ...bridge, controlOrganizations };
+  renderDesktop();
+  const choice = await screen.findByRole('dialog', { name: 'How will you use Tro?' });
+  const create = await within(choice).findByRole('button', { name: 'Create organization' });
+  expect(bridge.controlClassroom).not.toHaveBeenCalled();
+  expect(within(choice).getByRole('button', { name: 'Continue on my own' })).toBeTruthy();
+  fireEvent.click(create);
+  const naming = screen.getByRole('dialog', { name: 'Name your organization' });
+  fireEvent.change(within(naming).getByRole('textbox', { name: 'Organization name' }), {
+    target: { value: 'Our school' },
+  });
+  fireEvent.click(within(naming).getByRole('button', { name: 'Review name' }));
+  expect(
+    controlOrganizations.mock.calls.some(
+      ([request]) => request.command.kind === OrganizationAction.CREATE_OWN_ORGANIZATION,
+    ),
+  ).toBe(false);
+  fireEvent.click(within(naming).getByRole('button', { name: 'Confirm permanent name' }));
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog', { name: 'Name your organization' })).toBeNull();
+  });
+  expect(controlOrganizations).toHaveBeenCalledWith({
+    expectedAccountId: testUser.id,
+    command: { kind: OrganizationAction.CREATE_OWN_ORGANIZATION, name: 'Our school' },
+  });
+});
+
+it('lets unapproved users continue personally without offering organization ownership', async () => {
+  let chosen = false;
+  const controlOrganizations = vi
+    .fn<NonNullable<DesktopBridge['controlOrganizations']>>()
+    .mockImplementation(({ command }): Promise<OrganizationReply> => {
+      if (command.kind === OrganizationAction.CONTINUE_PERSONAL) {
+        chosen = true;
+        return Promise.resolve({ kind: 'ok' });
+      }
+      return Promise.resolve({
+        kind: 'home',
+        isAdmin: false,
+        canCreateOrganization: false,
+        hasChosenOrganization: chosen,
+        organizations: [],
+      });
+    });
+  window.tro = { ...createDesktopBridge(), controlOrganizations };
+  renderDesktop();
+  const choice = await screen.findByRole('dialog', { name: 'How will you use Tro?' });
+  const personal = await within(choice).findByRole('button', { name: 'Continue on my own' });
+  expect(within(choice).queryByRole('button', { name: 'Create organization' })).toBeNull();
+  fireEvent.click(personal);
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog', { name: 'How will you use Tro?' })).toBeNull();
+  });
+  expect(chosen).toBe(true);
+  cleanup();
+  renderDesktop();
+  await screen.findByText(testUser.email);
+  await waitFor(() => {
+    expect(document.querySelector('.main-panel')?.hasAttribute('inert')).toBe(false);
+  });
+  expect(screen.queryByRole('dialog', { name: 'How will you use Tro?' })).toBeNull();
 });

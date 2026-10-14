@@ -12,7 +12,7 @@ export function requireTeacherClassAccess(
     role !== AccountRole.TEACHER ||
     !schoolClass ||
     schoolClass.deleted ||
-    schoolClass.teacherId !== actorId
+    !(schoolClass.teacherIds?.includes(actorId) ?? schoolClass.teacherId === actorId)
   ) {
     throw new PetWorldError(PetWorldFailure.FORBIDDEN);
   }

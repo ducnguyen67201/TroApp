@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import {
   ClassroomAdminCapability,
+  ClassroomOrganizationCapability,
   ClassroomCommandSchema,
   ClassroomReplySchema,
   ClassroomFailure,
@@ -93,14 +94,36 @@ export function registerClassroomRoutes(
     }
     try {
       const result = ClassroomReplySchema.parse(await service.execute(userId, parsed.data));
-      if (
-        result.kind === 'home' &&
-        request.headers[ClassroomAdminCapability.HEADER] !== ClassroomAdminCapability.VERSION
-      ) {
-        /* Older desktops reject unknown home fields. Remove metadata only after
-           validating the current response; the header changes no authorization. */
-        const { role, courses, classes } = result.home;
-        return { kind: result.kind, home: { role, courses, classes } };
+      if (result.kind === 'home') {
+        const { teachingOrganizations, ...currentHome } = result.home;
+        const legacyHome = {
+          ...currentHome,
+          classes: currentHome.classes.map(({ schoolClass, meetings }) => ({
+            schoolClass,
+            meetings,
+          })),
+        };
+        const home =
+          request.headers[ClassroomOrganizationCapability.HEADER] ===
+          ClassroomOrganizationCapability.VERSION
+            ? result.home
+            : legacyHome;
+        if (request.headers[ClassroomAdminCapability.HEADER] !== ClassroomAdminCapability.VERSION) {
+          const { role, courses, classes } = home;
+          return {
+            kind: result.kind,
+            home: {
+              role,
+              courses,
+              classes,
+              ...(request.headers[ClassroomOrganizationCapability.HEADER] ===
+              ClassroomOrganizationCapability.VERSION
+                ? { teachingOrganizations }
+                : {}),
+            },
+          };
+        }
+        return { kind: result.kind, home };
       }
       return result;
     } catch (error: unknown) {

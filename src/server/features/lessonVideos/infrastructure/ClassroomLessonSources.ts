@@ -5,25 +5,28 @@ import { readPublicationPassages } from '../../materials/application/MaterialSou
 import { LessonVideoError } from '../domain/LessonVideoRules.js';
 import type { LessonSources, LessonSource } from '../application/LessonVideoPorts.js';
 
-/** Source reads always follow teacher ownership checks; the model cannot expand their scope. */
+/** Source reads always follow teacher assignment checks; the model cannot expand their scope. */
 export class ClassroomLessonSources implements LessonSources {
   constructor(private readonly store: ClassroomStore) {}
   async authorize(ownerId: string, classId: string): Promise<void> {
-    const classroom = await this.store.readClass(classId);
-    if (
-      (await this.store.readAccountRole(ownerId)) !== AccountRole.TEACHER ||
-      classroom?.teacherId !== ownerId
-    ) {
+    if (!(await this.store.canTeachClass(ownerId, classId))) {
       throw new LessonVideoError(LessonVideoFailure.FORBIDDEN);
     }
   }
   async list(ownerId: string): ReturnType<LessonSources['list']> {
-    if ((await this.store.readAccountRole(ownerId)) !== AccountRole.TEACHER) {
+    const classes = [];
+    for (const item of await this.store.listClasses(ownerId)) {
+      if (await this.store.canTeachClass(ownerId, item.id)) {
+        classes.push(item);
+      }
+    }
+    if (
+      classes.length === 0 &&
+      (await this.store.readAccountRole(ownerId)) !== AccountRole.TEACHER &&
+      (await this.store.listTeachingOrganizations(ownerId)).length === 0
+    ) {
       throw new LessonVideoError(LessonVideoFailure.FORBIDDEN);
     }
-    const classes = (await this.store.listClasses(ownerId)).filter(
-      (item) => item.teacherId === ownerId,
-    );
     return Promise.all(
       classes.map(async (item) => {
         const publication = await this.store.readMaterialPublication(item.courseRevisionId);

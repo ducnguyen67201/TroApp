@@ -3,11 +3,13 @@ import { AnalyticsPreferenceFailure, type AnalyticsView } from './analytics/UseA
 import { analyticsMessages } from './analytics/AnalyticsMessages.js';
 import { onboardingMessages } from './onboarding/OnboardingMessages.js';
 import { PetGallery } from './pets/PetGallery.js';
+import { TeamPanel } from './team/TeamPanel.js';
+import { teamMessages } from './team/TeamMessages.js';
 import { petMessages } from './pets/PetMessages.js';
 import { Badge, Button, Modal, NativeSelect, Switch, Tabs, Text, Title } from '@mantine/core';
 import type { VoiceoverView } from './voiceover/UseVoiceover.js';
 import { VoiceoverState } from '#contracts/Voiceover.js';
-import { IconPaw, IconSettings, IconUser } from '@tabler/icons-react';
+import { IconPaw, IconSettings, IconUserCircle, IconUsers } from '@tabler/icons-react';
 import { useId, type ReactElement, type ReactNode } from 'react';
 import { VoiceShortcut, type VoiceStatus } from '#contracts/VoiceInput.js';
 import type { AuthUser } from '#contracts/AuthSession.js';
@@ -16,7 +18,12 @@ import { useLocale } from './localization/UseLocale.js';
 import { defaultMicrophoneId } from './voice/Microphones.js';
 import type { MicrophoneView } from './voice/UseMicrophones.js';
 
-const SettingsSection = { GENERAL: 'general', ACCOUNT: 'account', PETS: 'pets' } as const;
+const SettingsSection = {
+  GENERAL: 'general',
+  ACCOUNT: 'account',
+  PETS: 'pets',
+  TEAM: 'team',
+} as const;
 
 const shortcutLabels = {
   [VoiceShortcut.COMMAND_CONTROL]: 'Command + Control',
@@ -36,6 +43,9 @@ interface SettingsDialogProps {
   onChooseMicrophone: () => void;
   onboarding?: OnboardingView;
   analytics?: AnalyticsView;
+  onTeamChanged?: () => void;
+  onCreateOrganization?: (() => void) | undefined;
+  teamOrganizationId?: string | null;
 }
 
 interface SettingsRowProps {
@@ -73,6 +83,9 @@ export function SettingsDialog({
   onChooseMicrophone,
   onboarding,
   analytics,
+  onTeamChanged,
+  onCreateOrganization,
+  teamOrganizationId,
 }: SettingsDialogProps): ReactElement {
   const { locale, messages, changeLocale, isLocaleSaved } = useLocale();
   const languageDescriptionId = useId();
@@ -112,7 +125,8 @@ export function SettingsDialog({
       }}
     >
       <Tabs
-        defaultValue={SettingsSection.GENERAL}
+        key={teamOrganizationId ?? SettingsSection.GENERAL}
+        defaultValue={teamOrganizationId && user ? SettingsSection.TEAM : SettingsSection.GENERAL}
         orientation="vertical"
         variant="pills"
         keepMounted={false}
@@ -120,26 +134,48 @@ export function SettingsDialog({
           root: 'settings-layout',
           list: 'settings-navigation',
           tab: 'settings-tab',
+          tabSection: 'settings-tab-icon',
           tabLabel: 'settings-tab-label',
           panel: 'settings-panel',
         }}
       >
         <Tabs.List aria-label={messages.settingsNavigation}>
-          <Tabs.Tab
-            value={SettingsSection.GENERAL}
-            leftSection={<IconSettings size={18} stroke={1.6} />}
-          >
-            {messages.settingsGeneral}
-          </Tabs.Tab>
-          <Tabs.Tab value={SettingsSection.PETS} leftSection={<IconPaw size={18} stroke={1.6} />}>
-            {petMessages[locale].pets}
-          </Tabs.Tab>
-          <Tabs.Tab
-            value={SettingsSection.ACCOUNT}
-            leftSection={<IconUser size={18} stroke={1.6} />}
-          >
-            {messages.account}
-          </Tabs.Tab>
+          <div className="settings-navigation-group" role="presentation">
+            <Text component="div" className="settings-navigation-heading" aria-hidden="true">
+              {messages.settingsPreferences}
+            </Text>
+            <Tabs.Tab
+              value={SettingsSection.GENERAL}
+              leftSection={<IconSettings size={18} stroke={1.7} aria-hidden="true" />}
+            >
+              {messages.settingsGeneral}
+            </Tabs.Tab>
+            <Tabs.Tab
+              value={SettingsSection.PETS}
+              leftSection={<IconPaw size={18} stroke={1.7} aria-hidden="true" />}
+            >
+              {petMessages[locale].pets}
+            </Tabs.Tab>
+          </div>
+          <div className="settings-navigation-group" role="presentation">
+            <Text component="div" className="settings-navigation-heading" aria-hidden="true">
+              {messages.account}
+            </Text>
+            <Tabs.Tab
+              value={SettingsSection.ACCOUNT}
+              leftSection={<IconUserCircle size={18} stroke={1.7} aria-hidden="true" />}
+            >
+              {messages.account}
+            </Tabs.Tab>
+            {user && (
+              <Tabs.Tab
+                value={SettingsSection.TEAM}
+                leftSection={<IconUsers size={18} stroke={1.7} aria-hidden="true" />}
+              >
+                {teamMessages[locale].title}
+              </Tabs.Tab>
+            )}
+          </div>
         </Tabs.List>
         <Tabs.Panel value={SettingsSection.GENERAL}>
           <Title order={3}>{messages.settingsGeneral}</Title>
@@ -330,6 +366,17 @@ export function SettingsDialog({
         <Tabs.Panel value={SettingsSection.PETS}>
           <PetGallery accountId={user?.id ?? null} />
         </Tabs.Panel>
+        {user && (
+          <Tabs.Panel value={SettingsSection.TEAM}>
+            <TeamPanel
+              key={user.id}
+              accountId={user.id}
+              onChanged={onTeamChanged}
+              onCreateOrganization={onCreateOrganization}
+              initialOrganizationId={teamOrganizationId ?? undefined}
+            />
+          </Tabs.Panel>
+        )}
         <Tabs.Panel value={SettingsSection.ACCOUNT}>
           <Title order={3}>{messages.account}</Title>
           <div className="settings-rows">

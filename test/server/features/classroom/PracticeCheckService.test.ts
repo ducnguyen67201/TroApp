@@ -332,6 +332,14 @@ it('evidence and targeted help remain scoped to the authenticated relationship',
   expect(
     (await service.execute('teacher', { kind: 'read-evidence', checkId: reply.check.id })).kind,
   ).toBe('evidence');
+  store.access.authorizedTeacherIds = ['teacher', 'co-teacher'];
+  expect(
+    (await service.execute('co-teacher', { kind: 'read-evidence', checkId: reply.check.id })).kind,
+  ).toBe('evidence');
+  store.access.authorizedTeacherIds = ['teacher'];
+  await expect(
+    service.execute('co-teacher', { kind: 'read-evidence', checkId: reply.check.id }),
+  ).rejects.toThrow('forbidden');
   const criterion = reply.check.rubric.criteria[0];
   if (!criterion) {
     throw new Error('Missing criterion.');

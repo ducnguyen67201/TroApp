@@ -549,3 +549,26 @@ describe('Pet World accounting and authorization', () => {
     ).toBe(false);
   });
 });
+
+it('initializes a personal world for an enrolled organization student with a global teacher role', async () => {
+  const { store, service, initialize } = createFixture();
+  store.roles.set('student', AccountRole.TEACHER);
+  store.organizationStudents.add('student');
+  expect(await service.execute('student', { kind: PetWorldCommandKind.OWN_WORLD })).toMatchObject({
+    kind: 'world',
+    world: { wallet: { balance: '0' }, profile: null },
+  });
+  expect(store.wallets.has('student')).toBe(false);
+  await service.execute('student', initialize());
+  expect(store.worlds.has('student')).toBe(true);
+  expect(store.wallets.get('student')?.balance).toBe(0n);
+  expect(store.entries.size).toBe(0);
+  store.organizationStudents.delete('student');
+  store.enrollments.clear();
+  await expect(
+    service.execute('student', { kind: PetWorldCommandKind.OWN_WORLD }),
+  ).resolves.toMatchObject({ kind: 'world', world: { profile: { activePetId: PetId.CAT } } });
+  await expect(service.execute('other-teacher', initialize())).rejects.toMatchObject({
+    code: PetWorldFailure.FORBIDDEN,
+  });
+});

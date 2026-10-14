@@ -47,6 +47,45 @@ textarea:focus-visible {
   object-fit: contain;
 }
 
+/* Organization artwork keeps the app's identity visible in the compact sidebar. */
+.organization-brand {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+
+button.organization-brand:hover {
+  background: var(--tro-navigation-selected);
+}
+
+.organization-brand-mark {
+  position: relative;
+  display: block;
+  width: 32px;
+  height: 32px;
+}
+
+.organization-brand-mark > img,
+.organization-logo-preview {
+  display: block;
+  object-fit: contain;
+  border-radius: 6px;
+  background: var(--tro-surface);
+}
+
+.organization-tro-badge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  padding: 2px;
+  border-radius: 5px;
+  background: var(--tro-sidebar);
+}
+
 .sidebar-link {
   display: flex;
   align-items: center;
@@ -394,30 +433,95 @@ textarea:focus-visible {
 }
 
 .settings-navigation {
-  flex: 0 0 190px;
+  flex: 0 0 200px;
+  min-height: 0;
   padding: 20px 12px;
-  gap: 6px;
+  gap: 0;
   border-right: 1px solid var(--tro-border);
   background: var(--tro-sidebar);
+  overflow-y: auto;
+}
+
+.settings-navigation-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-navigation-group + .settings-navigation-group {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--tro-border);
+}
+
+.settings-navigation-heading {
+  margin: 0 10px 10px;
+  color: var(--tro-muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .settings-tab {
+  flex-shrink: 0;
+  align-items: center;
   justify-content: flex-start;
-  padding: 11px 12px;
-  color: var(--tro-muted);
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tro-text);
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 1.5;
+  white-space: normal;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.settings-tab-icon {
+  display: flex;
+  flex: 0 0 18px;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-inline: 0;
+  color: inherit;
+}
+
+.settings-tab-icon svg {
+  display: block;
 }
 
 .settings-tab-label {
+  flex: 1;
+  min-width: 0;
   text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
-.settings-tab[data-active] {
+.settings-tab[data-active],
+.settings-tab[data-active]:hover {
   background: var(--tro-selection);
   color: var(--tro-text);
+  font-weight: 500;
 }
 
-.settings-tab:hover {
+.settings-tab:not([data-active]):hover {
   background: var(--tro-muted-surface);
+}
+
+.settings-tab:focus-visible {
+  outline: 2px solid var(--tro-muted);
+  outline-offset: -2px;
 }
 
 .settings-panel {
@@ -493,13 +597,17 @@ textarea:focus-visible {
 
 @media (max-width: 700px) {
   .settings-navigation {
-    flex-basis: 136px;
+    flex-basis: 156px;
     padding: 16px 8px;
   }
 
   .settings-tab {
-    gap: 6px;
+    gap: 8px;
     padding-inline: 8px;
+  }
+
+  .settings-navigation-heading {
+    margin-inline: 8px;
   }
 
   .settings-panel {

@@ -146,6 +146,7 @@ export const english = {
   signIn: 'Sign in',
   attention: 'Something needs attention',
   settingsGeneral: 'General',
+  settingsPreferences: 'Preferences',
   settingsNavigation: 'Settings categories',
   settingsClose: 'Close settings',
   settingsShortcut: 'Talk shortcut',

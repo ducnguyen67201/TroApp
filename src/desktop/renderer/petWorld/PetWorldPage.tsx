@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { Alert, Button, Group, Loader, Select, Stack, Tabs, Text, TextInput } from '@mantine/core';
 import { IconRefresh } from '@tabler/icons-react';
-import { AccountRole } from '#contracts/AccountRole.js';
+import type { AccountRole } from '#contracts/AccountRole.js';
 import { PetWorldCommandKind, PetWorldFailure, type PetWorldCommand } from '#contracts/PetWorld.js';
 import { useLocale } from '../localization/UseLocale.js';
 import { OwnPetWorldPanel } from './OwnPetWorldPanel.js';
@@ -9,6 +9,7 @@ import { PetNeighborhoodPanel } from './PetNeighborhoodPanel.js';
 import { TeacherRecognitionPanel } from './TeacherRecognitionPanel.js';
 import { formatPoints, type PetWorldTranslate } from './PetWorldLabels.js';
 import { usePetWorld } from './UsePetWorld.js';
+import { canTeachClass } from '../classroom/ClassroomAuthority.js';
 import './PetWorld.css';
 
 interface PetWorldPageProps {
@@ -134,11 +135,16 @@ export function PetWorldPage({
     [fromDate, toDate],
   );
   const view = usePetWorld(userId, initialClassId, period);
-  const isTeacher = view.classroom?.role === AccountRole.TEACHER;
-  const disabled = view.isSaving || view.pendingCommands.length > 0;
-  const selectedClass = view.classroom?.classes.find(
+  const selectedClassEntry = view.classroom?.classes.find(
     (entry) => entry.schoolClass.id === initialClassId,
-  )?.schoolClass;
+  );
+  const isTeacher = Boolean(
+    view.classroom &&
+    selectedClassEntry &&
+    canTeachClass(view.classroom, selectedClassEntry, userId),
+  );
+  const disabled = view.isSaving || view.pendingCommands.length > 0;
+  const selectedClass = selectedClassEntry?.schoolClass;
 
   useEffect(() => {
     if (view.classroom) {
@@ -265,7 +271,11 @@ export function PetWorldPage({
         </Group>
       )}
       {!view.isLoading && (
-        <Tabs defaultValue={isTeacher ? 'recognition' : 'home'} keepMounted={false}>
+        <Tabs
+          key={isTeacher ? 'teacher' : 'student'}
+          defaultValue={isTeacher ? 'recognition' : 'home'}
+          keepMounted={false}
+        >
           <Tabs.List mb="lg">
             {isTeacher && (
               <Tabs.Tab value="recognition">

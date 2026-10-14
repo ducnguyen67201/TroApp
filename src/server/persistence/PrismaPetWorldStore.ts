@@ -1,3 +1,5 @@
+import { AccountRole } from '#contracts/AccountRole.js';
+import { readClassroomRole } from './OrganizationClassroomAccess.js';
 import { z } from 'zod';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { CourseContentSchema } from '#contracts/Classroom.js';
@@ -53,12 +55,53 @@ class PrismaPetWorldTransaction implements PetWorldTransaction {
     return row ? readPetAccountRole(row.role) : null;
   }
 
+  async hasOrganizationStudentEnrollment(userId: string): Promise<boolean> {
+    const enrollment = await this.client.classroomEnrollment.findFirst({
+      where: {
+        studentId: userId,
+        active: true,
+        schoolClass: {
+          deletedAt: null,
+          organization: {
+            is: { memberships: { some: { userId, role: AccountRole.STUDENT, removedAt: null } } },
+          },
+        },
+      },
+      select: { classId: true },
+    });
+    return enrollment !== null;
+  }
+
+  async readClassRole(userId: string, classId: string) {
+    const row = await this.client.classroomGroup.findUnique({
+      where: { id: classId },
+      select: { organizationId: true },
+    });
+    return row ? readClassroomRole(this.client, userId, row.organizationId) : null;
+  }
+
   async readClassAccess(classId: string) {
     const row = await this.client.classroomGroup.findUnique({
       where: { id: classId },
-      select: { id: true, teacherId: true, deletedAt: true },
+      select: {
+        id: true,
+        teacherId: true,
+        organizationId: true,
+        teachers: { select: { userId: true } },
+        deletedAt: true,
+      },
     });
-    return row ? { id: row.id, teacherId: row.teacherId, deleted: row.deletedAt !== null } : null;
+    return row
+      ? {
+          id: row.id,
+          teacherId: row.teacherId,
+          teacherIds:
+            row.organizationId === null
+              ? [row.teacherId]
+              : row.teachers.map((teacher) => teacher.userId),
+          deleted: row.deletedAt !== null,
+        }
+      : null;
   }
 
   async listClassRoster(classId: string) {
@@ -67,11 +110,14 @@ class PrismaPetWorldTransaction implements PetWorldTransaction {
       include: { student: { select: { name: true, role: true } } },
       orderBy: { studentId: 'asc' },
     });
-    return rows.map((row) => ({
-      studentId: row.studentId,
-      displayName: row.student.name,
-      role: readPetAccountRole(row.student.role),
-    }));
+    const students = [];
+    for (const row of rows) {
+      const role = await this.readClassRole(row.studentId, classId);
+      if (role !== null) {
+        students.push({ studentId: row.studentId, displayName: row.student.name, role });
+      }
+    }
+    return students;
   }
 
   async isEnrolled(classId: string, studentId: string) {
@@ -79,7 +125,18 @@ class PrismaPetWorldTransaction implements PetWorldTransaction {
       where: { classId_studentId: { classId, studentId } },
       select: { active: true },
     });
-    return row?.active ?? false;
+    if (!row?.active) {
+      return false;
+    }
+    const schoolClass = await this.client.classroomGroup.findUnique({
+      where: { id: classId },
+      select: { organizationId: true },
+    });
+    return (
+      schoolClass !== null &&
+      (schoolClass.organizationId === null ||
+        (await this.readClassRole(studentId, classId)) !== null)
+    );
   }
 
   async isClassContextValid(
@@ -313,7 +370,13 @@ class PrismaPetWorldTransaction implements PetWorldTransaction {
       include: { student: { select: { name: true } } },
       orderBy: { studentId: 'asc' },
     });
-    return rows.map((row) => ({ ...readPetWorldRow(row), ownerName: row.student.name }));
+    const worlds = [];
+    for (const row of rows) {
+      if (await this.isEnrolled(classId, row.studentId)) {
+        worlds.push({ ...readPetWorldRow(row), ownerName: row.student.name });
+      }
+    }
+    return worlds;
   }
 
   async readClassWorld(classId: string, studentId: string) {
@@ -324,7 +387,9 @@ class PrismaPetWorldTransaction implements PetWorldTransaction {
       },
       include: { student: { select: { name: true } } },
     });
-    return row ? { ...readPetWorldRow(row), ownerName: row.student.name } : null;
+    return row && (await this.isEnrolled(classId, studentId))
+      ? { ...readPetWorldRow(row), ownerName: row.student.name }
+      : null;
   }
 
   async createWorldIfMissing(world: PetWorldState) {
