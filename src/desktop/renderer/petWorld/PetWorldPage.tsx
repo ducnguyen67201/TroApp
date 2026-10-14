@@ -65,8 +65,8 @@ function describeFailure(failure: PetWorldFailure, t: PetWorldTranslate): string
       );
     case PetWorldFailure.HOME_UNAVAILABLE:
       return t(
-        'This home is no longer shared with this class.',
-        'Ngôi nhà không còn được chia sẻ với lớp này.',
+        'This home is no longer available in this class.',
+        'Ngôi nhà không còn khả dụng trong lớp này.',
       );
     case PetWorldFailure.INITIALIZATION_REQUIRED:
       return t(
@@ -99,7 +99,7 @@ function describePendingCommand(command: PetWorldCommand, t: PetWorldTranslate):
     case PetWorldCommandKind.VOID_RECOGNITION:
       return t('Recognition correction', 'Sửa ghi nhận');
     case PetWorldCommandKind.SET_HOME_SHARING:
-      return t('Home sharing change', 'Thay đổi chia sẻ nhà');
+      return t('Previous home setting', 'Cài đặt nhà trước đây');
     default:
       return t('Companion or home update', 'Cập nhật thú cưng hoặc ngôi nhà');
   }
@@ -349,11 +349,8 @@ export function PetWorldPage({
                   userId={userId}
                   className={selectedClass.name}
                   neighborhood={view.neighborhood}
-                  world={view.world}
                   catalog={view.catalog}
-                  isSaving={disabled}
                   t={t}
-                  sendCommand={view.sendCommand}
                 />
               ) : (
                 <Text className="pet-world-empty">

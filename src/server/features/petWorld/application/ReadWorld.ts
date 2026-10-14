@@ -6,6 +6,7 @@ import {
   type PetWorldProfile,
 } from '#contracts/PetWorld.js';
 import type {
+  PetClassWorld,
   PetRecognitionState,
   PetWalletEntryState,
   PetWorldState,
@@ -26,11 +27,11 @@ export function buildPetProfile(world: PetWorldState): PetWorldProfile {
   };
 }
 
-/** Visitor-facing cosmetic projection, without wallet or recognition data. */
-export function buildSharedHome(world: PetWorldState): PetSharedHome {
+/** Classmate-facing account name and cosmetics, without wallet or recognition data. */
+export function buildSharedHome(world: PetClassWorld): PetSharedHome {
   return {
     studentId: world.studentId,
-    displayName: world.names[world.activePetId],
+    displayName: world.ownerName,
     profile: buildPetProfile(world),
   };
 }
@@ -81,11 +82,8 @@ export async function readOwnWorld(
     recognitions: (await transaction.listOwnerRecognitions(actorId, 0, 50)).map(
       buildRecognitionView,
     ),
-    shares: (await transaction.listHomeShares(actorId)).map((share) => ({
-      classId: share.classId,
-      enabled: share.enabled,
-      revision: share.revision,
-    })),
+    /* Retained for older API consumers; visibility now follows enrollment. */
+    shares: [],
   };
 }
 
@@ -94,11 +92,7 @@ export async function readSharedHome(
   classId: string,
   studentId: string,
 ): Promise<PetSharedHome> {
-  const share = await transaction.readHomeShare(studentId, classId);
-  if (!share?.enabled || !(await transaction.isEnrolled(classId, studentId))) {
-    throw new PetWorldError(PetWorldFailure.HOME_UNAVAILABLE);
-  }
-  const world = await transaction.readWorld(studentId);
+  const world = await transaction.readClassWorld(classId, studentId);
   if (!world) {
     throw new PetWorldError(PetWorldFailure.HOME_UNAVAILABLE);
   }

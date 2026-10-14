@@ -379,7 +379,7 @@ describe('Pet World accounting and authorization', () => {
     expect(store.inventory.size).toBe(1);
   });
 
-  it('shares only an explicit class and returns a cosmetic-only visitor projection', async () => {
+  it('shows each enrolled pet automatically and returns a cosmetic-only visitor projection', async () => {
     const { store, service, initialize } = createFixture();
     await service.execute('student', initialize());
     const visit = {
@@ -387,20 +387,10 @@ describe('Pet World accounting and authorization', () => {
       classId: PetWorldFixtureIds.CLASS,
       studentId: 'student',
     } as const;
-    await expect(service.execute('partner', visit)).rejects.toMatchObject({
-      code: PetWorldFailure.HOME_UNAVAILABLE,
-    });
-    await service.execute('student', {
-      kind: PetWorldCommandKind.SET_HOME_SHARING,
-      requestId: randomUUID(),
-      classId: PetWorldFixtureIds.CLASS,
-      expectedShareRevision: 0,
-      enabled: true,
-    });
     const result = await service.execute('partner', visit);
     expect(result).toMatchObject({
       kind: 'home',
-      home: { displayName: 'Mochi', profile: { activePetId: PetId.CAT } },
+      home: { displayName: 'An', profile: { activePetId: PetId.CAT, names: { cat: 'Mochi' } } },
     });
     expect(JSON.stringify(result)).not.toMatch(
       /wallet|inventory|recognitions|note|teacherId|requestId/,
@@ -412,6 +402,28 @@ describe('Pet World accounting and authorization', () => {
     await expect(service.execute('other-teacher', visit)).rejects.toMatchObject({
       code: PetWorldFailure.FORBIDDEN,
     });
+  });
+
+  it('rejects retired sharing changes without hiding an enrolled pet', async () => {
+    const { store, service, initialize } = createFixture();
+    await service.execute('student', initialize());
+    await expect(
+      service.execute('student', {
+        kind: PetWorldCommandKind.SET_HOME_SHARING,
+        requestId: randomUUID(),
+        classId: PetWorldFixtureIds.CLASS,
+        expectedShareRevision: 0,
+        enabled: false,
+      }),
+    ).rejects.toMatchObject({ code: PetWorldFailure.INVALID });
+    expect(store.receipts.size).toBe(1);
+    expect(
+      await service.execute('partner', {
+        kind: PetWorldCommandKind.VISIT_HOME,
+        classId: PetWorldFixtureIds.CLASS,
+        studentId: 'student',
+      }),
+    ).toMatchObject({ kind: 'home' });
   });
 
   it('loads a full classroom neighborhood without per-student queries or private recognition reads', async () => {
@@ -429,18 +441,12 @@ describe('Pet World accounting and authorization', () => {
         slots: { garden: null, home: null, feature: null },
         revision: 0,
       });
-      store.shares.set(`${studentId}:${PetWorldFixtureIds.CLASS}`, {
-        studentId,
-        classId: PetWorldFixtureIds.CLASS,
-        enabled: index < 150,
-        revision: 1,
-      });
     }
     store.enrollments.delete(`${PetWorldFixtureIds.CLASS}:pupil-000`);
-    const listSharedWorlds = vi.spyOn(store, 'listSharedWorlds');
+    const listClassWorlds = vi.spyOn(store, 'listClassWorlds');
     const countClassroomMoments = vi.spyOn(store, 'countClassroomMoments');
-    const readHomeShare = vi.spyOn(store, 'readHomeShare');
     const readWorld = vi.spyOn(store, 'readWorld');
+    const readClassWorld = vi.spyOn(store, 'readClassWorld');
     const listClassRecognitions = vi.spyOn(store, 'listClassRecognitions');
     const neighborhood = await service.execute('teacher', {
       kind: PetWorldCommandKind.CLASS_NEIGHBORHOOD,
@@ -449,13 +455,13 @@ describe('Pet World accounting and authorization', () => {
     if (neighborhood.kind !== 'neighborhood') {
       throw new Error('Expected neighborhood projection.');
     }
-    expect(neighborhood.homes).toHaveLength(149);
+    expect(neighborhood.homes).toHaveLength(199);
     expect(neighborhood.homes.some((home) => home.studentId === 'pupil-000')).toBe(false);
-    expect(neighborhood.homes.some((home) => home.studentId === 'pupil-150')).toBe(false);
-    expect(listSharedWorlds).toHaveBeenCalledTimes(1);
+    expect(neighborhood.homes.some((home) => home.studentId === 'pupil-150')).toBe(true);
+    expect(listClassWorlds).toHaveBeenCalledTimes(1);
     expect(countClassroomMoments).toHaveBeenCalledTimes(1);
-    expect(readHomeShare).not.toHaveBeenCalled();
     expect(readWorld).not.toHaveBeenCalled();
+    expect(readClassWorld).not.toHaveBeenCalled();
     expect(listClassRecognitions).not.toHaveBeenCalled();
     expect(JSON.stringify(neighborhood)).not.toMatch(/wallet|recognitions|note|teacherId/);
   });

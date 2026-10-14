@@ -16,7 +16,6 @@ import { grantPoints } from './GrantPoints.js';
 import { buyItem } from './BuyItem.js';
 import { equipItem, initializeWorld, placeItem, setPetProfile } from './ChangeWorld.js';
 import { correctRecognition } from './CorrectRecognition.js';
-import { setHomeSharing } from './SetHomeSharing.js';
 import { readOwnWorld } from './ReadWorld.js';
 import { readClassRecognition, readOwnHistory } from './ReadHistory.js';
 import { readNeighborhood, visitHome } from './ReadNeighborhood.js';
@@ -114,7 +113,8 @@ async function executeMutation(
     case PetWorldCommandKind.VOID_RECOGNITION:
       return await correctRecognition(context, command);
     case PetWorldCommandKind.SET_HOME_SHARING:
-      return await setHomeSharing(context, command);
+      /* Older desktops may retry this saved intent; it can no longer change visibility. */
+      throw new PetWorldError(PetWorldFailure.INVALID);
   }
 }
 

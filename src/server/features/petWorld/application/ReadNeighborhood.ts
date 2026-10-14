@@ -31,7 +31,7 @@ export async function readNeighborhood(
   now: string,
 ): Promise<PetWorldReply> {
   await requireNeighborhoodAccess(transaction, actorId, classId);
-  const worlds = await transaction.listSharedWorlds(classId);
+  const worlds = await transaction.listClassWorlds(classId);
   const classroomMoments = await transaction.countClassroomMoments(classId, now);
   return {
     kind: 'neighborhood',

@@ -2,7 +2,7 @@ import type { AccountRole } from '#contracts/AccountRole.js';
 import type { PetRecognition } from '#contracts/PetWorld.js';
 import type {
   PetClassAccess,
-  PetHomeShareState,
+  PetClassWorld,
   PetInventoryState,
   PetPurchaseState,
   PetRecognitionState,
@@ -52,13 +52,12 @@ export interface PetWorldTransaction {
     correction: NonNullable<PetRecognition['correction']>,
   ): Promise<void>;
   readWorld(studentId: string): Promise<PetWorldState | null>;
-  /** Lists cosmetic worlds with enabled consent and active enrollment in this class. */
-  listSharedWorlds(classId: string): Promise<PetWorldState[]>;
+  /** Reads a current class member's account name and cosmetic world together. */
+  readClassWorld(classId: string, studentId: string): Promise<PetClassWorld | null>;
+  /** Lists account names and cosmetic worlds for every currently enrolled member in one read. */
+  listClassWorlds(classId: string): Promise<PetClassWorld[]>;
   createWorldIfMissing(world: PetWorldState): Promise<PetWorldState>;
   saveWorld(world: PetWorldState, expectedRevision: number): Promise<void>;
   listInventory(studentId: string): Promise<PetInventoryState[]>;
   savePurchase(purchase: PetPurchaseState, inventory: PetInventoryState): Promise<void>;
-  readHomeShare(studentId: string, classId: string): Promise<PetHomeShareState | null>;
-  listHomeShares(studentId: string): Promise<PetHomeShareState[]>;
-  saveHomeShare(share: PetHomeShareState, expectedRevision: number): Promise<void>;
 }

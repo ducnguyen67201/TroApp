@@ -752,7 +752,7 @@ there is no award capability in agent, model, worker or MCP tools.
 
 [PetWorldService.ts](../src/server/features/petWorld/application/PetWorldService.ts)
 is the application facade. Focused operation functions own awards, purchases,
-profile/equipment changes, sharing, corrections and reads. Framework-free domain
+profile/equipment changes, corrections and reads. Framework-free domain
 functions own arithmetic, compatibility and recognition coverage. The root
 `PetWorldStore` port owns one atomic callback; its scoped `PetWorldTransaction`
 port exposes no nested transaction runner, network or Prisma surface.
@@ -781,14 +781,22 @@ when the wallet can cover it, or finally void recognition while preserving point
 and items. Corrections cannot credit points. Sign-in, practice feedback, pet actions
 and garden milestones never mint points automatically.
 
-Homes start private, with consent scoped to one class. Class withdrawal/deletion
-disables sharing in its own transaction; visits still recheck class access, current
-enrollment and consent. Visitor projections contain cosmetics without balances,
-teacher notes, email or learning evidence. Teacher recognition views expose only
+Each class neighborhood derives its homes directly from active class enrollments
+and account-wide pet profiles. No separate sharing choice or enrollment-time pet
+write is needed. A home appears in every enrolled class after its pet profile is
+initialized; withdrawal removes visibility and re-enrollment restores it. Class
+visits recheck the visitor's class access, the owner's current enrollment and class
+deletion in the same serializable snapshot. Retired `PetHomeShare` rows remain as
+historical data and are never read or written by application code. Legacy sharing
+commands remain parsable for saved desktop intents but new changes are rejected;
+legacy receipt shapes remain readable, and the owner response's `shares` field is
+empty for compatibility. Visitor projections contain the owner's account display
+name and cosmetics without balances, teacher notes, email or learning evidence.
+Teacher recognition views expose only
 their class's awards and descriptive coverage, never student-wide wealth/spending.
 A class garden counts distinct nonvoided award batches and changes shared scenery.
-Neighborhood reads fetch consented, currently enrolled homes in one bulk projection
-and group distinct uncorrected batches in PostgreSQL; they do not load private
+Neighborhood reads fetch every currently enrolled home and owner name in one bulk
+projection and group distinct uncorrected batches in PostgreSQL; they do not load private
 recognition prose or issue per-student home queries. These reads share the same
 serializable snapshot as the caller's class authorization.
 Recognition coverage describes recorded teacher choices within its displayed period;
@@ -806,8 +814,8 @@ account fences, cancellation, confirmed appearance and persisted unresolved onli
 intents. Its API client validates transport JSON; the renderer uses named,
 sender-checked preload methods. React hooks consume authoritative state rather than
 calculating balances. The Pet World page provides manual teacher awards, history,
-shop, inventory, home decoration and opted-in class visits. Active views and the
-visible companion refresh at the owning interval and on focus/resume. Mutations
+shop, inventory, home decoration and class visits. Active views and the visible
+companion refresh at the owning interval and on focus/resume. Mutations
 require online confirmation; retries reuse the saved intent across restarts.
 Owner history and teacher recognition append older pages while retaining the
 newest rows. Unchanged background refreshes preserve loaded teacher pages and

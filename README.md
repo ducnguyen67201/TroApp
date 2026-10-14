@@ -523,7 +523,11 @@ home. Teachers select an owned class and enrolled students, enter a positive who
 point amount and grant it manually. There is no teacher issuance budget. Students
 spend their own points in the shop, place owned decorations and equip passive pet
 backgrounds. The existing pet gallery controls whether the floating companion is
-shown on this device. Homes stay private until their owner shares with a class.
+shown on this device. Every enrolled student's pet home appears automatically in
+all their class neighborhoods once their pet profile is set up. Removing a student
+from a class removes their home there; re-enrollment restores visibility. Classmates
+can view each pet's owner name, pet and decorations, while points and teacher notes
+stay private.
 Class garden milestones count recognized moments; learning evidence remains in
 Insights and practice review. Interrupted actions appear as pending requests;
 retry the original action to reconcile its result. Awards and purchases require

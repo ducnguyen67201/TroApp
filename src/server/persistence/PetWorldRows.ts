@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { AccountRoleSchema } from '#contracts/AccountRole.js';
 import {
-  PetHomeShareSchema,
   PetInventoryItemSchema,
   PetPointBalanceSchema,
   PetRecognitionSchema,
@@ -11,7 +10,6 @@ import {
   PetWorldProfileSchema,
 } from '#contracts/PetWorld.js';
 import type {
-  PetHomeShare,
   PetInventoryItem,
   PetWallet,
   PetWalletEntry,
@@ -21,7 +19,6 @@ import type {
 } from '../generated/prisma/client.js';
 import { PetWorldError } from '../features/petWorld/domain/PetWorldError.js';
 import type {
-  PetHomeShareState,
   PetInventoryState,
   PetRecognitionState,
   PetWalletEntryState,
@@ -108,17 +105,6 @@ export function readPetInventoryRow(row: PetInventoryItem): PetInventoryState {
       itemId: row.itemId,
       purchaseId: row.purchaseId,
       acquiredAt: row.acquiredAt.toISOString(),
-    }),
-    studentId: row.studentId,
-  };
-}
-
-export function readPetHomeShareRow(row: PetHomeShare): PetHomeShareState {
-  return {
-    ...PetHomeShareSchema.parse({
-      classId: row.classId,
-      enabled: row.enabled,
-      revision: readPetRevision(row.revision),
     }),
     studentId: row.studentId,
   };

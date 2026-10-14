@@ -5,7 +5,7 @@ import type { PetWorldTransaction } from '../../../../src/server/features/petWor
 import { PetWorldError } from '../../../../src/server/features/petWorld/domain/PetWorldError.js';
 import type {
   PetClassAccess,
-  PetHomeShareState,
+  PetClassWorld,
   PetInventoryState,
   PetPurchaseState,
   PetRecognitionState,
@@ -25,6 +25,10 @@ export const PetWorldFixtureIds = {
 
 /** A rollback-capable application fake; PostgreSQL tests own actual concurrency proof. */
 export class MemoryPetWorldStore implements PetWorldStore, PetWorldTransaction {
+  readonly accountNames = new Map([
+    ['student', 'An'],
+    ['partner', 'Bao'],
+  ]);
   readonly roles = new Map<string, AccountRole>([
     ['teacher', AccountRole.TEACHER],
     ['other-teacher', AccountRole.TEACHER],
@@ -51,7 +55,6 @@ export class MemoryPetWorldStore implements PetWorldStore, PetWorldTransaction {
   worlds = new Map<string, PetWorldState>();
   inventory = new Map<string, PetInventoryState>();
   purchases = new Map<string, PetPurchaseState>();
-  shares = new Map<string, PetHomeShareState>();
   receipts = new Map<string, PetWorldReceipt>();
   failOnReceipt = false;
 
@@ -63,7 +66,6 @@ export class MemoryPetWorldStore implements PetWorldStore, PetWorldTransaction {
       worlds: this.worlds,
       inventory: this.inventory,
       purchases: this.purchases,
-      shares: this.shares,
       receipts: this.receipts,
     });
     try {
@@ -75,7 +77,6 @@ export class MemoryPetWorldStore implements PetWorldStore, PetWorldTransaction {
       this.worlds = snapshot.worlds;
       this.inventory = snapshot.inventory;
       this.purchases = snapshot.purchases;
-      this.shares = snapshot.shares;
       this.receipts = snapshot.receipts;
       throw error;
     }
@@ -91,7 +92,11 @@ export class MemoryPetWorldStore implements PetWorldStore, PetWorldTransaction {
     return Promise.resolve(
       [...this.roles]
         .filter(([id]) => this.enrollments.has(`${classId}:${id}`))
-        .map(([studentId, role]) => ({ studentId, role, displayName: studentId })),
+        .map(([studentId, role]) => ({
+          studentId,
+          role,
+          displayName: this.accountNames.get(studentId) ?? studentId,
+        })),
     );
   }
   isEnrolled(classId: string, studentId: string): Promise<boolean> {
@@ -229,14 +234,23 @@ export class MemoryPetWorldStore implements PetWorldStore, PetWorldTransaction {
     return Promise.resolve(this.worlds.get(studentId) ?? null);
   }
 
-  listSharedWorlds(classId: string): Promise<PetWorldState[]> {
+  readClassWorld(classId: string, studentId: string): Promise<PetClassWorld | null> {
+    const world = this.worlds.get(studentId);
+    return Promise.resolve(
+      world && this.enrollments.has(`${classId}:${studentId}`)
+        ? { ...world, ownerName: this.accountNames.get(studentId) ?? studentId }
+        : null,
+    );
+  }
+
+  listClassWorlds(classId: string): Promise<PetClassWorld[]> {
     return Promise.resolve(
       [...this.worlds.values()]
-        .filter(
-          (world) =>
-            this.enrollments.has(`${classId}:${world.studentId}`) &&
-            this.shares.get(`${world.studentId}:${classId}`)?.enabled,
-        )
+        .filter((world) => this.enrollments.has(`${classId}:${world.studentId}`))
+        .map((world) => ({
+          ...world,
+          ownerName: this.accountNames.get(world.studentId) ?? world.studentId,
+        }))
         .sort((first, second) => first.studentId.localeCompare(second.studentId)),
     );
   }
@@ -270,25 +284,6 @@ export class MemoryPetWorldStore implements PetWorldStore, PetWorldTransaction {
     }
     this.purchases.set(purchase.id, purchase);
     this.inventory.set(`${inventory.studentId}:${inventory.itemId}`, inventory);
-    return Promise.resolve();
-  }
-
-  readHomeShare(studentId: string, classId: string): Promise<PetHomeShareState | null> {
-    return Promise.resolve(this.shares.get(`${studentId}:${classId}`) ?? null);
-  }
-  listHomeShares(studentId: string): Promise<PetHomeShareState[]> {
-    return Promise.resolve(
-      [...this.shares.values()].filter((share) => share.studentId === studentId),
-    );
-  }
-
-  saveHomeShare(share: PetHomeShareState, expectedRevision: number): Promise<void> {
-    if (
-      (this.shares.get(`${share.studentId}:${share.classId}`)?.revision ?? 0) !== expectedRevision
-    ) {
-      throw new PetWorldError(PetWorldFailure.STALE);
-    }
-    this.shares.set(`${share.studentId}:${share.classId}`, share);
     return Promise.resolve();
   }
 }
