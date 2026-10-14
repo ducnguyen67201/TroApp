@@ -4,7 +4,7 @@ import { access, open, readdir, readFile, realpath, rm, stat } from 'node:fs/pro
 import { basename, isAbsolute, join, relative, sep } from 'node:path';
 import { promisify } from 'node:util';
 import type { Configuration } from 'electron-builder';
-import { readMacSigningEnv, type MacSigningEnv } from './Env.js';
+import { MacNotarizationMethod, readMacSigningEnv, type MacSigningEnv } from './Env.js';
 
 export type MacReleaseSettings = Extract<MacSigningEnv, { enabled: true }>;
 
@@ -31,13 +31,20 @@ export const runMacCommand: MacCommand = async (executable, arguments_) => {
 };
 
 /** v26 options stay in memory; the builder owns the outer bundle and app notarization. */
-export function createMacSigningConfig(settings: MacSigningEnv): Configuration {
+export function createMacSigningConfig(
+  settings: MacSigningEnv,
+  absoluteEntitlementsPath: string,
+): Configuration {
   if (!settings.enabled) {
     return {};
+  }
+  if (!isAbsolute(absoluteEntitlementsPath)) {
+    throw new Error('macOS signing requires an absolute staged entitlements path.');
   }
   return {
     forceCodeSigning: true,
     mac: {
+      type: 'distribution',
       identity: settings.identity,
       hardenedRuntime: true,
       notarize: true,
@@ -47,9 +54,10 @@ export function createMacSigningConfig(settings: MacSigningEnv): Configuration {
         { target: 'zip', arch: [settings.architecture] },
       ],
       artifactName: 'Tro-${version}-macos-${arch}.${ext}',
-      entitlements: 'DesktopEntitlements.plist',
-      entitlementsInherit: 'DesktopEntitlements.plist',
+      entitlements: absoluteEntitlementsPath,
+      entitlementsInherit: absoluteEntitlementsPath,
     },
+    dmg: { sign: true },
   };
 }
 
@@ -58,7 +66,9 @@ export async function checkMacReleaseSettings(
   settings: MacReleaseSettings,
   run: MacCommand = runMacCommand,
 ): Promise<void> {
-  await access(settings.apiKey);
+  if (settings.notarizationMethod === MacNotarizationMethod.API_KEY) {
+    await access(settings.apiKey);
+  }
   await access(settings.keychain);
   const identities = await run('/usr/bin/security', [
     'find-identity',

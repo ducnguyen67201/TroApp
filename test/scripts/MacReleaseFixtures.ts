@@ -3,17 +3,29 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { CuaCompanionBuild } from '../../src/contracts/CuaCompanionBuild.js';
 import type { MacCommand, MacReleaseSettings } from '../../scripts/MacSigning.js';
+import { MacNotarizationMethod } from '../../scripts/Env.js';
 
-export const macSettings: MacReleaseSettings = {
+export const macSettings = {
   enabled: true,
   architecture: 'arm64',
   identity: 'A'.repeat(40),
   teamId: 'TESTTEAM12',
   keychain: '/temporary/signing.keychain-db',
+  notarizationMethod: MacNotarizationMethod.API_KEY,
   apiKey: '/temporary/AuthKey.p8',
   apiKeyId: 'KEY1234567',
   apiIssuer: 'c74bf495-c6ee-4560-a2ef-c9a81218af12',
-};
+} satisfies MacReleaseSettings;
+
+export const macProfileSettings = {
+  enabled: true,
+  architecture: 'arm64',
+  identity: macSettings.identity,
+  teamId: macSettings.teamId,
+  keychain: macSettings.keychain,
+  notarizationMethod: MacNotarizationMethod.KEYCHAIN_PROFILE,
+  keychainProfile: 'tro-ci-notary',
+} satisfies MacReleaseSettings;
 
 export const macSignature =
   'Authority=Developer ID Application: Example (TESTTEAM12)\nTeamIdentifier=TESTTEAM12\nTimestamp=Oct 13, 2026\nCodeDirectory v=20500 flags=0x10000(runtime)\n';

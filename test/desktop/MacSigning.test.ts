@@ -19,6 +19,7 @@ import {
 import {
   createMacFixture,
   macCommand,
+  macProfileSettings,
   macSettings,
   macSignature,
 } from '../scripts/MacReleaseFixtures.js';
@@ -34,6 +35,15 @@ const environment = {
   MAIN_VITE_API_BASE_URL: 'https://api.example.test',
   MAIN_VITE_APP_ENV: 'prod',
 } satisfies NodeJS.ProcessEnv;
+const profileEnvironment = {
+  ...environment,
+  APPLE_API_KEY: undefined,
+  APPLE_API_KEY_ID: undefined,
+  APPLE_API_ISSUER: undefined,
+  APPLE_KEYCHAIN: macProfileSettings.keychain,
+  APPLE_KEYCHAIN_PROFILE: macProfileSettings.keychainProfile,
+} satisfies NodeJS.ProcessEnv;
+const entitlementsPath = '/temporary/staged-app/DesktopEntitlements.plist';
 const temporary: string[] = [];
 
 async function createTemporary(): Promise<string> {
@@ -54,19 +64,22 @@ describe('Mac release configuration', () => {
     expect(readMacSigningEnv({ TRO_SIGN_MACOS: 'false' }, 'darwin', 'arm64')).toEqual({
       enabled: false,
     });
-    expect(createMacSigningConfig({ enabled: false })).toEqual({});
+    expect(createMacSigningConfig({ enabled: false }, entitlementsPath)).toEqual({});
     const settings = readMacSigningEnv(environment, 'darwin', 'arm64');
     expect(settings).toEqual(macSettings);
-    const config = createMacSigningConfig(settings);
+    const config = createMacSigningConfig(settings, entitlementsPath);
     expect(config).toMatchObject({
       forceCodeSigning: true,
       mac: {
+        type: 'distribution',
         identity: macSettings.identity,
         hardenedRuntime: true,
         notarize: true,
         strictVerify: true,
-        entitlements: 'DesktopEntitlements.plist',
+        entitlements: entitlementsPath,
+        entitlementsInherit: entitlementsPath,
       },
+      dmg: { sign: true },
     });
     expect(config.mac?.target).toEqual([
       { target: 'dmg', arch: ['arm64'] },
@@ -75,8 +88,54 @@ describe('Mac release configuration', () => {
     expect(config).not.toHaveProperty('publish');
     expect(JSON.stringify(config)).not.toContain(macSettings.apiKey);
     expect(
-      createMacSigningConfig(readMacSigningEnv(environment, 'darwin', 'x64')).mac?.target,
+      createMacSigningConfig(readMacSigningEnv(environment, 'darwin', 'x64'), entitlementsPath).mac
+        ?.target,
     ).toContainEqual({ target: 'dmg', arch: ['x64'] });
+  });
+
+  it('requires an absolute staged entitlement path before passing options to codesign', () => {
+    expect(() => createMacSigningConfig(macSettings, 'DesktopEntitlements.plist')).toThrow(
+      'absolute staged entitlements path',
+    );
+  });
+
+  it('accepts notarization credentials saved in the isolated signing keychain', () => {
+    const settings = readMacSigningEnv(profileEnvironment, 'darwin', 'arm64');
+    expect(settings).toEqual(macProfileSettings);
+    expect(settings).not.toHaveProperty('apiKey');
+    expect(settings).not.toHaveProperty('password');
+    expect(JSON.stringify(createMacSigningConfig(settings, entitlementsPath))).not.toContain(
+      macProfileSettings.keychainProfile,
+    );
+  });
+
+  it.each([
+    { APPLE_KEYCHAIN: '' },
+    { APPLE_KEYCHAIN: 'relative' },
+    { APPLE_KEYCHAIN: '/temporary/different.keychain-db' },
+    { APPLE_KEYCHAIN_PROFILE: '' },
+    { APPLE_KEYCHAIN_PROFILE: '  ' },
+    { APPLE_API_KEY: macSettings.apiKey },
+    { APPLE_API_KEY_ID: macSettings.apiKeyId },
+    { APPLE_API_ISSUER: macSettings.apiIssuer },
+    { APPLE_ID: 'private@example.test' },
+    { APPLE_APP_SPECIFIC_PASSWORD: 'private-password' },
+    { APPLE_ID: ' ' },
+    { APPLE_APP_SPECIFIC_PASSWORD: ' ' },
+  ])('rejects incomplete or mixed keychain credentials: %j', (overrides) => {
+    expect(() =>
+      readMacSigningEnv({ ...profileEnvironment, ...overrides }, 'darwin', 'arm64'),
+    ).toThrow(/^macOS release configuration is invalid\.$/);
+  });
+
+  it('rejects a keychain selector mixed into API authentication', () => {
+    expect(() =>
+      readMacSigningEnv(
+        { ...environment, APPLE_KEYCHAIN: macSettings.keychain },
+        'darwin',
+        'arm64',
+      ),
+    ).toThrow(/^macOS release configuration is invalid\.$/);
   });
 
   it.each(Object.keys(environment).filter((name) => name !== 'TRO_SIGN_MACOS'))(
@@ -136,6 +195,26 @@ describe('Mac release configuration', () => {
       stderr: '',
     });
     await expect(checkMacReleaseSettings(settings, run)).rejects.toThrow('private key');
+  });
+
+  it('checks the keychain for profile authentication without requiring an API file', async () => {
+    const directory = await createTemporary();
+    const settings = { ...macProfileSettings, keychain: join(directory, 'keychain') };
+    await writeFile(settings.keychain, 'fixture');
+    const run = vi.fn<MacCommand>().mockResolvedValue({
+      stdout: `1) ${settings.identity} "Developer ID Application: Example (${settings.teamId})"`,
+      stderr: '',
+    });
+    await checkMacReleaseSettings(settings, run);
+    expect(run).toHaveBeenCalledWith('/usr/bin/security', [
+      'find-identity',
+      '-v',
+      '-p',
+      'codesigning',
+      settings.keychain,
+    ]);
+    await rm(settings.keychain);
+    await expect(checkMacReleaseSettings(settings, run)).rejects.toThrow();
   });
 });
 

@@ -53,7 +53,7 @@ jobs:
             app-directory: mac
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
-    environment: release-macos
+    environment: release
     env:
       MAIN_VITE_API_BASE_URL: ${{ vars.MAIN_VITE_API_BASE_URL }}
       MAIN_VITE_APP_ENV: prod
@@ -86,28 +86,40 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build and test pinned native companion without signing credentials
         run: pnpm build:cua
-      - name: Install temporary signing credentials
-        env:
-          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
-          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+      - name: Download Apple Developer ID intermediate certificate
         run: |
           set -euo pipefail
           umask 077
-          test -n "$MACOS_CERTIFICATE_P12_BASE64"
-          test -n "$MACOS_CERTIFICATE_PASSWORD"
-          test -n "$APPLE_NOTARY_KEY_P8_BASE64"
           credential_directory="$RUNNER_TEMP/tro-mac-signing"
           mkdir -p "$credential_directory"
-          printf '%s' "$MACOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$credential_directory/identity.p12"
-          printf '%s' "$APPLE_NOTARY_KEY_P8_BASE64" | base64 --decode > "$credential_directory/AuthKey.p8"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --retry 3 https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer --output "$credential_directory/DeveloperIDG2CA.cer"
+          printf 'f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a  %s\n' "$credential_directory/DeveloperIDG2CA.cer" | shasum -a 256 --check
+      - name: Install temporary signing credentials
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$CSC_LINK"
+          test -n "$CSC_KEY_PASSWORD"
+          test -n "$APPLE_ID"
+          test -n "$APPLE_APP_SPECIFIC_PASSWORD"
+          test -n "$APPLE_TEAM_ID"
+          credential_directory="$RUNNER_TEMP/tro-mac-signing"
+          mkdir -p "$credential_directory"
+          printf '%s' "$CSC_LINK" | base64 --decode > "$credential_directory/identity.p12"
           keychain_password="$(openssl rand -hex 32)"
           echo "::add-mask::$keychain_password"
           signing_keychain="$credential_directory/release.keychain-db"
           security create-keychain -p "$keychain_password" "$signing_keychain"
           security set-keychain-settings -lut 7200 "$signing_keychain"
           security unlock-keychain -p "$keychain_password" "$signing_keychain"
-          security import "$credential_directory/identity.p12" -P "$MACOS_CERTIFICATE_PASSWORD" -t cert -f pkcs12 -k "$signing_keychain" -T /usr/bin/codesign -T /usr/bin/security
+          security import "$credential_directory/DeveloperIDG2CA.cer" -t cert -k "$signing_keychain"
+          security import "$credential_directory/identity.p12" -P "$CSC_KEY_PASSWORD" -t cert -f pkcs12 -k "$signing_keychain" -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$signing_keychain" >/dev/null
           # Preserve the runner's existing search list. Never replace a developer login keychain.
           python3 - "$signing_keychain" "$credential_directory/search-list.json" <<'PYTHON'
@@ -118,19 +130,19 @@ jobs:
           subprocess.run(['security', 'list-keychains', '-d', 'user', '-s', sys.argv[1], *previous], check=True)
           PYTHON
           rm "$credential_directory/identity.p12"
+          xcrun notarytool store-credentials tro-ci-notary --keychain "$signing_keychain" --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID"
       - name: Package, notarize and verify distribution files
         env:
           TRO_SIGN_MACOS: 'true'
           MACOS_SIGNING_IDENTITY_SHA1: ${{ vars.MACOS_SIGNING_IDENTITY_SHA1 }}
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
-          APPLE_API_KEY_ID: ${{ vars.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ vars.APPLE_API_ISSUER }}
           EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
           APP_DIRECTORY: ${{ matrix.app-directory }}
         run: |
           set -euo pipefail
           export CSC_KEYCHAIN="$RUNNER_TEMP/tro-mac-signing/release.keychain-db"
-          export APPLE_API_KEY="$RUNNER_TEMP/tro-mac-signing/AuthKey.p8"
+          export APPLE_KEYCHAIN="$CSC_KEYCHAIN"
+          export APPLE_KEYCHAIN_PROFILE=tro-ci-notary
           pnpm exec tsx scripts/MacSigning.ts --check-macos-release
           pnpm package:desktop
           pnpm exec tsx scripts/VerifyMacRelease.ts --directory release --arch "$EXPECTED_ARCHITECTURE"

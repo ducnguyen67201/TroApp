@@ -6,7 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
 import { CuaCompanionBuildSchema } from '../src/contracts/CuaCompanionBuild.js';
-import { readMacSigningEnv } from './Env.js';
+import { MacNotarizationMethod, readMacSigningEnv } from './Env.js';
 import {
   readMacFileDigest,
   readMacNativeFiles,
@@ -38,14 +38,12 @@ export async function notarizeMacDmg(
   settings: MacReleaseSettings,
   ports: NotaryPorts = { run: runMacCommand, now: Date.now, wait: delay },
 ): Promise<string> {
-  const auth = [
-    '--key',
-    settings.apiKey,
-    '--key-id',
-    settings.apiKeyId,
-    '--issuer',
-    settings.apiIssuer,
-  ];
+  /* Profile credentials remain in the temporary keychain; polling and rejection logs
+   * must use the same authentication method as the initial submission. */
+  const auth =
+    settings.notarizationMethod === MacNotarizationMethod.KEYCHAIN_PROFILE
+      ? ['--keychain-profile', settings.keychainProfile, '--keychain', settings.keychain]
+      : ['--key', settings.apiKey, '--key-id', settings.apiKeyId, '--issuer', settings.apiIssuer];
   const submitted = await ports.run('/usr/bin/xcrun', [
     'notarytool',
     'submit',

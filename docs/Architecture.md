@@ -917,8 +917,11 @@ workflows, outside the runtime application. The manual Mac workflow builds each
 architecture natively, signs extra Mach-O resources before sealing the outer app,
 requires Apple notarization/stapling, and verifies extracted ZIP and mounted DMG
 contents before artifact upload. The pre-sign companion metadata remains input
-provenance; the external release inventory records final signed hashes. Apple
-credentials stay in a temporary runner keychain/files and never become app config.
+provenance; the external release inventory records final signed hashes. The GitHub
+`release` environment supplies credentials only to the temporary-keychain setup
+step. Packaging and notarization use the stored notary profile, then cleanup
+restores the runner's keychain search list and deletes that keychain. Apple
+credentials never become app config.
 The first Mac workflow rejects update feeds because container stapling changes
 artifact hashes. Signing activation, physical Mac acceptance, public publication
 and installed-update acceptance remain separate release gates; checked-in tooling
