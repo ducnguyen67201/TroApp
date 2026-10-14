@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { expect, it } from 'vitest';
 import {
   createDevelopmentProcessGroup,
+  DevelopmentProcessMetadataError,
   parseDevelopmentProcesses,
   selectDevelopmentProcesses,
   type DevelopmentProcess,
@@ -69,6 +70,32 @@ it('fails closed for malformed process identities, start times and executable me
   ]) {
     expect(() => parseDevelopmentProcesses(fixture.output, fixture.executables)).toThrow();
   }
+});
+
+it.each([
+  { source: 'processes', output: '123 private-token', executables: '123 /usr/local/bin/node' },
+  { source: 'executables', output: '', executables: 'private-token' },
+])('reports safe $source diagnostics without retaining raw records', (fixture) => {
+  let failure: unknown;
+  try {
+    parseDevelopmentProcesses(fixture.output, fixture.executables);
+  } catch (error) {
+    failure = error;
+  }
+
+  expect(failure).toBeInstanceOf(DevelopmentProcessMetadataError);
+  if (!(failure instanceof DevelopmentProcessMetadataError)) {
+    throw new Error('Expected a process metadata diagnostic.');
+  }
+  expect(failure.diagnostic).toEqual({
+    source: fixture.source,
+    recordNumber: 1,
+    recordLength: fixture.source === 'processes' ? 17 : 13,
+    pid: fixture.source === 'processes' ? 123 : null,
+    hasStartTime: false,
+  });
+  expect(JSON.stringify(failure)).not.toContain('private-token');
+  expect(failure.message).toBe('Development process metadata is unavailable.');
 });
 
 it('ignores exited processes, zombies and kernel tasks without a process group', () => {

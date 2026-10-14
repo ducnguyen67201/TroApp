@@ -1079,6 +1079,8 @@ Signal handling is installed before asynchronous startup work. Process identity
 and workspace checks preserve the invoking shell, launcher ancestors and unrelated
 processes. Linux discovery reads executable identity from `/proc/<pid>/exe` because
 process names can contain a runtime thread name such as Node's `MainThread`.
+POSIX process snapshots use the `C` locale so start-time parsing and identity
+comparisons do not depend on the invoking terminal's date format.
 Exited or inaccessible processes are excluded. Windows discovery requires an
 explicit checkout path; relative orphan commands without that ownership evidence
 are left alone. PostgreSQL and renderer
@@ -1090,6 +1092,8 @@ startup throws. Its stage identifies workspace setup, previous-process cleanup,
 renderer credential preparation, desktop environment validation, renderer startup
 or native service startup. Reasons use known messages and allowlisted OS codes;
 raw exceptions, command arguments and environment values are excluded.
+Process-list parse failures include bounded `processMetadata` record-shape
+diagnostics without retaining or logging raw records.
 
 Safe `lesson.video.stage` diagnostics report lesson/revision/stage, state, timing
 and provider usage when available, plus screen/attempt identity, degradation reason
