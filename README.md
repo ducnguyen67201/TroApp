@@ -713,6 +713,11 @@ architecture, Developer ID/Team ID, secure timestamps, hardened runtime, expecte
 bundle ID, entitlements, companion provenance, app version, Gatekeeper acceptance,
 and staples. It rejects native minimum OS versions above the currently advertised
 macOS 13.0; raising that minimum requires a reviewed website/docs change.
+Signed Mac builds compile native dependencies from source. Before signing, the
+hook's rebuilt `build/Release/uiohook_napi.node` must match the release architecture
+and support macOS 13.0. The shipped hook prebuilds require 13.5 and are removed;
+the native loader selects the rebuilt binary. Load-command inspection uses
+`otool -m -l` so parenthesized Electron helper names remain literal file paths.
 `codesign --verify --deep --strict`, `xcrun stapler validate`, and
 `spctl --assess --type execute --verbose=4` are useful independent checks against
 the downloaded app. Signing uses inside-out native resource handling; `--deep` is
@@ -725,6 +730,9 @@ temporary extraction setup, archive verification or container notarization.
 If artifact selection fails,
 `mac.release.artifacts.rejected` reports expected-file presence, file counts and
 known builder-sidecar presence without logging arbitrary filenames or paths.
+The selector ignores the builder's exact `builder-debug.yml` and
+`builder-effective-config.yaml` diagnostic filenames; they are never uploaded.
+Other YAML files, including update metadata, still reject the candidate.
 `mac.release.failed` includes an allowlisted filesystem/argument error code and
 whether schema validation failed, while keeping the original error private.
 `mac.release.notary.submitted` records a submission ID before polling;
@@ -734,7 +742,13 @@ numeric exit code, termination signal, elapsed milliseconds and a fixed failure
 category. It never includes raw command arguments, paths, tool output or errors.
 For `stapler.validate`, distinguish `ticket-not-found`, `ticket-not-stapled`,
 `ticket-validation-failed` and `network-error`; `unknown` requires further
-diagnosis, not a guessed retry or a relaxed verification gate. A prior
+diagnosis, not a guessed retry or a relaxed verification gate. Ticket validation
+retries only exit 68 with a network-error marker, at most three attempts with
+5-second then 10-second delays. Missing-ticket messages, invalid/revoked ticket
+exit codes and terminated commands are not retried. `mac.release.command.retry` records the
+attempt, next attempt, limit and delay without raw tool output. A persistent
+network or TLS error still fails the release; other commands are not retried by
+this policy. A prior
 `notarization successful` message does not replace the separate ticket check.
 `mac.release.verified` is emitted only after the inventory is written. No inventory
 is uploaded if any preceding step fails.

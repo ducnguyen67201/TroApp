@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
@@ -289,6 +289,63 @@ describe('Mac distribution verification', () => {
     expect(() => selectMacArtifacts(artifactNames, '0.1.1', 'x64')).toThrow();
   });
 
+  it.each(['arm64', 'x64'] as const)(
+    'selects only the %s distributables from realistic builder output',
+    (architecture) => {
+      const dmg = `Tro-0.1.1-macos-${architecture}.dmg`;
+      const zip = `Tro-0.1.1-macos-${architecture}.zip`;
+      expect(
+        selectMacArtifacts(
+          [
+            dmg,
+            zip,
+            `${dmg}.blockmap`,
+            `${zip}.blockmap`,
+            'builder-debug.yml',
+            'builder-effective-config.yaml',
+          ],
+          '0.1.1',
+          architecture,
+        ),
+      ).toEqual({ dmg, zip });
+    },
+  );
+
+  it.each([
+    'latest-mac.yml',
+    'beta-mac.yml',
+    'unknown.yaml',
+    'Builder-debug.yml',
+    'builder-debug.yaml',
+    'builder-effective-config.yml',
+    'builder-effective-config.YAML',
+  ])('rejects %s even alongside known builder diagnostics', (metadata) => {
+    expect(() =>
+      selectMacArtifacts(
+        [...artifactNames, 'builder-debug.yml', 'builder-effective-config.yaml', metadata],
+        '0.1.1',
+        'arm64',
+      ),
+    ).toThrow('artifacts');
+  });
+
+  it('does not let builder diagnostics mask missing, stale or wrong-architecture archives', () => {
+    const diagnostics = ['builder-debug.yml', 'builder-effective-config.yaml'];
+    for (const names of [
+      diagnostics,
+      [...artifactNames.slice(0, 1), ...diagnostics],
+      [...artifactNames, ...diagnostics, 'old.zip'],
+    ]) {
+      expect(() => selectMacArtifacts(names, '0.1.1', 'arm64')).toThrow('artifacts');
+    }
+    expect(() => selectMacArtifacts([...artifactNames, ...diagnostics], '0.1.1', 'x64')).toThrow(
+      'artifacts',
+    );
+    expect(() => selectMacArtifacts([...artifactNames, ...diagnostics], '0.1.2', 'arm64')).toThrow(
+      'artifacts',
+    );
+  });
+
   it('verifies extracted app and mounted app, then hashes final stapled bytes', async () => {
     const directory = await createRelease();
     const run = vi.fn<MacCommand>(archiveCommand);
@@ -314,6 +371,45 @@ describe('Mac distribution verification', () => {
     );
     expect(run.mock.calls.some(([, args]) => args[0] === 'detach')).toBe(true);
   });
+
+  it.each(['Renderer', 'GPU', 'Plugin'])(
+    'checks parenthesized %s helper names as literal paths',
+    async (kind) => {
+      const directory = await createRelease();
+      const helperName = `Tro Helper (${kind})`;
+      const helperPath = join(
+        'Contents',
+        'Frameworks',
+        `${helperName}.app`,
+        'Contents',
+        'MacOS',
+        helperName,
+      );
+      const run = vi.fn<MacCommand>(async (executable, args) => {
+        const result = await archiveCommand(executable, args);
+        if (
+          executable.endsWith('ditto') ||
+          (executable.endsWith('hdiutil') && args[0] === 'attach')
+        ) {
+          const destination = join(z.string().parse(args.at(-1)), 'Tro.app', helperPath);
+          await mkdir(dirname(destination), { recursive: true });
+          await writeFile(destination, Buffer.from('cffaedfe00000000', 'hex'));
+        }
+        return result;
+      });
+      await verifyMacRelease(directory, macSettings, '0.1.1', run, () =>
+        Promise.resolve(submissionId),
+      );
+      const commands = run.mock.calls.filter(
+        ([executable, args]) =>
+          executable === '/usr/bin/otool' && args.at(-1)?.endsWith(helperPath),
+      );
+      expect(commands).toHaveLength(2);
+      for (const [, args] of commands) {
+        expect(args).toEqual(['-m', '-l', expect.stringContaining(helperPath)]);
+      }
+    },
+  );
 
   it('detaches and leaves no success inventory after inconsistent archives', async () => {
     const directory = await createRelease();

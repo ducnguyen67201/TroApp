@@ -9,6 +9,7 @@ import { CuaCompanionBuildSchema } from '../src/contracts/CuaCompanionBuild.js';
 import { MacNotarizationMethod, readMacSigningEnv } from './Env.js';
 import {
   readMacFileDigest,
+  readMacMinimumVersions,
   readMacNativeFiles,
   runMacCommand,
   verifyMacApp,
@@ -96,7 +97,7 @@ export async function notarizeMacDmg(
   throw new Error('macOS notarization deadline exceeded. Recheck the recorded submission ID.');
 }
 
-/** Require one exact candidate per format; never promote stale files from another build. */
+/** Require exact distribution files; known builder diagnostics are never release candidates. */
 export function selectMacArtifacts(
   names: readonly string[],
   version: string,
@@ -106,7 +107,12 @@ export function selectMacArtifacts(
   const stem = `Tro-${version}-macos-${architecture}`;
   const dmg = `${stem}.dmg`;
   const zip = `${stem}.zip`;
-  const candidates = names.filter((name) => /\.(dmg|zip|yml|yaml)$/i.test(name));
+  const candidates = names.filter(
+    (name) =>
+      /\.(dmg|zip|yml|yaml)$/i.test(name) &&
+      name !== 'builder-debug.yml' &&
+      name !== 'builder-effective-config.yaml',
+  );
   if (candidates.length !== 2 || !candidates.includes(dmg) || !candidates.includes(zip)) {
     console.error(
       JSON.stringify({
@@ -154,25 +160,7 @@ async function inventoryMacApp(
   const appRoot = await realpath(app);
   const files = [];
   for (const path of await readMacNativeFiles(app)) {
-    const commands = await run('/usr/bin/otool', ['-l', path]);
-    const minimumVersions = [
-      ...commands.stdout.matchAll(
-        /(?:cmd LC_BUILD_VERSION[\s\S]*?\bminos|cmd LC_VERSION_MIN_MACOSX[\s\S]*?\bversion)\s+(\d+\.\d+(?:\.\d+)?)/g,
-      ),
-    ].map((match) => match[1]);
-    if (
-      minimumVersions.length === 0 ||
-      minimumVersions.some(
-        (value) =>
-          !value ||
-          Number(value.split('.')[0]) > 13 ||
-          (Number(value.split('.')[0]) === 13 && Number(value.split('.')[1]) > 0),
-      )
-    ) {
-      throw new Error(
-        'macOS native minimum version exceeds the advertised macOS 13.0 requirement or is unknown.',
-      );
-    }
+    const minimumVersions = await readMacMinimumVersions(path, run);
     files.push({
       path: relative(appRoot, path),
       ...(await readMacFileDigest(path)),

@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { access, open, readdir, readFile, realpath, rm, stat } from 'node:fs/promises';
 import { basename, isAbsolute, join, relative, sep } from 'node:path';
+import { setTimeout } from 'node:timers/promises';
 import { promisify } from 'node:util';
 import type { Configuration } from 'electron-builder';
 import { z } from 'zod';
@@ -94,10 +95,10 @@ function readMacCommandFailureReason(
       .map((value) => value.slice(0, 16_384))
       .join('\n');
     for (const [phrase, reason] of [
-      ['NSURLErrorDomain', MacCommandFailureReason.NETWORK_ERROR],
       ['Record not found', MacCommandFailureReason.TICKET_NOT_FOUND],
-      ['Could not validate ticket', MacCommandFailureReason.TICKET_VALIDATION_FAILED],
       ['does not have a ticket stapled', MacCommandFailureReason.TICKET_NOT_STAPLED],
+      ['NSURLErrorDomain', MacCommandFailureReason.NETWORK_ERROR],
+      ['Could not validate ticket', MacCommandFailureReason.TICKET_VALIDATION_FAILED],
     ] as const) {
       if (output.includes(phrase)) {
         return reason;
@@ -105,6 +106,29 @@ function readMacCommandFailureReason(
     }
   }
   return MacCommandFailureReason.UNKNOWN;
+}
+
+/** Error 68 also covers missing tickets; require the network marker and no rejection. */
+function canRetryMacTicketValidation(
+  executable: string,
+  arguments_: readonly string[],
+  error: unknown,
+): boolean {
+  if (readMacCommandOperation(basename(executable), arguments_) !== 'stapler.validate') {
+    return false;
+  }
+  const parsedFailure = CommandFailureSchema.safeParse(error);
+  if (!parsedFailure.success) {
+    return false;
+  }
+  const failure = parsedFailure.data;
+  return (
+    failure.code === 68 &&
+    failure.killed !== true &&
+    (failure.signal === undefined || failure.signal === null) &&
+    readMacCommandFailureReason('stapler.validate', failure) ===
+      MacCommandFailureReason.NETWORK_ERROR
+  );
 }
 
 /** Discard the raw cause deliberately: Node's command error can contain credentials. */
@@ -153,21 +177,42 @@ function reportMacCommandFailure(
   return new Error(`macOS release command failed: ${tool}.`);
 }
 
-/** Bound execution and report safe failure categories without credential-bearing errors. */
+/** Retry only ticket-validation network failures; every release still requires exit zero. */
 export const runMacCommand: MacCommand = async (executable, arguments_) => {
-  const startedAt = performance.now();
-  try {
-    return await executeFile(executable, [...arguments_], {
-      timeout: 120_000,
-      maxBuffer: 4 * 1024 * 1024,
-    });
-  } catch (error) {
-    throw reportMacCommandFailure(
-      executable,
-      arguments_,
-      error,
-      Math.round(performance.now() - startedAt),
-    );
+  const retryDelaysMs = [5_000, 10_000] as const;
+  for (let attempt = 1; ; attempt += 1) {
+    const startedAt = performance.now();
+    try {
+      return await executeFile(executable, [...arguments_], {
+        timeout: 120_000,
+        maxBuffer: 4 * 1024 * 1024,
+      });
+    } catch (error) {
+      const delayMs = retryDelaysMs[attempt - 1];
+      if (delayMs !== undefined && canRetryMacTicketValidation(executable, arguments_, error)) {
+        console.warn(
+          JSON.stringify({
+            event: 'mac.release.command.retry',
+            tool: 'xcrun',
+            operation: 'stapler.validate',
+            exitCode: 68,
+            reason: MacCommandFailureReason.NETWORK_ERROR,
+            attempt,
+            nextAttempt: attempt + 1,
+            maxAttempts: retryDelaysMs.length + 1,
+            delayMs,
+          }),
+        );
+        await setTimeout(delayMs);
+        continue;
+      }
+      throw reportMacCommandFailure(
+        executable,
+        arguments_,
+        error,
+        Math.round(performance.now() - startedAt),
+      );
+    }
   }
 };
 
@@ -184,6 +229,7 @@ export function createMacSigningConfig(
   }
   return {
     forceCodeSigning: true,
+    buildDependenciesFromSource: true,
     mac: {
       type: 'distribution',
       identity: settings.identity,
@@ -312,6 +358,34 @@ export async function verifyMacSignature(
   }
 }
 
+/** Read literal Mach-O paths and enforce the advertised macOS 13.0 deployment target. */
+export async function readMacMinimumVersions(
+  path: string,
+  run: MacCommand = runMacCommand,
+): Promise<readonly string[]> {
+  // Parentheses in Electron helper names must not be interpreted as archive-member syntax.
+  const commands = await run('/usr/bin/otool', ['-m', '-l', path]);
+  const minimumVersions = [
+    ...commands.stdout.matchAll(
+      /(?:cmd LC_BUILD_VERSION[\s\S]*?\bminos|cmd LC_VERSION_MIN_MACOSX[\s\S]*?\bversion)\s+(\d+\.\d+(?:\.\d+)?)/g,
+    ),
+  ].map((match) => match[1] ?? '');
+  if (
+    minimumVersions.length === 0 ||
+    minimumVersions.some(
+      (value) =>
+        !value ||
+        Number(value.split('.')[0]) > 13 ||
+        (Number(value.split('.')[0]) === 13 && Number(value.split('.')[1]) > 0),
+    )
+  ) {
+    throw new Error(
+      'macOS native minimum version exceeds the advertised macOS 13.0 requirement or is unknown.',
+    );
+  }
+  return minimumVersions;
+}
+
 /** Sign extra resources before electron-builder seals the bundle. */
 export async function signMacResources(
   appPath: string,
@@ -320,21 +394,14 @@ export async function signMacResources(
 ): Promise<void> {
   const resources = join(appPath, 'Contents', 'Resources');
   await readMacNativeFiles(resources);
-  const prebuilds = join(
-    resources,
-    'app.asar.unpacked',
-    'node_modules',
-    'uiohook-napi',
-    'prebuilds',
-  );
-  // Installed Mac packages need only the matching hook; remove unused cross-platform binaries.
-  const expectedPrebuild = `darwin-${settings.architecture}`;
-  await access(join(prebuilds, expectedPrebuild, 'uiohook-napi.node'));
-  for (const name of await readdir(prebuilds)) {
-    if (name !== expectedPrebuild) {
-      await rm(join(prebuilds, name), { recursive: true, force: true });
-    }
-  }
+  const shortcutDirectory = join(resources, 'app.asar.unpacked', 'node_modules', 'uiohook-napi');
+  const rebuiltShortcut = join(shortcutDirectory, 'build', 'Release', 'uiohook_napi.node');
+  await access(rebuiltShortcut);
+  await verifyMacArchitecture(rebuiltShortcut, settings.architecture, run);
+  await readMacMinimumVersions(rebuiltShortcut, run);
+  /* node-gyp-build loads build/Release first. The dependency's shipped Mac prebuilds
+   * require 13.5, so keep only the verified source build for our 13.0 release. */
+  await rm(join(shortcutDirectory, 'prebuilds'), { recursive: true, force: true });
   for (const path of await readMacNativeFiles(resources)) {
     await verifyMacArchitecture(path, settings.architecture, run);
     await run('/usr/bin/codesign', [

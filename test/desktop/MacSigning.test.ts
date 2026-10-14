@@ -81,6 +81,24 @@ async function copyShortcutPrebuildsToApp(app: string): Promise<string> {
   return prebuilds;
 }
 
+/** Stand in for the source build without compiling or executing a native addon. */
+async function createRebuiltShortcutInApp(app: string): Promise<string> {
+  const nativePath = join(
+    app,
+    'Contents',
+    'Resources',
+    'app.asar.unpacked',
+    'node_modules',
+    'uiohook-napi',
+    'build',
+    'Release',
+    'uiohook_napi.node',
+  );
+  await mkdir(dirname(nativePath), { recursive: true });
+  await writeFile(nativePath, Buffer.from('cffaedfe00000000', 'hex'));
+  return nativePath;
+}
+
 afterEach(async () => {
   await Promise.all(
     temporary.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
@@ -98,6 +116,7 @@ describe('Mac release configuration', () => {
     expect(settings).toEqual(macSettings);
     const config = createMacSigningConfig(settings, entitlementsPath);
     expect(config).toMatchObject({
+      buildDependenciesFromSource: true,
       forceCodeSigning: true,
       mac: {
         type: 'distribution',
@@ -311,13 +330,13 @@ describe('Mac native signatures', () => {
   });
 
   it.each(['arm64', 'x64'] as const)(
-    'signs the shipped %s shortcut prebuild and removes irrelevant platforms',
+    'signs the rebuilt %s shortcut addon and removes all shipped prebuilds',
     async (architecture) => {
       const directory = await createTemporary();
       const app = join(directory, 'Tro.app');
       await createMacFixture(app);
       const prebuilds = await copyShortcutPrebuildsToApp(app);
-      const nativePath = join(prebuilds, `darwin-${architecture}`, 'uiohook-napi.node');
+      const nativePath = await createRebuiltShortcutInApp(app);
       const settings = { ...macSettings, architecture };
       const run = vi.fn<MacCommand>((executable, arguments_) =>
         executable.endsWith('/lipo')
@@ -334,7 +353,7 @@ describe('Mac native signatures', () => {
       ).toBe(true);
       expect(signCalls.some(([, args]) => args.at(-1) === nativePath)).toBe(true);
       expect(isMachO(await readFile(nativePath))).toBe(true);
-      expect(await readdir(prebuilds)).toEqual([`darwin-${architecture}`]);
+      await expect(readdir(prebuilds)).rejects.toMatchObject({ code: 'ENOENT' });
       await verifyMacApp(app, settings, run);
       expect(run.mock.calls.some(([, args]) => args.includes('stapler'))).toBe(true);
       expect(run.mock.calls.some(([, args]) => args.includes('--assess'))).toBe(true);
@@ -346,16 +365,59 @@ describe('Mac native signatures', () => {
     },
   );
 
-  it('rejects a missing matching shortcut prebuild before signing or removing other platforms', async () => {
+  it('requires the rebuilt shortcut addon even when matching shipped prebuilds exist', async () => {
     const app = join(await createTemporary(), 'Tro.app');
     await createMacFixture(app);
     const prebuilds = await copyShortcutPrebuildsToApp(app);
-    await rm(join(prebuilds, 'darwin-arm64'), { recursive: true });
     const remainingPlatforms = await readdir(prebuilds);
+    expect(remainingPlatforms).toContain('darwin-arm64');
+    expect(remainingPlatforms).toContain('darwin-x64');
     const run = vi.fn<MacCommand>(macCommand);
     await expect(signMacResources(app, macSettings, run)).rejects.toThrow();
     expect(run).not.toHaveBeenCalled();
     expect(await readdir(prebuilds)).toEqual(remainingPlatforms);
+  });
+
+  it.each([
+    {
+      name: 'wrong architecture',
+      architecture: 'x86_64',
+      loadCommands: 'cmd LC_BUILD_VERSION\nminos 13.0',
+      error: 'architecture',
+    },
+    {
+      name: 'macOS 13.5 minimum',
+      architecture: 'arm64',
+      loadCommands: 'cmd LC_BUILD_VERSION\nminos 13.5',
+      error: 'minimum',
+    },
+    {
+      name: 'unknown macOS minimum',
+      architecture: 'arm64',
+      loadCommands: 'cmd LC_UUID',
+      error: 'minimum',
+    },
+  ])('rejects a rebuilt addon with $name before cleanup or signing', async (fixture) => {
+    const app = join(await createTemporary(), 'Tro.app');
+    await createMacFixture(app);
+    const prebuilds = await copyShortcutPrebuildsToApp(app);
+    const remainingPlatforms = await readdir(prebuilds);
+    const nativePath = await createRebuiltShortcutInApp(app);
+    const run = vi.fn<MacCommand>((executable, arguments_) => {
+      if (arguments_.at(-1) === nativePath) {
+        if (executable.endsWith('/lipo')) {
+          return Promise.resolve({ stdout: fixture.architecture, stderr: '' });
+        }
+        if (executable.endsWith('/otool')) {
+          return Promise.resolve({ stdout: fixture.loadCommands, stderr: '' });
+        }
+      }
+      return macCommand(executable, arguments_);
+    });
+    await expect(signMacResources(app, macSettings, run)).rejects.toThrow(fixture.error);
+    expect(run.mock.calls.some(([executable]) => executable.endsWith('/codesign'))).toBe(false);
+    expect(await readdir(prebuilds)).toEqual(remainingPlatforms);
+    expect(isMachO(await readFile(nativePath))).toBe(true);
   });
 
   it('blocks a missing staple and unapproved entitlement', async () => {
