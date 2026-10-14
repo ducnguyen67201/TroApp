@@ -78,6 +78,15 @@ jobs:
         run: pnpm exec tsx scripts/WindowsSigning.ts --check-windows-release
       - name: Test Windows verifier
         run: ./scripts/VerifyWindowsRelease.ps1 -Mode Test
+      - name: Build Windows companion
+        run: |
+          $installerDirectory = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer'
+          $installation = & (Join-Path $installerDirectory 'vswhere.exe') -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if ([string]::IsNullOrWhiteSpace($installation)) { throw 'MSVC build tools are missing.' }
+          $installer = Start-Process -FilePath (Join-Path $installerDirectory 'setup.exe') -ArgumentList @('modify', '--installPath', ('"' + $installation + '"'), '--add', 'Microsoft.VisualStudio.Component.VC.Runtimes.x86.x64.Spectre', '--quiet', '--norestart') -WindowStyle Hidden -Wait -PassThru
+          if ($installer.ExitCode -notin @(0, 3010)) { throw 'Could not install the required MSVC libraries.' }
+          rustup toolchain install 1.97.1 --profile minimal
+          pnpm build:cua
       - name: Azure OIDC login
         uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:

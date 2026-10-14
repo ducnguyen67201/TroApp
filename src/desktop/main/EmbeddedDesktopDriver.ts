@@ -12,7 +12,7 @@ import type { DesktopDriverPort } from './DesktopDriverPort.js';
 
 const driverExitCheckIntervalMs = 500;
 
-/** Main directly owns the embedded macOS daemon and its private MCP endpoint.
+/** Main directly owns the embedded desktop daemon and its private MCP endpoint.
  * No LaunchServices launch or connection to an independent driver's daemon. */
 export class EmbeddedDesktopDriver implements DesktopDriverPort {
   private host: DesktopDriverHost | null = null;
@@ -120,9 +120,6 @@ export class EmbeddedDesktopDriver implements DesktopDriverPort {
 
   private async startDriver(generation: number): Promise<DesktopDriverConnection> {
     const installation = await chooseCuaDriverCommand();
-    if (process.platform !== 'darwin') {
-      return { command: installation.command, args: ['mcp'], env: {} };
-    }
     if ((await new DesktopPermissions().readStatus()).kind !== DesktopPermissionState.READY) {
       throw new Error('Tro desktop permissions are missing.');
     }
@@ -130,7 +127,10 @@ export class EmbeddedDesktopDriver implements DesktopDriverPort {
     if (generation !== this.generation) {
       throw new Error('Desktop driver startup was canceled.');
     }
-    const bundleId = selectDesktopHostBundleId(app.isPackaged, process.execPath);
+    const bundleId =
+      process.platform === 'darwin'
+        ? selectDesktopHostBundleId(app.isPackaged, process.execPath)
+        : 'app.tro.desktop';
     const host = this.host ?? sdk.createHost(installation.command, bundleId);
     this.host = host;
     const connection = await host.start();

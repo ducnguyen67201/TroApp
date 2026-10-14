@@ -26,7 +26,7 @@ not requirements or evidence that a capability exists.
 Tro is one pnpm root and a modular monolith. Application code is strict TypeScript.
 The desktop uses Electron and React; the API uses Fastify and Prisma/PostgreSQL.
 The bundled Cua dependency uses native Rust and platform adapters. It owns screen
-capture, desktop tools, input observation and the macOS compositor. Its native
+capture, desktop tools, input observation and native macOS/Windows compositors. Its native
 presentation fence cannot be replaced by asynchronous TypeScript messages.
 
 Main records bounded unexpected child-process exit diagnostics without child names,
@@ -342,7 +342,7 @@ Classroom View as, and the renderer discards replies from stale account generati
 
 Typed instructions and completed voice transcripts enter `AgentChatController`.
 Main checks account, permissions and exclusivity, obtains a scoped model credential,
-and sends one task to the utility worker. With the macOS companion, the local
+and sends one task to the utility worker. With the native companion, the local
 following worker stays connected while the signed-in window is open. The fallback
 worker starts on demand and retains a bounded warm lifetime after a task. Every
 settled follow-up starts a fresh task; an active teaching lesson retains its own goal.
@@ -611,7 +611,8 @@ Current Presented jobs may animate without completing their receipt again. The
 lock order is HUD → unique guidance fences in pointer order → accessibility text;
 the callback does not await or acquire the render-controller lock. Coalesced or
 rejected images are released. The original one-second message deadline remains.
-Presented means CALayer accepted the current frame, not physical display scan-out.
+Presented means CALayer or the Win32 layered window accepted the current frame,
+not physical display scan-out.
 A message receipt alone does not satisfy a spatial teaching presentation.
 
 Settled HUD messages and stationary following cursors do not continuously publish
@@ -626,6 +627,32 @@ Common admission, explicit refresh commands and the installation fence keep HUD
 messages and receipts under the same owner. Native build provenance and the required
 app/driver pairing are owned by
 [CuaCompanionBuild.ts](../src/contracts/CuaCompanionBuild.ts).
+
+### Maintaining native driver changes
+
+Tro maintains its native Cua customizations in
+[CursorCompanion.patch](../driver-patches/CursorCompanion.patch), applied to the
+pinned public upstream source during the build. The patch is the maintained
+source for these customizations; temporary upstream checkouts and cached
+executables are build artifacts.
+
+Changes to Tro's TypeScript/React behavior do not require a native patch update
+unless they change the native tool contract or behavior. Changes to cursor
+rendering, drawing playback, native HUD presentation or OS input observation must
+update the patch in the same change. Edit and test the Rust files in an upstream
+checkout at the pinned commit, then regenerate the complete patch against that
+commit, including all existing Tro customizations and new files. Do not replace
+it with a diff against an already patched checkout.
+
+Keep the patched Rust workspace version and lockfile aligned with the required
+version in `CuaCompanionBuild.ts` when changing the native build. An upstream
+upgrade must also align the source commit, fetch tag in
+[BuildCuaCompanion.ts](../scripts/BuildCuaCompanion.ts), and patch base; resolve
+conflicts while preserving Tro's contracts. Review both platform adapters whenever
+shared native contracts change. Rebuild and verify the affected platforms before
+shipping, then restart Tro to load the new executable. Packaging verifies source,
+patch and executable provenance and rejects a stale cached build. README owns
+the build, restart and validation commands.
 
 A diagnosed gateway HTTP 502 with `provider_network_failed`, SDK connection or
 timeout errors, and validated temporary provider 500/502/503/504 responses pause
@@ -820,13 +847,12 @@ Manual text, supported images, PDF and sb3 uploads remain available. Capture pro
 time, dimensions and a digest, not proof of authorship or execution. Preload validates narrow
 capture commands/replies; main rejects changed or expired captured evidence.
 
-While idle, the macOS native HUD shows a compact vector Command symbol and K beside
+While idle, the native HUD shows Command + K on macOS and Alt + K on Windows beside
 Check work / Kiểm tra bài when the joined Practice activity has an approved checkpoint
 and its global shortcut is registered. `CompanionHudController` owns the display-only
 practice-ready phase; active voice, teaching and evaluation take priority. The hint returns
 after transient status fades and clears on eligibility loss or presentation reset. The
-shortcut opens capture/review; it never confirms hand-in. Windows keeps its Alt + K
-workflow; native companion rendering remains macOS-only.
+shortcut opens capture/review; it never confirms hand-in.
 
 The HUD uses the request locale for Checking… / Kiểm tra…, feedback ready,
 submission and failure phases. Request IDs, history matching and a bounded presentation timer
@@ -1425,8 +1451,15 @@ for the local driver executable.
 Signed macOS/Windows hardware checks still cover global shortcuts, mic routing,
 background capture, transparent-window interactions, physical click/drag/Esc,
 coordinate accuracy and installed updates. Synthetic receipts do not prove physical
-display scan-out or model quality. Native guidance currently targets the primary
-macOS display; Windows and multiple-display teaching parity are not established.
+display scan-out or model quality. Native guidance targets the primary display on macOS and Windows. Windows uses physical
+pixels for captures and drawing, and a click-through layered Win32 window for the cursor,
+scribbles and HUD. The native window installation holds the same ownership and generation
+fences as macOS; successful installation, rather than queued commands, acknowledges
+message and drawing presentation. Physical keyboard/button/scroll hooks cancel guidance
+on user takeover without retaining key contents. The task and HUD workers share one
+main-owned private driver on both platforms. Windows release packaging now requires the
+patched companion build; a stock driver is insufficient. Windows hardware acceptance and
+multiple-display teaching parity still require manual verification.
 Real provider quality, hosted deployment and production recovery need separate
 acceptance. Validation commands and manual smoke checks are in the root README.
 

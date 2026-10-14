@@ -45,9 +45,7 @@ export async function chooseCuaDriverCommand(
   const companionDirectory = join(locations.homeDirectory, '.cache', 'tro', 'cua-companion');
   const directories = [
     join(locations.resourcesPath, 'cua-driver'),
-    ...(locations.platform === 'darwin' && (await hasCompanionBuild(companionDirectory))
-      ? [companionDirectory]
-      : []),
+    ...((await hasCompanionBuild(companionDirectory)) ? [companionDirectory] : []),
     join(locations.homeDirectory, '.cache', 'tro', 'cua-driver'),
   ];
   for (const directory of directories) {
@@ -64,9 +62,5 @@ export async function chooseCuaDriverCommand(
     }
   }
 
-  if (locations.platform === 'darwin') {
-    throw new Error('The bundled Tro desktop driver is missing.');
-  }
-
-  return { command: 'cua-driver' };
+  throw new Error('The bundled Tro desktop driver is missing. Run pnpm build:cua.');
 }

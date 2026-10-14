@@ -101,3 +101,42 @@ it('does not use an independent macOS app when Tro has no prepared driver', asyn
     }),
   ).rejects.toThrow('bundled Tro desktop driver');
 });
+
+it('prefers the patched Windows companion over the standard driver cache', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'tro-windows-companion-'));
+  temporaryDirectories.push(root);
+  const homeDirectory = join(root, 'home');
+  const cache = join(homeDirectory, '.cache', 'tro', 'cua-companion');
+  const command = join(cache, 'cua-driver.exe');
+  await createExecutable(command);
+  await createExecutable(join(homeDirectory, '.cache', 'tro', 'cua-driver', 'cua-driver.exe'));
+  await writeFile(
+    join(cache, 'CompanionBuild.json'),
+    JSON.stringify({
+      version: CuaCompanionBuild.VERSION,
+      sourceCommit: CuaCompanionBuild.SOURCE_COMMIT,
+      patchSha256: 'a'.repeat(64),
+      executableSha256: 'b'.repeat(64),
+      architecture: 'x64',
+    }),
+  );
+  await expect(
+    chooseCuaDriverCommand({
+      resourcesPath: join(root, 'resources'),
+      homeDirectory,
+      platform: 'win32',
+    }),
+  ).resolves.toEqual({ command });
+});
+
+it('requires a Tro-owned Windows driver instead of searching PATH', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'tro-windows-driver-'));
+  temporaryDirectories.push(root);
+  await expect(
+    chooseCuaDriverCommand({
+      resourcesPath: join(root, 'resources'),
+      homeDirectory: join(root, 'home'),
+      platform: 'win32',
+    }),
+  ).rejects.toThrow('pnpm build:cua');
+});

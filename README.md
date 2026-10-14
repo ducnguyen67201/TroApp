@@ -2,7 +2,7 @@
 
 Electron + React desktop, strict TypeScript API and Prisma/PostgreSQL persistence.
 Tro supports authenticated computer use, student-controlled teaching, classroom
-materials, voice input and a native macOS companion.
+materials, voice input and native macOS/Windows companion support.
 
 Read [Architecture](docs/Architecture.md) for the current system, component
 communication, ownership and limits. It is the single maintained architecture
@@ -240,13 +240,26 @@ Automated tests use fakes and do not send events to a real project.
 
 ```sh
 pnpm build:cua
-pnpm dev:desktop
+pnpm dev
 ```
 
-`build:cua` fetches the pinned Cua source, applies `CursorCompanion.patch`, runs
-companion, MCP transport and session tests, builds/signs the local executable and
-records checksums in `~/.cache/tro/cua-companion`. Restart the desktop after
+`build:cua` requires Rust; Windows also requires the MSVC C++ build tools, their
+Spectre-mitigated libraries for the target architecture, and the Windows SDK.
+It fetches the pinned Cua source, applies `CursorCompanion.patch`, runs
+companion, MCP transport and session tests, builds the local executable (ad-hoc signed on macOS) and
+records checksums in `~/.cache/tro/cua-companion`. Run `pnpm build:cua` once on Windows
+before `pnpm dev`; installers bundle the same patched companion. Restart the desktop after
 rebuilding so its daemon loads that executable.
+If the API is already running, use `pnpm dev:desktop` to restart only the desktop.
+After native-driver edits, regenerate the patch and run `pnpm build:cua` again
+before restarting. Ordinary TypeScript/React edits do not require that rebuild
+unless they change native contracts. Follow the
+[native maintenance workflow](docs/Architecture.md#maintaining-native-driver-changes)
+when updating the patch or pinned upstream source. Then run the repository
+[validation commands](#validation) and perform the affected platform's hardware checks.
+`companion.presentation.failed` reports a bounded startup/connect stage and reason;
+the native `companion` warning with `stage=input_hooks` identifies unavailable
+Windows input observation. Neither event includes screen content or key values.
 [CuaCompanionBuild.ts](src/contracts/CuaCompanionBuild.ts)
 owns the required version/source commit. Packaged driver resources take precedence
 over development caches.
@@ -993,7 +1006,7 @@ offline tests do not prove that authorization works.
 Before public distribution, perform the Windows hardware checks below and inspect
 the installed uninstaller's signature on a disposable Windows machine. Confirm
 install, launch and uninstall, and test a signed older-to-newer update when a feed
-is enabled. Windows teaching parity with the patched macOS companion is not
+is enabled. Windows teaching uses the patched native companion; hardware acceptance is not
 established by this workflow. Signing identifies the publisher; it does not
 guarantee a SmartScreen warning will never appear.
 

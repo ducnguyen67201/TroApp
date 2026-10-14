@@ -204,7 +204,7 @@ async function startDesktop(): Promise<void> {
     join(mainDirectory, 'StartAgentWorker.js'),
     environment.APP_ENV === AppEnvironment.DEV,
     desktopDriver,
-    process.platform === 'darwin' ? hudClient.group : undefined,
+    hudClient.group,
     (progress) => {
       chat?.receiveProgress(progress);
       if (progress.presentationPending || progress.presentationRevoked) {
@@ -991,7 +991,7 @@ async function startDesktop(): Promise<void> {
     { startFollowing: () => companionChat.startCursorCompanion() },
     {
       canShow: async () =>
-        process.platform === 'darwin' &&
+        (process.platform === 'darwin' || process.platform === 'win32') &&
         (await auth.readSession()).kind === 'signed-in' &&
         (await permissions.readStatus()).kind === 'ready',
     },
@@ -1494,10 +1494,7 @@ async function startDesktop(): Promise<void> {
     try {
       return await executeAgentCommand(rawCommand, {
         chat,
-        startFollowing: () =>
-          process.platform === 'darwin'
-            ? companion.startFollowing()
-            : Promise.resolve({ kind: 'stopped' }),
+        startFollowing: () => companion.startFollowing(),
         canSendMessage: () =>
           !voice ||
           [VoiceState.IDLE, VoiceState.DISABLED].some(
