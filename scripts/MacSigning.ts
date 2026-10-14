@@ -4,6 +4,7 @@ import { access, open, readdir, readFile, realpath, rm, stat } from 'node:fs/pro
 import { basename, isAbsolute, join, relative, sep } from 'node:path';
 import { promisify } from 'node:util';
 import type { Configuration } from 'electron-builder';
+import { z } from 'zod';
 import { MacNotarizationMethod, readMacSigningEnv, type MacSigningEnv } from './Env.js';
 
 export type MacReleaseSettings = Extract<MacSigningEnv, { enabled: true }>;
@@ -15,18 +16,158 @@ export type MacCommand = (
 
 const executeFile = promisify(execFile);
 
-/** Bound tool execution and discard errors that can contain credential-bearing arguments. */
+const MacCommandFailureReason = {
+  UNKNOWN: 'unknown',
+  EXECUTABLE_NOT_FOUND: 'executable-not-found',
+  TERMINATED: 'terminated',
+  TICKET_NOT_FOUND: 'ticket-not-found',
+  TICKET_VALIDATION_FAILED: 'ticket-validation-failed',
+  TICKET_NOT_STAPLED: 'ticket-not-stapled',
+  NETWORK_ERROR: 'network-error',
+} as const;
+
+const CommandFailureSchema = z.object({
+  code: z.unknown().optional(),
+  signal: z.unknown().optional(),
+  killed: z.unknown().optional(),
+  stdout: z.unknown().optional(),
+  stderr: z.unknown().optional(),
+});
+
+function readMacCommandOperation(tool: string, arguments_: readonly string[]): string {
+  if (tool === 'xcrun') {
+    const [command, action] = arguments_;
+    if (!command || !action) {
+      return 'other';
+    }
+    const operation = `${command}.${action}`;
+    if (
+      [
+        'stapler.validate',
+        'stapler.staple',
+        'notarytool.submit',
+        'notarytool.info',
+        'notarytool.log',
+      ].includes(operation)
+    ) {
+      return operation;
+    }
+  }
+  const flags = {
+    codesign: [
+      ['--verify', 'verify'],
+      ['--display', 'display'],
+      ['-d', 'display'],
+      ['--sign', 'sign'],
+    ],
+    security: [['find-identity', 'find-identity']],
+    plutil: [['-extract', 'extract']],
+    lipo: [['-archs', 'archs']],
+    spctl: [['--assess', 'assess']],
+  } satisfies Record<string, readonly (readonly [string, string])[]>;
+  for (const [name, operations] of Object.entries(flags)) {
+    if (tool === name) {
+      for (const [flag, operation] of operations) {
+        if (arguments_.includes(flag)) {
+          return `${name}.${operation}`;
+        }
+      }
+    }
+  }
+  return 'other';
+}
+
+/** Classify only known phrases; never return tool output, paths, URLs or command arguments. */
+function readMacCommandFailureReason(
+  operation: string,
+  failure: z.infer<typeof CommandFailureSchema> | undefined,
+): (typeof MacCommandFailureReason)[keyof typeof MacCommandFailureReason] {
+  if (failure?.code === 'ENOENT') {
+    return MacCommandFailureReason.EXECUTABLE_NOT_FOUND;
+  }
+  if (failure?.killed === true) {
+    return MacCommandFailureReason.TERMINATED;
+  }
+  if (operation === 'stapler.validate' || operation === 'stapler.staple') {
+    const output = [failure?.stdout, failure?.stderr]
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.slice(0, 16_384))
+      .join('\n');
+    for (const [phrase, reason] of [
+      ['NSURLErrorDomain', MacCommandFailureReason.NETWORK_ERROR],
+      ['Record not found', MacCommandFailureReason.TICKET_NOT_FOUND],
+      ['Could not validate ticket', MacCommandFailureReason.TICKET_VALIDATION_FAILED],
+      ['does not have a ticket stapled', MacCommandFailureReason.TICKET_NOT_STAPLED],
+    ] as const) {
+      if (output.includes(phrase)) {
+        return reason;
+      }
+    }
+  }
+  return MacCommandFailureReason.UNKNOWN;
+}
+
+/** Discard the raw cause deliberately: Node's command error can contain credentials. */
+function reportMacCommandFailure(
+  executable: string,
+  arguments_: readonly string[],
+  error: unknown,
+  durationMs: number,
+): Error {
+  const toolName = basename(executable);
+  const tool = [
+    'xcrun',
+    'codesign',
+    'security',
+    'spctl',
+    'plutil',
+    'lipo',
+    'otool',
+    'ditto',
+    'hdiutil',
+    'node',
+  ].includes(toolName)
+    ? toolName
+    : 'other';
+  const operation = readMacCommandOperation(tool, arguments_);
+  const parsedFailure = CommandFailureSchema.safeParse(error);
+  const failure = parsedFailure.success ? parsedFailure.data : undefined;
+  const exitCode =
+    typeof failure?.code === 'number' && Number.isSafeInteger(failure.code) ? failure.code : null;
+  const signal =
+    typeof failure?.signal === 'string' &&
+    ['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGABRT', 'SIGSEGV', 'SIGPIPE'].includes(failure.signal)
+      ? failure.signal
+      : null;
+  console.error(
+    JSON.stringify({
+      event: 'mac.release.command.failed',
+      tool,
+      operation,
+      exitCode,
+      signal,
+      durationMs,
+      reason: readMacCommandFailureReason(operation, failure),
+    }),
+  );
+  return new Error(`macOS release command failed: ${tool}.`);
+}
+
+/** Bound execution and report safe failure categories without credential-bearing errors. */
 export const runMacCommand: MacCommand = async (executable, arguments_) => {
+  const startedAt = performance.now();
   try {
     return await executeFile(executable, [...arguments_], {
       timeout: 120_000,
       maxBuffer: 4 * 1024 * 1024,
     });
-  } catch {
-    console.error(
-      JSON.stringify({ event: 'mac.release.command.failed', tool: basename(executable) }),
+  } catch (error) {
+    throw reportMacCommandFailure(
+      executable,
+      arguments_,
+      error,
+      Math.round(performance.now() - startedAt),
     );
-    throw new Error(`macOS release command failed: ${basename(executable)}.`);
   }
 };
 

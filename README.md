@@ -667,7 +667,13 @@ used for verification, not blanket signing. No library-validation bypass is adde
 `mac.release.stage` identifies archive verification or container notarization.
 `mac.release.notary.submitted` records a submission ID before polling;
 `mac.release.notary.rejected` reports that ID and issue count without raw Apple
-messages. `mac.release.command.failed` names the failed tool without arguments.
+messages. `mac.release.command.failed` identifies the allowlisted tool/operation,
+numeric exit code, termination signal, elapsed milliseconds and a fixed failure
+category. It never includes raw command arguments, paths, tool output or errors.
+For `stapler.validate`, distinguish `ticket-not-found`, `ticket-not-stapled`,
+`ticket-validation-failed` and `network-error`; `unknown` requires further
+diagnosis, not a guessed retry or a relaxed verification gate. A prior
+`notarization successful` message does not replace the separate ticket check.
 `mac.release.verified` is emitted only after the inventory is written. No inventory
 is uploaded if any preceding step fails.
 
