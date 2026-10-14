@@ -664,7 +664,13 @@ used for verification, not blanket signing. No library-validation bypass is adde
 
 #### Diagnostics and recovery
 
-`mac.release.stage` identifies archive verification or container notarization.
+`mac.release.stage` identifies settings/version reads, artifact selection and reads,
+temporary extraction setup, archive verification or container notarization.
+If artifact selection fails,
+`mac.release.artifacts.rejected` reports expected-file presence, file counts and
+known builder-sidecar presence without logging arbitrary filenames or paths.
+`mac.release.failed` includes an allowlisted filesystem/argument error code and
+whether schema validation failed, while keeping the original error private.
 `mac.release.notary.submitted` records a submission ID before polling;
 `mac.release.notary.rejected` reports that ID and issue count without raw Apple
 messages. `mac.release.command.failed` identifies the allowlisted tool/operation,
