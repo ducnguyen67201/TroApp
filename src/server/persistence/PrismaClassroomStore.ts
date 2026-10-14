@@ -26,6 +26,8 @@ import { randomUUID } from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Prisma } from '../generated/prisma/client.js';
 import {
+  AdminClassroomLimits,
+  AdminClassroomSummarySchema,
   ClassSchema,
   ClassMeetingSchema,
   CourseRevisionSchema,
@@ -247,6 +249,69 @@ class PrismaClassroomStore implements ClassroomStore {
       throw new ClassroomError(ClassroomFailure.UNAUTHORIZED);
     }
     return AccountRoleSchema.parse(user.role);
+  }
+
+  async readIsAdmin(userId: string): Promise<boolean> {
+    const user = await this.client.user.findUnique({
+      where: { id: userId },
+      select: { isAdmin: true },
+    });
+    return user?.isAdmin ?? false;
+  }
+
+  async listClassesForAdmin(search: string, offset: number) {
+    const rows = await this.client.classroomGroup.findMany({
+      where: {
+        deletedAt: null,
+        ...(search
+          ? {
+              OR: [
+                { name: { contains: search, mode: Prisma.QueryMode.insensitive } },
+                { teacher: { name: { contains: search, mode: Prisma.QueryMode.insensitive } } },
+                { teacher: { email: { contains: search, mode: Prisma.QueryMode.insensitive } } },
+              ],
+            }
+          : {}),
+      },
+      include: { teacher: { select: { name: true, email: true } } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      skip: offset,
+      take: AdminClassroomLimits.PAGE_SIZE + 1,
+    });
+    return {
+      classes: rows.slice(0, AdminClassroomLimits.PAGE_SIZE).map((row) =>
+        AdminClassroomSummarySchema.parse({
+          schoolClass: {
+            id: row.id,
+            teacherId: row.teacherId,
+            name: row.name,
+            courseRevisionId: row.courseRevisionId,
+          },
+          teacherName: row.teacher.name,
+          teacherEmail: row.teacher.email,
+        }),
+      ),
+      hasMore: rows.length > AdminClassroomLimits.PAGE_SIZE,
+    };
+  }
+
+  async readClassForAdmin(classId: string) {
+    const row = await this.client.classroomGroup.findFirst({
+      where: { id: classId, deletedAt: null },
+      include: { teacher: { select: { name: true, email: true } } },
+    });
+    return row
+      ? AdminClassroomSummarySchema.parse({
+          schoolClass: {
+            id: row.id,
+            teacherId: row.teacherId,
+            name: row.name,
+            courseRevisionId: row.courseRevisionId,
+          },
+          teacherName: row.teacher.name,
+          teacherEmail: row.teacher.email,
+        })
+      : null;
   }
 
   async readVerifiedEmail(userId: string) {

@@ -451,7 +451,7 @@ async function runContract(): Promise<void> {
     readSession: () =>
       Promise.resolve({
         kind: 'signed-in',
-        user: { id: 'contract', name: 'Contract', email: 'contract@example.test' },
+        user: { id: 'contract', name: 'Contract', email: 'contract@example.test', isAdmin: false },
       }),
     signInWithGoogle: () =>
       Promise.resolve({

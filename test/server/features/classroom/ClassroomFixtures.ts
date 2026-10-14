@@ -13,6 +13,7 @@ import type {
   StoredClassroomInvitation,
 } from '../../../../src/server/features/classroom/application/ClassroomStore.js';
 import {
+  AdminClassroomLimits,
   ClassroomPacing,
   ClassroomPhase,
   ClassroomStatus,
@@ -139,12 +140,45 @@ export class MemoryClassroomStore implements ClassroomStore {
     return Promise.resolve();
   }
 
+  readonly admins = new Set<string>();
+  readonly names = new Map<string, string>();
   readonly roles = new Map<string, AccountRole>([['teacher', AccountRole.TEACHER]]);
   readonly emails = new Map<string, string | null>();
   readonly invitations = new Map<string, StoredClassroomInvitation>();
 
   readAccountRole(userId: string) {
     return Promise.resolve(this.roles.get(userId) ?? AccountRole.STUDENT);
+  }
+  readIsAdmin(userId: string) {
+    return Promise.resolve(this.admins.has(userId));
+  }
+  async listClassesForAdmin(search: string, offset: number) {
+    const summaries = await Promise.all(
+      [...this.classes.keys()].map((classId) => this.readClassForAdmin(classId)),
+    );
+    const matches = summaries
+      .filter((summary) => summary !== null)
+      .filter((summary) =>
+        [summary.schoolClass.name, summary.teacherName, summary.teacherEmail].some((value) =>
+          value.toLowerCase().includes(search.toLowerCase()),
+        ),
+      )
+      .sort((first, second) => first.schoolClass.id.localeCompare(second.schoolClass.id));
+    return {
+      classes: matches.slice(offset, offset + AdminClassroomLimits.PAGE_SIZE),
+      hasMore: matches.length > offset + AdminClassroomLimits.PAGE_SIZE,
+    };
+  }
+  async readClassForAdmin(classId: string) {
+    const schoolClass = await this.readClass(classId);
+    return schoolClass
+      ? {
+          schoolClass,
+          teacherName: this.names.get(schoolClass.teacherId) ?? schoolClass.teacherId,
+          teacherEmail:
+            this.emails.get(schoolClass.teacherId) ?? `${schoolClass.teacherId}@example.test`,
+        }
+      : null;
   }
   readVerifiedEmail(userId: string) {
     return Promise.resolve(
@@ -176,6 +210,7 @@ export class MemoryClassroomStore implements ClassroomStore {
   readonly submissions = new Map<string, SubmissionReceipt>();
   readonly enrollments = new Set<string>();
   readonly events = new Set<string>();
+  readonly rosters = new Map<string, Awaited<ReturnType<ClassroomStore['readRoster']>>>();
 
   runAtomically<T>(operation: (store: ClassroomStore) => Promise<T>): Promise<T> {
     return operation(this);
@@ -321,8 +356,8 @@ export class MemoryClassroomStore implements ClassroomStore {
     this.submissions.set(`${receipt.attemptId}:${idempotencyKey}`, receipt);
     return Promise.resolve();
   }
-  readRoster() {
-    return Promise.resolve([]);
+  readRoster(meetingId: string): ReturnType<ClassroomStore['readRoster']> {
+    return Promise.resolve(this.rosters.get(meetingId) ?? []);
   }
 }
 

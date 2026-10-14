@@ -85,6 +85,38 @@ it('exposes only validated feature commands and narrow parent export identity', 
   });
 });
 
+it('validates admin classroom browsing through the existing narrow classroom bridge', async () => {
+  await import('../../../src/desktop/preload/Preload.js');
+  electron.invoke.mockClear();
+  const bridge = electron.expose.mock.calls[0]?.[1];
+  if (!bridge?.controlClassroom) {
+    throw new Error('Missing classroom bridge');
+  }
+  const page = { kind: 'admin-classes', classes: [], hasMore: false };
+  electron.invoke.mockResolvedValue(page);
+  expect(
+    await bridge.controlClassroom({ kind: 'admin-classes', search: 'Teacher', offset: 0 }),
+  ).toEqual(page);
+  expect(electron.invoke).toHaveBeenCalledWith('tro:classroom-command', {
+    kind: 'admin-classes',
+    search: 'Teacher',
+    offset: 0,
+  });
+
+  const calls = electron.invoke.mock.calls.length;
+  expect(await bridge.controlClassroom({ kind: 'admin-class', classId: '/private' })).toEqual({
+    kind: 'failed',
+    code: 'unavailable',
+  });
+  expect(electron.invoke.mock.calls).toHaveLength(calls);
+
+  electron.invoke.mockResolvedValue({ ...page, cookie: 'must-not-cross-preload' });
+  expect(await bridge.controlClassroom({ kind: 'admin-classes', offset: 0 })).toEqual({
+    kind: 'failed',
+    code: 'unavailable',
+  });
+});
+
 it('routes a validated lesson answer over the registered agent IPC and rejects malformed replies', async () => {
   await import('../../../src/desktop/preload/Preload.js');
   electron.invoke.mockClear();

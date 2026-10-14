@@ -246,7 +246,7 @@ it('discards a previous account read that finishes after the account changes', a
       }),
     controlClassroom: vi.fn<NonNullable<DesktopBridge['controlClassroom']>>().mockResolvedValue({
       kind: 'home',
-      home: { role: AccountRole.STUDENT, courses: [], classes: [] },
+      home: { role: AccountRole.STUDENT, isAdmin: false, courses: [], classes: [] },
     }),
     readPetWorldPending: vi
       .fn<NonNullable<DesktopBridge['readPetWorldPending']>>()
@@ -298,7 +298,7 @@ it('keeps the last confirmed wallet when a purchase result is unknown and expose
       }),
     controlClassroom: vi.fn<NonNullable<DesktopBridge['controlClassroom']>>().mockResolvedValue({
       kind: 'home',
-      home: { role: AccountRole.STUDENT, courses: [], classes: [] },
+      home: { role: AccountRole.STUDENT, isAdmin: false, courses: [], classes: [] },
     }),
     readPetWorldPending: vi
       .fn<NonNullable<DesktopBridge['readPetWorldPending']>>()

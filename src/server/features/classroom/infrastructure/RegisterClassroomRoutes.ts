@@ -2,6 +2,7 @@ import type { IncomingHttpHeaders } from 'node:http';
 import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import {
+  ClassroomAdminCapability,
   ClassroomCommandSchema,
   ClassroomReplySchema,
   ClassroomFailure,
@@ -91,7 +92,17 @@ export function registerClassroomRoutes(
       return reply.code(429).send({ kind: 'failed', code: ClassroomFailure.UNAVAILABLE });
     }
     try {
-      return ClassroomReplySchema.parse(await service.execute(userId, parsed.data));
+      const result = ClassroomReplySchema.parse(await service.execute(userId, parsed.data));
+      if (
+        result.kind === 'home' &&
+        request.headers[ClassroomAdminCapability.HEADER] !== ClassroomAdminCapability.VERSION
+      ) {
+        /* Older desktops reject unknown home fields. Remove metadata only after
+           validating the current response; the header changes no authorization. */
+        const { role, courses, classes } = result.home;
+        return { kind: result.kind, home: { role, courses, classes } };
+      }
+      return result;
     } catch (error: unknown) {
       const code = error instanceof ClassroomError ? error.code : ClassroomFailure.UNAVAILABLE;
       log.warn(

@@ -1,7 +1,7 @@
 # Tro architecture
 
 This is the single maintained description of Tro's implemented system. Updated
-October 12, 2026. Change this document when component ownership, communication or
+October 13, 2026. Change this document when component ownership, communication or
 an architectural invariant changes. Contracts and configuration in the linked code
 own exact wire shapes and policy values. Setup and validation commands live in the
 [root README](../README.md). Research and UI prototypes are reference material,
@@ -103,6 +103,19 @@ and generation guards; `EncryptedAccountVault` stores cookies using Electron
 `safeStorage` with atomic replacement. It fails closed when native encryption is
 unavailable. Cookies remain in main; only validated profile metadata crosses
 preload. Adding or switching an account does not change backend roles.
+
+`User.isAdmin` is a backend-owned flag separate from the student/teacher role and
+defaults to false. Better Auth excludes it from sign-up/profile-update input.
+Validated session metadata carries it to the desktop, but persisted authorization
+is checked again for every admin classroom request; cached profile metadata never
+grants access.
+
+The desktop advertises admin-classroom support through the capability header owned
+by [Classroom.ts](../src/contracts/Classroom.ts). The API includes the home admin
+flag only for clients advertising that capability, so older desktop releases keep
+their original strict response shape. This header selects presentation metadata;
+it cannot grant admin access. Updated desktops default a missing flag to false
+when connected to an older API.
 
 `AccountTransitionGate` excludes account changes from active task, voice,
 microphone-test and classroom/material operations. A switch verifies the target
@@ -491,6 +504,16 @@ separate facts. Sessions expose Explanation, Practice, Submission and Review;
 teacher-paced sessions bind the current activity, while self-paced sessions allow
 student selection. Class detail routes remain inside the installed renderer's hash
 router; a route does not authorize class access.
+
+Admins can open a separate read-only class browser in Classroom, search across
+class and teacher names or teacher email, and switch between active classes.
+`ClassroomService` checks the current database flag before listing classes or
+returning a class's published course, sessions and student rosters/progress.
+The normal classroom home remains scoped to ownership/enrollment. Admin viewing
+does not enroll the viewer, join a live session, change device participation,
+impersonate a teacher or grant access to mutation commands. Deleted classes are
+excluded. The renderer clears previous class details while switching and discards
+late responses when selection or account changes.
 
 `ClassroomSessionController` loads fresh authorized context for each class-bound
 Show me request, including pinned course revision, stage, activity, criteria,

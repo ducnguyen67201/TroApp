@@ -107,13 +107,28 @@ describe('saved account sessions', () => {
     const harness = createAccounts();
     expect(await harness.accounts.readSession()).toEqual({
       kind: 'signed-in',
-      user: { id: teacher.id, name: teacher.name, email: teacher.email },
+      user: { id: teacher.id, name: teacher.name, email: teacher.email, isAdmin: false },
     });
     const saved = harness.accounts.listAccounts();
     expect(saved.accounts).toHaveLength(1);
     expect(saved.accounts[0]?.role).toBe(AccountRole.TEACHER);
     expect(JSON.stringify(saved)).not.toContain('cookie');
     expect(harness.accounts.readCookie()).toBe('teacher-cookie');
+  });
+
+  it('refreshes administrator access from the backend and preserves the account role', async () => {
+    const harness = createAccounts();
+    harness.request.mockResolvedValueOnce(Response.json({ user: { ...teacher, isAdmin: true } }));
+    expect(await harness.accounts.readSession()).toEqual({
+      kind: 'signed-in',
+      user: { id: teacher.id, name: teacher.name, email: teacher.email, isAdmin: true },
+    });
+    expect(harness.accounts.listAccounts().accounts[0]?.user.isAdmin).toBe(true);
+    expect(harness.accounts.listAccounts().accounts[0]?.role).toBe(AccountRole.TEACHER);
+
+    await harness.accounts.readSession();
+    expect(harness.accounts.listAccounts().accounts[0]?.user.isAdmin).toBe(false);
+    expect(harness.accounts.listAccounts().accounts[0]?.role).toBe(AccountRole.TEACHER);
   });
 
   it('keeps separate cookies, rechecks the target, and restores an account after restart', async () => {

@@ -376,8 +376,8 @@ export class AccountSessions {
       });
       return { kind: 'failed', message: 'Could not read your sign-in.' } as const;
     }
-    const { id, name, email, role } = parsed.data.user;
-    return { kind: 'verified', user: { id, name, email }, role: role ?? null } as const;
+    const { id, name, email, isAdmin, role } = parsed.data.user;
+    return { kind: 'verified', user: { id, name, email, isAdmin }, role: role ?? null } as const;
   }
 }
 

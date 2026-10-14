@@ -26,7 +26,7 @@ const state: AccountVaultState = {
   accounts: [
     {
       id: accountId,
-      user: { id: 'test-user', name: 'Teacher', email: 'teacher@example.test' },
+      user: { id: 'test-user', name: 'Teacher', email: 'teacher@example.test', isAdmin: false },
       role: AccountRole.TEACHER,
       requiresSignIn: false,
       cookie: 'private-session-cookie',

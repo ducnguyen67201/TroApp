@@ -6,8 +6,10 @@ import {
   ClassroomFailure,
   ClassroomPacing,
   ClassroomPhase,
+  ClassroomStatus,
   type TeachingContext,
   type ClassroomReply,
+  type ClassroomCommand,
 } from '#contracts/Classroom.js';
 import { createCourseContent, MemoryClassroomStore } from './ClassroomFixtures.js';
 
@@ -462,4 +464,197 @@ describe('durable classroom participation', () => {
       });
     },
   );
+});
+
+describe('admin classroom browsing', () => {
+  it.each([AccountRole.STUDENT, AccountRole.TEACHER])(
+    'lets a %s admin view another class without joining or changing ordinary class access',
+    async (role) => {
+      const { service, store, schoolClass, meeting, join } = await createClassroom();
+      const context = await join('student');
+      store.admins.add('admin');
+      store.roles.set('admin', role);
+      store.names.set('teacher', 'Class Teacher');
+      store.rosters.set(meeting.id, [
+        {
+          studentId: 'student',
+          name: 'Student',
+          participation: context.participation,
+          attempts: [context.attempt],
+          submissions: [],
+        },
+      ]);
+      const before = {
+        classes: [...store.classes.values()],
+        enrollments: [...store.enrollments],
+        participations: [...store.participations.values()],
+        attempts: [...store.attempts.values()],
+      };
+      await expect(service.execute('admin', { kind: 'admin-classes', offset: 0 })).resolves.toEqual(
+        {
+          kind: 'admin-classes',
+          classes: [
+            { schoolClass, teacherName: 'Class Teacher', teacherEmail: 'teacher@example.test' },
+          ],
+          hasMore: false,
+        },
+      );
+      await expect(
+        service.execute('admin', { kind: 'admin-class', classId: schoolClass.id }),
+      ).resolves.toMatchObject({
+        kind: 'admin-class',
+        schoolClass,
+        course: { id: schoolClass.courseRevisionId },
+        meetings: [meeting],
+        rosters: [
+          {
+            classSessionId: meeting.id,
+            students: [{ studentId: 'student', attempts: [context.attempt] }],
+          },
+        ],
+      });
+      await expect(service.execute('admin', { kind: 'home' })).resolves.toEqual({
+        kind: 'home',
+        home: { role, isAdmin: true, courses: [], classes: [] },
+      });
+      expect({
+        classes: [...store.classes.values()],
+        enrollments: [...store.enrollments],
+        participations: [...store.participations.values()],
+        attempts: [...store.attempts.values()],
+      }).toEqual(before);
+    },
+  );
+
+  it('requires the current persisted admin flag on every list and detail request', async () => {
+    const { service, store, schoolClass } = await createClassroom();
+    const commands: ClassroomCommand[] = [
+      { kind: 'admin-classes', offset: 0 },
+      { kind: 'admin-class', classId: schoolClass.id },
+    ];
+    for (const userId of ['student', 'teacher', 'missing-user']) {
+      for (const command of commands) {
+        await expect(service.execute(userId, command)).rejects.toMatchObject({
+          code: ClassroomFailure.FORBIDDEN,
+        });
+      }
+    }
+    store.admins.add('admin');
+    await expect(
+      service.execute('admin', { kind: 'admin-classes', offset: 0 }),
+    ).resolves.toMatchObject({ kind: 'admin-classes' });
+    store.admins.delete('admin');
+    for (const command of commands) {
+      await expect(service.execute('admin', command)).rejects.toMatchObject({
+        code: ClassroomFailure.FORBIDDEN,
+      });
+    }
+    await expect(service.execute('admin', { kind: 'home' })).resolves.toMatchObject({
+      home: { isAdmin: false },
+    });
+  });
+
+  it('does not grant an admin the owner or student authority needed by ordinary commands', async () => {
+    const { service, store, schoolClass, meeting, first, join } = await createClassroom();
+    const studentContext = await join('student');
+    store.admins.add('admin');
+    store.roles.set('admin', AccountRole.TEACHER);
+    const commands: ClassroomCommand[] = [
+      { kind: 'delete-class', classId: schoolClass.id },
+      { kind: 'enroll', classId: schoolClass.id, email: 'new-student@example.test' },
+      { kind: 'revoke', classId: schoolClass.id, studentId: 'student' },
+      { kind: 'create-invitation', classId: schoolClass.id },
+      { kind: 'revoke-invitations', classId: schoolClass.id },
+      {
+        kind: 'start-session',
+        classId: schoolClass.id,
+        activityId: first.id,
+        pacing: ClassroomPacing.TEACHER,
+      },
+      {
+        kind: 'update-session',
+        classSessionId: meeting.id,
+        contextVersion: meeting.contextVersion,
+        activityId: first.id,
+        phase: ClassroomPhase.PRACTICE,
+        pacing: ClassroomPacing.TEACHER,
+      },
+      { kind: 'end-session', classSessionId: meeting.id, contextVersion: meeting.contextVersion },
+      { kind: 'session-roster', classSessionId: meeting.id },
+      { kind: 'join', classSessionId: meeting.id, deviceId: randomUUID() },
+      { kind: 'context', ...binding(studentContext) },
+      {
+        kind: 'save-workspace',
+        ...mutation(studentContext),
+        url: 'https://scratch.mit.edu/projects/123/',
+      },
+    ];
+    for (const command of commands) {
+      await expect(service.execute('admin', command)).rejects.toMatchObject({
+        code: ClassroomFailure.FORBIDDEN,
+      });
+    }
+    expect(store.participations.size).toBe(1);
+    expect(await store.readClass(schoolClass.id)).toEqual(schoolClass);
+    expect(await store.isEnrolled(schoolClass.id, 'admin')).toBe(false);
+    expect(await store.isEnrolled(schoolClass.id, 'student')).toBe(true);
+  });
+
+  it('loads only the requested or live session roster and rejects a session from another class', async () => {
+    const { service, store, schoolClass, meeting } = await createClassroom();
+    store.admins.add('admin');
+    const olderMeeting = { ...meeting, id: randomUUID(), status: ClassroomStatus.ENDED };
+    await store.saveMeeting(olderMeeting);
+    const otherClass = await store.saveClass(
+      'teacher',
+      'Other class',
+      schoolClass.courseRevisionId,
+    );
+    const otherMeeting = { ...meeting, id: randomUUID(), classId: otherClass.id };
+    await store.saveMeeting(otherMeeting);
+    const readRoster = vi.spyOn(store, 'readRoster');
+    const current = await service.execute('admin', {
+      kind: 'admin-class',
+      classId: schoolClass.id,
+    });
+    expect(current).toMatchObject({
+      kind: 'admin-class',
+      meetings: [meeting, olderMeeting],
+      rosters: [{ classSessionId: meeting.id, students: [] }],
+    });
+    expect(readRoster).toHaveBeenCalledExactlyOnceWith(meeting.id, schoolClass.id);
+    readRoster.mockClear();
+    expect(
+      await service.execute('admin', {
+        kind: 'admin-class',
+        classId: schoolClass.id,
+        classSessionId: olderMeeting.id,
+      }),
+    ).toMatchObject({
+      kind: 'admin-class',
+      rosters: [{ classSessionId: olderMeeting.id, students: [] }],
+    });
+    expect(readRoster).toHaveBeenCalledExactlyOnceWith(olderMeeting.id, schoolClass.id);
+    for (const classSessionId of [otherMeeting.id, randomUUID()]) {
+      await expect(
+        service.execute('admin', { kind: 'admin-class', classId: schoolClass.id, classSessionId }),
+      ).rejects.toMatchObject({ code: ClassroomFailure.NOT_FOUND });
+    }
+  });
+
+  it('does not expose deleted classes or details for a missing class', async () => {
+    const { service, store, schoolClass } = await createClassroom();
+    store.admins.add('admin');
+    await store.deleteClass(schoolClass.id);
+    await expect(service.execute('admin', { kind: 'admin-classes', offset: 0 })).resolves.toEqual({
+      kind: 'admin-classes',
+      classes: [],
+      hasMore: false,
+    });
+    for (const classId of [schoolClass.id, randomUUID()]) {
+      await expect(
+        service.execute('admin', { kind: 'admin-class', classId }),
+      ).rejects.toMatchObject({ code: ClassroomFailure.NOT_FOUND });
+    }
+  });
 });

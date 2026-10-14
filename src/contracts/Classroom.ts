@@ -236,7 +236,14 @@ export const ClassroomInviteCodeSchema = z
   .transform((value) => value.replace(/[\s-]/g, '').toUpperCase())
   .pipe(z.string().regex(/^[A-F0-9]{12}$/));
 
+/** Negotiates the home response shape only; it never grants administrator authority. */
+export const ClassroomAdminCapability = {
+  HEADER: 'x-tro-classroom-admin',
+  VERSION: '1',
+} as const;
+
 export const ClassroomHomeSchema = z.strictObject({
+  isAdmin: z.boolean().default(false),
   role: AccountRoleSchema,
   courses: z
     .array(
@@ -263,6 +270,16 @@ const mutation = {
 };
 export const ClassroomCommandSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('home') }),
+  z.strictObject({
+    kind: z.literal('admin-classes'),
+    search: z.string().trim().max(200).optional(),
+    offset: z.number().int().nonnegative().max(1_000_000).default(0),
+  }),
+  z.strictObject({
+    kind: z.literal('admin-class'),
+    classId: z.uuid(),
+    classSessionId: z.uuid().optional(),
+  }),
   z.strictObject({
     kind: z.literal('create-invitation'),
     classId: z.uuid(),
@@ -373,7 +390,38 @@ export const ClassroomRosterSchema = z
   )
   .max(200);
 
+export const AdminClassroomLimits = { PAGE_SIZE: 50 } as const;
+
+export const AdminClassroomSummarySchema = z.strictObject({
+  schoolClass: ClassSchema,
+  teacherName: z.string(),
+  teacherEmail: z.email(),
+});
+
+export type AdminClassroomSummary = z.infer<typeof AdminClassroomSummarySchema>;
+
+export const AdminClassroomPageSchema = z.strictObject({
+  classes: z.array(AdminClassroomSummarySchema).max(AdminClassroomLimits.PAGE_SIZE),
+  hasMore: z.boolean(),
+});
+
+export type AdminClassroomPage = z.infer<typeof AdminClassroomPageSchema>;
+
+/** A read-only view; its IDs grant no membership or permission to change a class. */
+export const AdminClassroomDetailSchema = z.strictObject({
+  ...AdminClassroomSummarySchema.shape,
+  course: CourseRevisionSchema,
+  meetings: z.array(ClassMeetingSchema).max(100),
+  rosters: z
+    .array(z.strictObject({ classSessionId: z.uuid(), students: ClassroomRosterSchema }))
+    .max(1),
+});
+
+export type AdminClassroomDetail = z.infer<typeof AdminClassroomDetailSchema>;
+
 export const ClassroomReplySchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('admin-classes'), ...AdminClassroomPageSchema.shape }),
+  z.strictObject({ kind: z.literal('admin-class'), ...AdminClassroomDetailSchema.shape }),
   z.strictObject({ kind: z.literal('home'), home: ClassroomHomeSchema }),
   z.strictObject({ kind: z.literal('invitation'), invitation: ClassroomInvitationSchema }),
   z.strictObject({ kind: z.literal('context'), context: TeachingContextSchema }),

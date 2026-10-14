@@ -33,14 +33,19 @@ import {
 import { LocaleProvider } from '../../../src/desktop/renderer/localization/LocaleProvider.js';
 import { desktopTheme, resolveDesktopCssVariables } from '../../../src/desktop/renderer/Theme.js';
 
-const testUser: AuthUser = { id: 'test-user', name: 'Alex Example', email: 'alex@example.test' };
+const testUser: AuthUser = {
+  id: 'test-user',
+  name: 'Alex Example',
+  email: 'alex@example.test',
+  isAdmin: false,
+};
 const sessionId = 'a8f6d44a-5c18-4ce3-9237-44624549f63f';
 
 function createDesktopBridge() {
   return {
     controlClassroom: vi.fn<NonNullable<DesktopBridge['controlClassroom']>>().mockResolvedValue({
       kind: 'home',
-      home: { role: AccountRole.STUDENT, courses: [], classes: [] },
+      home: { role: AccountRole.STUDENT, isAdmin: false, courses: [], classes: [] },
     }),
     readAppUpdate: vi
       .fn<DesktopBridge['readAppUpdate']>()
@@ -1606,6 +1611,7 @@ it('shows teacher preparation and invitation controls only with a server-provide
     kind: 'home',
     home: {
       role: AccountRole.TEACHER,
+      isAdmin: false,
       courses: [
         {
           id: context.courseRevisionId,
@@ -1659,6 +1665,7 @@ it.each([true, false])(
           kind: 'home',
           home: {
             role: 'teacher',
+            isAdmin: false,
             courses: [],
             classes: [
               {
@@ -1972,7 +1979,12 @@ it.each([MaterialState.COLLECTING, MaterialState.QUEUED, MaterialState.PREPARING
 
 function createSavedAccountBridge() {
   const bridge = createDesktopBridge();
-  const student: AuthUser = { id: 'student-user', name: 'Minh Nguyen', email: 'minh@example.test' };
+  const student: AuthUser = {
+    id: 'student-user',
+    name: 'Minh Nguyen',
+    email: 'minh@example.test',
+    isAdmin: false,
+  };
   const teacherId = '11111111-1111-4111-8111-111111111111';
   const studentId = '22222222-2222-4222-8222-222222222222';
   const readSavedAccounts = vi
@@ -2094,6 +2106,7 @@ it('restores an existing classroom participation when the desktop opens', async 
         kind: 'home',
         home: {
           role: AccountRole.STUDENT,
+          isAdmin: false,
           courses: [],
           classes: [
             {

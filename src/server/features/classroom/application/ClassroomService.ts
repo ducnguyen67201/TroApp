@@ -72,6 +72,50 @@ export class ClassroomService {
     userId: string,
     command: ClassroomCommand,
   ): Promise<ClassroomReply> {
+    if (command.kind === 'admin-classes' || command.kind === 'admin-class') {
+      // Check the stored flag inside every request's transaction, including after revocation.
+      if (!(await store.readIsAdmin(userId))) {
+        throw new ClassroomError(ClassroomFailure.FORBIDDEN);
+      }
+      if (command.kind === 'admin-classes') {
+        return {
+          kind: 'admin-classes',
+          ...(await store.listClassesForAdmin(command.search ?? '', command.offset)),
+        };
+      }
+      const summary = await store.readClassForAdmin(command.classId);
+      if (!summary) {
+        throw new ClassroomError(ClassroomFailure.NOT_FOUND);
+      }
+      const course = await store.readCourse(summary.schoolClass.courseRevisionId);
+      if (!course) {
+        throw new ClassroomError(ClassroomFailure.NOT_FOUND);
+      }
+      const meetings = await store.listMeetings(command.classId);
+      const selectedMeeting = command.classSessionId
+        ? await store.readMeeting(command.classSessionId)
+        : (meetings.find((meeting) => meeting.status === ClassroomStatus.LIVE) ?? meetings[0]);
+      if (
+        (command.classSessionId && !selectedMeeting) ||
+        (selectedMeeting && selectedMeeting.classId !== command.classId)
+      ) {
+        throw new ClassroomError(ClassroomFailure.NOT_FOUND);
+      }
+      return {
+        kind: 'admin-class',
+        ...summary,
+        course,
+        meetings,
+        rosters: selectedMeeting
+          ? [
+              {
+                classSessionId: selectedMeeting.id,
+                students: await store.readRoster(selectedMeeting.id, command.classId),
+              },
+            ]
+          : [],
+      };
+    }
     if (command.kind === 'delete-class') {
       await this.readOwnedClass(store, userId, command.classId);
       if (
@@ -164,6 +208,7 @@ export class ClassroomService {
       return {
         kind: 'home',
         home: {
+          isAdmin: await store.readIsAdmin(userId),
           role,
           courses,
           classes: await Promise.all(
