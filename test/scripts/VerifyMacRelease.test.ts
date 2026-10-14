@@ -1,6 +1,8 @@
+import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import {
@@ -214,6 +216,62 @@ describe('Mac notarization', () => {
 });
 
 describe('Mac distribution verification', () => {
+  it('reports CLI argument errors without printing their private values', async () => {
+    const result = await new Promise<{
+      exitCode: number | string | null | undefined;
+      stdout: string;
+      stderr: string;
+    }>((resolve) => {
+      execFile(
+        process.execPath,
+        [
+          '--import',
+          'tsx',
+          fileURLToPath(new URL('../../scripts/VerifyMacRelease.ts', import.meta.url)),
+          '--private-argument',
+          'private-value-never-log',
+        ],
+        { encoding: 'utf8', timeout: 10_000 },
+        (error, stdout, stderr) => {
+          resolve({ exitCode: error?.code, stdout, stderr });
+        },
+      );
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain('"stage":"read-settings"');
+    expect(result.stderr).toContain('"code":"ERR_PARSE_ARGS_UNKNOWN_OPTION"');
+    expect(result.stderr).not.toContain('private-argument');
+    expect(result.stderr).not.toContain('private-value-never-log');
+  });
+
+  it('reports artifact selection counts without leaking arbitrary filenames', () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      expect(() =>
+        selectMacArtifacts(
+          [...artifactNames, 'private-filename.yml', 'builder-debug.yml'],
+          '0.1.1',
+          'arm64',
+        ),
+      ).toThrow('artifacts');
+      expect(errorLog).toHaveBeenCalledExactlyOnceWith(
+        JSON.stringify({
+          event: 'mac.release.artifacts.rejected',
+          architecture: 'arm64',
+          expectedDmgPresent: true,
+          expectedZipPresent: true,
+          dmgCount: 1,
+          zipCount: 1,
+          metadataCount: 2,
+          hasBuilderDebug: true,
+          hasBuilderConfig: false,
+        }),
+      );
+    } finally {
+      errorLog.mockRestore();
+    }
+  });
+
   it('selects exact version/architecture and rejects stale files or feed metadata', () => {
     expect(selectMacArtifacts(artifactNames, '0.1.1', 'arm64')).toEqual({
       dmg: artifactNames[0],

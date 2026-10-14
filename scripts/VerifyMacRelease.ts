@@ -108,6 +108,19 @@ export function selectMacArtifacts(
   const zip = `${stem}.zip`;
   const candidates = names.filter((name) => /\.(dmg|zip|yml|yaml)$/i.test(name));
   if (candidates.length !== 2 || !candidates.includes(dmg) || !candidates.includes(zip)) {
+    console.error(
+      JSON.stringify({
+        event: 'mac.release.artifacts.rejected',
+        architecture,
+        expectedDmgPresent: names.includes(dmg),
+        expectedZipPresent: names.includes(zip),
+        dmgCount: names.filter((name) => /\.dmg$/i.test(name)).length,
+        zipCount: names.filter((name) => /\.zip$/i.test(name)).length,
+        metadataCount: names.filter((name) => /\.ya?ml$/i.test(name)).length,
+        hasBuilderDebug: names.includes('builder-debug.yml'),
+        hasBuilderConfig: names.includes('builder-effective-config.yaml'),
+      }),
+    );
     throw new Error(
       'macOS release artifacts are missing, ambiguous or contain unsupported update metadata.',
     );
@@ -194,6 +207,13 @@ export async function verifyMacRelease(
   run: MacCommand = runMacCommand,
   notarize: (path: string, settings: MacReleaseSettings) => Promise<string> = notarizeMacDmg,
 ): Promise<void> {
+  console.info(
+    JSON.stringify({
+      event: 'mac.release.stage',
+      stage: 'select-artifacts',
+      architecture: settings.architecture,
+    }),
+  );
   const root = resolve(directory);
   const inventoryPath = join(root, `MacSignatures-${settings.architecture}.json`);
   // A failed re-verification must not leave an old success inventory available for upload.
@@ -201,11 +221,25 @@ export async function verifyMacRelease(
   const artifacts = selectMacArtifacts(await readdir(root), version, settings.architecture);
   const dmg = join(root, artifacts.dmg);
   const zip = join(root, artifacts.zip);
+  console.info(
+    JSON.stringify({
+      event: 'mac.release.stage',
+      stage: 'check-artifacts',
+      architecture: settings.architecture,
+    }),
+  );
   for (const path of [dmg, zip]) {
     if ((await readMacFileDigest(path)).size === 0) {
       throw new Error('macOS release artifact is empty.');
     }
   }
+  console.info(
+    JSON.stringify({
+      event: 'mac.release.stage',
+      stage: 'prepare-extraction',
+      architecture: settings.architecture,
+    }),
+  );
   const temporary = await mkdtemp(join(tmpdir(), 'tro-mac-verification-'));
   try {
     const extracted = join(temporary, 'zip');
@@ -298,6 +332,7 @@ export async function verifyMacRelease(
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
+    console.info(JSON.stringify({ event: 'mac.release.stage', stage: 'read-settings' }));
     const { values } = parseArgs({
       options: { directory: { type: 'string' }, arch: { type: 'string' } },
     });
@@ -305,10 +340,33 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     if (!settings.enabled || !values.directory || values.arch !== settings.architecture) {
       throw new Error('macOS release verifier requires enabled signing and matching architecture.');
     }
+    console.info(JSON.stringify({ event: 'mac.release.stage', stage: 'read-version' }));
     const raw: unknown = JSON.parse(await readFile('package.json', 'utf8'));
     const { version } = z.object({ version: ReleaseVersionSchema }).parse(raw);
     await verifyMacRelease(values.directory, settings, version);
-  } catch {
+  } catch (error) {
+    const failure = z
+      .object({
+        code: z.enum([
+          'ENOENT',
+          'EACCES',
+          'EPERM',
+          'ENOSPC',
+          'ENOMEM',
+          'ERR_FS_FILE_TOO_LARGE',
+          'ERR_PARSE_ARGS_UNKNOWN_OPTION',
+          'ERR_PARSE_ARGS_INVALID_OPTION_VALUE',
+          'ERR_PARSE_ARGS_UNEXPECTED_POSITIONAL',
+        ]),
+      })
+      .safeParse(error);
+    console.error(
+      JSON.stringify({
+        event: 'mac.release.failed',
+        code: failure.success ? failure.data.code : 'unknown',
+        validationError: error instanceof z.ZodError,
+      }),
+    );
     console.error(
       'macOS release verification failed. Inspect the last safe stage or submission ID.',
     );
