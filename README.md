@@ -913,7 +913,10 @@ Before a signed macOS/Windows release, perform these manual checks:
 - Test held shortcuts, both-release rearming, AltGr on Windows, background recording,
   cancel/close/sleep/lock, fast release while connecting and final transcription once.
 - Test USB/Bluetooth/built-in microphones, unplug an explicitly selected device,
-  change OS default routing, compare locally, cancel tests and verify tracks stop.
+  change OS default routing and verify the picker previews each selected input
+  automatically. Hide or close the picker and verify tracks stop; return to the
+  visible picker and verify preview resumes. Compare locally and verify cancel
+  returns to the selected input's preview without overlapping captures.
 - Ask Show me to open YouTube: follow its browser/address-bar cues with real input,
   include input during a preview/model turn, wait through loading, and verify the
   original goal against the visible result. Passive movement must not advance it.

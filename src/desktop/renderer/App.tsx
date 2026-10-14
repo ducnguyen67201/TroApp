@@ -11,6 +11,7 @@ import { AccountMenu } from './accounts/AccountMenu.js';
 import { useVoiceover } from './voiceover/UseVoiceover.js';
 import { useFocusReturn } from '@mantine/hooks';
 import { useMicrophoneTests } from './voice/UseMicrophoneTests.js';
+import { useMicrophonePreview } from './voice/UseMicrophonePreview.js';
 import { useMicrophones } from './voice/UseMicrophones.js';
 import { MicrophonePicker } from './voice/MicrophonePicker.js';
 import { VoiceState } from '#contracts/VoiceInput.js';
@@ -157,12 +158,40 @@ export function App(): ReactElement {
     !controller.isSending &&
     !voice.isStarting &&
     (voice.status.state === VoiceState.IDLE || voice.status.state === VoiceState.DISABLED);
+  const microphonePreview = useMicrophonePreview(
+    dialogs.state.microphone && canTestMicrophone && microphoneTests.activeDeviceId === null,
+    microphones,
+  );
+  const canStartMicrophoneCapture = useRef(false);
+  const microphoneCaptureGeneration = useRef(0);
+  canStartMicrophoneCapture.current = dialogs.state.microphone && canTestMicrophone;
+
+  async function startMicrophoneTest(deviceId: string): Promise<void> {
+    const generation = ++microphoneCaptureGeneration.current;
+    await microphonePreview.stopPreview();
+    if (!canStartMicrophoneCapture.current || generation !== microphoneCaptureGeneration.current) {
+      return;
+    }
+    await microphoneTests.startTest(deviceId);
+  }
+
+  async function pausePreviewAndRetryVoice(): Promise<void> {
+    const generation = ++microphoneCaptureGeneration.current;
+    await microphonePreview.stopPreview();
+    if (!canStartMicrophoneCapture.current || generation !== microphoneCaptureGeneration.current) {
+      return;
+    }
+    await voice.retryVoice();
+  }
 
   useEffect(() => {
+    if (!dialogs.state.microphone || !canTestMicrophone) {
+      microphoneCaptureGeneration.current += 1;
+    }
     if (!dialogs.state.microphone) {
       microphoneTests.cancelTest();
     }
-  }, [dialogs.state.microphone, microphoneTests.cancelTest]);
+  }, [dialogs.state.microphone, canTestMicrophone, microphoneTests.cancelTest]);
 
   useEffect(() => {
     if (!user || accountTransition) {
@@ -249,15 +278,19 @@ export function App(): ReactElement {
           onExitTransitionEnd={returnMicrophoneFocus}
           opened={dialogs.state.microphone && Boolean(user)}
           onClose={() => {
+            microphoneCaptureGeneration.current += 1;
+            canStartMicrophoneCapture.current = false;
+            void microphonePreview.stopPreview();
             microphoneTests.cancelTest();
             closeDialog(DesktopDialog.MICROPHONE);
           }}
-          tests={microphoneTests}
+          tests={{ ...microphoneTests, startTest: startMicrophoneTest }}
+          preview={microphonePreview}
           canTest={canTestMicrophone}
           microphones={microphones}
           isEnabled={Boolean(user) && !accountTransition}
           hasVoiceError={voice.error}
-          retryVoice={() => voice.retryVoice()}
+          retryVoice={pausePreviewAndRetryVoice}
           isRetryingVoice={voice.isStarting}
         />
       </Modal.Stack>

@@ -26,7 +26,7 @@ export function MicrophoneTools({
     [MicrophoneTestPhase.OPENING]: messages.microphoneTestOpening,
     [MicrophoneTestPhase.QUIET]: messages.microphoneTestQuiet,
     [MicrophoneTestPhase.SPEAKING]: messages.microphoneTestSpeak,
-  };
+  } satisfies Record<MicrophoneTestPhase, string>;
   const isTesting = tests.activeDeviceId !== null;
   const formatDeviceName = (deviceId: string): string => {
     const index = microphones.microphones.findIndex(
@@ -96,9 +96,11 @@ export function MicrophoneTools({
           )}
           {isTesting ? (
             <Stack gap="xs">
-              <Text size="sm" role="status" aria-live="polite">
-                {formatDeviceName(tests.activeDeviceId ?? '')} · {phases[tests.phase]}{' '}
-                {tests.secondsRemaining > 0 ? String(tests.secondsRemaining) : ''}
+              <Text size="sm" role="status">
+                {formatDeviceName(tests.activeDeviceId ?? '')} · {phases[tests.phase]}
+                {tests.secondsRemaining > 0
+                  ? ` · ${messages.microphoneTestCountdown(tests.secondsRemaining)}`
+                  : ''}
               </Text>
               {tests.phase === MicrophoneTestPhase.SPEAKING && (
                 <Text size="sm" fw={600}>

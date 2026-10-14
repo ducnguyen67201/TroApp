@@ -1,7 +1,7 @@
 # Tro architecture
 
 This is the single maintained description of Tro's implemented system. Updated
-October 13, 2026. Change this document when component ownership, communication or
+October 14, 2026. Change this document when component ownership, communication or
 an architectural invariant changes. Contracts and configuration in the linked code
 own exact wire shapes and policy values. Setup and validation commands live in the
 [root README](../README.md). Research and UI prototypes are reference material,
@@ -473,16 +473,26 @@ the worklet flushes its tail; main/relay enforce sequence order before commit an
 correlate the final transcript to the committed item. Partial transcripts do not
 start agent tasks. Release stops tracks immediately; bounded buffering allows
 already captured speech to finish while the connection opens. Esc, account/window
-changes, sleep/lock or failure invalidate late finals. No microphone stays open
-between holds.
+changes, sleep/lock or failure invalidate late finals. Voice capture stops between
+holds; the open microphone picker has a separate local-only input preview.
 
 `Microphones`, `MicrophonePicker` and local preferences own input selection.
 Automatic selection follows OS routing; explicit selection uses exact constraints
 and fails visibly if missing. Suggestions are name-based hints. Ranking does not
 switch the selected route. Local quiet/speech comparisons use a main-owned exclusive
 lease, compute scalar measurements and stop every track. Test audio is neither
-uploaded nor saved. Transcription usage reservations and active captures are
-persisted through the backend allowance adapter.
+uploaded nor saved. Opening the picker automatically previews the selected input,
+including OS routing for Auto-detect. Changing the selection releases the previous
+capture before opening the new route. The preview worklet emits only short-window
+RMS levels at most ten times per second, with no transcription or retained audio.
+The renderer renews the main-owned preview lease while the picker remains open;
+an expired or rejected renewal stops capture. Closing or hiding the picker,
+signing out, a device change, sleep/lock or a failure clears the bar and stops tracks.
+Visible, eligible pickers resume after visibility/device changes. Guided six-second
+comparisons remain explicit and use exact inputs; starting one releases the preview
+first, then the preview resumes when the comparison ends or is canceled. Hold-to-talk
+is excluded while the preview or comparison owns the microphone. Transcription usage
+reservations and active captures are persisted through the backend allowance adapter.
 
 HUD narration is a separate flow: installed native message readback →
 `VoiceoverController` → authenticated backend OpenAI PCM speech stream → bounded renderer

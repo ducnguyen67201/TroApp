@@ -1,4 +1,5 @@
 import {
+  MicrophoneCaptureMode,
   microphoneTestLeaseMs,
   type MicrophoneTestEvent,
   type MicrophoneTestReply,
@@ -14,8 +15,10 @@ interface MicrophoneTestDependencies {
 /** Reservation covers pending authorization too, so hold-to-talk cannot race a test. */
 export class MicrophoneTestLease {
   private generation = 0;
+  private expiryGeneration = 0;
   private hasAuthorization = false;
   private testId: string | null = null;
+  private mode: MicrophoneCaptureMode = MicrophoneCaptureMode.TEST;
   private cancelTimer: (() => void) | undefined;
 
   constructor(private readonly dependencies: MicrophoneTestDependencies) {}
@@ -28,15 +31,17 @@ export class MicrophoneTestLease {
     return this.isActive() && this.hasAuthorization;
   }
 
-  async startTest(testId: string): Promise<MicrophoneTestReply> {
+  async startTest(
+    testId: string,
+    mode: MicrophoneCaptureMode = MicrophoneCaptureMode.TEST,
+  ): Promise<MicrophoneTestReply> {
     if (this.isActive() || !this.dependencies.canStart()) {
       return { kind: 'failed' };
     }
     const generation = ++this.generation;
     this.testId = testId;
-    this.cancelTimer = this.dependencies.schedule(() => {
-      this.cancelTest();
-    }, microphoneTestLeaseMs);
+    this.mode = mode;
+    this.scheduleExpiry();
     try {
       const isAllowed = await this.dependencies.requestAccess();
       if (this.testId !== testId || generation !== this.generation) {
@@ -56,14 +61,40 @@ export class MicrophoneTestLease {
     }
   }
 
+  /** Only an authorized preview can extend its existing exclusive reservation. */
+  renewTest(testId: string): MicrophoneTestReply {
+    if (
+      this.testId !== testId ||
+      !this.hasAuthorization ||
+      this.mode !== MicrophoneCaptureMode.PREVIEW ||
+      !this.dependencies.canStart()
+    ) {
+      return { kind: 'failed' };
+    }
+    this.scheduleExpiry();
+    return { kind: 'ok' };
+  }
+
+  private scheduleExpiry(): void {
+    this.cancelTimer?.();
+    const expiryGeneration = ++this.expiryGeneration;
+    this.cancelTimer = this.dependencies.schedule(() => {
+      if (expiryGeneration === this.expiryGeneration) {
+        this.cancelTest();
+      }
+    }, microphoneTestLeaseMs);
+  }
+
   stopTest(testId: string): MicrophoneTestReply {
     if (this.testId !== testId) {
       return { kind: 'failed' };
     }
     this.generation += 1;
+    this.expiryGeneration += 1;
     this.cancelTimer?.();
     this.cancelTimer = undefined;
     this.testId = null;
+    this.mode = MicrophoneCaptureMode.TEST;
     this.hasAuthorization = false;
     return { kind: 'ok' };
   }

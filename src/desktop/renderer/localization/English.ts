@@ -57,7 +57,21 @@ export const english = {
   updateUnavailable: 'Could not start the update. Try again.',
   microphone: 'Microphone',
   microphoneDescription:
-    'Choose the microphone Tro uses for voice instructions. Voice instructions are captured while you hold the talk shortcut. You can also start a local sound test below.',
+    'Choose a microphone for voice instructions. The input level updates automatically while this window is open.',
+  microphoneInputLevel: 'Input level',
+  microphoneInputIdle: 'Not listening',
+  microphoneInputListening: 'Listening',
+  microphoneInputQuiet: 'Quiet',
+  microphoneInputLoud: 'Loud',
+  microphoneInputHint:
+    'Speak to see the level change. Close this window to use voice instructions.',
+  microphoneInputPaused: 'Input preview is paused while Tro is busy.',
+  microphoneInputError:
+    'Could not preview this microphone. Check microphone access or choose another input.',
+  microphoneInputPrivacy:
+    'Preview audio stays on this device and is never uploaded or saved. Closing this window turns the microphone off.',
+  microphoneInputLevelValue: (levelDb: number): string => `${String(levelDb)} dBFS`,
+  microphoneTestCountdown: (seconds: number): string => `${String(seconds)}s`,
   microphoneChoose: 'Audio input',
   microphoneInputCount: (count: number): string => `${String(count)} microphone inputs`,
   microphoneAuto: 'Auto-detect',
@@ -73,10 +87,9 @@ export const english = {
   microphoneUnknownHint: 'Try this input if it is the microphone you normally speak into.',
   microphoneRecommendationHint:
     'Suggestions use device names, not a sound test. The best choice depends on your setup and surroundings.',
-  microphoneNextHoldHint:
-    'Your choice is saved on this device and applies to the next hold. Opening this list does not record audio.',
+  microphoneNextHoldHint: 'Your choice is saved on this device for your next voice instruction.',
   microphonePermissionHint:
-    'No named inputs yet. Hold the talk shortcut once to allow microphone access, then refresh. Also check microphone permission in your computer settings.',
+    'No named inputs yet. Allow microphone access when prompted, then refresh. Also check microphone permission in your computer settings.',
   microphoneUnavailable:
     'Your selected microphone is unavailable. Reconnect it, choose another input, or select Auto-detect. Tro will not silently switch inputs.',
   microphoneListError: 'Could not list microphones. Check OS microphone access and try refreshing.',
@@ -97,7 +110,7 @@ export const english = {
   microphoneMoveDown: (name: string): string => `Move ${name} down`,
   microphoneCompare: 'Compare microphones',
   microphoneTestPrivacy:
-    'Tests open one microphone for six seconds. Sound is measured on this device, never uploaded or saved. Close this dialog or cancel to stop.',
+    'Each comparison measures one microphone for six seconds. Sound stays on this device and is never uploaded or saved. Cancel returns to the live preview; close this window to turn the microphone off.',
   microphoneTestInstructions:
     'For each input: stay quiet for two seconds, then speak the same phrase for four seconds. Keep your position and surroundings the same. Hold-to-talk is paused during a test.',
   microphoneTestPhrase: '“This is a microphone test. I want my voice to sound clear.”',
