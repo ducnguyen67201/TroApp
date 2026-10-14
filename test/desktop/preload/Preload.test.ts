@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 import type { PracticeShortcutEvent } from '#contracts/PracticeShortcut.js';
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
+import { AnalyticsScreen } from '#contracts/Analytics.js';
 
 const electron = vi.hoisted(() => ({
   expose: vi.fn<(name: string, bridge: DesktopBridge) => void>(),
@@ -18,6 +19,39 @@ vi.mock('electron', () => ({
     removeListener: electron.removeListener,
   },
 }));
+
+it('exposes consent and fixed screen names without a generic analytics payload', async () => {
+  await import('../../../src/desktop/preload/Preload.js');
+  electron.invoke.mockClear();
+  const bridge = electron.expose.mock.calls[0]?.[1];
+  if (!bridge?.readAnalyticsStatus || !bridge.setAnalyticsEnabled || !bridge.trackScreenView) {
+    throw new Error('Missing analytics bridge');
+  }
+  const status = { kind: 'ok', status: { configured: true, enabled: false } };
+  electron.invoke.mockResolvedValue(status);
+  expect(await bridge.readAnalyticsStatus()).toEqual(status);
+  expect(electron.invoke).toHaveBeenLastCalledWith('tro:analytics-status');
+  expect(await bridge.setAnalyticsEnabled(true)).toEqual(status);
+  expect(electron.invoke).toHaveBeenLastCalledWith('tro:analytics-enabled', { enabled: true });
+  electron.invoke.mockResolvedValue(true);
+  await bridge.trackScreenView(AnalyticsScreen.CLASSROOM);
+  expect(electron.invoke).toHaveBeenLastCalledWith('tro:analytics-screen', 'classroom');
+
+  const calls = electron.invoke.mock.calls.length;
+  const trackScreenView = bridge.trackScreenView;
+  const sendInvalidScreen = async (screen: unknown): Promise<void> => {
+    const reply: unknown = Reflect.apply(trackScreenView, bridge, [screen]);
+    await reply;
+  };
+  await sendInvalidScreen('#/classroom/private-class-id');
+  await sendInvalidScreen({ screen: 'classroom', email: 'private@example.test' });
+  expect(electron.invoke.mock.calls).toHaveLength(calls);
+  electron.invoke.mockResolvedValue({ ...status, userId: 'must-not-cross-preload' });
+  expect(await bridge.readAnalyticsStatus()).toEqual({ kind: 'failed' });
+  electron.invoke.mockRejectedValue(new Error('Unavailable'));
+  expect(await bridge.setAnalyticsEnabled(false)).toEqual({ kind: 'failed' });
+  await expect(bridge.trackScreenView(AnalyticsScreen.SIGN_IN)).resolves.toBeUndefined();
+});
 
 it('preserves validated session retry advice and rejects malformed auth replies', async () => {
   await import('../../../src/desktop/preload/Preload.js');
@@ -80,6 +114,38 @@ it('exposes only validated feature commands and narrow parent export identity', 
   ).toEqual({ saved: false, code: 'unavailable' });
   electron.invoke.mockResolvedValue({ kind: 'status', enabled: true, cookie: 'secret' });
   expect(await bridge.controlClassroomInsights({ kind: 'status', classId: id })).toEqual({
+    kind: 'failed',
+    code: 'unavailable',
+  });
+});
+
+it('validates admin classroom browsing through the existing narrow classroom bridge', async () => {
+  await import('../../../src/desktop/preload/Preload.js');
+  electron.invoke.mockClear();
+  const bridge = electron.expose.mock.calls[0]?.[1];
+  if (!bridge?.controlClassroom) {
+    throw new Error('Missing classroom bridge');
+  }
+  const page = { kind: 'admin-classes', classes: [], hasMore: false };
+  electron.invoke.mockResolvedValue(page);
+  expect(
+    await bridge.controlClassroom({ kind: 'admin-classes', search: 'Teacher', offset: 0 }),
+  ).toEqual(page);
+  expect(electron.invoke).toHaveBeenCalledWith('tro:classroom-command', {
+    kind: 'admin-classes',
+    search: 'Teacher',
+    offset: 0,
+  });
+
+  const calls = electron.invoke.mock.calls.length;
+  expect(await bridge.controlClassroom({ kind: 'admin-class', classId: '/private' })).toEqual({
+    kind: 'failed',
+    code: 'unavailable',
+  });
+  expect(electron.invoke.mock.calls).toHaveLength(calls);
+
+  electron.invoke.mockResolvedValue({ ...page, cookie: 'must-not-cross-preload' });
+  expect(await bridge.controlClassroom({ kind: 'admin-classes', offset: 0 })).toEqual({
     kind: 'failed',
     code: 'unavailable',
   });

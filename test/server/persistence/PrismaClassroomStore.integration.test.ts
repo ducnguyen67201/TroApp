@@ -13,6 +13,9 @@ import { registerClassroomRoutes } from '../../../src/server/features/classroom/
 import { createApi } from '../../../src/server/CreateApi.js';
 import { createServerLogger } from '../../../src/server/Logger.js';
 import {
+  ClassroomAdminCapability,
+  AdminClassroomLimits,
+  ClassroomFailure,
   ClassroomReplySchema,
   ClassroomPacing,
   ClassroomPhase,
@@ -473,4 +476,362 @@ it('restores persisted participation through authenticated HTTP after desktop re
   } finally {
     await api.close();
   }
+});
+
+describe('persisted admin classroom browsing', () => {
+  it('retains historical participants and work while live and teacher rosters keep current enrollment', async () => {
+    const fixture = await createFixture();
+    const context = await fixture.join(fixture.first);
+    const progress = await fixture.service.execute(fixture.first, {
+      kind: 'report-progress',
+      ...mutation(context),
+      eventId: randomUUID(),
+      evidence: [],
+      declaredComplete: true,
+      helpSummary: 'Finished the activity.',
+    });
+    if (progress.kind !== 'context') {
+      throw new Error('Expected saved progress.');
+    }
+    const submission = {
+      id: randomUUID(),
+      attemptId: progress.context.attempt.id,
+      url: 'https://scratch.mit.edu/projects/123/',
+      submittedAt: new Date().toISOString(),
+    };
+    await database.store.saveSubmission(submission, randomUUID());
+    await fixture.service.execute(fixture.first, {
+      kind: 'leave',
+      participationId: context.participation.id,
+      deviceId: context.participation.deviceId,
+    });
+    await fixture.service.execute(fixture.teacher, {
+      kind: 'end-session',
+      classSessionId: fixture.meeting.id,
+      contextVersion: fixture.meeting.contextVersion,
+    });
+    await fixture.service.execute(fixture.teacher, {
+      kind: 'revoke',
+      classId: fixture.schoolClass.id,
+      studentId: fixture.first,
+    });
+    const newcomerId = randomUUID();
+    const newcomer = await client.user.create({
+      data: {
+        id: newcomerId,
+        name: 'New student',
+        email: `${newcomerId}@example.test`,
+        emailVerified: true,
+      },
+    });
+    await fixture.service.execute(fixture.teacher, {
+      kind: 'enroll',
+      classId: fixture.schoolClass.id,
+      email: newcomer.email,
+    });
+    await client.user.update({ where: { id: fixture.teacher }, data: { isAdmin: true } });
+
+    const detail = await fixture.service.execute(fixture.teacher, {
+      kind: 'admin-class',
+      classId: fixture.schoolClass.id,
+      classSessionId: fixture.meeting.id,
+    });
+    if (detail.kind !== 'admin-class') {
+      throw new Error('Expected admin classroom detail.');
+    }
+    expect(detail.rosters[0]?.students).toEqual([
+      {
+        studentId: fixture.first,
+        name: fixture.first,
+        participation: await database.store.readParticipation(context.participation.id),
+        attempts: [progress.context.attempt],
+        submissions: [submission],
+      },
+    ]);
+    expect(detail.rosters[0]?.students[0]?.participation?.left).toBe(true);
+    expect(await database.store.isEnrolled(fixture.schoolClass.id, fixture.first)).toBe(false);
+    expect(await database.store.isEnrolled(fixture.schoolClass.id, newcomer.id)).toBe(true);
+    expect(await database.store.readSessionParticipants(fixture.meeting.id, randomUUID())).toEqual(
+      [],
+    );
+
+    const teacherRoster = await fixture.service.execute(fixture.teacher, {
+      kind: 'session-roster',
+      classSessionId: fixture.meeting.id,
+    });
+    if (teacherRoster.kind !== 'roster') {
+      throw new Error('Expected teacher roster.');
+    }
+    const currentStudentIds = [fixture.second, newcomer.id].sort();
+    expect(teacherRoster.roster.map((student) => student.studentId).sort()).toEqual(
+      currentStudentIds,
+    );
+
+    await fixture.service.execute(fixture.teacher, {
+      kind: 'start-session',
+      classId: fixture.schoolClass.id,
+      activityId: fixture.activity.id,
+      pacing: ClassroomPacing.TEACHER,
+    });
+    const liveDetail = await fixture.service.execute(fixture.teacher, {
+      kind: 'admin-class',
+      classId: fixture.schoolClass.id,
+    });
+    if (liveDetail.kind !== 'admin-class') {
+      throw new Error('Expected live admin classroom detail.');
+    }
+    expect(liveDetail.rosters[0]?.students.map((student) => student.studentId).sort()).toEqual(
+      currentStudentIds,
+    );
+    expect(liveDetail.rosters[0]?.students.every((student) => student.participation === null)).toBe(
+      true,
+    );
+  });
+
+  it('checks stored admin authority for each HTTP request without changing class membership or progress', async () => {
+    const fixture = await createFixture();
+    const studentContext = await fixture.join(fixture.first);
+    const admin = await client.user.create({
+      data: {
+        id: randomUUID(),
+        name: 'Admin',
+        email: `${randomUUID()}@example.test`,
+        emailVerified: true,
+      },
+    });
+    expect(admin.isAdmin).toBe(false);
+    const api = createApi({ isDatabaseReady: () => Promise.resolve(true) });
+    registerClassroomRoutes(
+      api,
+      (headers) =>
+        Promise.resolve(typeof headers['x-test-user'] === 'string' ? headers['x-test-user'] : null),
+      fixture.service,
+      createServerLogger(environment.APP_ENV),
+    );
+    const post = (userId: string, payload: object) =>
+      api.inject({
+        method: 'POST',
+        url: '/api/v1/classroom/command',
+        headers: {
+          'x-test-user': userId,
+          [ClassroomAdminCapability.HEADER]: ClassroomAdminCapability.VERSION,
+        },
+        payload,
+      });
+    const listCommand = { kind: 'admin-classes', search: fixture.teacher };
+    const detailCommand = { kind: 'admin-class', classId: fixture.schoolClass.id };
+    try {
+      expect(
+        (
+          await api.inject({
+            method: 'POST',
+            url: '/api/v1/classroom/command',
+            payload: listCommand,
+          })
+        ).statusCode,
+      ).toBe(401);
+      for (const userId of [admin.id, fixture.teacher, fixture.first, randomUUID()]) {
+        expect((await post(userId, listCommand)).statusCode).toBe(403);
+        expect((await post(userId, detailCommand)).statusCode).toBe(403);
+      }
+      await client.user.update({ where: { id: admin.id }, data: { isAdmin: true } });
+      const enrollmentsBefore = await client.classroomEnrollment.findMany({
+        where: { classId: fixture.schoolClass.id },
+        orderBy: { studentId: 'asc' },
+      });
+      const participationsBefore = await client.classroomParticipation.findMany({
+        where: { classSessionId: fixture.meeting.id },
+        orderBy: { id: 'asc' },
+      });
+      const attemptsBefore = await client.classroomAttempt.findMany({
+        where: { participationId: studentContext.participation.id },
+      });
+      const listResponse = await post(admin.id, listCommand);
+      expect(listResponse.statusCode).toBe(200);
+      expect(ClassroomReplySchema.parse(listResponse.json())).toEqual({
+        kind: 'admin-classes',
+        classes: [
+          {
+            schoolClass: fixture.schoolClass,
+            teacherName: fixture.teacher,
+            teacherEmail: `${fixture.teacher}@example.test`,
+          },
+        ],
+        hasMore: false,
+      });
+      const detailResponse = await post(admin.id, detailCommand);
+      expect(detailResponse.statusCode).toBe(200);
+      const detail = ClassroomReplySchema.parse(detailResponse.json());
+      expect(detail).toMatchObject({
+        kind: 'admin-class',
+        schoolClass: fixture.schoolClass,
+        course: { id: fixture.schoolClass.courseRevisionId },
+        meetings: [fixture.meeting],
+        rosters: [{ classSessionId: fixture.meeting.id }],
+      });
+      if (detail.kind !== 'admin-class') {
+        throw new Error('Expected admin classroom detail.');
+      }
+      expect(
+        detail.rosters[0]?.students.find((student) => student.studentId === fixture.first),
+      ).toEqual({
+        studentId: fixture.first,
+        name: fixture.first,
+        participation: studentContext.participation,
+        attempts: [studentContext.attempt],
+        submissions: [],
+      });
+      expect(detail.rosters[0]?.students).toHaveLength(2);
+      const homeResponse = await post(admin.id, { kind: 'home' });
+      expect(ClassroomReplySchema.parse(homeResponse.json())).toMatchObject({
+        kind: 'home',
+        home: { isAdmin: true, role: AccountRole.STUDENT, classes: [], courses: [] },
+      });
+      expect(
+        (
+          await post(admin.id, {
+            kind: 'join',
+            classSessionId: fixture.meeting.id,
+            deviceId: randomUUID(),
+          })
+        ).statusCode,
+      ).toBe(403);
+      await client.user.update({ where: { id: admin.id }, data: { role: AccountRole.TEACHER } });
+      expect(
+        (
+          await post(admin.id, {
+            kind: 'enroll',
+            classId: fixture.schoolClass.id,
+            email: admin.email,
+          })
+        ).statusCode,
+      ).toBe(403);
+      expect(
+        (
+          await post(admin.id, {
+            kind: 'end-session',
+            classSessionId: fixture.meeting.id,
+            contextVersion: fixture.meeting.contextVersion,
+          })
+        ).statusCode,
+      ).toBe(403);
+      expect(
+        await client.classroomEnrollment.findMany({
+          where: { classId: fixture.schoolClass.id },
+          orderBy: { studentId: 'asc' },
+        }),
+      ).toEqual(enrollmentsBefore);
+      expect(
+        await client.classroomParticipation.findMany({
+          where: { classSessionId: fixture.meeting.id },
+          orderBy: { id: 'asc' },
+        }),
+      ).toEqual(participationsBefore);
+      expect(
+        await client.classroomAttempt.findMany({
+          where: { participationId: studentContext.participation.id },
+        }),
+      ).toEqual(attemptsBefore);
+      await client.user.update({ where: { id: admin.id }, data: { isAdmin: false } });
+      expect((await post(admin.id, listCommand)).statusCode).toBe(403);
+      expect((await post(admin.id, detailCommand)).statusCode).toBe(403);
+      const revokedHome = await post(admin.id, { kind: 'home' });
+      expect(ClassroomReplySchema.parse(revokedHome.json())).toMatchObject({
+        kind: 'home',
+        home: { isAdmin: false },
+      });
+    } finally {
+      await api.close();
+    }
+  });
+
+  it('paginates deterministically, searches class and teacher identity, and excludes deleted classes', async () => {
+    const marker = randomUUID();
+    const adminId = randomUUID();
+    const teacherId = randomUUID();
+    await client.user.createMany({
+      data: [
+        { id: adminId, name: 'Admin', email: `${adminId}@example.test`, isAdmin: true },
+        {
+          id: teacherId,
+          name: `Teacher ${marker}`,
+          email: `${marker}@example.test`,
+          role: AccountRole.TEACHER,
+        },
+      ],
+    });
+    const course = await database.store.saveCourse(teacherId, 'Course', createCourseContent());
+    const createdAt = new Date('2026-01-01T00:00:00.000Z');
+    const classes = Array.from({ length: AdminClassroomLimits.PAGE_SIZE + 3 }, (_, index) => ({
+      id: randomUUID(),
+      teacherId,
+      name: index === 0 ? `Special ${marker}` : `Class ${String(index)}`,
+      courseRevisionId: course.id,
+      createdAt,
+      deletedAt: index === AdminClassroomLimits.PAGE_SIZE + 2 ? createdAt : null,
+    }));
+    await client.classroomGroup.createMany({ data: classes });
+    const service = new ClassroomService(database.store);
+    const first = await service.execute(adminId, {
+      kind: 'admin-classes',
+      search: marker,
+      offset: 0,
+    });
+    const second = await service.execute(adminId, {
+      kind: 'admin-classes',
+      search: marker,
+      offset: AdminClassroomLimits.PAGE_SIZE,
+    });
+    if (first.kind !== 'admin-classes' || second.kind !== 'admin-classes') {
+      throw new Error('Expected admin classroom pages.');
+    }
+    expect(first.classes).toHaveLength(AdminClassroomLimits.PAGE_SIZE);
+    expect(first.hasMore).toBe(true);
+    expect(second.classes).toHaveLength(2);
+    expect(second.hasMore).toBe(false);
+    expect([...first.classes, ...second.classes].map((entry) => entry.schoolClass.id)).toEqual(
+      classes
+        .filter((entry) => !entry.deletedAt)
+        .map((entry) => entry.id)
+        .sort(),
+    );
+    expect(
+      await service.execute(adminId, { kind: 'admin-classes', search: marker, offset: 0 }),
+    ).toEqual(first);
+    for (const search of [
+      `TEACHER ${marker.toUpperCase()}`,
+      `${marker.toUpperCase()}@EXAMPLE.TEST`,
+    ]) {
+      expect(await service.execute(adminId, { kind: 'admin-classes', search, offset: 0 })).toEqual(
+        first,
+      );
+    }
+    const specialClass = classes.find((entry) => entry.name.startsWith('Special'));
+    const deletedClass = classes.find((entry) => entry.deletedAt);
+    if (!specialClass || !deletedClass) {
+      throw new Error('Missing class search fixtures.');
+    }
+    expect(
+      await service.execute(adminId, {
+        kind: 'admin-classes',
+        search: `SPECIAL ${marker.toUpperCase()}`,
+        offset: 0,
+      }),
+    ).toMatchObject({
+      kind: 'admin-classes',
+      classes: [{ schoolClass: { id: specialClass.id } }],
+      hasMore: false,
+    });
+    expect(
+      await service.execute(adminId, { kind: 'admin-classes', search: marker, offset: 100 }),
+    ).toEqual({ kind: 'admin-classes', classes: [], hasMore: false });
+    expect(
+      await service.execute(adminId, { kind: 'admin-class', classId: specialClass.id }),
+    ).toMatchObject({ kind: 'admin-class', meetings: [], rosters: [] });
+    for (const classId of [deletedClass.id, randomUUID()]) {
+      await expect(
+        service.execute(adminId, { kind: 'admin-class', classId }),
+      ).rejects.toMatchObject({ code: ClassroomFailure.NOT_FOUND });
+    }
+  });
 });

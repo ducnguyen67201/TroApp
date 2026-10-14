@@ -104,6 +104,9 @@ importers:
       pino:
         specifier: ^10.3.1
         version: 10.3.1
+      posthog-node:
+        specifier: ^5.55.3
+        version: 5.55.3(rxjs@7.8.2)
       prisma:
         specifier: 7.10.0
         version: 7.10.0(@types/node@24.19.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)
@@ -1425,6 +1428,12 @@ packages:
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
+
+  '@posthog/core@1.58.1':
+    resolution: {integrity: sha512-z0ISzMUoF1izukfLIUSjGZBdO5H2BPdqN8MX27OKYGQ1sDj/r+WW9Nq7m5WsQY56NOxVsFtHClx9iHj6MYM3Tg==}
+
+  '@posthog/types@1.415.3':
+    resolution: {integrity: sha512-y90ARRBbyXcZDwuXXXvAnbjiuxQ+4FmUI4sasI19AHOPgdWPyd2Kpo0c0B2pKIR+fq+BcRokhF35eAdA54Mfbw==}
 
   '@prisma/adapter-pg@7.10.0':
     resolution: {integrity: sha512-N7nwSor0HO1Kz6xBv0TPAjAPysKK0fac6p4fVN3ensLOuzc/83Fgmln5k92eK/cvzqdkSR/2kkAqlbcdwVrwpw==}
@@ -4254,6 +4263,15 @@ packages:
     resolution: {integrity: sha512-Jtc2612XINuBjIl/QTWsV5UvE8UHuNblcO3vVADSrKsrc6RqGX6lOW1cEo3CM2v0XG4Nat8nI+YM7/f26VxXLw==}
     engines: {node: '>=12'}
 
+  posthog-node@5.55.3:
+    resolution: {integrity: sha512-UllcPxGClim6WM8l4cuJCccCN7zH/7z8t59APs0oIkQ+t/UrWPauDvuLnz3lWS2Adj1Vccl0Yq3dnIOI+JvCVg==}
+    engines: {node: ^20.20.0 || >=22.22.0}
+    peerDependencies:
+      rxjs: ^7.0.0
+    peerDependenciesMeta:
+      rxjs:
+        optional: true
+
   postject@1.0.0-alpha.6:
     resolution: {integrity: sha512-b9Eb8h2eVqNE8edvKdwqkrY6O7kAwmI8kcnBv1NScolYJbo59XUF0noFq+lxbC1yN20bmC0WBEbDC5H/7ASb0A==}
     engines: {node: '>=14.0.0'}
@@ -6301,6 +6319,12 @@ snapshots:
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
+
+  '@posthog/core@1.58.1':
+    dependencies:
+      '@posthog/types': 1.415.3
+
+  '@posthog/types@1.415.3': {}
 
   '@prisma/adapter-pg@7.10.0':
     dependencies:
@@ -9473,6 +9497,12 @@ snapshots:
       xtend: 4.0.2
 
   postgres@3.4.7: {}
+
+  posthog-node@5.55.3(rxjs@7.8.2):
+    dependencies:
+      '@posthog/core': 1.58.1
+    optionalDependencies:
+      rxjs: 7.8.2
 
   postject@1.0.0-alpha.6:
     dependencies:

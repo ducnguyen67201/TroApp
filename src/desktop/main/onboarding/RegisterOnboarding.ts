@@ -5,7 +5,11 @@ import {
   OnboardingUpdateSchema,
   type OnboardingReply,
 } from '#contracts/Onboarding.js';
-import { OnboardingAction, OnboardingFailure } from '#contracts/OnboardingValues.js';
+import {
+  OnboardingAction,
+  OnboardingFailure,
+  type OnboardingStatus,
+} from '#contracts/OnboardingValues.js';
 import type { AuthResult } from '#contracts/AuthSession.js';
 import type { OnboardingService } from '../../onboarding/application/OnboardingService.js';
 import type { AccountTransitionGate } from '../accounts/AccountTransitionGate.js';
@@ -26,11 +30,13 @@ export function registerOnboardingHandlers<Event>(
   },
   access: OnboardingAccess<Event>,
   service: OnboardingService,
+  recordProgress?: (action: OnboardingAction, status: OnboardingStatus) => void,
 ): void {
   async function authorize(
     event: Event,
     expectedAccountId: string,
     operation: (accountId: string) => Promise<OnboardingReply>,
+    action?: OnboardingAction,
   ): Promise<OnboardingReply> {
     const unavailable: OnboardingReply = { kind: 'failed', reason: OnboardingFailure.UNAVAILABLE };
     if (!access.isTrustedSender(event)) {
@@ -46,8 +52,18 @@ export function registerOnboardingHandlers<Event>(
         ) {
           return unavailable;
         }
-        const reply = await operation(session.user.id);
-        return access.isTrustedSender(event) ? OnboardingReplySchema.parse(reply) : unavailable;
+        const reply = OnboardingReplySchema.parse(await operation(session.user.id));
+        if (!access.isTrustedSender(event)) {
+          return unavailable;
+        }
+        if (action && reply.kind === 'ok') {
+          try {
+            recordProgress?.(action, reply.progress.status);
+          } catch {
+            // Optional usage reporting cannot change a saved onboarding transition.
+          }
+        }
+        return reply;
       } catch {
         console.warn('onboarding.access.failed', { stage: 'authorize' });
         return unavailable;
@@ -66,16 +82,28 @@ export function registerOnboardingHandlers<Event>(
   ipc.handle('tro:onboarding-update', (event, raw: unknown): Promise<OnboardingReply> => {
     const parsed = OnboardingUpdateSchema.safeParse(raw);
     return parsed.success
-      ? authorize(event, parsed.data.expectedAccountId, (accountId) =>
-          service.changeProgress(accountId, parsed.data.expectedRevision, parsed.data.action),
+      ? authorize(
+          event,
+          parsed.data.expectedAccountId,
+          (accountId) =>
+            service.changeProgress(accountId, parsed.data.expectedRevision, parsed.data.action),
+          parsed.data.action,
         )
       : Promise.resolve({ kind: 'failed', reason: OnboardingFailure.INVALID });
   });
   ipc.handle('tro:onboarding-restart', (event, raw: unknown): Promise<OnboardingReply> => {
     const parsed = OnboardingRestartSchema.safeParse(raw);
     return parsed.success
-      ? authorize(event, parsed.data.expectedAccountId, (accountId) =>
-          service.changeProgress(accountId, parsed.data.expectedRevision, OnboardingAction.RESTART),
+      ? authorize(
+          event,
+          parsed.data.expectedAccountId,
+          (accountId) =>
+            service.changeProgress(
+              accountId,
+              parsed.data.expectedRevision,
+              OnboardingAction.RESTART,
+            ),
+          OnboardingAction.RESTART,
         )
       : Promise.resolve({ kind: 'failed', reason: OnboardingFailure.INVALID });
   });

@@ -9,6 +9,7 @@ export const petWorldClassId = '11111111-1111-4111-8111-111111111111';
 
 export const teacherClassroom: ClassroomHome = {
   role: AccountRole.TEACHER,
+  isAdmin: false,
   courses: [],
   classes: [
     {
@@ -69,7 +70,7 @@ export function installPetWorldBridge(
     executePetWorld,
     controlClassroom: vi.fn<NonNullable<DesktopBridge['controlClassroom']>>().mockResolvedValue({
       kind: 'home',
-      home: { role, courses: [], classes: [] },
+      home: { role, isAdmin: false, courses: [], classes: [] },
     }),
     readPetWorldPending: vi
       .fn<NonNullable<DesktopBridge['readPetWorldPending']>>()

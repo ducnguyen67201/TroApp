@@ -28,6 +28,7 @@ const meetingId = '66666666-6666-4666-8666-666666666666';
 function createHome(isLive = false): ClassroomHome {
   return {
     role: AccountRole.TEACHER,
+    isAdmin: false,
     courses: [
       {
         id: courseId,

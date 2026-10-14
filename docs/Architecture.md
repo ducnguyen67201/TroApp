@@ -1,7 +1,7 @@
 # Tro architecture
 
 This is the single maintained description of Tro's implemented system. Updated
-October 12, 2026. Change this document when component ownership, communication or
+October 13, 2026. Change this document when component ownership, communication or
 an architectural invariant changes. Contracts and configuration in the linked code
 own exact wire shapes and policy values. Setup and validation commands live in the
 [root README](../README.md). Research and UI prototypes are reference material,
@@ -16,6 +16,7 @@ not requirements or evidence that a capability exists.
 - [Classroom and materials](#classroom-and-materials)
 - [Pet World and classroom recognition](#pet-world-and-classroom-recognition)
 - [Local presentation and app updates](#local-presentation-and-app-updates)
+- [Optional product analytics](#optional-product-analytics)
 - [Code ownership](#code-ownership)
 - [Verification and current limits](#verification-and-current-limits)
 
@@ -103,6 +104,19 @@ and generation guards; `EncryptedAccountVault` stores cookies using Electron
 `safeStorage` with atomic replacement. It fails closed when native encryption is
 unavailable. Cookies remain in main; only validated profile metadata crosses
 preload. Adding or switching an account does not change backend roles.
+
+`User.isAdmin` is a backend-owned flag separate from the student/teacher role and
+defaults to false. Better Auth excludes it from sign-up/profile-update input.
+Validated session metadata carries it to the desktop, but persisted authorization
+is checked again for every admin classroom request; cached profile metadata never
+grants access.
+
+The desktop advertises admin-classroom support through the capability header owned
+by [Classroom.ts](../src/contracts/Classroom.ts). The API includes the home admin
+flag only for clients advertising that capability, so older desktop releases keep
+their original strict response shape. This header selects presentation metadata;
+it cannot grant admin access. Updated desktops default a missing flag to false
+when connected to an older API.
 
 `AccountTransitionGate` excludes account changes from active task, voice,
 microphone-test and classroom/material operations. A switch verifies the target
@@ -491,6 +505,21 @@ separate facts. Sessions expose Explanation, Practice, Submission and Review;
 teacher-paced sessions bind the current activity, while self-paced sessions allow
 student selection. Class detail routes remain inside the installed renderer's hash
 router; a route does not authorize class access.
+
+Admins can open a separate read-only class browser in Classroom, search across
+class and teacher names or teacher email, and switch between active classes.
+`ClassroomService` checks the current database flag before listing classes or
+returning a class's published course, sessions and student rosters/progress.
+Live admin rosters use current enrollment. Ended-session admin rosters use saved
+session participation, retaining students who later left or lost enrollment and
+their progress; later enrollees are excluded unless they participated in that
+session. This historical view cannot recover attendance for students who never
+joined, and ordinary teacher roster behavior is unchanged.
+The normal classroom home remains scoped to ownership/enrollment. Admin viewing
+does not enroll the viewer, join a live session, change device participation,
+impersonate a teacher or grant access to mutation commands. Deleted classes are
+excluded. The renderer clears previous class details while switching and discards
+late responses when selection or account changes.
 
 `ClassroomSessionController` loads fresh authorized context for each class-bound
 Show me request, including pinned course revision, stage, activity, criteria,
@@ -1083,6 +1112,41 @@ Reviewed feature settings for classroom insights, practice, materials and HUD
 voiceover belong to `src/server/config/`, exported through `Index.ts`. Startup
 validates them before opening resources. Backend credentials and deployment
 addresses remain in `Env.ts`.
+
+## Optional product analytics
+
+[AnalyticsController](../src/desktop/main/analytics/AnalyticsController.ts) owns
+installation-scoped usage sharing in Electron main. A validated, private atomic
+preferences file stores the sharing setting and a random installation UUID.
+A configured installation without preferences saves sharing enabled and its identity
+before capture, without a first-launch prompt. Existing saved opt-outs remain off.
+Missing configuration, disabled sharing or unreadable preferences disable delivery.
+The Node PostHog adapter is created only when sharing is enabled; the renderer has no SDK or
+direct analytics network access. [RegisterAnalytics](../src/desktop/main/RegisterAnalytics.ts)
+accepts only sender-checked preference operations and a fixed screen-name enum.
+The Settings control explains that the preference applies to every account using
+this installation. The [public contract](../src/contracts/Analytics.ts) validates
+every event before capture and rejects unexpected properties.
+
+Main captures app openings and renderer failures. The shared AgentChatController
+path reports typed and voice task starts, fixed completion categories and elapsed
+time, excluding follow-up answers within an existing lesson. Classroom reporting
+counts explicit operations and excludes routine polling; onboarding reports only
+successfully saved transitions. Events contain version/environment/platform and
+bounded categorical or timing fields, never account identity, student content,
+class identifiers, URLs, screenshots, audio, raw errors or model answers.
+PostHog receives no person-profile writes, GeoIP enrichment, session replay,
+automatic exception capture or feature-flag evaluation. The installation UUID
+supports installation-level usage, not a count of students or a learning assessment.
+
+Capture is nonblocking and best effort with a bounded in-memory queue, no disk
+backlog and no fetch retries. Opt-out immediately closes collection and aborts
+pending transport, even if the preference cannot be saved; the renderer exposes
+save failure and retry. Re-enabling rotates the identifier. Already delivered
+events remain in PostHog. Shutdown flushes under a bounded deadline alongside
+native cleanup. Analytics failure cannot change task results. Desktop Env owns
+the paired public project token and cloud ingestion region; backend credentials
+never enter this integration. README owns setup and release configuration.
 
 ## Code ownership
 

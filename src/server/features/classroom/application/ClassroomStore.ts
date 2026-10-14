@@ -6,6 +6,8 @@ import type {
 import type { MaterialFile } from '../../materials/application/MaterialPreparation.js';
 import type { AccountRole } from '#contracts/AccountRole.js';
 import type {
+  AdminClassroomPage,
+  AdminClassroomSummary,
   ClassMeeting,
   CourseRevision,
   CourseContent,
@@ -48,6 +50,10 @@ export interface ClassroomStore {
   readMaterialPublication(courseId: string): Promise<MaterialPublication | null>;
   updateClassCourse(classId: string, courseId: string): Promise<void>;
   readAccountRole(userId: string): Promise<AccountRole>;
+  /** Reads the persisted flag; missing users have no admin authority. */
+  readIsAdmin(userId: string): Promise<boolean>;
+  listClassesForAdmin(search: string, offset: number): Promise<AdminClassroomPage>;
+  readClassForAdmin(classId: string): Promise<AdminClassroomSummary | null>;
   readVerifiedEmail(userId: string): Promise<string | null>;
   saveInvitation(invitation: StoredClassroomInvitation): Promise<void>;
   readInvitation(codeDigest: string): Promise<StoredClassroomInvitation | null>;
@@ -86,4 +92,9 @@ export interface ClassroomStore {
   readLatestSubmission(attemptId: string): Promise<SubmissionReceipt | null>;
   saveSubmission(receipt: SubmissionReceipt, idempotencyKey: string): Promise<void>;
   readRoster(meetingId: string, classId: string): Promise<z.infer<typeof ClassroomRosterSchema>>;
+  /** Historical members are persisted participants, regardless of current enrollment or leaving. */
+  readSessionParticipants(
+    meetingId: string,
+    classId: string,
+  ): Promise<z.infer<typeof ClassroomRosterSchema>>;
 }

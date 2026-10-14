@@ -26,6 +26,7 @@ import { AppUpdateState, type AppUpdateSnapshot } from '#contracts/AppUpdate.js'
 import { CompletionMode, TaskOutcomeStatus } from '#contracts/TaskOutcome.js';
 import { microphoneStorageKey } from '../../../src/desktop/renderer/voice/Microphones.js';
 import { App } from '../../../src/desktop/renderer/App.js';
+import { AnalyticsScreen } from '#contracts/Analytics.js';
 import {
   DesktopLocale,
   localeStorageKey,
@@ -33,14 +34,19 @@ import {
 import { LocaleProvider } from '../../../src/desktop/renderer/localization/LocaleProvider.js';
 import { desktopTheme, resolveDesktopCssVariables } from '../../../src/desktop/renderer/Theme.js';
 
-const testUser: AuthUser = { id: 'test-user', name: 'Alex Example', email: 'alex@example.test' };
+const testUser: AuthUser = {
+  id: 'test-user',
+  name: 'Alex Example',
+  email: 'alex@example.test',
+  isAdmin: false,
+};
 const sessionId = 'a8f6d44a-5c18-4ce3-9237-44624549f63f';
 
 function createDesktopBridge() {
   return {
     controlClassroom: vi.fn<NonNullable<DesktopBridge['controlClassroom']>>().mockResolvedValue({
       kind: 'home',
-      home: { role: AccountRole.STUDENT, courses: [], classes: [] },
+      home: { role: AccountRole.STUDENT, isAdmin: false, courses: [], classes: [] },
     }),
     readAppUpdate: vi
       .fn<DesktopBridge['readAppUpdate']>()
@@ -149,6 +155,131 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   window.localStorage.clear();
+});
+
+describe('optional usage sharing', () => {
+  function createAnalyticsBridge(configured = true) {
+    return {
+      ...createDesktopBridge(),
+      readAnalyticsStatus: vi
+        .fn<NonNullable<DesktopBridge['readAnalyticsStatus']>>()
+        .mockResolvedValue({ kind: 'ok', status: { configured, enabled: false } }),
+      setAnalyticsEnabled: vi
+        .fn<NonNullable<DesktopBridge['setAnalyticsEnabled']>>()
+        .mockImplementation((enabled) =>
+          Promise.resolve({ kind: 'ok', status: { configured, enabled } }),
+        ),
+      trackScreenView: vi.fn<NonNullable<DesktopBridge['trackScreenView']>>().mockResolvedValue(),
+    } satisfies DesktopBridge;
+  }
+
+  it('explains installation sharing and keeps it unavailable without a project', async () => {
+    const bridge = createAnalyticsBridge(false);
+    window.tro = bridge;
+    renderDesktop();
+    await screen.findByText(testUser.email);
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(screen.getByRole('switch', { name: 'Share app usage' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    expect(screen.getByText(/Names, emails, screenshots, audio and student work/)).toHaveProperty(
+      'textContent',
+      expect.stringContaining('all accounts on this installation'),
+    );
+    expect(bridge.trackScreenView).not.toHaveBeenCalled();
+  });
+
+  it('tracks the enabled default without opening settings or a first-launch sharing prompt', async () => {
+    const bridge = createAnalyticsBridge();
+    bridge.readAnalyticsStatus.mockResolvedValue({
+      kind: 'ok',
+      status: { configured: true, enabled: true },
+    });
+    window.tro = bridge;
+    renderDesktop();
+    await screen.findByText(testUser.email);
+    await waitFor(() => {
+      expect(bridge.trackScreenView).toHaveBeenCalledExactlyOnceWith(AnalyticsScreen.WORKSPACE);
+    });
+    expect(bridge.setAnalyticsEnabled).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull();
+    expect(screen.queryByRole('switch', { name: 'Share app usage' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(screen.getByRole('switch', { name: 'Share app usage' })).toHaveProperty('checked', true);
+    expect(screen.getByText(/On by default/)).toBeTruthy();
+  });
+
+  it('tracks only fixed screen names after re-enabling and stops after opt-out', async () => {
+    const bridge = createAnalyticsBridge();
+    window.tro = bridge;
+    renderDesktop();
+    await screen.findByText(testUser.email);
+    expect(bridge.trackScreenView).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Share app usage' }));
+    await waitFor(() => {
+      expect(bridge.trackScreenView).toHaveBeenCalledExactlyOnceWith(AnalyticsScreen.WORKSPACE);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Close settings' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Classroom' }));
+    await waitFor(() => {
+      expect(bridge.trackScreenView).toHaveBeenLastCalledWith(AnalyticsScreen.CLASSROOM);
+    });
+    act(() => {
+      window.location.hash = '#/classroom/11111111-1111-4111-8111-111111111111';
+    });
+    await waitFor(() => {
+      expect(window.location.hash).toContain('11111111');
+    });
+    expect(bridge.trackScreenView.mock.calls).toEqual([
+      [AnalyticsScreen.WORKSPACE],
+      [AnalyticsScreen.CLASSROOM],
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Share app usage' }));
+    await waitFor(() => {
+      expect(screen.getByRole('switch', { name: 'Share app usage' })).toHaveProperty(
+        'checked',
+        false,
+      );
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Close settings' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+    expect(bridge.trackScreenView).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows and retries a save error in Vietnamese without silently enabling sharing', async () => {
+    window.localStorage.setItem(localeStorageKey, DesktopLocale.VIETNAMESE);
+    const bridge = createAnalyticsBridge();
+    bridge.setAnalyticsEnabled.mockResolvedValueOnce({ kind: 'failed' });
+    window.tro = bridge;
+    renderDesktop();
+    await screen.findByText(testUser.email);
+    fireEvent.click(screen.getByRole('button', { name: 'Cài đặt' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Chia sẻ dữ liệu sử dụng' }));
+    await screen.findByText(/Không thể lưu tùy chọn này/);
+    expect(screen.getByRole('switch', { name: 'Chia sẻ dữ liệu sử dụng' })).toHaveProperty(
+      'checked',
+      false,
+    );
+    expect(bridge.trackScreenView).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /^Thử lại$/ }));
+    await waitFor(() => {
+      expect(screen.getByRole('switch', { name: 'Chia sẻ dữ liệu sử dụng' })).toHaveProperty(
+        'checked',
+        true,
+      );
+    });
+    expect(bridge.setAnalyticsEnabled).toHaveBeenLastCalledWith(true);
+    expect(screen.queryByText(/Không thể lưu tùy chọn này/)).toBeNull();
+  });
 });
 
 describe('startup sign-in checks', () => {
@@ -1606,6 +1737,7 @@ it('shows teacher preparation and invitation controls only with a server-provide
     kind: 'home',
     home: {
       role: AccountRole.TEACHER,
+      isAdmin: false,
       courses: [
         {
           id: context.courseRevisionId,
@@ -1659,6 +1791,7 @@ it.each([true, false])(
           kind: 'home',
           home: {
             role: 'teacher',
+            isAdmin: false,
             courses: [],
             classes: [
               {
@@ -1972,7 +2105,12 @@ it.each([MaterialState.COLLECTING, MaterialState.QUEUED, MaterialState.PREPARING
 
 function createSavedAccountBridge() {
   const bridge = createDesktopBridge();
-  const student: AuthUser = { id: 'student-user', name: 'Minh Nguyen', email: 'minh@example.test' };
+  const student: AuthUser = {
+    id: 'student-user',
+    name: 'Minh Nguyen',
+    email: 'minh@example.test',
+    isAdmin: false,
+  };
   const teacherId = '11111111-1111-4111-8111-111111111111';
   const studentId = '22222222-2222-4222-8222-222222222222';
   const readSavedAccounts = vi
@@ -2094,6 +2232,7 @@ it('restores an existing classroom participation when the desktop opens', async 
         kind: 'home',
         home: {
           role: AccountRole.STUDENT,
+          isAdmin: false,
           courses: [],
           classes: [
             {

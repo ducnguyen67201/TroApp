@@ -158,6 +158,50 @@ in `src/server/config/`, exported by `Index.ts`. Credentials remain in `Env.ts`.
 
 ## Desktop and native companion
 
+### PostHog usage tracking
+
+The desktop supports optional [PostHog product analytics](https://posthog.com/docs/libraries/node).
+In an ignored `.env.local`, set `MAIN_VITE_POSTHOG_PROJECT_TOKEN` to the public
+project token and `MAIN_VITE_POSTHOG_HOST` to `https://us.i.posthog.com` or
+`https://eu.i.posthog.com`. Supply both or neither; personal API keys are rejected.
+Restart development or rebuild the desktop after changing these build settings.
+For installed releases, set the same two public variables in the GitHub `release`
+environment before running the Mac or Windows release workflow. No backend secret
+or PostHog management credential belongs in the desktop.
+
+Sharing is on by default when PostHog is configured, with no first-launch prompt,
+and applies to all accounts using this installation. Existing saved opt-outs remain
+off. Use **Settings → General → Share app usage** to turn it off. Disabling stops subsequent
+collection and aborts queued/in-flight delivery; it cannot remove already received
+PostHog events. Re-enabling generates a new random installation identifier.
+Preference save failures are visible and can be retried; a failed opt-out save
+still disables sharing until restart.
+
+Events cover app openings, fixed screen names, agent task starts/results/durations,
+explicit classroom join/leave/start/end/check/submit outcomes, onboarding transitions
+and renderer process failures. Ordinary refreshes are excluded. Practice-check
+success means the API accepted the operation, not that a student passed assessment.
+The [event contract](src/contracts/Analytics.ts) owns the allowed properties.
+No names, emails, account/class identifiers, instructions, student work, URLs,
+screenshots, audio, raw errors or session recordings are sent. GeoIP enrichment,
+person profiles, automatic exception capture and feature flags are disabled.
+
+In PostHog, use `app_opened` unique identifiers for active installations,
+`screen_viewed` broken down by `screen` for feature discovery, and
+`agent_task_finished` broken down by `result`, `outcome` or `teachingOutcome`
+for task outcomes. Filter `appEnvironment` to separate development from production.
+Counts cover installations with sharing enabled, not individual students or learning attainment.
+Delivery is bounded and best effort; offline events are not saved to disk.
+
+For a manual smoke check, use a test project, launch a fresh installation, navigate between
+screens, and inspect PostHog Activity for only the allowed properties. Turn sharing
+off and repeat; no new events should arrive after already-sent requests settle.
+Relaunch and verify the saved opt-out remains off, then re-enable it in Settings
+if desired. A fresh configured installation saves its random identity before sending.
+Automated tests use fakes and do not send events to a real project.
+
+### Native setup
+
 ```sh
 pnpm build:cua
 pnpm dev:desktop
@@ -427,6 +471,18 @@ student who has signed in or provide an invitation code. Start a session and sel
 its section, stage and pacing. Sign in as an enrolled student and explicitly join.
 Account switching permits sequential teacher/student checks on one device; it does
 not establish simultaneous two-device behavior.
+
+Accounts also have a separate `User.isAdmin` boolean, defaulting to false. After
+applying the committed migration, an operator can set it in the backend database
+for the intended account (the Prisma `User` model maps to the `user` table).
+Refresh Classroom to pick up a change, then select **Admin view** to search and
+switch between other teachers' classes. This view shows published course content,
+sessions and student progress without changing enrollment or teacher ownership.
+Setting the field back to false revokes admin viewing on the next request. No
+account is granted admin access by the migration. Apply it with `pnpm db:deploy`
+against the intended backend before deploying the updated API. Existing desktop
+releases retain their original classroom response; admin viewing requires the
+updated desktop.
 
 Enable and approve a practice checkpoint before testing **Check my work**. In a
 joined Practice activity, choose a work window, then use **Check current window**,

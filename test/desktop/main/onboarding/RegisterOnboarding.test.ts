@@ -1,6 +1,10 @@
 import { expect, it, vi } from 'vitest';
 import type { OnboardingReply } from '#contracts/Onboarding.js';
-import { OnboardingAction, OnboardingFailure } from '#contracts/OnboardingValues.js';
+import {
+  OnboardingAction,
+  OnboardingFailure,
+  OnboardingStatus,
+} from '#contracts/OnboardingValues.js';
 import {
   registerOnboardingHandlers,
   type OnboardingAccess,
@@ -15,6 +19,7 @@ interface TestEvent {
 }
 
 function createHandlers() {
+  const recordProgress = vi.fn<(action: OnboardingAction, status: OnboardingStatus) => void>();
   const store = {
     readProgress: vi
       .fn<OnboardingStore['readProgress']>()
@@ -30,7 +35,7 @@ function createHandlers() {
     isTrustedSender: (event: TestEvent) => event.trusted,
     readSession: vi.fn<OnboardingAccess<TestEvent>['readSession']>().mockResolvedValue({
       kind: 'signed-in',
-      user: { id: 'current', name: 'Sample', email: 'sample@example.test' },
+      user: { id: 'current', name: 'Sample', email: 'sample@example.test', isAdmin: false },
     }),
   } satisfies OnboardingAccess<TestEvent>;
   const handlers = new Map<string, (event: TestEvent, raw: unknown) => Promise<OnboardingReply>>();
@@ -42,9 +47,11 @@ function createHandlers() {
     },
     access,
     new OnboardingService(store),
+    recordProgress,
   );
   return {
     store,
+    recordProgress,
     access,
     gate,
     invoke: async (channel: string, raw: unknown, event: TestEvent = { trusted: true }) => {
@@ -85,6 +92,31 @@ it('checks sender and active identity before disk access and rejects injected ca
   expect(store.saveProgress).toHaveBeenCalledTimes(2);
 });
 
+it('reports only successful onboarding transitions and ignores analytics failures', async () => {
+  const { invoke, recordProgress } = createHandlers();
+  await invoke('tro:onboarding-read', { expectedAccountId: 'current' });
+  await invoke('tro:onboarding-update', {
+    expectedAccountId: 'current',
+    expectedRevision: 5,
+    action: OnboardingAction.START,
+  });
+  expect(recordProgress).not.toHaveBeenCalled();
+  recordProgress.mockImplementation(() => {
+    throw new Error('analytics unavailable');
+  });
+  expect(
+    await invoke('tro:onboarding-update', {
+      expectedAccountId: 'current',
+      expectedRevision: 0,
+      action: OnboardingAction.START,
+    }),
+  ).toMatchObject({ kind: 'ok' });
+  expect(recordProgress).toHaveBeenCalledExactlyOnceWith(
+    OnboardingAction.START,
+    OnboardingStatus.IN_PROGRESS,
+  );
+});
+
 it('rechecks the sender after session verification and holds account changes through the operation', async () => {
   const { store, access, gate, invoke } = createHandlers();
   const event = { trusted: true };
@@ -104,7 +136,7 @@ it('rechecks the sender after session verification and holds account changes thr
   event.trusted = false;
   completeSession?.({
     kind: 'signed-in',
-    user: { id: 'current', name: 'Sample', email: 'sample@example.test' },
+    user: { id: 'current', name: 'Sample', email: 'sample@example.test', isAdmin: false },
   });
   expect(await request).toEqual({ kind: 'failed', reason: OnboardingFailure.UNAVAILABLE });
   expect(store.readProgress).not.toHaveBeenCalled();

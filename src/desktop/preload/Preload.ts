@@ -5,6 +5,11 @@ import {
   LessonMediaReplySchema,
 } from '#contracts/LessonVideos.js';
 import {
+  AnalyticsReplySchema,
+  AnalyticsScreenSchema,
+  AnalyticsSetEnabledSchema,
+} from '#contracts/Analytics.js';
+import {
   OnboardingReadSchema,
   OnboardingUpdateSchema,
   OnboardingRestartSchema,
@@ -111,6 +116,32 @@ import {
 /* Expose named session operations, not generic IPC or direct computer tools.
    Validate IPC data before it enters the renderer. */
 const bridge: DesktopBridge = {
+  async readAnalyticsStatus() {
+    try {
+      const reply: unknown = await ipcRenderer.invoke('tro:analytics-status');
+      return AnalyticsReplySchema.parse(reply);
+    } catch {
+      return { kind: 'failed' };
+    }
+  },
+  async setAnalyticsEnabled(enabled) {
+    try {
+      const reply: unknown = await ipcRenderer.invoke(
+        'tro:analytics-enabled',
+        AnalyticsSetEnabledSchema.parse({ enabled }),
+      );
+      return AnalyticsReplySchema.parse(reply);
+    } catch {
+      return { kind: 'failed' };
+    }
+  },
+  async trackScreenView(screen) {
+    try {
+      await ipcRenderer.invoke('tro:analytics-screen', AnalyticsScreenSchema.parse(screen));
+    } catch {
+      /* Optional usage reporting must not interrupt navigation. */
+    }
+  },
   async controlLessonVideos(command) {
     return LessonVideoReplySchema.parse(
       await ipcRenderer.invoke('tro:lesson-videos', LessonVideoCommandSchema.parse(command)),
