@@ -506,20 +506,28 @@ teacher-paced sessions bind the current activity, while self-paced sessions allo
 student selection. Class detail routes remain inside the installed renderer's hash
 router; a route does not authorize class access.
 
-Admins can open a separate read-only class browser in Classroom, search across
-class and teacher names or teacher email, and switch between active classes.
-`ClassroomService` checks the current database flag before listing classes or
-returning a class's published course, sessions and student rosters/progress.
-Live admin rosters use current enrollment. Ended-session admin rosters use saved
-session participation, retaining students who later left or lost enrollment and
-their progress; later enrollees are excluded unless they participated in that
-session. This historical view cannot recover attendance for students who never
-joined, and ordinary teacher roster behavior is unchanged.
-The normal classroom home remains scoped to ownership/enrollment. Admin viewing
-does not enroll the viewer, join a live session, change device participation,
-impersonate a teacher or grant access to mutation commands. Deleted classes are
-excluded. The renderer clears previous class details while switching and discards
-late responses when selection or account changes.
+Admins use the Classroom toolbar's **View as** person picker to select a teacher
+or student, then use the same classroom screens with that person's classroom
+permissions, including changes to classes, materials, sessions, practice and insights.
+The classroom renders one person's class list at a time. Teachers who also enroll
+in classes can switch between classes taught and classes joined; enrolled class
+routes open the student panel instead of appending a second dashboard.
+The signed-in account and cookies remain the administrator's. Main owns the selected
+person in memory and adds a scoped header only to classroom transports. The backend
+checks the persisted admin flag and the target account on every delegated request;
+other APIs reject that header. A target's own admin flag does not grant delegated
+admin operations. Completed requests record actor/subject IDs, operation, route,
+request ID and status, never submitted content, in `classroom.view_as.completed`.
+
+View changes use the account transition gate, clear participation, prepared work,
+insight/export state and abort old transport requests. Active authenticated requests
+and agent work prevent switching. The renderer remounts the existing classroom
+panels and discards late replies. Selecting a student does not automatically restore
+or take over that student's live device lease; joining remains an explicit action.
+Returning to the signed-in account is possible even after admin access is revoked.
+Account changes clear the selection. Paid gateways and non-classroom features keep
+the actual signed-in identity. Legacy read-only admin class endpoints remain for
+older clients; the separate admin browser is no longer rendered.
 
 `ClassroomSessionController` loads fresh authorized context for each class-bound
 Show me request, including pinned course revision, stage, activity, criteria,

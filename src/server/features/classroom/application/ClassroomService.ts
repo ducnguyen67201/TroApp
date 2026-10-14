@@ -72,6 +72,23 @@ export class ClassroomService {
     userId: string,
     command: ClassroomCommand,
   ): Promise<ClassroomReply> {
+    if (command.kind === 'admin-people' || command.kind === 'admin-view-as') {
+      if (!(await store.readIsAdmin(userId))) {
+        throw new ClassroomError(ClassroomFailure.FORBIDDEN);
+      }
+      if (command.kind === 'admin-people') {
+        return {
+          kind: 'admin-people',
+          ...(await store.listClassroomPeople(command.search, command.offset)),
+        };
+      }
+      const person =
+        command.userId === null ? null : await store.readClassroomPerson(command.userId);
+      if (command.userId !== null && !person) {
+        throw new ClassroomError(ClassroomFailure.NOT_FOUND);
+      }
+      return { kind: 'admin-view-as', person };
+    }
     if (command.kind === 'admin-classes' || command.kind === 'admin-class') {
       // Check the stored flag inside every request's transaction, including after revocation.
       if (!(await store.readIsAdmin(userId))) {
