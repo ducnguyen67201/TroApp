@@ -23,6 +23,11 @@ describe('local-only test audio resources', () => {
     const capture = new MicrophoneTestCapture(receive, () => {});
     await capture.startTest('usb');
     expect(getUserMedia.mock.calls[0]?.[0]?.audio).toMatchObject({ deviceId: { exact: 'usb' } });
+    resources.port.onmessage?.(
+      new MessageEvent('message', { data: { kind: 'level', levelDb: -30 } }),
+    );
+    expect(receive).toHaveBeenCalledWith({ kind: 'level', levelDb: -30 });
+    expect(stream.track.stop).not.toHaveBeenCalled();
     const measurement = { version: 1, noiseDb: -50, speechDb: -20, clippedFraction: 0 };
     resources.port.onmessage?.(
       new MessageEvent('message', { data: { kind: 'result', measurement } }),
@@ -34,6 +39,25 @@ describe('local-only test audio resources', () => {
     expect(resources.port.onmessage).toBeNull();
     capture.dispose();
     expect(stream.track.stop).toHaveBeenCalledOnce();
+  });
+
+  it('rejects raw audio attached to a live level and closes its resources', async () => {
+    const stream = new TestAudioStream(new TestAudioTrack());
+    const resources = stubCapture(vi.fn<MediaDevices['getUserMedia']>().mockResolvedValue(stream));
+    const receive = vi.fn<(event: MicrophoneMeasurementEvent) => void>();
+    const fail = vi.fn<() => void>();
+    const capture = new MicrophoneTestCapture(receive, fail);
+    await capture.startTest('usb');
+    resources.port.onmessage?.(
+      new MessageEvent('message', {
+        data: { kind: 'level', levelDb: -30, samples: new Float32Array(128) },
+      }),
+    );
+    expect(receive).not.toHaveBeenCalled();
+    expect(fail).toHaveBeenCalledOnce();
+    expect(stream.track.stop).toHaveBeenCalledOnce();
+    expect(resources.closeContext).toHaveBeenCalledOnce();
+    expect(resources.closePort).toHaveBeenCalledOnce();
   });
 
   it('stops late streams after canceled permission/setup', async () => {

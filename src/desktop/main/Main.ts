@@ -393,6 +393,22 @@ async function startDesktop(): Promise<void> {
     whatsNew.execute(raw, isTrustedSender(event)),
   );
   let isStartingMicrophone = false;
+  let microphoneTestStartGeneration = 0;
+  let pendingMicrophoneTestStart: { testId: string; generation: number } | null = null;
+
+  /** Release only the startup guard owned by the canceled local capture. */
+  function cancelMicrophoneTestStart(testId?: string): void {
+    if (
+      pendingMicrophoneTestStart === null ||
+      (testId !== undefined && pendingMicrophoneTestStart.testId !== testId)
+    ) {
+      return;
+    }
+    pendingMicrophoneTestStart = null;
+    microphoneTestStartGeneration += 1;
+    isStartingMicrophone = false;
+  }
+
   const cancelShortcut = new GlobalTaskCancelShortcut(globalShortcut);
   const cancelVoiceover = (): void => {
     voiceEnableGeneration += 1;
@@ -401,6 +417,7 @@ async function startDesktop(): Promise<void> {
     narration.clearTask();
     desktopCompanion?.reset();
     voice?.cancelVoiceCapture();
+    cancelMicrophoneTestStart();
     microphoneTests?.cancelTest();
   };
   const playbackReplies = new Map<string, (accepted: boolean) => void>();
@@ -1011,6 +1028,7 @@ async function startDesktop(): Promise<void> {
       };
     },
     emit: (event) => {
+      cancelMicrophoneTestStart(event.testId);
       if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
         mainWindow.webContents.send('tro:microphone-test-event', event);
       }
@@ -1025,20 +1043,39 @@ async function startDesktop(): Promise<void> {
         return { kind: 'failed' };
       }
       if (parsed.data.kind === 'stop') {
+        cancelMicrophoneTestStart(parsed.data.testId);
         return microphoneTests.stopTest(parsed.data.testId);
       }
       if (isStartingMicrophone || accountGate.isChanging() || auth.isAddingAccount()) {
         return { kind: 'failed' };
       }
+      if (parsed.data.kind === 'renew') {
+        return microphoneTests.renewTest(parsed.data.testId);
+      }
       isStartingMicrophone = true;
+      const pendingStart = {
+        testId: parsed.data.testId,
+        generation: ++microphoneTestStartGeneration,
+      };
+      pendingMicrophoneTestStart = pendingStart;
+      const isCurrentStart = (): boolean =>
+        pendingMicrophoneTestStart?.generation === pendingStart.generation;
       const generation = voiceEnableGeneration;
       try {
-        if (!(await narration.stopSpeaking()) || generation !== voiceEnableGeneration) {
+        if (
+          !(await narration.stopSpeaking()) ||
+          generation !== voiceEnableGeneration ||
+          !isCurrentStart()
+        ) {
           return { kind: 'failed' };
         }
-        return await microphoneTests.startTest(parsed.data.testId);
+        return await microphoneTests.startTest(parsed.data.testId, parsed.data.mode);
       } finally {
-        isStartingMicrophone = false;
+        /* A canceled request must not release a newer test or voice startup guard. */
+        if (isCurrentStart()) {
+          pendingMicrophoneTestStart = null;
+          isStartingMicrophone = false;
+        }
       }
     },
   );
@@ -1048,6 +1085,7 @@ async function startDesktop(): Promise<void> {
     for (const finish of [...playbackReplies.values()]) {
       finish(false);
     }
+    cancelMicrophoneTestStart();
     microphoneTests?.cancelTest();
     voiceKeysReleased = true;
     voiceEnableGeneration += 1;
@@ -1058,6 +1096,7 @@ async function startDesktop(): Promise<void> {
 
   powerMonitor.on('suspend', () => {
     narration.clearTask();
+    cancelMicrophoneTestStart();
     microphoneTests?.cancelTest();
     voiceShortcut.reset();
     voice?.cancelVoiceCapture();
@@ -1065,6 +1104,7 @@ async function startDesktop(): Promise<void> {
   });
   powerMonitor.on('lock-screen', () => {
     narration.clearTask();
+    cancelMicrophoneTestStart();
     microphoneTests?.cancelTest();
     voiceShortcut.reset();
     voice?.cancelVoiceCapture();
@@ -1383,6 +1423,7 @@ async function startDesktop(): Promise<void> {
     window.webContents.on('did-start-navigation', (_event, _url, _inPlace, isMainFrame) => {
       if (isMainFrame) {
         narration.clearTask();
+        cancelMicrophoneTestStart();
         microphoneTests?.cancelTest();
       }
     });

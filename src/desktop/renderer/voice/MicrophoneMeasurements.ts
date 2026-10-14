@@ -25,6 +25,7 @@ export interface MicrophoneTestResult extends MicrophoneMeasurement {
 }
 
 export const MicrophoneMeasurementEventSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('level'), levelDb: LevelSchema }),
   z.strictObject({
     kind: z.literal('progress'),
     phase: z.enum([MicrophoneTestPhase.QUIET, MicrophoneTestPhase.SPEAKING]),

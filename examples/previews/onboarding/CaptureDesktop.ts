@@ -168,7 +168,7 @@ window.tro = {
     }),
   appendVoiceAudio: () => Promise.resolve({ kind: 'failed' }),
   updateVoiceMeter: () => {},
-  controlMicrophoneTest: () => Promise.resolve({ kind: 'ok' }),
+  controlMicrophoneTest: () => Promise.resolve({ kind: 'failed' }),
   subscribeMicrophoneTest: () => () => {},
   readAppUpdate: () => Promise.resolve({ revision: 0, status: { state: 'disabled' } }),
   subscribeAppUpdate: () => () => {},

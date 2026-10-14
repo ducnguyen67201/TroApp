@@ -4,14 +4,18 @@ import {
   speechTestSeconds,
 } from './MicrophoneTestTiming.js';
 import type { MicrophoneMeasurementEvent } from './MicrophoneMeasurements.js';
+import { MicrophoneLevelCollector } from './MicrophoneLevelCollector.js';
 
-interface SampleTotals {
+interface SampleEnergy {
   count: number;
   squares: number;
+}
+
+interface SampleTotals extends SampleEnergy {
   clipped: number;
 }
 
-function convertToDecibels(totals: SampleTotals): number {
+function convertToDecibels(totals: SampleEnergy): number {
   return Math.max(-120, Math.min(0, 10 * Math.log10(totals.squares / Math.max(1, totals.count))));
 }
 
@@ -19,10 +23,13 @@ function convertToDecibels(totals: SampleTotals): number {
 export class MicrophoneMeasurementCollector {
   private readonly quiet: SampleTotals = { count: 0, squares: 0, clipped: 0 };
   private readonly speech: SampleTotals = { count: 0, squares: 0, clipped: 0 };
+  private readonly levels: MicrophoneLevelCollector;
   private count = 0;
   private previousSecond = -1;
 
-  constructor(private readonly sampleRate: number) {}
+  constructor(private readonly sampleRate: number) {
+    this.levels = new MicrophoneLevelCollector(sampleRate);
+  }
 
   collectSamples(samples: Float32Array): MicrophoneMeasurementEvent[] {
     const events: MicrophoneMeasurementEvent[] = [];
@@ -30,14 +37,16 @@ export class MicrophoneMeasurementCollector {
     if (this.count >= totalSamples) {
       return events;
     }
+    const previousCount = this.count;
     for (const sample of samples) {
       if (this.count >= totalSamples) {
         break;
       }
       const totals = this.count < this.sampleRate * quietTestSeconds ? this.quiet : this.speech;
       const boundedSample = Number.isFinite(sample) ? Math.max(-1, Math.min(1, sample)) : 0;
+      const squaredSample = boundedSample * boundedSample;
       totals.count += 1;
-      totals.squares += boundedSample * boundedSample;
+      totals.squares += squaredSample;
       if (Math.abs(boundedSample) >= 0.99) {
         totals.clipped += 1;
       }
@@ -55,6 +64,11 @@ export class MicrophoneMeasurementCollector {
         });
       }
       this.count += 1;
+    }
+    for (const levelDb of this.levels.collectSamples(
+      samples.subarray(0, this.count - previousCount),
+    )) {
+      events.push({ kind: 'level', levelDb });
     }
     if (this.count === totalSamples) {
       events.push({

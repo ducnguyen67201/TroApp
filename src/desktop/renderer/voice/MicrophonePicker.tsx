@@ -1,5 +1,7 @@
 import { MicrophoneTools } from './MicrophoneTools.js';
+import { MicrophoneInputLevel } from './MicrophoneInputLevel.js';
 import type { MicrophoneTestsView } from './UseMicrophoneTests.js';
+import type { MicrophonePreviewView } from './UseMicrophonePreview.js';
 import { Alert, Badge, Button, Group, Modal, Stack, Text } from '@mantine/core';
 import { useId, useState, type ReactElement } from 'react';
 import { useLocale } from '../localization/UseLocale.js';
@@ -10,6 +12,7 @@ interface MicrophonePickerProps {
   opened: boolean;
   stackId?: string;
   tests: MicrophoneTestsView;
+  preview: MicrophonePreviewView;
   canTest: boolean;
   onClose: () => void;
   onExitTransitionEnd: () => void;
@@ -69,7 +72,7 @@ function MicrophoneOption({
             </Badge>
           )}
         </span>
-        <span className="microphone-option-copy" id={descriptionId}>
+        <span className="microphone-option-copy" id={descriptionId} hidden={!isSelected}>
           {detail && (
             <Text component="span" size="sm">
               {detail}
@@ -89,11 +92,12 @@ function MicrophoneOption({
   );
 }
 
-/** Opening the dialog enumerates only. Tests require an explicit button press. */
+/** The open picker previews input automatically; guided comparisons remain optional. */
 export function MicrophonePicker({
   opened,
   stackId,
   tests,
+  preview,
   canTest,
   onClose,
   onExitTransitionEnd,
@@ -134,8 +138,9 @@ export function MicrophonePicker({
       onExitTransitionEnd={onExitTransitionEnd}
       title={messages.microphone}
       size={isComparing ? 'lg' : 'md'}
+      classNames={{ content: 'microphone-picker', body: 'microphone-picker-body' }}
     >
-      <Stack gap="md">
+      <Stack gap="sm">
         <Text size="sm" c="dimmed">
           {messages.microphoneDescription}
         </Text>
@@ -165,6 +170,12 @@ export function MicrophonePicker({
             {messages.microphoneUnavailable}
           </Alert>
         )}
+        <MicrophoneInputLevel
+          microphones={microphones}
+          tests={tests}
+          preview={preview}
+          canPreview={isEnabled && canTest}
+        />
         <fieldset
           className="microphone-options"
           disabled={!isEnabled || tests.activeDeviceId !== null}
@@ -219,7 +230,7 @@ export function MicrophonePicker({
             {messages.microphoneStorageWarning}
           </Text>
         )}
-        <Group>
+        <Group gap="xs">
           <Button
             variant="subtle"
             disabled={!isEnabled || tests.activeDeviceId !== null}
@@ -242,14 +253,16 @@ export function MicrophonePicker({
             {messages.microphoneCompare}
           </Button>
         </Group>
-        <MicrophoneTools
-          microphones={microphones}
-          tests={tests}
-          canTest={canTest}
-          isEditingRanking={isEditingRanking}
-          isComparing={isComparing}
-        />
-        <Group justify="space-between">
+        {(isEditingRanking || isComparing) && (
+          <MicrophoneTools
+            microphones={microphones}
+            tests={tests}
+            canTest={canTest}
+            isEditingRanking={isEditingRanking}
+            isComparing={isComparing}
+          />
+        )}
+        <Group justify="space-between" className="microphone-picker-footer">
           <Button
             variant="default"
             disabled={!isEnabled}

@@ -13,6 +13,7 @@ export interface MicrophoneTestsView {
   activeDeviceId: string | null;
   phase: MicrophoneTestPhase;
   secondsRemaining: number;
+  inputLevelDb: number | null;
   results: MicrophoneTestResult[];
   hasError: boolean;
   startTest: (deviceId: string) => Promise<void>;
@@ -32,6 +33,7 @@ export function useMicrophoneTests(
   const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null);
   const [phase, setPhase] = useState<MicrophoneTestPhase>(MicrophoneTestPhase.OPENING);
   const [secondsRemaining, setSecondsRemaining] = useState(0);
+  const [inputLevelDb, setInputLevelDb] = useState<number | null>(null);
   const [results, setResults] = useState<MicrophoneTestResult[]>([]);
   const [hasError, setHasError] = useState(false);
   const active = useRef<ActiveMicrophoneTest | null>(null);
@@ -47,6 +49,7 @@ export function useMicrophoneTests(
       void window.tro.controlMicrophoneTest({ kind: 'stop', testId: test.testId });
     }
     setActiveDeviceId(null);
+    setInputLevelDb(null);
   }, []);
 
   useEffect(() => {
@@ -109,6 +112,10 @@ export function useMicrophoneTests(
         if (!isCurrentTest()) {
           return;
         }
+        if (event.kind === 'level') {
+          setInputLevelDb(event.levelDb);
+          return;
+        }
         firstSampleAt ??= performance.now();
         if (event.kind === 'progress') {
           setPhase(event.phase);
@@ -130,6 +137,7 @@ export function useMicrophoneTests(
       setActiveDeviceId(deviceId);
       setPhase(MicrophoneTestPhase.OPENING);
       setSecondsRemaining(0);
+      setInputLevelDb(null);
       setHasError(false);
       setResults((previous) => previous.filter((result) => result.deviceId !== deviceId));
       try {
@@ -155,5 +163,14 @@ export function useMicrophoneTests(
     [cancelTest],
   );
 
-  return { activeDeviceId, phase, secondsRemaining, results, hasError, startTest, cancelTest };
+  return {
+    activeDeviceId,
+    phase,
+    secondsRemaining,
+    inputLevelDb,
+    results,
+    hasError,
+    startTest,
+    cancelTest,
+  };
 }

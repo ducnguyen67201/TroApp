@@ -42,6 +42,25 @@ const testUser: AuthUser = {
 };
 const sessionId = 'a8f6d44a-5c18-4ce3-9237-44624549f63f';
 
+const microphonePreviews = vi.hoisted(() => ({
+  instances: new Array<{
+    receive: (levelDb: number) => void;
+    dispose: () => void;
+  }>(),
+  startPreview: vi.fn<(deviceId: string) => Promise<void>>().mockResolvedValue(),
+}));
+
+vi.mock('../../../src/desktop/renderer/voice/MicrophonePreviewCapture.js', () => ({
+  MicrophonePreviewCapture: class {
+    dispose = vi.fn<() => void>();
+    startPreview = microphonePreviews.startPreview;
+
+    constructor(readonly receive: (levelDb: number) => void) {
+      microphonePreviews.instances.push(this);
+    }
+  },
+}));
+
 function createDesktopBridge() {
   return {
     controlClassroom: vi.fn<NonNullable<DesktopBridge['controlClassroom']>>().mockResolvedValue({
@@ -144,6 +163,8 @@ afterAll(() => {
 });
 
 beforeEach(() => {
+  microphonePreviews.instances.length = 0;
+  microphonePreviews.startPreview.mockClear();
   window.location.hash = '#/workspace';
   window.localStorage.clear();
   window.localStorage.setItem(localeStorageKey, DesktopLocale.ENGLISH);
@@ -1267,7 +1288,7 @@ it('renders a voice takeover with the same typed teaching outcome', async () => 
   ).toBeTruthy();
 });
 
-it('selects and saves a suggested microphone from the accessible picker without opening audio', async () => {
+it('automatically previews the selected microphone, saves changes and stops when the picker closes', async () => {
   function createDevice(deviceId: string, label: string): MediaDeviceInfo {
     return {
       deviceId,
@@ -1300,6 +1321,10 @@ it('selects and saves a suggested microphone from the accessible picker without 
     renderDesktop();
     fireEvent.click(await screen.findByRole('button', { name: 'Microphone' }));
     const dialog = await screen.findByRole('dialog', { name: 'Microphone' });
+    await waitFor(() => {
+      expect(microphonePreviews.startPreview).toHaveBeenCalledWith('default');
+    });
+    expect(within(dialog).queryByRole('button', { name: 'Test input' })).toBeNull();
     expect(await within(dialog).findByText('Suggested')).toBeTruthy();
     expect(
       within(dialog).getAllByText(
@@ -1310,8 +1335,22 @@ it('selects and saves a suggested microphone from the accessible picker without 
     expect(usbOption.getAttribute('aria-describedby')).toBeTruthy();
     expect(within(dialog).getByText('2 microphone inputs')).toBeTruthy();
     fireEvent.click(usbOption);
+    await waitFor(() => {
+      expect(microphonePreviews.startPreview).toHaveBeenCalledWith('usb');
+    });
+    const activePreview = microphonePreviews.instances.at(-1);
+    if (!activePreview) {
+      throw new Error('Missing microphone preview');
+    }
+    act(() => {
+      activePreview.receive(-30);
+    });
+    expect(
+      within(dialog).getByRole('meter', { name: 'Input level' }).getAttribute('aria-valuenow'),
+    ).toBe('50');
     expect(window.localStorage.getItem(microphoneStorageKey)).toBe('usb');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+    expect(activePreview.dispose).toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     const settings = screen.getByRole('dialog', { name: 'Settings' });
     expect(within(settings).getByText('USB microphone')).toBeTruthy();
@@ -1339,7 +1378,7 @@ it('selects and saves a suggested microphone from the accessible picker without 
       true,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Compare microphones' }));
-    expect(screen.getByText(/Sound is measured on this device/)).toBeTruthy();
+    expect(screen.getByText(/Each comparison measures one microphone/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Test AirPods' })).toBeTruthy();
     expect(getUserMedia).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
@@ -1349,6 +1388,182 @@ it('selects and saves a suggested microphone from the accessible picker without 
       expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull();
     });
     expect(screen.getByRole('textbox', { name: 'Your message' })).toBeTruthy();
+  } finally {
+    cleanup();
+    Reflect.deleteProperty(navigator, 'mediaDevices');
+  }
+});
+
+it('releases the automatic preview before retrying voice startup and resumes after voice becomes idle', async () => {
+  const bridge = createDesktopBridge();
+  const operations: string[] = [];
+  let enableAttempts = 0;
+  let finishRetry: ((reply: VoiceReply) => void) | undefined;
+  bridge.controlVoiceInput.mockImplementation((command) => {
+    if (command.kind === 'enable') {
+      enableAttempts += 1;
+      if (enableAttempts === 1) {
+        operations.push('voice-enable-failed');
+        return Promise.resolve({ kind: 'failed' });
+      }
+      operations.push('voice-enable-retry');
+      return new Promise((resolve) => {
+        finishRetry = resolve;
+      });
+    }
+    return Promise.resolve({
+      kind: 'ok',
+      status: {
+        state: VoiceState.DISABLED,
+        shortcut: VoiceShortcut.COMMAND_CONTROL,
+        globalShortcutAvailable: false,
+      },
+    });
+  });
+  let releasePreview: (() => void) | undefined;
+  let shouldDelayRelease = true;
+  bridge.controlMicrophoneTest.mockImplementation((command) => {
+    if (command.kind === 'stop' && shouldDelayRelease) {
+      operations.push('preview-stop');
+      return new Promise((resolve) => {
+        releasePreview = () => {
+          shouldDelayRelease = false;
+          operations.push('preview-released');
+          resolve({ kind: 'ok' });
+        };
+      });
+    }
+    return Promise.resolve({ kind: 'ok' });
+  });
+  window.tro = bridge;
+  const events = new EventTarget();
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: {
+      enumerateDevices: vi.fn<MediaDevices['enumerateDevices']>().mockResolvedValue([]),
+      addEventListener: events.addEventListener.bind(events),
+      removeEventListener: events.removeEventListener.bind(events),
+    },
+  });
+  try {
+    renderDesktop();
+    fireEvent.click(await screen.findByRole('button', { name: 'Microphone' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Microphone' });
+    const retryButton = await within(dialog).findByRole('button', { name: 'Retry voice startup' });
+    await waitFor(() => {
+      expect(microphonePreviews.startPreview).toHaveBeenCalledExactlyOnceWith('default');
+    });
+    const activePreview = microphonePreviews.instances.at(-1);
+    if (!activePreview) {
+      throw new Error('Missing automatic microphone preview');
+    }
+    vi.mocked(activePreview.dispose).mockImplementation(() => {
+      operations.push('preview-disposed');
+    });
+    fireEvent.click(retryButton);
+    await waitFor(() => {
+      expect(releasePreview).toBeTypeOf('function');
+    });
+    expect(activePreview.dispose).toHaveBeenCalledOnce();
+    expect(enableAttempts).toBe(1);
+    expect(operations).toEqual(['voice-enable-failed', 'preview-disposed', 'preview-stop']);
+
+    await act(async () => {
+      releasePreview?.();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(finishRetry).toBeTypeOf('function');
+    });
+    expect(operations).toEqual([
+      'voice-enable-failed',
+      'preview-disposed',
+      'preview-stop',
+      'preview-released',
+      'voice-enable-retry',
+    ]);
+    expect(microphonePreviews.startPreview).toHaveBeenCalledOnce();
+    await act(async () => {
+      finishRetry?.({
+        kind: 'ok',
+        status: {
+          state: VoiceState.IDLE,
+          shortcut: VoiceShortcut.COMMAND_CONTROL,
+          globalShortcutAvailable: true,
+        },
+      });
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(microphonePreviews.startPreview).toHaveBeenCalledTimes(2);
+      expect(within(dialog).getByRole('status').textContent).toBe('Listening');
+    });
+    expect(microphonePreviews.startPreview).toHaveBeenLastCalledWith('default');
+    expect(within(dialog).queryByRole('button', { name: 'Retry voice startup' })).toBeNull();
+  } finally {
+    cleanup();
+    Reflect.deleteProperty(navigator, 'mediaDevices');
+  }
+});
+
+it('does not revive a comparison after the picker closes and reopens while releasing its preview', async () => {
+  const bridge = createDesktopBridge();
+  let finishRelease: (() => void) | undefined;
+  bridge.controlMicrophoneTest.mockImplementation((command) => {
+    if (command.kind === 'stop') {
+      return new Promise((resolve) => {
+        finishRelease = () => {
+          resolve({ kind: 'ok' });
+        };
+      });
+    }
+    return Promise.resolve({ kind: 'ok' });
+  });
+  window.tro = bridge;
+  const events = new EventTarget();
+  const device: MediaDeviceInfo = {
+    deviceId: 'usb',
+    groupId: 'usb',
+    kind: 'audioinput',
+    label: 'USB microphone',
+    toJSON: () => ({ deviceId: 'usb', label: 'USB microphone' }),
+  };
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: {
+      enumerateDevices: vi.fn<MediaDevices['enumerateDevices']>().mockResolvedValue([device]),
+      addEventListener: events.addEventListener.bind(events),
+      removeEventListener: events.removeEventListener.bind(events),
+    },
+  });
+  try {
+    renderDesktop();
+    fireEvent.click(await screen.findByRole('button', { name: 'Microphone' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Microphone' });
+    await waitFor(() => {
+      expect(microphonePreviews.startPreview).toHaveBeenCalledWith('default');
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Compare microphones' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Test USB microphone' }));
+    await waitFor(() => {
+      expect(finishRelease).toBeTypeOf('function');
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Microphone' }));
+    await act(async () => {
+      finishRelease?.();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(microphonePreviews.startPreview).toHaveBeenCalledTimes(2);
+    });
+    const startCommands = bridge.controlMicrophoneTest.mock.calls
+      .map(([command]) => command)
+      .filter((command) => command.kind === 'start');
+    expect(startCommands).toHaveLength(2);
+    expect(startCommands.map((command) => command.mode)).toEqual(['preview', 'preview']);
+    expect(bridge.appendVoiceAudio).not.toHaveBeenCalled();
+    expect(bridge.sendAgentMessage).not.toHaveBeenCalled();
   } finally {
     cleanup();
     Reflect.deleteProperty(navigator, 'mediaDevices');

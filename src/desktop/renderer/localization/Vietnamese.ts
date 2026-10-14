@@ -57,7 +57,19 @@ export const vietnamese = {
   updateUnavailable: 'Không thể bắt đầu cập nhật. Vui lòng thử lại.',
   microphone: 'Micrô',
   microphoneDescription:
-    'Chọn micrô Tro dùng cho yêu cầu bằng giọng nói. Thu lệnh khi bạn giữ phím tắt nói; bạn cũng có thể bắt đầu bài thử âm thanh cục bộ bên dưới.',
+    'Chọn micrô cho yêu cầu bằng giọng nói. Mức âm thanh tự cập nhật khi cửa sổ này đang mở.',
+  microphoneInputLevel: 'Mức âm thanh đầu vào',
+  microphoneInputIdle: 'Chưa thu âm',
+  microphoneInputListening: 'Đang nghe',
+  microphoneInputQuiet: 'Nhỏ',
+  microphoneInputLoud: 'Lớn',
+  microphoneInputHint: 'Nói để xem mức âm thanh. Đóng cửa sổ này để ra lệnh bằng giọng nói.',
+  microphoneInputPaused: 'Tạm dừng xem mức âm thanh khi Tro đang bận.',
+  microphoneInputError: 'Không thể nghe micrô này. Kiểm tra quyền micrô hoặc chọn thiết bị khác.',
+  microphoneInputPrivacy:
+    'Âm thanh chỉ được đo trên máy, không tải lên hay lưu lại. Đóng cửa sổ này để tắt micrô.',
+  microphoneInputLevelValue: (levelDb: number): string => `${String(levelDb)} dBFS`,
+  microphoneTestCountdown: (seconds: number): string => `${String(seconds)} giây`,
   microphoneChoose: 'Thiết bị thu âm',
   microphoneInputCount: (count: number): string => `${String(count)} thiết bị thu âm`,
   microphoneAuto: 'Tự động chọn',
@@ -74,10 +86,9 @@ export const vietnamese = {
   microphoneUnknownHint: 'Hãy chọn nếu đây là micrô bạn thường dùng để nói.',
   microphoneRecommendationHint:
     'Đề xuất dựa trên tên thiết bị, chưa kiểm tra âm thanh. Lựa chọn phù hợp tùy thuộc thiết bị và môi trường của bạn.',
-  microphoneNextHoldHint:
-    'Lựa chọn được lưu trên thiết bị này và áp dụng cho lần giữ phím tiếp theo. Mở danh sách không thu âm.',
+  microphoneNextHoldHint: 'Lựa chọn được lưu trên máy cho yêu cầu giọng nói tiếp theo.',
   microphonePermissionHint:
-    'Chưa có thiết bị được đặt tên. Giữ phím tắt nói một lần để cấp quyền micrô rồi làm mới. Kiểm tra quyền micrô trong cài đặt máy tính.',
+    'Chưa có thiết bị được đặt tên. Cho phép truy cập micrô khi được hỏi rồi làm mới. Kiểm tra quyền micrô trong cài đặt máy tính.',
   microphoneUnavailable:
     'Micrô đã chọn không khả dụng. Kết nối lại, chọn thiết bị khác hoặc Tự động chọn. Tro sẽ không tự đổi thiết bị.',
   microphoneListError:
@@ -99,7 +110,7 @@ export const vietnamese = {
   microphoneMoveDown: (name: string): string => `Đưa ${name} xuống`,
   microphoneCompare: 'So sánh micrô',
   microphoneTestPrivacy:
-    'Mỗi lần thử mở một micrô trong sáu giây. Âm thanh được đo ngay trên máy, không tải lên hoặc lưu lại. Đóng hộp thoại hoặc hủy để dừng.',
+    'Mỗi lần so sánh đo một micrô trong sáu giây, không tải lên hay lưu âm thanh. Hủy để trở về mức âm thanh trực tiếp; đóng cửa sổ để tắt micrô.',
   microphoneTestInstructions:
     'Với mỗi micrô: giữ im lặng hai giây, rồi đọc cùng một câu trong bốn giây. Giữ nguyên vị trí và môi trường. Nhấn giữ để nói tạm dừng khi thử.',
   microphoneTestPhrase: '“Đây là bài thử micrô. Tôi muốn giọng nói của mình rõ ràng.”',

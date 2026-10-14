@@ -166,7 +166,7 @@
         "zip"
       ],
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Tro uses your microphone for held voice instructions and optional local sound tests. Voice instructions are sent to the agent; test audio stays on this device."
+        "NSMicrophoneUsageDescription": "Tro uses your microphone for held voice instructions and a live input preview while the microphone picker is open. Voice instructions are sent to the agent; preview and comparison audio stay on this device."
       },
       "entitlements": "DesktopEntitlements.plist",
       "entitlementsInherit": "DesktopEntitlements.plist"

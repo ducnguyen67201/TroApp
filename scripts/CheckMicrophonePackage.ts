@@ -32,13 +32,16 @@ try {
   const preload = readFileSync(join(archive, 'preload', 'Preload.cjs'), 'utf8');
   const assets = readdirSync(join(archive, 'renderer', 'assets'));
   const processor = assets.find(name => name.startsWith('MicrophoneTestProcessor-') && name.endsWith('.js'));
+  const previewProcessor = assets.find(name => name.startsWith('MicrophonePreviewProcessor-') && name.endsWith('.js'));
   const voiceProcessor = assets.find(name => name.startsWith('VoiceAudioProcessor-') && name.endsWith('.js'));
-  if (!processor || !voiceProcessor || !main.includes('tro:microphone-test') || !preload.includes('controlMicrophoneTest') || !preload.includes('subscribeMicrophoneTest')) {
+  if (!processor || !previewProcessor || !voiceProcessor || !main.includes('tro:microphone-test') || !preload.includes('controlMicrophoneTest') || !preload.includes('subscribeMicrophoneTest')) {
     throw new Error('Microphone assets or bridge operations missing');
   }
   const code = readFileSync(join(archive, 'renderer', 'assets', processor), 'utf8');
   if (!code.includes('tro-microphone-test')) { throw new Error('Test processor missing'); }
-  console.log(JSON.stringify({ archive: 'passed', testProcessor: processor, voiceProcessor }));
+  const previewCode = readFileSync(join(archive, 'renderer', 'assets', previewProcessor), 'utf8');
+  if (!previewCode.includes('tro-microphone-preview')) { throw new Error('Preview processor missing'); }
+  console.log(JSON.stringify({ archive: 'passed', testProcessor: processor, previewProcessor, voiceProcessor }));
   app.exit(0);
 } catch {
   console.error('Packaged microphone assets could not be verified.');
@@ -55,6 +58,7 @@ try {
     .strictObject({
       archive: z.literal('passed'),
       testProcessor: z.string(),
+      previewProcessor: z.string(),
       voiceProcessor: z.string(),
     })
     .parse(raw);
@@ -69,8 +73,8 @@ try {
       '-',
       join(root, 'Contents', 'Info.plist'),
     ]);
-    if (!description.includes('local sound tests')) {
-      throw new Error('Packaged microphone purpose does not describe local tests.');
+    if (!description.includes('live input preview')) {
+      throw new Error('Packaged microphone purpose does not describe the live input preview.');
     }
     const { stdout: entitlements } = await runFile('/usr/bin/codesign', [
       '-d',

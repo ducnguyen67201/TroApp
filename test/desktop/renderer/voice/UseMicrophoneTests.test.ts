@@ -78,6 +78,54 @@ afterEach(() => {
 });
 
 describe('local comparison lifecycle', () => {
+  it('shows current input levels without changing phases or first-sample startup timing', async () => {
+    const bridge = createBridge();
+    const now = vi.spyOn(performance, 'now').mockReturnValue(100);
+    const { result } = renderHook(() => useMicrophoneTests(true, createInventory()));
+    expect(result.current.inputLevelDb).toBeNull();
+    await act(() => result.current.startTest('usb'));
+    expect(result.current.inputLevelDb).toBeNull();
+    now.mockReturnValue(150);
+    act(() => {
+      captures.instances[0]?.receive({ kind: 'progress', phase: 'quiet', secondsRemaining: 2 });
+    });
+    now.mockReturnValue(300);
+    act(() => {
+      captures.instances[0]?.receive({ kind: 'level', levelDb: -30 });
+    });
+    expect(result.current.inputLevelDb).toBe(-30);
+    expect(result.current.phase).toBe('quiet');
+    expect(result.current.secondsRemaining).toBe(2);
+    expect(result.current.results).toEqual([]);
+    now.mockReturnValue(6_150);
+    act(() => {
+      captures.instances[0]?.receive({
+        kind: 'result',
+        measurement: { version: 1, noiseDb: -50, speechDb: -20, clippedFraction: 0 },
+      });
+    });
+    expect(result.current.results[0]?.startupMs).toBe(50);
+    expect(result.current.inputLevelDb).toBeNull();
+
+    await act(() => result.current.startTest('usb'));
+    expect(result.current.inputLevelDb).toBeNull();
+    act(() => {
+      captures.instances[0]?.receive({ kind: 'level', levelDb: -10 });
+    });
+    expect(result.current.inputLevelDb).toBeNull();
+    act(() => {
+      captures.instances[1]?.receive({ kind: 'level', levelDb: -40 });
+    });
+    expect(result.current.inputLevelDb).toBe(-40);
+    act(() => {
+      result.current.cancelTest();
+      captures.instances[1]?.receive({ kind: 'level', levelDb: -10 });
+    });
+    expect(result.current.inputLevelDb).toBeNull();
+    expect(bridge.appendVoiceAudio).not.toHaveBeenCalled();
+    expect(bridge.sendAgentMessage).not.toHaveBeenCalled();
+  });
+
   it('tests one device at a time, retains measurements without submitting audio or tasks', async () => {
     const bridge = createBridge();
     const inventory = createInventory();
@@ -141,8 +189,12 @@ describe('local comparison lifecycle', () => {
     );
     const savedStart = result.current.startTest;
     await act(() => savedStart('usb'));
+    act(() => {
+      captures.instances[0]?.receive({ kind: 'level', levelDb: -30 });
+    });
     rerender({ enabled: false });
     act(() => {
+      captures.instances[0]?.receive({ kind: 'level', levelDb: -10 });
       captures.instances[0]?.receive({
         kind: 'result',
         measurement: { version: 1, noiseDb: -50, speechDb: -20, clippedFraction: 0 },
@@ -152,6 +204,7 @@ describe('local comparison lifecycle', () => {
     expect(captures.startTest).toHaveBeenCalledOnce();
     expect(result.current.results).toEqual([]);
     expect(result.current.activeDeviceId).toBeNull();
+    expect(result.current.inputLevelDb).toBeNull();
     expect(captures.instances[0]?.dispose).toHaveBeenCalled();
   });
 
@@ -159,6 +212,9 @@ describe('local comparison lifecycle', () => {
     const bridge = createBridge();
     const { result } = renderHook(() => useMicrophoneTests(true, createInventory()));
     await act(() => result.current.startTest('usb'));
+    act(() => {
+      captures.instances[0]?.receive({ kind: 'level', levelDb: -30 });
+    });
     const command = bridge.controlMicrophoneTest.mock.calls[0]?.[0];
     if (!command) {
       throw new Error('Missing test command');
@@ -171,6 +227,7 @@ describe('local comparison lifecycle', () => {
     });
     expect(result.current.hasError).toBe(true);
     expect(result.current.activeDeviceId).toBeNull();
+    expect(result.current.inputLevelDb).toBeNull();
   });
 });
 
@@ -193,11 +250,15 @@ it('cancels on device changes or visibility loss and removes its listeners on un
     });
     expect(result.current.results).toEqual([]);
     await act(() => result.current.startTest('usb'));
+    act(() => {
+      captures.instances.at(-1)?.receive({ kind: 'level', levelDb: -30 });
+    });
     Object.defineProperty(document, 'hidden', { configurable: true, value: true });
     act(() => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
     expect(result.current.activeDeviceId).toBeNull();
+    expect(result.current.inputLevelDb).toBeNull();
     await act(() => result.current.startTest('usb'));
     unmount();
     const calls = bridge.controlMicrophoneTest.mock.calls.length;
@@ -221,9 +282,11 @@ it('fails denied access without opening a microphone and reports capture errors 
   expect(result.current.hasError).toBe(true);
   await act(() => result.current.startTest('usb'));
   act(() => {
+    captures.instances.at(-1)?.receive({ kind: 'level', levelDb: -30 });
     captures.instances.at(-1)?.fail();
   });
   expect(result.current.hasError).toBe(true);
   expect(result.current.activeDeviceId).toBeNull();
+  expect(result.current.inputLevelDb).toBeNull();
   expect(result.current.results).toEqual([]);
 });
