@@ -2,7 +2,10 @@ import type { ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { readDesktopChildEnv } from './Env.js';
-import { createDevelopmentProcessGroup } from './DevelopmentProcesses.js';
+import {
+  createDevelopmentProcessGroup,
+  DevelopmentProcessMetadataError,
+} from './DevelopmentProcesses.js';
 
 const DevelopmentStartupStage = {
   WORKSPACE: 'workspace',
@@ -162,6 +165,9 @@ void startDevelopment().catch((error: unknown) => {
       event: 'development.startup.failed',
       stage: startupStage,
       reason: readStartupFailureReason(error),
+      ...(error instanceof DevelopmentProcessMetadataError
+        ? { processMetadata: error.diagnostic }
+        : {}),
     }),
   );
   console.error('Development startup failed. Check local configuration and host prerequisites.');

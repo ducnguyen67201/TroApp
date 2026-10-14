@@ -4,6 +4,7 @@ import { basename } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { promisify } from 'node:util';
 import { z } from 'zod';
+import { readProcessListEnv } from './Env.js';
 
 const executeFile = promisify(execFile);
 const processSchema = z.strictObject({
@@ -20,16 +21,42 @@ const shutdownForceMs = 1000;
 
 export type DevelopmentProcess = z.infer<typeof processSchema>;
 
+const ProcessMetadataSource = {
+  EXECUTABLES: 'executables',
+  PROCESSES: 'processes',
+} as const;
+
+/** Safe record shape only: never retain process arguments, paths or raw tool output. */
+export class DevelopmentProcessMetadataError extends Error {
+  readonly diagnostic;
+
+  constructor(
+    source: (typeof ProcessMetadataSource)[keyof typeof ProcessMetadataSource],
+    line: string,
+    recordNumber: number,
+  ) {
+    super('Development process metadata is unavailable.');
+    const pid = Number(/^\s*(\d+)(?:\s|$)/.exec(line)?.[1]);
+    this.diagnostic = {
+      source,
+      recordNumber,
+      recordLength: line.length,
+      pid: Number.isSafeInteger(pid) && pid > 0 ? pid : null,
+      hasStartTime: /\d{2}:\d{2}:\d{2}\s+\d{4}/.test(line),
+    };
+  }
+}
+
 /** Process metadata stays local: command arguments can contain private desktop URLs. */
 export function parseDevelopmentProcesses(
   output: string,
   executables: string,
 ): DevelopmentProcess[] {
   const names = new Map<number, string>();
-  for (const line of executables.trim().split('\n').filter(Boolean)) {
+  for (const [index, line] of executables.trim().split('\n').filter(Boolean).entries()) {
     const match = /^\s*(\d+)\s+(.+?)\s*$/.exec(line);
     if (!match) {
-      throw new Error('Development process metadata is unavailable.');
+      throw new DevelopmentProcessMetadataError(ProcessMetadataSource.EXECUTABLES, line, index + 1);
     }
     names.set(Number(match[1]), match[2] ?? '');
   }
@@ -37,13 +64,13 @@ export function parseDevelopmentProcesses(
     .trim()
     .split('\n')
     .filter(Boolean)
-    .flatMap((line) => {
+    .flatMap((line, index) => {
       const match =
         /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(?:(\S+)\s+)?(\S+\s+\S+\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4})\s+(.+?)\s*$/.exec(
           line,
         );
       if (!match) {
-        throw new Error('Development process metadata is unavailable.');
+        throw new DevelopmentProcessMetadataError(ProcessMetadataSource.PROCESSES, line, index + 1);
       }
       const executable = names.get(Number(match[1]));
       // Snapshots may straddle an exit; zombies and kernel tasks cannot own development groups.
@@ -120,14 +147,15 @@ async function readProcesses(): Promise<DevelopmentProcess[]> {
     const value: unknown = JSON.parse(result.stdout);
     return z.array(processSchema).parse(value);
   }
+  const processListOptions = { ...commandLimits, env: readProcessListEnv() };
   const metadata = await executeFile(
     'ps',
     ['-axo', 'pid=,ppid=,pgid=,stat=,lstart=,command='],
-    commandLimits,
+    processListOptions,
   );
   const executables =
     process.platform === 'darwin'
-      ? (await executeFile('ps', ['-axo', 'pid=,comm='], commandLimits)).stdout
+      ? (await executeFile('ps', ['-axo', 'pid=,comm='], processListOptions)).stdout
       : await readLinuxProcessExecutables(metadata.stdout);
   return parseDevelopmentProcesses(metadata.stdout, executables);
 }
@@ -139,10 +167,14 @@ async function readLinuxProcessExecutables(metadata: string): Promise<string> {
       .trim()
       .split('\n')
       .filter(Boolean)
-      .map(async (line) => {
+      .map(async (line, index) => {
         const pid = /^\s*(\d+)\s/.exec(line)?.[1];
         if (pid === undefined) {
-          throw new Error('Development process metadata is unavailable.');
+          throw new DevelopmentProcessMetadataError(
+            ProcessMetadataSource.PROCESSES,
+            line,
+            index + 1,
+          );
         }
         try {
           return `${pid} ${await readlink(`/proc/${pid}/exe`)}`;

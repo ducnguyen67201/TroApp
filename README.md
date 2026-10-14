@@ -35,6 +35,12 @@ during startup. PostgreSQL and renderer containers stay running. The API default
 If startup fails before service output, `development.startup.failed` reports the
 failed stage and a safe reason. It excludes command arguments, environment values
 and raw child-process errors, which can contain credentials.
+For process-list parsing failures, `processMetadata` identifies the failing
+snapshot (`processes` or `executables`), record number, character count, numeric
+PID when available, and whether a start-time shape was present. These fields help
+diagnose host-output differences without exposing the raw process record.
+Process discovery uses the `C` locale for consistent date parsing; your terminal
+and development services keep their configured locales.
 
 For separate terminals, with the corresponding configs selected:
 

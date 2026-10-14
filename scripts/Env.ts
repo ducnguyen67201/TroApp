@@ -4,6 +4,13 @@ import { loadEnv } from 'vite';
 import { AppUpdateUrlSchema } from '../src/contracts/AppUpdate.js';
 import { z } from 'zod';
 
+/** Keep ps start times machine-readable without changing the launcher or service locales. */
+export function readProcessListEnv(
+  environment: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  return { ...environment, LC_ALL: 'C' };
+}
+
 /** Authoring-only speech generation receives its key from Doppler in this process. */
 export function readOnboardingSpeechEnv(environment: NodeJS.ProcessEnv): { apiKey: string } {
   const validated = createEnv({

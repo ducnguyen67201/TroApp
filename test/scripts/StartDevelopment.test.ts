@@ -17,6 +17,15 @@ const startupFailureSchema = z.strictObject({
   event: z.literal('development.startup.failed'),
   stage: z.enum(['previous-process-cleanup', 'desktop-environment']),
   reason: z.string().min(1),
+  processMetadata: z
+    .strictObject({
+      source: z.enum(['processes', 'executables']),
+      recordNumber: z.number().int().positive(),
+      recordLength: z.number().int().nonnegative(),
+      pid: z.number().int().positive().nullable(),
+      hasStartTime: z.boolean(),
+    })
+    .optional(),
 });
 
 interface StartupResult {
@@ -86,9 +95,9 @@ it.skipIf(process.platform === 'win32').each([
   15_000,
 );
 
-it.skipIf(process.platform === 'win32')(
-  'reports a missing desktop home directory after safe cleanup in an empty temporary workspace',
-  async () => {
+it.skipIf(process.platform === 'win32').each(['C', 'en_CA.UTF-8', 'en_GB.UTF-8', 'fr_CA.UTF-8'])(
+  'passes process cleanup under locale %s before reporting a missing desktop home directory',
+  async (locale) => {
     const temporary = await mkdtemp(join(tmpdir(), 'tro-startup-invalid-environment-'));
     try {
       const bin = await createIsolatedBin(temporary);
@@ -112,6 +121,9 @@ it.skipIf(process.platform === 'win32')(
       const result = await runStartup(temporary, {
         PATH: bin,
         TMPDIR: temporary,
+        LANG: locale,
+        LC_TIME: locale,
+        LC_ALL: locale,
         OPENAI_API_KEY: syntheticSecret,
       });
 
@@ -184,9 +196,21 @@ function expectStartupFailure(
   const lines = result.stderr.trim().split(/\r?\n/);
   expect(lines).toHaveLength(2);
   const diagnostic: unknown = JSON.parse(lines[0] ?? '');
-  expect(startupFailureSchema.parse(diagnostic)).toEqual({
+  const parsed = startupFailureSchema.parse(diagnostic);
+  expect(parsed).toEqual({
     event: 'development.startup.failed',
     ...expected,
+    ...(expected.reason === 'Development process metadata is unavailable.'
+      ? {
+          processMetadata: {
+            source: process.platform === 'darwin' ? 'executables' : 'processes',
+            recordNumber: 1,
+            recordLength: 'malformed process metadata'.length,
+            pid: null,
+            hasStartTime: false,
+          },
+        }
+      : {}),
   });
   expect(lines[1]).toBe(genericFailure);
 }
