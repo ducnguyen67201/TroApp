@@ -188,7 +188,7 @@ export async function signMacResources(
   );
   // Installed Mac packages need only the matching hook; remove unused cross-platform binaries.
   const expectedPrebuild = `darwin-${settings.architecture}`;
-  await access(join(prebuilds, expectedPrebuild, 'uiohook_napi.node'));
+  await access(join(prebuilds, expectedPrebuild, 'uiohook-napi.node'));
   for (const name of await readdir(prebuilds)) {
     if (name !== expectedPrebuild) {
       await rm(join(prebuilds, name), { recursive: true, force: true });

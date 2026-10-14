@@ -1,6 +1,17 @@
-import { mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  cp,
+  mkdtemp,
+  mkdir,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readMacSigningEnv } from '../../scripts/Env.js';
 import {
@@ -50,6 +61,24 @@ async function createTemporary(): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), 'tro-mac-test-'));
   temporary.push(directory);
   return realpath(directory);
+}
+
+/** Use the dependency's shipped names without loading or executing its native addon. */
+async function copyShortcutPrebuildsToApp(app: string): Promise<string> {
+  const packageDirectory = dirname(
+    createRequire(import.meta.url).resolve('uiohook-napi/package.json'),
+  );
+  const prebuilds = join(
+    app,
+    'Contents',
+    'Resources',
+    'app.asar.unpacked',
+    'node_modules',
+    'uiohook-napi',
+    'prebuilds',
+  );
+  await cp(join(packageDirectory, 'prebuilds'), prebuilds, { recursive: true });
+  return prebuilds;
 }
 
 afterEach(async () => {
@@ -281,44 +310,52 @@ describe('Mac native signatures', () => {
     ).rejects.toThrow('architecture');
   });
 
-  it('signs native resources before verification and removes irrelevant hook prebuilds', async () => {
-    const directory = await createTemporary();
-    const app = join(directory, 'Tro.app');
-    await createMacFixture(app);
-    const prebuilds = join(
-      app,
-      'Contents',
-      'Resources',
-      'app.asar.unpacked',
-      'node_modules',
-      'uiohook-napi',
-      'prebuilds',
-    );
-    for (const platform of ['darwin-arm64', 'darwin-x64', 'win32-x64']) {
-      await mkdir(join(prebuilds, platform), { recursive: true });
-      await writeFile(
-        join(prebuilds, platform, 'uiohook_napi.node'),
-        Buffer.from('cffaedfe', 'hex'),
+  it.each(['arm64', 'x64'] as const)(
+    'signs the shipped %s shortcut prebuild and removes irrelevant platforms',
+    async (architecture) => {
+      const directory = await createTemporary();
+      const app = join(directory, 'Tro.app');
+      await createMacFixture(app);
+      const prebuilds = await copyShortcutPrebuildsToApp(app);
+      const nativePath = join(prebuilds, `darwin-${architecture}`, 'uiohook-napi.node');
+      const settings = { ...macSettings, architecture };
+      const run = vi.fn<MacCommand>((executable, arguments_) =>
+        executable.endsWith('/lipo')
+          ? Promise.resolve({ stdout: architecture === 'x64' ? 'x86_64' : 'arm64', stderr: '' })
+          : macCommand(executable, arguments_),
       );
-    }
+      await signMacResources(app, settings, run);
+      const signCalls = run.mock.calls.filter(([, args]) => args.includes('--sign'));
+      expect(signCalls).toHaveLength(2);
+      expect(
+        signCalls.every(
+          ([, args]) => args.includes(settings.identity) && args.includes('--timestamp'),
+        ),
+      ).toBe(true);
+      expect(signCalls.some(([, args]) => args.at(-1) === nativePath)).toBe(true);
+      expect(isMachO(await readFile(nativePath))).toBe(true);
+      expect(await readdir(prebuilds)).toEqual([`darwin-${architecture}`]);
+      await verifyMacApp(app, settings, run);
+      expect(run.mock.calls.some(([, args]) => args.includes('stapler'))).toBe(true);
+      expect(run.mock.calls.some(([, args]) => args.includes('--assess'))).toBe(true);
+      const digest = await readMacFileDigest(
+        join(app, 'Contents', 'Resources', 'cua-driver', 'cua-driver'),
+      );
+      expect(digest.sha256).toMatch(/^[a-f0-9]{64}$/);
+      expect(digest.size).toBe(8);
+    },
+  );
+
+  it('rejects a missing matching shortcut prebuild before signing or removing other platforms', async () => {
+    const app = join(await createTemporary(), 'Tro.app');
+    await createMacFixture(app);
+    const prebuilds = await copyShortcutPrebuildsToApp(app);
+    await rm(join(prebuilds, 'darwin-arm64'), { recursive: true });
+    const remainingPlatforms = await readdir(prebuilds);
     const run = vi.fn<MacCommand>(macCommand);
-    await signMacResources(app, macSettings, run);
-    const signCalls = run.mock.calls.filter(([, args]) => args.includes('--sign'));
-    expect(signCalls).toHaveLength(2);
-    expect(
-      signCalls.every(
-        ([, args]) => args.includes(macSettings.identity) && args.includes('--timestamp'),
-      ),
-    ).toBe(true);
-    await expect(readFile(join(prebuilds, 'darwin-x64', 'uiohook_napi.node'))).rejects.toThrow();
-    await verifyMacApp(app, macSettings, run);
-    expect(run.mock.calls.some(([, args]) => args.includes('stapler'))).toBe(true);
-    expect(run.mock.calls.some(([, args]) => args.includes('--assess'))).toBe(true);
-    const digest = await readMacFileDigest(
-      join(app, 'Contents', 'Resources', 'cua-driver', 'cua-driver'),
-    );
-    expect(digest.sha256).toMatch(/^[a-f0-9]{64}$/);
-    expect(digest.size).toBe(8);
+    await expect(signMacResources(app, macSettings, run)).rejects.toThrow();
+    expect(run).not.toHaveBeenCalled();
+    expect(await readdir(prebuilds)).toEqual(remainingPlatforms);
   });
 
   it('blocks a missing staple and unapproved entitlement', async () => {
