@@ -479,6 +479,115 @@ it('restores persisted participation through authenticated HTTP after desktop re
 });
 
 describe('persisted admin classroom browsing', () => {
+  it('retains historical participants and work while live and teacher rosters keep current enrollment', async () => {
+    const fixture = await createFixture();
+    const context = await fixture.join(fixture.first);
+    const progress = await fixture.service.execute(fixture.first, {
+      kind: 'report-progress',
+      ...mutation(context),
+      eventId: randomUUID(),
+      evidence: [],
+      declaredComplete: true,
+      helpSummary: 'Finished the activity.',
+    });
+    if (progress.kind !== 'context') {
+      throw new Error('Expected saved progress.');
+    }
+    const submission = {
+      id: randomUUID(),
+      attemptId: progress.context.attempt.id,
+      url: 'https://scratch.mit.edu/projects/123/',
+      submittedAt: new Date().toISOString(),
+    };
+    await database.store.saveSubmission(submission, randomUUID());
+    await fixture.service.execute(fixture.first, {
+      kind: 'leave',
+      participationId: context.participation.id,
+      deviceId: context.participation.deviceId,
+    });
+    await fixture.service.execute(fixture.teacher, {
+      kind: 'end-session',
+      classSessionId: fixture.meeting.id,
+      contextVersion: fixture.meeting.contextVersion,
+    });
+    await fixture.service.execute(fixture.teacher, {
+      kind: 'revoke',
+      classId: fixture.schoolClass.id,
+      studentId: fixture.first,
+    });
+    const newcomerId = randomUUID();
+    const newcomer = await client.user.create({
+      data: {
+        id: newcomerId,
+        name: 'New student',
+        email: `${newcomerId}@example.test`,
+        emailVerified: true,
+      },
+    });
+    await fixture.service.execute(fixture.teacher, {
+      kind: 'enroll',
+      classId: fixture.schoolClass.id,
+      email: newcomer.email,
+    });
+    await client.user.update({ where: { id: fixture.teacher }, data: { isAdmin: true } });
+
+    const detail = await fixture.service.execute(fixture.teacher, {
+      kind: 'admin-class',
+      classId: fixture.schoolClass.id,
+      classSessionId: fixture.meeting.id,
+    });
+    if (detail.kind !== 'admin-class') {
+      throw new Error('Expected admin classroom detail.');
+    }
+    expect(detail.rosters[0]?.students).toEqual([
+      {
+        studentId: fixture.first,
+        name: fixture.first,
+        participation: await database.store.readParticipation(context.participation.id),
+        attempts: [progress.context.attempt],
+        submissions: [submission],
+      },
+    ]);
+    expect(detail.rosters[0]?.students[0]?.participation?.left).toBe(true);
+    expect(await database.store.isEnrolled(fixture.schoolClass.id, fixture.first)).toBe(false);
+    expect(await database.store.isEnrolled(fixture.schoolClass.id, newcomer.id)).toBe(true);
+    expect(await database.store.readSessionParticipants(fixture.meeting.id, randomUUID())).toEqual(
+      [],
+    );
+
+    const teacherRoster = await fixture.service.execute(fixture.teacher, {
+      kind: 'session-roster',
+      classSessionId: fixture.meeting.id,
+    });
+    if (teacherRoster.kind !== 'roster') {
+      throw new Error('Expected teacher roster.');
+    }
+    const currentStudentIds = [fixture.second, newcomer.id].sort();
+    expect(teacherRoster.roster.map((student) => student.studentId).sort()).toEqual(
+      currentStudentIds,
+    );
+
+    await fixture.service.execute(fixture.teacher, {
+      kind: 'start-session',
+      classId: fixture.schoolClass.id,
+      activityId: fixture.activity.id,
+      pacing: ClassroomPacing.TEACHER,
+    });
+    const liveDetail = await fixture.service.execute(fixture.teacher, {
+      kind: 'admin-class',
+      classId: fixture.schoolClass.id,
+    });
+    if (liveDetail.kind !== 'admin-class') {
+      throw new Error('Expected live admin classroom detail.');
+    }
+    expect(liveDetail.rosters[0]?.students.map((student) => student.studentId).sort()).toEqual(
+      currentStudentIds,
+    );
+    expect(liveDetail.rosters[0]?.students.every((student) => student.participation === null)).toBe(
+      true,
+    );
+  });
+
   it('checks stored admin authority for each HTTP request without changing class membership or progress', async () => {
     const fixture = await createFixture();
     const studentContext = await fixture.join(fixture.first);

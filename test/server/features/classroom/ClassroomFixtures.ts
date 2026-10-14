@@ -359,6 +359,34 @@ export class MemoryClassroomStore implements ClassroomStore {
   readRoster(meetingId: string): ReturnType<ClassroomStore['readRoster']> {
     return Promise.resolve(this.rosters.get(meetingId) ?? []);
   }
+
+  readSessionParticipants(
+    meetingId: string,
+    classId: string,
+  ): ReturnType<ClassroomStore['readSessionParticipants']> {
+    if (this.meetings.get(meetingId)?.classId !== classId) {
+      return Promise.resolve([]);
+    }
+    return Promise.resolve(
+      [...this.participations.values()]
+        .filter((participation) => participation.classSessionId === meetingId)
+        .map((participation) => {
+          const attempts = [...this.attempts.values()].filter(
+            (attempt) => attempt.participationId === participation.id,
+          );
+          const attemptIds = new Set(attempts.map((attempt) => attempt.id));
+          return {
+            studentId: participation.studentId,
+            name: this.names.get(participation.studentId) ?? participation.studentId,
+            participation,
+            attempts,
+            submissions: [...this.submissions.values()].filter((submission) =>
+              attemptIds.has(submission.attemptId),
+            ),
+          };
+        }),
+    );
+  }
 }
 
 export function createTeachingContext(): TeachingContext {

@@ -509,6 +509,11 @@ Admins can open a separate read-only class browser in Classroom, search across
 class and teacher names or teacher email, and switch between active classes.
 `ClassroomService` checks the current database flag before listing classes or
 returning a class's published course, sessions and student rosters/progress.
+Live admin rosters use current enrollment. Ended-session admin rosters use saved
+session participation, retaining students who later left or lost enrollment and
+their progress; later enrollees are excluded unless they participated in that
+session. This historical view cannot recover attendance for students who never
+joined, and ordinary teacher roster behavior is unchanged.
 The normal classroom home remains scoped to ownership/enrollment. Admin viewing
 does not enroll the viewer, join a live session, change device participation,
 impersonate a teacher or grant access to mutation commands. Deleted classes are

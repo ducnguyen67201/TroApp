@@ -110,7 +110,10 @@ export class ClassroomService {
           ? [
               {
                 classSessionId: selectedMeeting.id,
-                students: await store.readRoster(selectedMeeting.id, command.classId),
+                students:
+                  selectedMeeting.status === ClassroomStatus.ENDED
+                    ? await store.readSessionParticipants(selectedMeeting.id, command.classId)
+                    : await store.readRoster(selectedMeeting.id, command.classId),
               },
             ]
           : [],

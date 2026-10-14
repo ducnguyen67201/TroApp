@@ -92,4 +92,9 @@ export interface ClassroomStore {
   readLatestSubmission(attemptId: string): Promise<SubmissionReceipt | null>;
   saveSubmission(receipt: SubmissionReceipt, idempotencyKey: string): Promise<void>;
   readRoster(meetingId: string, classId: string): Promise<z.infer<typeof ClassroomRosterSchema>>;
+  /** Historical members are persisted participants, regardless of current enrollment or leaving. */
+  readSessionParticipants(
+    meetingId: string,
+    classId: string,
+  ): Promise<z.infer<typeof ClassroomRosterSchema>>;
 }

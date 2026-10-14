@@ -613,6 +613,7 @@ describe('admin classroom browsing', () => {
     const otherMeeting = { ...meeting, id: randomUUID(), classId: otherClass.id };
     await store.saveMeeting(otherMeeting);
     const readRoster = vi.spyOn(store, 'readRoster');
+    const readSessionParticipants = vi.spyOn(store, 'readSessionParticipants');
     const current = await service.execute('admin', {
       kind: 'admin-class',
       classId: schoolClass.id,
@@ -623,6 +624,7 @@ describe('admin classroom browsing', () => {
       rosters: [{ classSessionId: meeting.id, students: [] }],
     });
     expect(readRoster).toHaveBeenCalledExactlyOnceWith(meeting.id, schoolClass.id);
+    expect(readSessionParticipants).not.toHaveBeenCalled();
     readRoster.mockClear();
     expect(
       await service.execute('admin', {
@@ -634,12 +636,80 @@ describe('admin classroom browsing', () => {
       kind: 'admin-class',
       rosters: [{ classSessionId: olderMeeting.id, students: [] }],
     });
-    expect(readRoster).toHaveBeenCalledExactlyOnceWith(olderMeeting.id, schoolClass.id);
+    expect(readRoster).not.toHaveBeenCalled();
+    expect(readSessionParticipants).toHaveBeenCalledExactlyOnceWith(
+      olderMeeting.id,
+      schoolClass.id,
+    );
     for (const classSessionId of [otherMeeting.id, randomUUID()]) {
       await expect(
         service.execute('admin', { kind: 'admin-class', classId: schoolClass.id, classSessionId }),
       ).rejects.toMatchObject({ code: ClassroomFailure.NOT_FOUND });
     }
+  });
+
+  it('retains ended-session participants and their progress after enrollment changes', async () => {
+    const { service, store, schoolClass, meeting, join } = await createClassroom();
+    store.admins.add('admin');
+    const context = await join('student');
+    const progressed = contextOf(
+      await service.execute('student', {
+        kind: 'report-progress',
+        ...mutation(context),
+        eventId: randomUUID(),
+        evidence: [],
+        declaredComplete: true,
+        helpSummary: 'Finished the activity.',
+      }),
+    );
+    const submission = {
+      id: randomUUID(),
+      attemptId: progressed.attempt.id,
+      url: 'https://scratch.mit.edu/projects/123/',
+      submittedAt: new Date().toISOString(),
+    };
+    await store.saveSubmission(submission, randomUUID());
+    await service.execute('student', {
+      kind: 'leave',
+      participationId: context.participation.id,
+      deviceId: context.participation.deviceId,
+    });
+    await service.execute('teacher', {
+      kind: 'end-session',
+      classSessionId: meeting.id,
+      contextVersion: meeting.contextVersion,
+    });
+    await service.execute('teacher', {
+      kind: 'revoke',
+      classId: schoolClass.id,
+      studentId: 'student',
+    });
+    await service.execute('teacher', {
+      kind: 'enroll',
+      classId: schoolClass.id,
+      email: 'newcomer@example.test',
+    });
+
+    const detail = await service.execute('admin', {
+      kind: 'admin-class',
+      classId: schoolClass.id,
+      classSessionId: meeting.id,
+    });
+    if (detail.kind !== 'admin-class') {
+      throw new Error('Expected admin classroom detail.');
+    }
+    expect(detail.rosters[0]?.students).toEqual([
+      {
+        studentId: 'student',
+        name: 'student',
+        participation: await store.readParticipation(context.participation.id),
+        attempts: [progressed.attempt],
+        submissions: [submission],
+      },
+    ]);
+    expect(detail.rosters[0]?.students[0]?.participation?.left).toBe(true);
+    expect(await store.isEnrolled(schoolClass.id, 'student')).toBe(false);
+    expect(await store.isEnrolled(schoolClass.id, 'newcomer')).toBe(true);
   });
 
   it('does not expose deleted classes or details for a missing class', async () => {

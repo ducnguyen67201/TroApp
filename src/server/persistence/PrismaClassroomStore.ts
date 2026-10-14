@@ -695,50 +695,74 @@ class PrismaClassroomStore implements ClassroomStore {
       },
       take: 200,
     });
-    return rows.map(({ student }) => {
-      const participation = student.classParticipations[0];
-      return {
-        studentId: student.id,
-        name: student.name,
-        participation: participation
-          ? ParticipationSchema.parse({
-              id: participation.id,
-              classSessionId,
-              studentId: student.id,
-              deviceId: participation.deviceId,
-              leaseUntil: participation.leaseUntil.toISOString(),
-              left: participation.left,
-            })
-          : null,
-        attempts:
-          participation?.attempts.map((attempt) =>
-            StudentAttemptSchema.parse({
-              id: attempt.id,
-              participationId: attempt.participationId,
-              activityId: attempt.activityId,
-              progressVersion: attempt.progressVersion,
-              workspaceUrl: attempt.workspaceUrl,
-              evidence: attempt.evidence,
-              declaredComplete: attempt.declaredComplete,
-              helpSummary: attempt.helpSummary,
-            }),
-          ) ?? [],
-        submissions:
-          participation?.attempts
-            .flatMap((attempt) =>
-              attempt.submissions.map((submission) =>
-                SubmissionReceiptSchema.parse({
-                  id: submission.id,
-                  attemptId: attempt.id,
-                  url: submission.url,
-                  submittedAt: submission.submittedAt.toISOString(),
-                }),
-              ),
-            )
-            .slice(0, 100) ?? [],
-      };
-    });
+    return rows.map(({ student }) => buildRosterStudent(student, student.classParticipations[0]));
   }
+
+  async readSessionParticipants(classSessionId: string, classId: string) {
+    const rows = await this.client.classroomParticipation.findMany({
+      where: { classSessionId, meeting: { classId } },
+      include: {
+        student: { select: { id: true, name: true } },
+        attempts: {
+          include: { submissions: { take: 100, orderBy: { submittedAt: 'desc' } } },
+        },
+      },
+      orderBy: { studentId: 'asc' },
+      take: 200,
+    });
+    return rows.map((participation) => buildRosterStudent(participation.student, participation));
+  }
+}
+
+/** Both roster reads validate the same retained progress without changing their membership rules. */
+function buildRosterStudent(
+  student: Prisma.UserGetPayload<{ select: { id: true; name: true } }>,
+  participation:
+    | Prisma.ClassroomParticipationGetPayload<{
+        include: { attempts: { include: { submissions: true } } };
+      }>
+    | undefined,
+): Awaited<ReturnType<ClassroomStore['readRoster']>>[number] {
+  return {
+    studentId: student.id,
+    name: student.name,
+    participation: participation
+      ? ParticipationSchema.parse({
+          id: participation.id,
+          classSessionId: participation.classSessionId,
+          studentId: student.id,
+          deviceId: participation.deviceId,
+          leaseUntil: participation.leaseUntil.toISOString(),
+          left: participation.left,
+        })
+      : null,
+    attempts:
+      participation?.attempts.map((attempt) =>
+        StudentAttemptSchema.parse({
+          id: attempt.id,
+          participationId: attempt.participationId,
+          activityId: attempt.activityId,
+          progressVersion: attempt.progressVersion,
+          workspaceUrl: attempt.workspaceUrl,
+          evidence: attempt.evidence,
+          declaredComplete: attempt.declaredComplete,
+          helpSummary: attempt.helpSummary,
+        }),
+      ) ?? [],
+    submissions:
+      participation?.attempts
+        .flatMap((attempt) =>
+          attempt.submissions.map((submission) =>
+            SubmissionReceiptSchema.parse({
+              id: submission.id,
+              attemptId: attempt.id,
+              url: submission.url,
+              submittedAt: submission.submittedAt.toISOString(),
+            }),
+          ),
+        )
+        .slice(0, 100) ?? [],
+  };
 }
 
 export function createPrismaClassroomStore(
