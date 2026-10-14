@@ -36,6 +36,7 @@ import type { AgentTaskMode } from './CursorCompanion.js';
 import type { AgentResult } from './AgentSession.js';
 import type { DesktopLocale } from './DesktopLocale.js';
 import type { AuthResult } from './AuthSession.js';
+import type { StudentAccessCommand, StudentAccessReply } from './StudentAccess.js';
 import type {
   DesktopPermissionStatus,
   PermissionActionResult,
@@ -99,6 +100,8 @@ export interface DesktopBridge {
   subscribeVoiceInput(listener: (event: VoiceEvent) => void): () => void;
   subscribeAgentProgress(listener: (event: AgentProgress) => void): () => void;
   readSavedAccounts?: () => Promise<AccountReply>;
+  controlStudentAccess?: (command: StudentAccessCommand) => Promise<StudentAccessReply>;
+  subscribeStudentSessionEnded?: (listener: () => void) => () => void;
   addGoogleAccount?: () => Promise<AuthResult>;
   switchAccount?: (accountId: string) => Promise<AuthResult>;
   cancelAccountSignIn?: () => Promise<AuthResult>;

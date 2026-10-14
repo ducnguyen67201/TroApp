@@ -337,8 +337,10 @@ export function SettingsDialog({
               <>
                 <SettingsRow label={messages.name} description={user.name} />
                 <SettingsRow
-                  label={messages.email}
-                  description={<span className="account-email">{user.email}</span>}
+                  label={user.learner ? 'Student ID' : messages.email}
+                  description={
+                    <span className="account-email">{user.learner?.externalId ?? user.email}</span>
+                  }
                 />
                 <Text size="sm" c="dimmed" className="settings-account-hint">
                   {messages.signOutHint}

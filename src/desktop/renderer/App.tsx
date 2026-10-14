@@ -8,6 +8,7 @@ import { WhatsNewDialog } from './updates/WhatsNewDialog.js';
 import { useWhatsNew } from './updates/UseWhatsNew.js';
 import { whatsNewMessages } from './updates/WhatsNewMessages.js';
 import { AccountMenu } from './accounts/AccountMenu.js';
+import { StudentSignInButton } from './accounts/StudentAccessForm.js';
 import { useVoiceover } from './voiceover/UseVoiceover.js';
 import { useFocusReturn } from '@mantine/hooks';
 import { useMicrophoneTests } from './voice/UseMicrophoneTests.js';
@@ -119,7 +120,8 @@ export function App(): ReactElement {
         ? analyticsScreens[page]
         : AnalyticsScreen.SIGN_IN,
   );
-  const voiceover = useVoiceover(activeUserId);
+  const voiceUserId = user?.learner ? null : activeUserId;
+  const voiceover = useVoiceover(voiceUserId);
   const onboarding = useOnboarding(activeUserId);
   const workspaceAnchor = useRef<HTMLButtonElement>(null);
   const classesAnchor = useRef<HTMLButtonElement>(null);
@@ -145,7 +147,7 @@ export function App(): ReactElement {
   }, [user?.id, navigation.openWorkspace]);
   const microphones = useMicrophones(Boolean(user));
   const voice = useVoiceInput(
-    activeUserId,
+    voiceUserId,
     controller.receiveVoiceEvent,
     controller.taskMode,
     microphones,
@@ -522,6 +524,9 @@ export function App(): ReactElement {
                     controller={controller}
                     signInActions={
                       <Stack gap="sm" align="center" className="sign-in-controls">
+                        {window.tro.controlStudentAccess && (
+                          <StudentSignInButton controller={controller} />
+                        )}
                         {controller.savedAccounts &&
                           controller.savedAccounts.accounts.length > 0 && (
                             <AccountMenu

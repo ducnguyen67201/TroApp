@@ -1,0 +1,3506 @@
+<!doctype html>
+<!-- Design prototype only. All QR scans, learners, device sessions and roster imports are simulated. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Tro · Student QR onboarding</title>
+    <style>
+      :root {
+        --paper: #f7f5ef;
+        --white: #fffefa;
+        --ink: #252d36;
+        --muted: #666861;
+        --line: #dfdfd5;
+        --orange: #c94723;
+        --orange-soft: #fce9de;
+        --green: #38614c;
+        --green-soft: #e7efe4;
+        --gold: #765b1e;
+        --gold-soft: #f6edcf;
+        --blue: #3c6179;
+        --blue-soft: #e7eff5;
+        --nav: #242d37;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: var(--ink);
+        background: var(--paper);
+        font-size: 14px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      button,
+      input {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+        color: inherit;
+      }
+      button:disabled {
+        cursor: default;
+        opacity: 0.55;
+      }
+      button,
+      input,
+      summary,
+      a {
+        -webkit-tap-highlight-color: transparent;
+      }
+      :focus-visible {
+        outline: 3px solid var(--blue);
+        outline-offset: 4px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      button,
+      a {
+        touch-action: manipulation;
+      }
+      button {
+        min-height: 44px;
+      }
+      .icon {
+        width: 20px;
+        height: 20px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.7;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex-shrink: 0;
+      }
+      .symbols {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      .skip-link {
+        position: fixed;
+        top: -80px;
+        left: 20px;
+        z-index: 20;
+        padding: 12px 18px;
+        background: var(--ink);
+        color: white;
+        border-radius: 8px;
+      }
+      .skip-link:focus {
+        top: 12px;
+      }
+      .topbar {
+        min-height: 78px;
+        padding: 16px 36px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        border-bottom: 1px solid var(--line);
+        background: var(--white);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-weight: 750;
+        font-size: 25px;
+        letter-spacing: -0.06em;
+      }
+      .brand-mark {
+        width: 28px;
+        height: 30px;
+        color: var(--orange);
+      }
+      .topbar-divider {
+        width: 1px;
+        height: 25px;
+        background: var(--line);
+      }
+      .topbar-title {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .draft {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 5px 8px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .topbar-end {
+        margin-left: auto;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+      }
+      .text-button {
+        border: 0;
+        padding: 9px 4px;
+        background: transparent;
+        color: var(--muted);
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12px;
+      }
+      .text-button:hover {
+        color: var(--orange);
+      }
+      .page {
+        max-width: 1600px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 224px minmax(0, 1fr);
+        min-height: calc(100dvh - 78px);
+      }
+      .sidebar {
+        padding: 35px 18px 24px 24px;
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+      .eyebrow {
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .scenario-list {
+        display: grid;
+        gap: 7px;
+        margin-top: 14px;
+      }
+      .scenario {
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        text-align: left;
+        width: 100%;
+        border: 1px solid transparent;
+        border-radius: 9px;
+        background: transparent;
+        padding: 12px 10px;
+      }
+      .scenario:hover {
+        background: #eeece4;
+      }
+      .scenario[aria-current='page'] {
+        border-color: #e4d6c8;
+        background: var(--white);
+        box-shadow: 0 2px 3px #252d3603;
+      }
+      .scenario-number {
+        align-self: start;
+        padding-top: 2px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #777971;
+        font-variant-numeric: tabular-nums;
+      }
+      .scenario[aria-current='page'] .scenario-number {
+        color: var(--orange);
+      }
+      .scenario-title {
+        display: block;
+        font-size: 12px;
+        font-weight: 650;
+      }
+      .scenario-hint {
+        display: block;
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 4px;
+        line-height: 1.5;
+      }
+      .sidebar-note {
+        margin-top: auto;
+        padding: 18px 10px 0;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.7;
+      }
+      .sidebar-note strong {
+        display: block;
+        margin: 7px 0 4px;
+        color: var(--ink);
+        font-size: 12px;
+      }
+      .workspace {
+        min-width: 0;
+        padding: 34px 36px 22px;
+      }
+      .workspace-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 22px;
+        margin-bottom: 25px;
+      }
+      h1 {
+        font-size: clamp(23px, 2.3vw, 32px);
+        line-height: 1.2;
+        font-weight: 650;
+        letter-spacing: -1.1px;
+      }
+      .subtitle {
+        margin-top: 10px;
+        color: var(--muted);
+        line-height: 1.65;
+        font-size: 12px;
+        max-width: 620px;
+      }
+      .scenario-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: 4px;
+        flex-shrink: 0;
+        font-size: 11px;
+        background: var(--green-soft);
+        color: var(--green);
+        border-radius: 100px;
+        padding: 7px 11px;
+      }
+      .scenario-label .icon {
+        width: 15px;
+        height: 15px;
+      }
+      .workspace-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 244px;
+        align-items: start;
+        gap: 24px;
+      }
+      .preview-column {
+        min-width: 0;
+      }
+      .journey {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-bottom: 17px;
+        font-size: 10px;
+        color: var(--muted);
+        flex-wrap: wrap;
+      }
+      .journey-step {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .step-dot {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: #e9e7de;
+        color: #62655e;
+        font-size: 9px;
+      }
+      .journey-step.active {
+        color: var(--ink);
+        font-weight: 650;
+      }
+      .journey-step.active .step-dot {
+        background: var(--ink);
+        color: white;
+      }
+      .journey-step.done .step-dot {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+      .journey .icon {
+        width: 12px;
+        height: 12px;
+        color: #8a8c83;
+      }
+      .app-frame {
+        overflow: hidden;
+        border: 1px solid #d6d7ce;
+        border-radius: 14px;
+        background: var(--white);
+        box-shadow:
+          0 12px 40px #252d3606,
+          0 2px 5px #252d3603;
+      }
+      .window-bar {
+        padding: 13px 17px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        border-bottom: 1px solid var(--line);
+        background: #eeede6;
+        font-size: 10px;
+        color: #5c625b;
+      }
+      .window-dots {
+        display: flex;
+        gap: 5px;
+        margin-right: 6px;
+      }
+      .window-dots i {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #c8c9bd;
+      }
+      .window-bar .icon {
+        width: 13px;
+        height: 13px;
+      }
+      .window-device {
+        margin-left: auto;
+        display: flex;
+        gap: 5px;
+        align-items: center;
+      }
+      .app-body {
+        min-height: 500px;
+        position: relative;
+      }
+      .student-app {
+        padding: 26px 34px 22px;
+        min-height: 500px;
+        display: flex;
+        flex-direction: column;
+      }
+      .student-layout {
+        display: grid;
+        grid-template-columns: 80px minmax(0, 1fr);
+        min-height: 500px;
+      }
+      .student-layout .student-app {
+        min-width: 0;
+        padding-left: 25px;
+        padding-right: 25px;
+      }
+      .learner-sidebar {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        padding: 25px 10px 16px;
+        background: var(--nav);
+        color: #d4dae0;
+        border-right: 1px solid #39424a;
+      }
+      .learner-sidebar > .small-brand {
+        padding: 0 0 25px;
+        text-align: center;
+        color: white;
+      }
+      .learner-navigation {
+        display: grid;
+        gap: 5px;
+      }
+      .learner-navigation button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        text-align: left;
+        padding: 12px 4px;
+        font-size: 9px;
+        line-height: 1.5;
+      }
+      .learner-navigation button[aria-current='page'] {
+        background: #35404b;
+        color: white;
+        font-weight: 650;
+      }
+      .learner-navigation .icon {
+        width: 16px;
+        height: 16px;
+      }
+      .saved-profiles {
+        margin-top: auto;
+        padding-top: 40px;
+      }
+      .account-trigger {
+        width: 100%;
+        padding: 17px 0 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        border: 0;
+        border-top: 1px solid #46505a;
+        background: transparent;
+        color: #d4dae0;
+      }
+      .account-trigger:hover {
+        color: white;
+      }
+      .account-trigger .profile-avatar {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        background: #f3eee3;
+        color: var(--ink);
+        font-size: 14px;
+      }
+      .sidebar-role {
+        font-size: 9px;
+        line-height: 1.5;
+      }
+      .account-popover {
+        position: fixed;
+        inset: auto;
+        width: min(344px, calc(100vw - 32px));
+        max-height: calc(100dvh - 32px);
+        margin: 0;
+        padding: 18px;
+        overflow: auto;
+        border: 1px solid #e0e4e8;
+        border-radius: 18px;
+        background: white;
+        color: var(--ink);
+        box-shadow: 0 12px 36px #242d3720;
+      }
+      .account-popover::backdrop {
+        background: transparent;
+      }
+      .account-popover-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 4px;
+      }
+      .account-popover-header h2 {
+        font-size: 14px;
+        font-weight: 650;
+      }
+      .close-account {
+        display: grid;
+        place-items: center;
+        min-width: 32px;
+        min-height: 32px;
+        padding: 4px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+      }
+      .close-account:hover {
+        background: #f2f3ed;
+      }
+      .close-account .icon {
+        width: 17px;
+        height: 17px;
+      }
+      .account-popover > p {
+        margin: 3px 0 16px;
+        font-size: 11px;
+        line-height: 1.7;
+        color: var(--muted);
+      }
+      .account-popover .profile-avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: #f3eee3;
+        color: var(--ink);
+        font-size: 14px;
+      }
+      .account-popover .profile-label strong {
+        font-size: 12px;
+      }
+      .account-popover .profile-label small {
+        font-size: 10px;
+        line-height: 1.5;
+      }
+      .account-popover .saved-profile {
+        padding: 11px 8px;
+      }
+      .account-popover .saved-profile[aria-pressed='true'] {
+        background: #f7f8f1;
+        border-color: transparent;
+      }
+      .account-popover .saved-profile:hover:enabled {
+        background: #f2f3ed;
+      }
+      .account-row-title {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .account-row-title strong {
+        min-width: 0;
+      }
+      .account-role-badge {
+        flex-shrink: 0;
+        padding: 3px 5px;
+        border-radius: 4px;
+        background: #f2eee4;
+        font-size: 7px;
+        font-weight: 650;
+        letter-spacing: 0.06em;
+      }
+      .account-actions {
+        margin-top: 13px;
+        padding-top: 10px;
+        border-top: 1px solid #e4e5de;
+      }
+      .account-actions .add-learner {
+        margin: 0;
+        border: 0;
+        padding: 10px 8px;
+        color: var(--ink);
+        font-size: 12px;
+      }
+      .account-popover > .account-storage-note {
+        margin: 13px 0 0;
+        font-size: 10px;
+      }
+      .account-choice-list {
+        width: min(100%, 310px);
+        margin-top: 22px;
+        text-align: left;
+      }
+      .saved-profiles-label {
+        display: block;
+        padding: 0 7px 10px;
+        font-size: 9px;
+        font-weight: 600;
+        color: var(--muted);
+      }
+      .saved-profile-list {
+        display: grid;
+        gap: 5px;
+        max-height: 228px;
+        overflow-y: auto;
+        padding: 4px;
+        margin: -4px;
+      }
+      .saved-profile {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        min-width: 0;
+        padding: 9px 7px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
+        text-align: left;
+      }
+      .saved-profile:hover:enabled {
+        background: #eae6da;
+      }
+      .saved-profile:disabled {
+        opacity: 1;
+      }
+      .saved-profile[aria-pressed='true'] {
+        background: var(--white);
+        border-color: #e1d6c6;
+      }
+      .profile-avatar {
+        flex-shrink: 0;
+        display: grid;
+        place-items: center;
+        width: 29px;
+        height: 29px;
+        border-radius: 10px;
+        background: #f2d7bc;
+        color: #79532f;
+        font-size: 12px;
+        font-weight: 650;
+      }
+      .saved-profile:nth-child(even) .profile-avatar {
+        background: #dce7d8;
+        color: var(--green);
+      }
+      .profile-label {
+        flex: 1;
+        min-width: 0;
+      }
+      .profile-label strong {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 10px;
+        font-weight: 650;
+      }
+      .profile-label small {
+        display: block;
+        margin-top: 4px;
+        font-size: 8px;
+        color: var(--muted);
+      }
+      .saved-profile > .icon {
+        width: 13px;
+        height: 13px;
+        color: var(--green);
+      }
+      .add-learner {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        width: 100%;
+        margin-top: 9px;
+        padding: 9px 7px;
+        border: 0;
+        border-top: 1px solid var(--line);
+        background: transparent;
+        color: var(--muted);
+        font-size: 10px;
+        text-align: left;
+      }
+      .add-learner .icon {
+        width: 15px;
+        height: 15px;
+      }
+      .add-learner:hover {
+        color: var(--orange);
+      }
+      .cancel-add {
+        align-self: center;
+        padding-top: 0;
+        font-size: 10px;
+      }
+      .student-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .small-brand {
+        font-size: 22px;
+        letter-spacing: -0.07em;
+        color: var(--ink);
+        font-weight: 750;
+      }
+      .school-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 10px;
+        color: #54614e;
+      }
+      .school-chip .icon {
+        width: 14px;
+        height: 14px;
+      }
+      .student-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 27px 0 24px;
+        text-align: center;
+      }
+      .student-content h2 {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        font-size: 26px;
+        font-weight: 650;
+        line-height: 1.3;
+        letter-spacing: -0.8px;
+        margin-top: 16px;
+      }
+      .student-content > p {
+        margin-top: 9px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.7;
+        max-width: 340px;
+      }
+      .student-footer {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        color: #6b6c64;
+        font-size: 10px;
+        line-height: 1.6;
+        text-align: center;
+      }
+      .student-footer .icon {
+        width: 13px;
+        height: 13px;
+      }
+      .scanner {
+        position: relative;
+        width: 180px;
+        height: 170px;
+        display: grid;
+        place-items: center;
+      }
+      .scanner:before,
+      .scanner:after {
+        content: '';
+        position: absolute;
+        width: 36px;
+        height: 36px;
+        border-color: var(--orange);
+        border-style: solid;
+      }
+      .scanner:before {
+        left: 0;
+        top: 0;
+        border-width: 3px 0 0 3px;
+        border-radius: 11px 0 0 0;
+      }
+      .scanner:after {
+        right: 0;
+        bottom: 0;
+        border-width: 0 3px 3px 0;
+        border-radius: 0 0 11px 0;
+      }
+      .school-card {
+        width: 114px;
+        height: 143px;
+        padding: 10px 12px;
+        background: #fff;
+        border: 1px solid #dadbd1;
+        box-shadow: 0 7px 15px #242d3710;
+        border-radius: 8px;
+        transform: rotate(-7deg);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .card-brand {
+        font-size: 7px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: 700;
+      }
+      .card-qr {
+        width: 67px;
+        height: 67px;
+        color: var(--nav);
+      }
+      .card-id {
+        font-family: ui-monospace, monospace;
+        font-size: 8px;
+        color: var(--muted);
+      }
+      .card-ribbon {
+        width: 50px;
+        height: 4px;
+        border-radius: 2px;
+        background: #ee926c;
+      }
+      .primary-button {
+        border: 1px solid var(--orange);
+        border-radius: 8px;
+        padding: 12px 20px;
+        background: var(--orange);
+        color: white;
+        display: inline-flex;
+        gap: 10px;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .primary-button:hover:enabled {
+        background: #ae381b;
+        border-color: #ae381b;
+      }
+      .primary-button .icon {
+        width: 16px;
+        height: 16px;
+      }
+      .secondary-button {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        gap: 7px;
+        padding: 11px 16px;
+        border: 1px solid #d6d7ca;
+        border-radius: 8px;
+        background: var(--white);
+        font-size: 12px;
+      }
+      .secondary-button:hover {
+        background: #f2f1e9;
+      }
+      .secondary-button .icon {
+        width: 15px;
+        height: 15px;
+      }
+      .student-actions {
+        display: grid;
+        gap: 9px;
+        margin-top: 24px;
+        width: min(100%, 290px);
+      }
+      .student-actions .text-button {
+        justify-content: center;
+        font-size: 10px;
+      }
+      .demo-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        font-size: 9px;
+        color: var(--muted);
+        margin-top: 7px;
+      }
+      .name-avatar {
+        width: 66px;
+        height: 66px;
+        display: grid;
+        place-items: center;
+        border-radius: 23px;
+        background: var(--orange-soft);
+        color: var(--orange);
+      }
+      .name-avatar .icon {
+        width: 30px;
+        height: 30px;
+      }
+      .student-form {
+        width: min(100%, 290px);
+        margin-top: 22px;
+        text-align: left;
+      }
+      .student-form label {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      .student-form input {
+        width: 100%;
+        min-height: 47px;
+        border: 1px solid #c7c9bd;
+        border-radius: 8px;
+        padding: 11px 13px;
+        background: #fff;
+        color: var(--ink);
+        font-size: 14px;
+      }
+      .student-form input::placeholder {
+        color: #777a70;
+      }
+      .student-form .primary-button {
+        width: 100%;
+        margin-top: 17px;
+      }
+      .field-note {
+        margin-top: 7px;
+        font-size: 10px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      .error-message {
+        font-size: 11px;
+        color: #a43225;
+        line-height: 1.6;
+        margin-top: 10px;
+      }
+      .error-panel {
+        width: min(100%, 320px);
+        padding: 12px;
+        background: #fbebe5;
+        border-radius: 8px;
+        color: #943821;
+        font-size: 11px;
+        line-height: 1.6;
+        margin-top: 15px;
+      }
+      .welcome-orbit {
+        width: 90px;
+        height: 82px;
+        display: grid;
+        place-items: center;
+        position: relative;
+      }
+      .welcome-orbit:before {
+        content: '';
+        position: absolute;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #d6b356;
+        top: 2px;
+        right: 6px;
+      }
+      .welcome-orbit:after {
+        content: '';
+        position: absolute;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #8ab7a1;
+        bottom: 6px;
+        left: 2px;
+      }
+      .initial-avatar {
+        display: grid;
+        place-items: center;
+        width: 65px;
+        height: 65px;
+        border-radius: 24px;
+        background: #f5dabd;
+        color: #79532f;
+        font-size: 27px;
+        font-weight: 600;
+      }
+      .lesson-preview {
+        width: min(100%, 360px);
+        margin-top: 24px;
+        text-align: left;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        padding: 16px 0;
+      }
+      .lesson-icon {
+        flex-shrink: 0;
+        width: 43px;
+        height: 43px;
+        border-radius: 12px;
+        background: var(--green-soft);
+        color: var(--green);
+        display: grid;
+        place-items: center;
+      }
+      .lesson-copy {
+        flex: 1;
+        min-width: 0;
+      }
+      .lesson-copy small {
+        font-size: 9px;
+        color: var(--muted);
+      }
+      .lesson-copy h3 {
+        font-size: 12px;
+        font-weight: 650;
+        margin-top: 4px;
+      }
+      .lesson-copy p {
+        color: var(--muted);
+        font-size: 10px;
+        margin-top: 5px;
+        line-height: 1.5;
+      }
+      .lesson-progress {
+        font-size: 10px;
+        color: var(--green);
+      }
+      .activity-art {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 10px;
+        color: var(--green);
+      }
+      .activity-art .icon {
+        width: 52px;
+        height: 52px;
+      }
+      .scratch-block {
+        background: #faf0ce;
+        padding: 11px 15px;
+        border-radius: 7px;
+        color: #77541a;
+        font-size: 12px;
+      }
+      .answer-options {
+        display: flex;
+        gap: 10px;
+        margin-top: 22px;
+      }
+      .answer-options button {
+        min-width: 74px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+      .answer-options button:hover {
+        border-color: var(--orange);
+        background: var(--orange-soft);
+      }
+      .success-mark {
+        width: 66px;
+        height: 66px;
+        border-radius: 50%;
+        background: var(--green-soft);
+        color: var(--green);
+        display: grid;
+        place-items: center;
+      }
+      .success-mark .icon {
+        width: 30px;
+        height: 30px;
+      }
+      .preview-caption {
+        display: flex;
+        align-items: start;
+        gap: 8px;
+        margin-top: 14px;
+        font-size: 10px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+      .preview-caption .icon {
+        width: 14px;
+        height: 14px;
+        margin-top: 2px;
+      }
+      .reviewer {
+        padding-top: 36px;
+      }
+      .reviewer-section {
+        border-top: 1px solid var(--line);
+        padding-top: 17px;
+        margin-top: 20px;
+      }
+      .reviewer-section:first-child {
+        border: 0;
+        padding-top: 0;
+        margin-top: 0;
+      }
+      .reviewer h2 {
+        font-size: 13px;
+        font-weight: 650;
+        margin-top: 8px;
+        letter-spacing: -0.2px;
+      }
+      .reviewer p {
+        font-size: 11px;
+        line-height: 1.8;
+        color: var(--muted);
+        margin-top: 9px;
+      }
+      .reviewer strong {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .state-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 8px;
+        border-radius: 5px;
+        font-size: 9px;
+        font-weight: 600;
+        background: var(--gold-soft);
+        color: var(--gold);
+        margin-top: 11px;
+      }
+      .state-pill.green {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+      .state-pill.blue {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+      .state-list {
+        margin: 11px 0 0;
+        display: grid;
+        gap: 9px;
+        font-size: 10px;
+      }
+      .state-list div {
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+        align-items: baseline;
+      }
+      .state-list dt {
+        color: var(--muted);
+      }
+      .state-list dd {
+        text-align: right;
+        margin: 0;
+        color: var(--ink);
+        font-weight: 500;
+        overflow-wrap: anywhere;
+      }
+      .state-list code {
+        font-size: 9px;
+        font-family: ui-monospace, monospace;
+      }
+      .note-list {
+        margin: 10px 0 0;
+        padding-left: 15px;
+        display: grid;
+        gap: 9px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.7;
+      }
+      details {
+        margin-top: 18px;
+      }
+      summary {
+        cursor: pointer;
+        font-size: 10px;
+        color: var(--muted);
+        min-height: 32px;
+        padding: 7px 0;
+      }
+      .edge-controls {
+        display: grid;
+        gap: 7px;
+        margin-top: 8px;
+      }
+      .edge-controls button {
+        text-align: left;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 9px;
+        background: transparent;
+        font-size: 10px;
+        min-height: 36px;
+      }
+      .edge-controls button:hover {
+        background: var(--white);
+      }
+      .teacher-app {
+        padding: 26px;
+        min-height: 500px;
+      }
+      .teacher-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 10px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--line);
+      }
+      .teacher-avatar {
+        margin-left: auto;
+        width: 27px;
+        height: 27px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: #e1e8dd;
+        color: var(--green);
+        font-size: 10px;
+        font-weight: 600;
+      }
+      .teacher-heading {
+        padding: 23px 0 19px;
+      }
+      .teacher-heading h2 {
+        font-size: 21px;
+        letter-spacing: -0.6px;
+        line-height: 1.3;
+      }
+      .teacher-heading p {
+        margin-top: 8px;
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.8;
+      }
+      .import-zone {
+        padding: 27px 18px;
+        border: 1px dashed #b7c5b1;
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 13px;
+        background: #f3f6ee;
+      }
+      .import-zone > .icon {
+        width: 30px;
+        height: 30px;
+        color: var(--green);
+      }
+      .import-zone h3 {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .import-zone p {
+        max-width: 310px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.8;
+      }
+      .teacher-facts {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        padding: 20px 0 0;
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .teacher-facts strong {
+        display: block;
+        font-size: 19px;
+        color: var(--ink);
+        margin-bottom: 6px;
+        font-weight: 600;
+      }
+      .roster-summary {
+        display: flex;
+        gap: 7px;
+        flex-wrap: wrap;
+        margin-bottom: 15px;
+      }
+      .roster-summary .state-pill {
+        margin-top: 0;
+      }
+      .table-scroll {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10px;
+        text-align: left;
+      }
+      th {
+        font-size: 9px;
+        color: var(--muted);
+        font-weight: 600;
+        padding: 10px 7px;
+        border-bottom: 1px solid var(--line);
+        white-space: nowrap;
+      }
+      td {
+        padding: 14px 7px;
+        border-bottom: 1px solid #e9e9df;
+        vertical-align: middle;
+      }
+      td strong {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      td small {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 9px;
+      }
+      td code {
+        font-size: 9px;
+        font-family: ui-monospace, monospace;
+      }
+      .table-status {
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+        font-size: 9px;
+        white-space: nowrap;
+        color: var(--green);
+      }
+      .table-status.pending {
+        color: var(--gold);
+      }
+      .table-status.muted {
+        color: var(--muted);
+      }
+      .table-status .icon {
+        width: 12px;
+        height: 12px;
+      }
+      .table-checkbox {
+        accent-color: var(--green);
+        width: 17px;
+        height: 17px;
+        cursor: pointer;
+      }
+      .checkbox-label {
+        min-width: 30px;
+        min-height: 34px;
+        display: grid;
+        place-items: center;
+      }
+      .roster-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding-top: 19px;
+      }
+      .roster-actions .text-button {
+        font-size: 10px;
+      }
+      .sync-success {
+        display: flex;
+        align-items: start;
+        gap: 9px;
+        background: var(--green-soft);
+        border-radius: 8px;
+        padding: 13px;
+        margin-bottom: 17px;
+        color: var(--green);
+        font-size: 11px;
+        line-height: 1.7;
+      }
+      .sync-success .icon {
+        margin-top: 1px;
+        width: 16px;
+        height: 16px;
+      }
+      .conflict-panel {
+        margin-top: 17px;
+        padding: 16px;
+        border: 1px solid #ded1aa;
+        border-radius: 8px;
+        background: #fbf6e8;
+      }
+      .conflict-panel h3 {
+        font-size: 12px;
+        margin-bottom: 7px;
+      }
+      .conflict-panel p {
+        font-size: 10px;
+        color: #746447;
+        line-height: 1.8;
+      }
+      .conflict-profiles {
+        display: grid;
+        gap: 7px;
+        margin: 11px 0;
+        font-size: 10px;
+        color: #746447;
+      }
+      .conflict-profiles span {
+        display: flex;
+        gap: 10px;
+        justify-content: space-between;
+      }
+      .overview {
+        padding: 30px;
+        min-height: 500px;
+      }
+      .overview h2 {
+        font-size: 24px;
+        letter-spacing: -0.7px;
+      }
+      .overview > p {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.8;
+        margin-top: 9px;
+      }
+      .flow-list {
+        margin: 25px 0 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 0;
+      }
+      .flow-item {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr);
+        gap: 13px;
+        position: relative;
+        padding-bottom: 25px;
+      }
+      .flow-item:not(:last-child):before {
+        content: '';
+        position: absolute;
+        top: 30px;
+        bottom: 3px;
+        left: 16px;
+        width: 1px;
+        background: var(--line);
+      }
+      .flow-symbol {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border-radius: 10px;
+        background: #eeece4;
+        color: #5b6355;
+        z-index: 1;
+      }
+      .flow-symbol .icon {
+        width: 17px;
+        height: 17px;
+      }
+      .flow-item h3 {
+        font-size: 12px;
+        margin: 2px 0 6px;
+      }
+      .flow-item p {
+        font-size: 10px;
+        line-height: 1.8;
+        color: var(--muted);
+      }
+      .flow-split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 17px;
+        margin-top: 12px;
+      }
+      .flow-branch {
+        padding-left: 11px;
+        border-left: 2px solid #afc1a6;
+      }
+      .flow-branch:last-child {
+        border-color: #c7bd9c;
+      }
+      .flow-branch strong {
+        display: block;
+        font-size: 10px;
+        margin-bottom: 5px;
+      }
+      .flow-item .text-button {
+        font-size: 10px;
+        min-height: 32px;
+        padding-bottom: 0;
+        color: var(--orange);
+      }
+      .workspace-footer {
+        display: flex;
+        align-items: start;
+        gap: 20px;
+        justify-content: space-between;
+        border-top: 1px solid var(--line);
+        margin-top: 26px;
+        padding-top: 16px;
+        font-size: 10px;
+        line-height: 1.7;
+        color: var(--muted);
+      }
+      .workspace-footer span:last-child {
+        text-align: right;
+      }
+      .toast {
+        position: fixed;
+        bottom: 22px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--nav);
+        color: #fff;
+        padding: 12px 18px;
+        border-radius: 8px;
+        box-shadow: 0 5px 20px #242d3720;
+        font-size: 12px;
+        max-width: calc(100vw - 36px);
+        z-index: 10;
+      }
+      @media (min-width: 1450px) {
+        .workspace {
+          padding: 40px 44px 26px;
+        }
+        .workspace-grid {
+          grid-template-columns: minmax(0, 1fr) 264px;
+          gap: 32px;
+        }
+        .app-body,
+        .student-app,
+        .teacher-app,
+        .overview {
+          min-height: 545px;
+        }
+      }
+      @media (max-width: 1170px) {
+        .page {
+          grid-template-columns: 190px minmax(0, 1fr);
+        }
+        .sidebar {
+          padding-left: 15px;
+          padding-right: 12px;
+        }
+        .workspace {
+          padding: 28px 25px 20px;
+        }
+        .workspace-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .reviewer {
+          padding-top: 0;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 22px;
+        }
+        .reviewer-section {
+          margin-top: 0;
+        }
+        .reviewer-section:first-child {
+          border-top: 1px solid var(--line);
+          padding-top: 17px;
+        }
+        .reviewer details {
+          grid-column: 1 / -1;
+          margin-top: 0;
+        }
+        .edge-controls {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      @media (max-width: 700px) {
+        .topbar {
+          padding: 14px 18px;
+          min-height: 68px;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .topbar-title {
+          font-size: 11px;
+        }
+        .topbar-end {
+          gap: 8px;
+        }
+        .topbar-end .text-button span {
+          display: none;
+        }
+        .page {
+          display: block;
+        }
+        .sidebar {
+          padding: 16px 14px 12px;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        .sidebar .eyebrow,
+        .sidebar-note {
+          display: none;
+        }
+        .scenario-list {
+          display: flex;
+          overflow-x: auto;
+          margin-top: 0;
+          gap: 5px;
+          padding: 3px 2px 6px;
+        }
+        .scenario {
+          display: flex;
+          flex: 0 0 auto;
+          width: auto;
+          padding: 10px;
+          gap: 7px;
+        }
+        .scenario-number {
+          align-self: auto;
+          font-size: 10px;
+          padding: 0;
+        }
+        .scenario-title {
+          font-size: 11px;
+          white-space: nowrap;
+        }
+        .scenario-hint {
+          display: none;
+        }
+        .workspace {
+          padding: 24px 16px 18px;
+        }
+        .workspace-header {
+          display: block;
+          margin-bottom: 20px;
+        }
+        .scenario-label {
+          margin-top: 14px;
+        }
+        .student-app {
+          padding: 22px 22px 18px;
+        }
+        .student-layout {
+          display: block;
+        }
+        .learner-sidebar {
+          flex-direction: row;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px 18px;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        .learner-sidebar > .small-brand {
+          display: block;
+          padding: 0;
+        }
+        .learner-navigation {
+          display: none;
+        }
+        .saved-profiles {
+          margin-top: 0;
+          padding-top: 0;
+        }
+        .account-trigger {
+          width: auto;
+          flex-direction: row;
+          min-height: 44px;
+          padding: 0;
+          border: 0;
+          gap: 9px;
+        }
+        .sidebar-role {
+          font-size: 10px;
+        }
+        .account-popover .saved-profile-list {
+          max-height: 40dvh;
+        }
+        .app-body,
+        .student-app,
+        .teacher-app,
+        .overview {
+          min-height: 490px;
+        }
+        .student-content h2 {
+          font-size: 24px;
+        }
+        .student-content {
+          padding-top: 24px;
+          padding-bottom: 22px;
+        }
+        .reviewer {
+          display: block;
+        }
+        .reviewer-section {
+          margin-top: 20px;
+        }
+        .reviewer details {
+          margin-top: 17px;
+        }
+        .edge-controls {
+          grid-template-columns: 1fr;
+        }
+        .window-bar {
+          padding: 12px;
+          gap: 5px;
+        }
+        .window-dots {
+          display: none;
+        }
+        .window-device {
+          font-size: 9px;
+        }
+        .teacher-app,
+        .overview {
+          padding: 21px 16px;
+        }
+        .flow-split {
+          grid-template-columns: 1fr;
+        }
+        .workspace-footer {
+          display: block;
+        }
+        .workspace-footer span {
+          display: block;
+        }
+        .workspace-footer span:last-child {
+          text-align: left;
+          margin-top: 5px;
+        }
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .app-body > * {
+          animation: appear 180ms ease-out;
+        }
+        @keyframes appear {
+          from {
+            opacity: 0.5;
+            transform: translateY(4px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      }
+      @media print {
+        .topbar-end,
+        .sidebar,
+        .edge-controls,
+        .toast {
+          display: none;
+        }
+        .page {
+          display: block;
+        }
+        .workspace-grid {
+          grid-template-columns: 1fr 250px;
+        }
+        .reviewer {
+          display: block;
+          padding-top: 36px;
+        }
+        .app-frame {
+          box-shadow: none;
+        }
+        .workspace {
+          padding: 24px 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#preview">Skip to interactive preview</a>
+    <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5" /></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" /></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6" /></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" /></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" /></symbol>
+      <symbol id="i-qr" viewBox="0 0 24 24">
+        <path d="M3 3h7v7H3zm11 0h7v7h-7zM3 14h7v7H3zm11 0h3v3h-3zm7 0v4h-3v3h-4m7 0v-1" />
+      </symbol>
+      <symbol id="i-school" viewBox="0 0 24 24">
+        <path d="m3 9 9-6 9 6v12H3zm6 12v-6h6v6m-9-9h1m10 0h1M12 8v2" />
+      </symbol>
+      <symbol id="i-desktop" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="13" rx="2" />
+        <path d="M8 21h8m-4-5v5" />
+      </symbol>
+      <symbol id="i-users" viewBox="0 0 24 24">
+        <circle cx="9" cy="7" r="3" />
+        <path d="M3 21v-3a6 6 0 0 1 12 0v3m1-17a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 4v3" />
+      </symbol>
+      <symbol id="i-user" viewBox="0 0 24 24">
+        <circle cx="12" cy="7" r="4" />
+        <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
+      </symbol>
+      <symbol id="i-book" viewBox="0 0 24 24">
+        <path d="M12 5v16m0-16C8 2 4 3 2 4v15c3-1 6-1 10 2 4-3 7-3 10-2V4c-2-1-6-2-10 1" />
+      </symbol>
+      <symbol id="i-info" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 11v6m0-10v.1" />
+      </symbol>
+      <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 2 7M3 4v7h7" /></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24">
+        <path
+          d="m10 14 4-4m-6 5-1 1a4 4 0 0 1-6-6l5-5a4 4 0 0 1 6 0m0 4 1-1a4 4 0 0 1 6 6l-5 5a4 4 0 0 1-6 0"
+          transform="translate(2 0)"
+        />
+      </symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24">
+        <path d="M12 16V3m-5 5 5-5 5 5M3 15v6h18v-6" />
+      </symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24">
+        <path d="m12 3 9 4v6c0 5-9 9-9 9s-9-4-9-9V7z" />
+        <path d="m8 12 3 3 5-6" />
+      </symbol>
+      <symbol id="i-exit" viewBox="0 0 24 24">
+        <path d="M10 3H3v18h7m-2-9h13m-5-5 5 5-5 5" />
+      </symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24">
+        <path d="M5 22V3m0 1c5-5 9 5 15 0v10c-6 5-10-5-15 0" />
+      </symbol>
+      <symbol id="i-save" viewBox="0 0 24 24">
+        <path d="M4 3h13l4 4v14H3V3zm3 0v7h10V3M7 21v-7h10v7" />
+      </symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </symbol>
+    </svg>
+    <header class="topbar">
+      <div class="brand" aria-label="Tro">
+        <svg class="brand-mark" viewBox="0 0 30 32" fill="none" aria-hidden="true">
+          <path d="M5 4h21v6H5zM12 12h7v16h-7z" fill="currentColor" />
+          <path d="m3 13 5-2 2 5-5 2z" fill="#dfb95e" />
+        </svg>
+        tro
+      </div>
+      <span class="topbar-divider" aria-hidden="true"></span>
+      <span class="topbar-title">Classroom access / QR onboarding</span>
+      <div class="topbar-end">
+        <span class="draft">Interactive draft</span>
+        <button class="text-button" type="button" data-action="reset" aria-label="Reset preview">
+          <svg class="icon" aria-hidden="true"><use href="#i-reset"></use></svg>
+          <span>Reset preview</span>
+        </button>
+      </div>
+    </header>
+    <div class="page">
+      <aside class="sidebar">
+        <div>
+          <div class="eyebrow">Walk through the flow</div>
+          <nav class="scenario-list" aria-label="Preview scenarios">
+            <button class="scenario" type="button" data-scenario="first" aria-current="page">
+              <span class="scenario-number">01</span>
+              <span
+                ><span class="scenario-title">First visit</span
+                ><span class="scenario-hint">School card → name → learn</span></span
+              >
+            </button>
+            <button class="scenario" type="button" data-scenario="return">
+              <span class="scenario-number">02</span>
+              <span
+                ><span class="scenario-title">Personal computer</span
+                ><span class="scenario-hint">A remembered student returns</span></span
+              >
+            </button>
+            <button class="scenario" type="button" data-scenario="shared">
+              <span class="scenario-number">03</span>
+              <span
+                ><span class="scenario-title">Shared computer</span
+                ><span class="scenario-hint">A fresh classroom session</span></span
+              >
+            </button>
+            <button class="scenario" type="button" data-scenario="teacher">
+              <span class="scenario-number">04</span>
+              <span
+                ><span class="scenario-title">Teacher sync</span
+                ><span class="scenario-hint">Connect the roster later</span></span
+              >
+            </button>
+            <button class="scenario" type="button" data-scenario="overview">
+              <span class="scenario-number">05</span>
+              <span
+                ><span class="scenario-title">Whole flow</span
+                ><span class="scenario-hint">How the pieces fit together</span></span
+              >
+            </button>
+          </nav>
+        </div>
+        <div class="sidebar-note">
+          <svg class="icon" aria-hidden="true"><use href="#i-school"></use></svg>
+          <strong>Use the card they already have.</strong>
+          Ask for a name once. Keep school setup and roster management with staff.
+        </div>
+      </aside>
+      <main class="workspace" id="preview">
+        <div class="workspace-header">
+          <div>
+            <h1 id="scenario-heading">A school card. A first lesson.</h1>
+            <p class="subtitle" id="scenario-subtitle">
+              Students can begin before the teacher connects a roster. Try the student journey
+              below.
+            </p>
+          </div>
+          <span class="scenario-label" id="scenario-label"></span>
+        </div>
+        <div class="workspace-grid">
+          <div class="preview-column">
+            <div class="journey" id="journey" aria-label="Current journey step"></div>
+            <section class="app-frame" aria-label="Interactive Tro application preview" lang="vi">
+              <div class="window-bar">
+                <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                <svg class="icon" aria-hidden="true"><use href="#i-school"></use></svg>
+                <span>CodeSpace</span>
+                <span class="window-device" id="device-label"></span>
+              </div>
+              <div class="app-body" id="app-screen"></div>
+            </section>
+            <p class="preview-caption">
+              <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
+              <span
+                >Design prototype · Fictional students · Scans and imports are simulated. Nothing is
+                sent to a server or saved after reload.</span
+              >
+            </p>
+          </div>
+          <aside class="reviewer" id="reviewer" aria-label="Flow explanation"></aside>
+        </div>
+        <footer class="workspace-footer">
+          <span>Child-facing screens: Vietnamese<br />Flow notes: English</span>
+          <span
+            >Setup once · Learn first · Connect the roster later<br />Proposed experience, separate
+            from the current Tro application.</span
+          >
+        </footer>
+      </main>
+    </div>
+    <div class="sr-only" id="announcement" role="status" aria-live="polite"></div>
+    <div class="toast" id="toast" role="status" hidden></div>
+    <script>
+      /** Fixed values belong to the preview; none are production auth contracts. */
+      const Scenario = /** @type {const} */ ({
+        FIRST: 'first',
+        RETURN: 'return',
+        SHARED: 'shared',
+        TEACHER: 'teacher',
+        OVERVIEW: 'overview',
+      });
+      const StudentScreen = /** @type {const} */ ({
+        SCAN: 'scan',
+        ACCOUNTS: 'accounts',
+        NAME: 'name',
+        HOME: 'home',
+        ACTIVITY: 'activity',
+        COMPLETE: 'complete',
+      });
+      const TeacherStage = /** @type {const} */ ({
+        IDLE: 'idle',
+        REVIEW: 'review',
+      });
+
+      /** @typedef {typeof Scenario[keyof typeof Scenario]} ScenarioName */
+      /** @typedef {typeof StudentScreen[keyof typeof StudentScreen]} StudentScreenName */
+      /** @typedef {{ profileId: string, name: string, studentId: string, completedActivities: number }} Learner */
+      /** @typedef {{ id: string, name: string, schoolName: string, studentId: string, activities: number, match: 'ready' | 'duplicate' | 'missing' }} RosterRow */
+      /** @typedef {{ scenario: ScenarioName, screen: StudentScreenName, personalLearners: Learner[], rememberedProfileIds: Set<string>, activePersonalProfileId: string | null, isAddingLearner: boolean, hasSeededPersonalDemo: boolean, sharedLearner: Learner | null, sharedAttempts: Learner[], scannedStudentId: string, manualEntry: boolean, scanError: string, fieldError: string, activityFeedback: string, teacherStage: typeof TeacherStage[keyof typeof TeacherStage], selectedMatches: Set<string>, linkedRows: Set<string>, conflictOpen: boolean, conflictDeferred: boolean, profileNumber: number }} PreviewState */
+
+      /** @returns {PreviewState} */
+      function createPreviewState() {
+        return {
+          scenario: Scenario.FIRST,
+          screen: StudentScreen.SCAN,
+          personalLearners: [],
+          rememberedProfileIds: new Set(),
+          activePersonalProfileId: null,
+          isAddingLearner: false,
+          hasSeededPersonalDemo: false,
+          sharedLearner: null,
+          sharedAttempts: [],
+          scannedStudentId: '',
+          manualEntry: false,
+          scanError: '',
+          fieldError: '',
+          activityFeedback: '',
+          teacherStage: TeacherStage.IDLE,
+          selectedMatches: new Set(),
+          linkedRows: new Set(),
+          conflictOpen: false,
+          conflictDeferred: false,
+          profileNumber: 1,
+        };
+      }
+
+      let state = createPreviewState();
+      /** @returns {Learner} */
+      function createSamplePersonalLearner() {
+        return {
+          profileId: 'tro-demo-remembered',
+          name: 'Minh Anh',
+          studentId: 'CS-1042',
+          completedActivities: 1,
+        };
+      }
+      /** @type {ReturnType<typeof setTimeout> | undefined} */
+      let toastTimeout;
+
+      /** @param {string} id @returns {HTMLElement} */
+      function getElement(id) {
+        const element = document.getElementById(id);
+        if (!element) {
+          throw new Error('Missing preview element: ' + id);
+        }
+        return element;
+      }
+
+      /** User-entered display names are text, including inside preview templates.
+       * @param {string} value @returns {string}
+       */
+      function escapeHtml(value) {
+        return value
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#39;');
+      }
+
+      /** @param {string} name @returns {string} */
+      function renderIcon(name) {
+        return '<svg class="icon" aria-hidden="true"><use href="#i-' + name + '"></use></svg>';
+      }
+
+      /** @param {string} message @returns {void} */
+      function announce(message) {
+        getElement('announcement').textContent = message;
+      }
+
+      /** @param {string} message @returns {void} */
+      function showToast(message) {
+        const toast = getElement('toast');
+        clearTimeout(toastTimeout);
+        toast.textContent = message;
+        toast.hidden = false;
+        toastTimeout = setTimeout(() => {
+          toast.hidden = true;
+        }, 3600);
+      }
+
+      /** @returns {Learner} */
+      function readPersonalLearner() {
+        return (
+          state.personalLearners.find(
+            (learner) => learner.profileId === state.activePersonalProfileId,
+          ) ?? createSamplePersonalLearner()
+        );
+      }
+
+      /** @returns {Learner[]} */
+      function readRememberedPersonalLearners() {
+        return state.personalLearners.filter((learner) =>
+          state.rememberedProfileIds.has(learner.profileId),
+        );
+      }
+
+      /** Signing out leaves work intact and never opens another student's account automatically.
+       * @returns {StudentScreenName}
+       */
+      function readSavedStudentScreen() {
+        if (
+          state.activePersonalProfileId &&
+          state.rememberedProfileIds.has(state.activePersonalProfileId)
+        ) {
+          return StudentScreen.HOME;
+        }
+        return readRememberedPersonalLearners().length > 0
+          ? StudentScreen.ACCOUNTS
+          : StudentScreen.SCAN;
+      }
+
+      /** Shared sessions deliberately never resolve a learner from the scanned public ID.
+       * @returns {Learner}
+       */
+      function readCurrentLearner() {
+        if (state.scenario === Scenario.SHARED) {
+          if (!state.sharedLearner) {
+            throw new Error('A shared lesson needs a fresh learner session.');
+          }
+          return state.sharedLearner;
+        }
+        const learner = state.personalLearners.find(
+          (profile) => profile.profileId === state.activePersonalProfileId,
+        );
+        if (!learner || !state.rememberedProfileIds.has(learner.profileId)) {
+          throw new Error('A personal lesson needs a remembered learner session.');
+        }
+        return learner;
+      }
+
+      /** Sample remembered sessions are owned by state so Reset clears them too.
+       * @returns {void}
+       */
+      function seedRememberedPersonalLearners() {
+        if (state.personalLearners.length > 0) {
+          return;
+        }
+        const first = createSamplePersonalLearner();
+        state.personalLearners.push(first, {
+          profileId: 'tro-demo-remembered-an',
+          name: 'Bảo An',
+          studentId: 'CS-1045',
+          completedActivities: 0,
+        });
+        state.activePersonalProfileId = first.profileId;
+        state.rememberedProfileIds.add(first.profileId);
+        state.rememberedProfileIds.add('tro-demo-remembered-an');
+        state.hasSeededPersonalDemo = true;
+      }
+
+      /** @returns {string} */
+      function readSampleStudentId() {
+        if (!state.isAddingLearner) {
+          return 'CS-1042';
+        }
+        let number = 1045;
+        while (state.personalLearners.some((learner) => learner.studentId === 'CS-' + number)) {
+          number += 1;
+        }
+        return 'CS-' + number;
+      }
+
+      /** Only already remembered device sessions can be selected in this list.
+       * @returns {string}
+       */
+      function renderAccountRows() {
+        const isShared = state.scenario === Scenario.SHARED;
+        const learners = isShared
+          ? state.sharedLearner
+            ? [state.sharedLearner]
+            : []
+          : readRememberedPersonalLearners();
+        const activeId = isShared ? state.sharedLearner?.profileId : state.activePersonalProfileId;
+        const profiles = learners
+          .map((learner) => {
+            const current = learner.profileId === activeId;
+            return (
+              '<button class="saved-profile" type="button" data-profile="' +
+              escapeHtml(learner.profileId) +
+              '" aria-pressed="' +
+              current +
+              '"' +
+              ' aria-label="' +
+              escapeHtml(learner.name + (current ? ', đang dùng' : ', chuyển hồ sơ')) +
+              '"' +
+              (current || isShared ? ' disabled' : '') +
+              '>' +
+              '<span class="profile-avatar" aria-hidden="true">' +
+              escapeHtml(learner.name.charAt(0).toUpperCase()) +
+              '</span>' +
+              '<span class="profile-label"><span class="account-row-title"><strong title="' +
+              escapeHtml(learner.name) +
+              '">' +
+              escapeHtml(learner.name) +
+              '</strong><span class="account-role-badge">HỌC SINH</span></span><small>Mã học sinh · ' +
+              escapeHtml(learner.studentId) +
+              '</small></span>' +
+              (current ? renderIcon('check') : renderIcon('arrow')) +
+              '</button>'
+            );
+          })
+          .join('');
+        return profiles;
+      }
+
+      /** @returns {string} */
+      function renderAccountPopover() {
+        const isShared = state.scenario === Scenario.SHARED;
+        return (
+          '<dialog class="account-popover" id="account-popover" aria-labelledby="account-popover-title" tabindex="-1">' +
+          '<div class="account-popover-header"><h2 id="account-popover-title">Chuyển tài khoản</h2>' +
+          '<button class="close-account" type="button" data-action="close-account" aria-label="Đóng chuyển tài khoản">' +
+          renderIcon('close') +
+          '</button></div>' +
+          '<p>' +
+          (isShared ? 'Buổi học trên máy lớp học' : 'Tài khoản trên máy này') +
+          '</p>' +
+          '<div class="saved-profile-list" role="group" aria-label="Tài khoản trên máy này">' +
+          renderAccountRows() +
+          '</div><div class="account-actions">' +
+          (isShared
+            ? '<button class="add-learner" type="button" data-action="finish-shared">' +
+              renderIcon('users') +
+              ' Đổi học sinh</button>'
+            : '<button class="add-learner" type="button" data-action="add-learner">' +
+              renderIcon('plus') +
+              ' Thêm tài khoản</button>' +
+              '<button class="add-learner" type="button" data-action="sign-out-personal">' +
+              renderIcon('exit') +
+              ' Đăng xuất tài khoản này</button>') +
+          '</div><p class="account-storage-note">Bản mẫu · Phiên đăng nhập được mô phỏng trong trang này.</p></dialog>'
+        );
+      }
+
+      /** @returns {string} */
+      function renderLearnerSidebar() {
+        const learner = readCurrentLearner();
+        return (
+          '<aside class="learner-sidebar" aria-label="Hồ sơ học sinh">' +
+          '<span class="small-brand">tro</span><nav class="learner-navigation" aria-label="Học tập">' +
+          '<button type="button" data-action="home"' +
+          (state.screen === StudentScreen.HOME && !state.isAddingLearner
+            ? ' aria-current="page"'
+            : '') +
+          '>' +
+          renderIcon('school') +
+          ' Góc học tập</button>' +
+          '<button type="button" data-action="open-lesson"' +
+          (state.screen === StudentScreen.ACTIVITY ? ' aria-current="page"' : '') +
+          '>' +
+          renderIcon('book') +
+          ' Bài học</button></nav>' +
+          '<div class="saved-profiles"><button class="account-trigger" type="button" id="account-trigger" data-action="toggle-account"' +
+          ' aria-label="Chuyển tài khoản" aria-haspopup="dialog" aria-controls="account-popover" aria-expanded="false" title="' +
+          escapeHtml(learner.name) +
+          '"><span class="profile-avatar" aria-hidden="true">' +
+          escapeHtml(learner.name.charAt(0).toUpperCase()) +
+          '</span>' +
+          '<span class="sidebar-role">Học sinh</span></button></div></aside>' +
+          renderAccountPopover()
+        );
+      }
+
+      /** @returns {string} */
+      function renderAccountChoiceScreen() {
+        return renderStudentShell(
+          '<div class="name-avatar" aria-hidden="true">' +
+            renderIcon('users') +
+            '</div>' +
+            '<h2 tabindex="-1" data-focus-heading>Chọn tài khoản</h2>' +
+            '<p>Chọn tài khoản đã lưu trên máy này để tiếp tục.</p>' +
+            '<div class="account-choice-list" role="group" aria-label="Tài khoản đã lưu">' +
+            renderAccountRows() +
+            '</div>' +
+            '<div class="student-actions"><button class="secondary-button" type="button" data-action="add-learner">' +
+            renderIcon('plus') +
+            ' Thêm tài khoản</button></div>',
+        );
+      }
+
+      /** Decorative sample, deliberately not a functional school login QR.
+       * @returns {string}
+       */
+      function renderSampleCard() {
+        return (
+          '<div class="scanner" aria-hidden="true">' +
+          '<div class="school-card"><span class="card-brand">CodeSpace</span>' +
+          '<svg class="card-qr" viewBox="0 0 29 29" fill="currentColor">' +
+          '<path d="M1 1h9v9H1zm2 2v5h5V3zM19 1h9v9h-9zm2 2v5h5V3zM1 19h9v9H1zm2 2v5h5v-5z" fill-rule="evenodd"/>' +
+          '<path d="M4 4h3v3H4zm18 0h3v3h-3zM4 22h3v3H4zm8-21h3v3h-3zm3 3h2v4h-2zm-3 5h3v4h-3zm4 2h3v3h-3zm5 1h4v2h-4zm4 2h3v4h-3zM1 12h4v3H1zm5 2h4v3H6zm-4 2h3v2H2zm10-1h3v4h-3zm4 0h3v3h-3zm4 3h3v3h-3zm-7 3h3v4h-3zm4 1h2v3h-2zm7-2h4v3h-4zm-4 5h3v3h-3zm5 0h3v3h-3zm-13 1h5v2h-5z"/>' +
+          '</svg><span class="card-id">' +
+          readSampleStudentId() +
+          '</span><span class="card-ribbon"></span></div></div>'
+        );
+      }
+
+      /** @param {string} content @returns {string} */
+      function renderStudentShell(content) {
+        const isShared = state.scenario === Scenario.SHARED;
+        const showSidebar =
+          state.screen === StudentScreen.HOME ||
+          state.screen === StudentScreen.ACTIVITY ||
+          state.screen === StudentScreen.COMPLETE ||
+          (state.isAddingLearner &&
+            state.activePersonalProfileId !== null &&
+            state.rememberedProfileIds.has(state.activePersonalProfileId));
+        const footer = isShared
+          ? 'Máy lớp học · Sẵn sàng cho bạn tiếp theo khi em kết thúc.'
+          : 'Máy cá nhân · Tro ghi nhớ em trên máy này.';
+        return (
+          (showSidebar ? '<div class="student-layout">' + renderLearnerSidebar() : '') +
+          '<div class="student-app"><div class="student-header">' +
+          (showSidebar ? '<span>Góc học tập</span>' : '<span class="small-brand">tro</span>') +
+          '<span class="school-chip">' +
+          renderIcon('school') +
+          ' CodeSpace</span></div>' +
+          '<div class="student-content">' +
+          content +
+          '</div>' +
+          (state.isAddingLearner
+            ? '<button class="text-button cancel-add" type="button" data-action="cancel-add">Hủy, quay lại hồ sơ hiện tại</button>'
+            : '') +
+          '<div class="student-footer">' +
+          renderIcon(isShared ? 'users' : 'desktop') +
+          '<span>' +
+          footer +
+          '</span></div></div>' +
+          (showSidebar ? '</div>' : '')
+        );
+      }
+
+      /** @returns {string} */
+      function renderScanScreen() {
+        let content =
+          renderSampleCard() +
+          '<h2 tabindex="-1" data-focus-heading>Quét thẻ học sinh</h2>' +
+          '<p>Đưa mã QR trên thẻ vào khung.<br />Mình cùng bắt đầu nhé!</p>';
+        if (state.scanError) {
+          content +=
+            '<div class="error-panel" role="alert">' + escapeHtml(state.scanError) + '</div>';
+        }
+        if (state.manualEntry) {
+          content +=
+            '<form class="student-form" data-form="student-id">' +
+            '<label for="student-id">Mã trên thẻ của em</label>' +
+            '<input id="student-id" name="studentId" placeholder="Ví dụ: CS-1042" maxlength="20" autocomplete="off" spellcheck="false" aria-describedby="student-id-note" required />' +
+            '<p class="field-note" id="student-id-note">Bản mẫu dùng mã dạng CS-1042.</p>' +
+            '<button class="primary-button" type="submit">Tiếp tục ' +
+            renderIcon('arrow') +
+            '</button>' +
+            '<button class="text-button" type="button" data-action="close-manual">Quay lại quét thẻ</button></form>';
+        } else {
+          content +=
+            '<div class="student-actions">' +
+            '<button class="primary-button" type="button" data-action="scan">' +
+            renderIcon('qr') +
+            ' Thử quét thẻ mẫu</button>' +
+            '<button class="text-button" type="button" data-action="open-manual">Không quét được? Nhập mã trên thẻ</button>' +
+            '<span class="demo-badge">Quét thử · Không sử dụng camera</span></div>';
+        }
+        return renderStudentShell(content);
+      }
+
+      /** @returns {string} */
+      function renderNameScreen() {
+        return renderStudentShell(
+          '<div class="name-avatar" aria-hidden="true">' +
+            renderIcon('user') +
+            '</div>' +
+            '<h2 tabindex="-1" data-focus-heading>Tro gọi em là gì?</h2>' +
+            '<p>Cho mình biết tên để cùng bắt đầu nhé.</p>' +
+            '<form class="student-form" data-form="name">' +
+            '<label for="student-name">Tên của em</label>' +
+            '<input id="student-name" name="displayName" placeholder="Ví dụ: Minh Anh" maxlength="32" autocomplete="off" aria-describedby="name-note' +
+            (state.fieldError ? ' name-error' : '') +
+            '" aria-invalid="' +
+            Boolean(state.fieldError) +
+            '" required />' +
+            '<p class="field-note" id="name-note">Em có thể đổi tên sau.</p>' +
+            (state.fieldError
+              ? '<p class="error-message" id="name-error" role="alert">' +
+                escapeHtml(state.fieldError) +
+                '</p>'
+              : '') +
+            '<button class="primary-button" type="submit">Bắt đầu học ' +
+            renderIcon('arrow') +
+            '</button>' +
+            '</form>',
+        );
+      }
+
+      /** @returns {string} */
+      function renderHomeScreen() {
+        const learner = readCurrentLearner();
+        const isReturning = state.scenario === Scenario.RETURN;
+        const isShared = state.scenario === Scenario.SHARED;
+        const completed = learner.completedActivities > 0;
+        return renderStudentShell(
+          '<div class="welcome-orbit" aria-hidden="true"><div class="initial-avatar">' +
+            escapeHtml(learner.name.charAt(0).toUpperCase()) +
+            '</div></div>' +
+            '<h2 tabindex="-1" data-focus-heading>Chào ' +
+            escapeHtml(learner.name) +
+            '!</h2>' +
+            '<p>' +
+            (isShared
+              ? 'Buổi học mới của em đã sẵn sàng.'
+              : isReturning
+                ? 'Mình tiếp tục từ chỗ em đã dừng nhé.'
+                : 'Góc học tập của em đã sẵn sàng.') +
+            '</p>' +
+            '<div class="lesson-preview"><div class="lesson-icon">' +
+            renderIcon('flag') +
+            '</div><div class="lesson-copy"><small>SCRATCH · BÀI HỌC MẪU</small>' +
+            '<h3>Cho nhân vật chuyển động</h3><p>' +
+            (completed
+              ? 'Em đã hoàn thành bài tập đầu tiên.'
+              : 'Cùng thử bước đầu tiên thật đơn giản.') +
+            '</p></div><span class="lesson-progress">' +
+            (completed ? '1/1' : '0/1') +
+            '</span></div>' +
+            '<div class="student-actions"><button class="primary-button" type="button" data-action="open-lesson">' +
+            (completed ? 'Xem lại bài học' : isReturning ? 'Tiếp tục học' : 'Vào bài học') +
+            ' ' +
+            renderIcon('arrow') +
+            '</button>' +
+            (isShared
+              ? '<button class="text-button" type="button" data-action="finish-shared">' +
+                renderIcon('exit') +
+                ' Kết thúc buổi học</button>'
+              : '<button class="text-button" type="button" data-action="reopen-personal">' +
+                renderIcon('desktop') +
+                ' Thử mở lại Tro</button>') +
+            '</div>',
+        );
+      }
+
+      /** @returns {string} */
+      function renderActivityScreen() {
+        return renderStudentShell(
+          '<div class="activity-art" aria-hidden="true">' +
+            renderIcon('flag') +
+            '<span class="scratch-block">xoay ↻ ? độ</span></div>' +
+            '<h2 tabindex="-1" data-focus-heading>Thử một chút nhé!</h2>' +
+            '<p>Để nhân vật quay một vòng,<br />em chọn góc bao nhiêu độ?</p>' +
+            '<div class="answer-options" role="group" aria-label="Chọn góc quay">' +
+            '<button type="button" data-answer="90">90°</button>' +
+            '<button type="button" data-answer="180">180°</button>' +
+            '<button type="button" data-answer="360">360°</button></div>' +
+            '<p role="status">' +
+            escapeHtml(state.activityFeedback || 'Chọn một đáp án để thử.') +
+            '</p>' +
+            '<div class="student-actions"><button class="text-button" type="button" data-action="home">Quay lại góc học tập</button></div>',
+        );
+      }
+
+      /** @returns {string} */
+      function renderCompleteScreen() {
+        return renderStudentShell(
+          '<div class="success-mark" aria-hidden="true">' +
+            renderIcon('check') +
+            '</div>' +
+            '<h2 tabindex="-1" data-focus-heading>Đúng rồi, một vòng là 360°!</h2>' +
+            '<p>Bài làm của em đã được lưu trong bản mẫu.<br />Làm tốt lắm!</p>' +
+            '<div class="student-actions"><button class="primary-button" type="button" data-action="home">Về góc học tập ' +
+            renderIcon('arrow') +
+            '</button>' +
+            (state.scenario === Scenario.SHARED
+              ? '<button class="text-button" type="button" data-action="finish-shared">Kết thúc buổi học</button>'
+              : '<button class="text-button" type="button" data-action="reopen-personal">Thử mở lại Tro</button>') +
+            '</div>',
+        );
+      }
+
+      /** @returns {RosterRow[]} */
+      function readRosterRows() {
+        const schoolNames = new Map([
+          ['CS-1042', 'Nguyễn Minh Anh'],
+          ['CS-1043', 'Trần Hoàng Nam'],
+          ['CS-1044', 'Lê Bảo An'],
+          ['CS-1045', 'Phạm Bảo An'],
+        ]);
+        const personalLearners =
+          state.personalLearners.length > 0
+            ? state.personalLearners
+            : [createSamplePersonalLearner()];
+        /** @type {Learner[]} */
+        const learners = [
+          ...personalLearners,
+          ...state.sharedAttempts,
+          {
+            profileId: 'tro-roster-nam',
+            name: 'Nam',
+            studentId: 'CS-1043',
+            completedActivities: 2,
+          },
+          {
+            profileId: 'tro-roster-an-a',
+            name: 'An · Hồ sơ A',
+            studentId: 'CS-1044',
+            completedActivities: 1,
+          },
+          {
+            profileId: 'tro-roster-an-b',
+            name: 'Bảo An · Hồ sơ B',
+            studentId: 'CS-1044',
+            completedActivities: 2,
+          },
+          {
+            profileId: 'tro-roster-linh',
+            name: 'Linh',
+            studentId: 'CS-1099',
+            completedActivities: 1,
+          },
+        ];
+        /** All records in this sample are scoped to the already configured CodeSpace school.
+         * @type {Map<string, number>}
+         */
+        const claimsPerStudentId = new Map();
+        for (const learner of learners) {
+          claimsPerStudentId.set(
+            learner.studentId,
+            (claimsPerStudentId.get(learner.studentId) ?? 0) + 1,
+          );
+        }
+        return learners.map((learner) => ({
+          id: learner.profileId,
+          name: learner.name,
+          schoolName: schoolNames.get(learner.studentId) ?? '',
+          studentId: learner.studentId,
+          activities: learner.completedActivities,
+          match:
+            (claimsPerStudentId.get(learner.studentId) ?? 0) > 1
+              ? 'duplicate'
+              : schoolNames.has(learner.studentId)
+                ? 'ready'
+                : 'missing',
+        }));
+      }
+
+      /** @param {RosterRow} row @returns {string} */
+      function renderRosterRow(row) {
+        const ready = row.match === 'ready';
+        const linked = state.linkedRows.has(row.id) && ready;
+        const status = linked
+          ? 'Đã kết nối'
+          : ready
+            ? 'Khớp mã'
+            : row.match === 'duplicate'
+              ? state.conflictDeferred
+                ? 'Chờ xác minh'
+                : 'Trùng mã'
+              : 'Chưa có trong lớp';
+        const statusClass =
+          linked || ready ? '' : row.match === 'duplicate' ? ' pending' : ' muted';
+        const selector = ready
+          ? '<label class="checkbox-label"><input class="table-checkbox" type="checkbox" data-match="' +
+            row.id +
+            '" aria-label="Kết nối hồ sơ ' +
+            escapeHtml(row.name) +
+            '" ' +
+            (state.selectedMatches.has(row.id) ? 'checked ' : '') +
+            (linked ? 'disabled ' : '') +
+            '/></label>'
+          : '<span aria-hidden="true">—</span>';
+        return (
+          '<tr><td>' +
+          selector +
+          '</td><td><strong>' +
+          escapeHtml(row.name) +
+          '</strong><small>' +
+          escapeHtml(row.schoolName || 'Chưa tìm thấy tên trong danh sách') +
+          '</small></td>' +
+          '<td><code>' +
+          escapeHtml(row.studentId) +
+          '</code></td><td>' +
+          row.activities +
+          '</td>' +
+          '<td><span class="table-status' +
+          statusClass +
+          '">' +
+          renderIcon(linked || ready ? 'check' : 'clock') +
+          status +
+          '</span></td></tr>'
+        );
+      }
+
+      /** @returns {Map<string, { name: string, activities: number }[]>} */
+      function readDuplicateProfileGroups() {
+        /** @type {Map<string, { name: string, activities: number }[]>} */
+        const groups = new Map();
+        for (const row of readRosterRows()) {
+          if (row.match !== 'duplicate') {
+            continue;
+          }
+          const profiles = groups.get(row.studentId) ?? [];
+          profiles.push({ name: row.name, activities: row.activities });
+          groups.set(row.studentId, profiles);
+        }
+        return groups;
+      }
+
+      /** @returns {string} */
+      function renderConflictPanel() {
+        let profiles = '';
+        for (const [studentId, learners] of readDuplicateProfileGroups()) {
+          profiles +=
+            '<div class="conflict-profiles"><strong>' +
+            escapeHtml(studentId) +
+            ' · ' +
+            learners.length +
+            ' hồ sơ</strong>' +
+            learners
+              .map(
+                (learner) =>
+                  '<span>' +
+                  escapeHtml(learner.name) +
+                  '<span>' +
+                  learner.activities +
+                  ' bài đã lưu</span></span>',
+              )
+              .join('') +
+            '</div>';
+        }
+        return (
+          '<div class="conflict-panel"><h3 tabindex="-1" data-focus-heading>Có hồ sơ trùng mã</h3>' +
+          '<p>Giữ riêng bài làm của từng hồ sơ. Thầy cô có thể đối chiếu với học sinh trước khi kết nối.</p>' +
+          profiles +
+          '<button class="secondary-button" type="button" data-action="defer-conflict">Giữ riêng, xem lại sau</button></div>'
+        );
+      }
+
+      /** @returns {string} */
+      function renderTeacherScreen() {
+        const rows = readRosterRows();
+        let content =
+          '<div class="teacher-app"><div class="teacher-toolbar"><span class="small-brand">tro</span>' +
+          '<span> / Lớp học / Scratch nhập môn</span><span class="teacher-avatar" aria-label="Giáo viên Đức">Đ</span></div>' +
+          '<div class="teacher-heading"><h2 tabindex="-1" data-focus-heading>Kết nối danh sách học sinh</h2>' +
+          '<p>Học sinh đã có thể bắt đầu học.<br />Kết nối danh sách khi thầy cô sẵn sàng.</p></div>';
+        if (state.teacherStage === TeacherStage.IDLE) {
+          content +=
+            '<div class="import-zone">' +
+            renderIcon('upload') +
+            '<h3>Đã có danh sách từ hệ thống trường?</h3><p>Dùng mã học sinh để đối chiếu các hồ sơ đã bắt đầu trên Tro.</p>' +
+            '<button class="primary-button" type="button" data-action="import-roster">Thử danh sách mẫu ' +
+            renderIcon('arrow') +
+            '</button>' +
+            '<span class="demo-badge">Mô phỏng nhập danh sách · Không tải tệp thật</span></div>' +
+            '<div class="teacher-facts"><span><strong>' +
+            rows.length +
+            '</strong>Hồ sơ đã bắt đầu</span><span><strong>' +
+            rows.reduce((total, row) => total + row.activities, 0) +
+            '</strong>Bài tập đã lưu</span><span><strong>0</strong>Email cần thu thập</span></div>';
+        } else {
+          if (state.linkedRows.size > 0) {
+            content +=
+              '<div class="sync-success">' +
+              renderIcon('check') +
+              '<span>Đã kết nối ' +
+              state.linkedRows.size +
+              ' hồ sơ với danh sách lớp. Bài làm đã lưu được giữ nguyên.</span></div>';
+          }
+          content +=
+            '<div class="roster-summary"><span class="state-pill green">' +
+            rows.filter((row) => row.match === 'ready').length +
+            ' mã khớp danh sách</span>' +
+            '<span class="state-pill">' +
+            readDuplicateProfileGroups().size +
+            ' mã trùng</span><span class="state-pill blue">' +
+            rows.filter((row) => row.match === 'missing').length +
+            ' mã chưa có</span></div>' +
+            '<div class="table-scroll" tabindex="0" role="region" aria-label="Danh sách đối chiếu học sinh">' +
+            '<table><caption class="sr-only">Đối chiếu hồ sơ Tro với danh sách học sinh mẫu</caption>' +
+            '<thead><tr><th scope="col"><span class="sr-only">Chọn hồ sơ</span></th><th scope="col">Hồ sơ / Tên trong lớp</th>' +
+            '<th scope="col">Mã học sinh</th><th scope="col">Bài đã lưu</th><th scope="col">Đối chiếu</th></tr></thead>' +
+            '<tbody>' +
+            rows.map(renderRosterRow).join('') +
+            '</tbody></table></div>' +
+            '<div class="roster-actions"><button class="primary-button" type="button" data-action="link-roster" ' +
+            (state.selectedMatches.size === 0 ? 'disabled' : '') +
+            '>Kết nối ' +
+            state.selectedMatches.size +
+            ' hồ sơ ' +
+            renderIcon('link') +
+            '</button>' +
+            '<button class="text-button" type="button" data-action="review-conflict">Xem mã trùng ' +
+            renderIcon('chevron') +
+            '</button></div>';
+          if (state.conflictOpen) {
+            content += renderConflictPanel();
+          }
+        }
+        return content + '</div>';
+      }
+
+      /** @returns {string} */
+      function renderOverviewScreen() {
+        return (
+          '<div class="overview" lang="en"><div class="eyebrow">The proposed experience</div>' +
+          '<h2 tabindex="-1" data-focus-heading style="margin-top:12px">Learn first. Connect later.</h2>' +
+          '<p>School setup is handled once. Each child brings the student card they already use.</p>' +
+          '<ol class="flow-list">' +
+          '<li class="flow-item"><span class="flow-symbol">' +
+          renderIcon('school') +
+          '</span><div><h3>Staff connects the school once</h3>' +
+          '<p>Company computers know their school. Personal devices need an authorized school invite or setup context. School access and usage allowance are established here.</p></div></li>' +
+          '<li class="flow-item"><span class="flow-symbol">' +
+          renderIcon('qr') +
+          '</span><div><h3>Scan school card → enter a name → start</h3>' +
+          '<p>Record the school-scoped student ID as an unverified claim. Create a separate Tro learner ID and save the first lesson to it.</p>' +
+          '<button class="text-button" type="button" data-scenario="first">Try first visit ' +
+          renderIcon('arrow') +
+          '</button></div></li>' +
+          '<li class="flow-item"><span class="flow-symbol">' +
+          renderIcon('desktop') +
+          '</span><div><h3>Returning depends on the device</h3>' +
+          '<div class="flow-split"><div class="flow-branch"><strong>Personal computer</strong><p>Open the bottom sidebar avatar to switch remembered accounts. Each learner keeps separate progress.</p></div>' +
+          '<div class="flow-branch"><strong>Shared computer</strong><p>Start a fresh lesson session. A public student ID cannot restore private history.</p></div></div></div></li>' +
+          '<li class="flow-item"><span class="flow-symbol">' +
+          renderIcon('link') +
+          '</span><div><h3>Teacher connects the roster when ready</h3>' +
+          '<p>Review school + student ID matches in a batch. Preserve work and keep duplicate claims separate. Matching the roster does not verify the scanner.</p>' +
+          '<button class="text-button" type="button" data-scenario="teacher">Try roster sync ' +
+          renderIcon('arrow') +
+          '</button></div></li>' +
+          '</ol></div>'
+        );
+      }
+
+      /** @param {string} title @param {string} body @returns {string} */
+      function renderNote(title, body) {
+        return (
+          '<section class="reviewer-section"><div class="eyebrow">Behind this step</div>' +
+          '<h2>' +
+          title +
+          '</h2><p>' +
+          body +
+          '</p></section>'
+        );
+      }
+
+      /** @returns {string} */
+      function renderReviewer() {
+        const isTeacher = state.scenario === Scenario.TEACHER;
+        const isShared = state.scenario === Scenario.SHARED;
+        const isReturning = state.scenario === Scenario.RETURN;
+        if (state.scenario === Scenario.OVERVIEW) {
+          return (
+            renderNote(
+              'A small daily routine',
+              'One class-start action for the teacher. A remembered session on personal devices. A quick start on shared machines.',
+            ) +
+            '<section class="reviewer-section"><div class="eyebrow">Decisions in this draft</div>' +
+            '<ul class="note-list"><li>Students enter only a display name.</li><li>School context comes from staff setup.</li>' +
+            '<li>The QR contains a public student ID.</li><li>Existing private work stays behind a verified credential.</li>' +
+            '<li>Roster sync is a later batch task.</li></ul></section>' +
+            '<section class="reviewer-section"><h2>Licensing stays with the school</h2>' +
+            '<p>A proposed simultaneous-learner allowance applies to company and personal computers. Device sessions and AI usage limits still need backend enforcement.</p></section>'
+          );
+        }
+        if (isTeacher) {
+          const learner = readPersonalLearner();
+          return (
+            renderNote(
+              state.teacherStage === TeacherStage.IDLE
+                ? 'Students do not wait for a roster'
+                : 'Match records, preserve work',
+              state.teacherStage === TeacherStage.IDLE
+                ? 'All remembered profiles and closed shared sessions appear alongside the sample roster cases. Progress is kept by Tro profile ID, even when students switch.'
+                : 'Compare <strong>school + student ID</strong>. Link reviewed metadata to the same Tro profile. A roster match is <strong>not proof of the scanner’s identity</strong>.',
+            ) +
+            '<section class="reviewer-section"><div class="eyebrow">What changes</div>' +
+            '<span class="state-pill ' +
+            (state.linkedRows.size > 0 ? 'green' : '') +
+            '">' +
+            (state.linkedRows.size > 0 ? 'Roster metadata linked' : 'Awaiting roster connection') +
+            '</span>' +
+            '<dl class="state-list"><div><dt>Profiles linked</dt><dd>' +
+            state.linkedRows.size +
+            '</dd></div>' +
+            '<div><dt>Selected learner’s work</dt><dd>' +
+            learner.completedActivities +
+            ' exercise saved</dd></div>' +
+            '<div><dt>Access permissions</dt><dd>Unchanged</dd></div>' +
+            '<div><dt>Duplicate claims</dt><dd>' +
+            (state.conflictDeferred ? 'Kept separate' : 'Review together') +
+            '</dd></div></dl></section>' +
+            '<section class="reviewer-section"><h2>Identity is a separate step</h2>' +
+            '<p>Importing names does not unlock private history on a new device. That needs the school’s verified sign-in or a private Tro credential.</p>' +
+            '<p>Every profile remains separate. Linking roster metadata never combines student histories automatically.</p></section>'
+          );
+        }
+        const hasLearner =
+          state.screen === StudentScreen.HOME ||
+          state.screen === StudentScreen.ACTIVITY ||
+          state.screen === StudentScreen.COMPLETE;
+        const learner = hasLearner ? readCurrentLearner() : null;
+        let title = 'School setup happens once';
+        let explanation =
+          'This preview assumes CodeSpace access is already enabled. Students do not choose their school, handle licensing, or wait for device approval.';
+        if (state.screen === StudentScreen.ACCOUNTS) {
+          title = 'Choose a saved account';
+          explanation =
+            'Signing out removed only that device session. Work stays with the Tro profile. Choose another saved account explicitly; no other student’s history opens automatically.';
+        } else if (state.screen === StudentScreen.NAME) {
+          title = 'One name, then straight into learning';
+          explanation =
+            'The QR supplies a student ID. Tro creates its own learner ID and records an <strong>unverified school-ID claim</strong>. A typed name does not verify identity.';
+        } else if (hasLearner) {
+          title = isShared
+            ? 'Fresh session, separate work'
+            : isReturning
+              ? 'A remembered session does the work'
+              : 'A provisional learner can begin';
+          explanation = isShared
+            ? 'This scan created a fresh session, even though the sample card has the same ID as the personal-device example. <strong>No previous private history is loaded.</strong>'
+            : isReturning
+              ? 'Click the avatar at the bottom of the sidebar to open “Chuyển tài khoản”. Switch saved sessions, add an account, or sign out while preserving saved work.'
+              : 'The learner can start in the authorized school experience. Work belongs to the new Tro profile; the public student ID remains an unverified claim.';
+        }
+        const pill =
+          state.screen === StudentScreen.ACCOUNTS
+            ? 'Saved accounts available'
+            : isShared
+              ? 'Classroom session'
+              : isReturning
+                ? 'Remembered device session'
+                : hasLearner
+                  ? 'Provisional learner profile'
+                  : state.screen === StudentScreen.NAME
+                    ? 'Unverified student-ID claim'
+                    : 'School access enabled';
+        const studentId = learner?.studentId || state.scannedStudentId || 'Not scanned yet';
+        const profileId =
+          learner?.profileId ||
+          (state.screen === StudentScreen.ACCOUNTS
+            ? 'No account selected'
+            : 'Created after name entry');
+        return (
+          renderNote(title, explanation) +
+          '<section class="reviewer-section"><div class="eyebrow">Current state · demo only</div>' +
+          '<span class="state-pill ' +
+          (isReturning ? 'green' : isShared ? 'blue' : '') +
+          '">' +
+          pill +
+          '</span>' +
+          '<dl class="state-list"><div><dt>School</dt><dd>CodeSpace</dd></div>' +
+          '<div><dt>External student ID</dt><dd><code>' +
+          escapeHtml(studentId) +
+          '</code></dd></div>' +
+          '<div><dt>Tro profile</dt><dd><code>' +
+          escapeHtml(profileId) +
+          '</code></dd></div>' +
+          '<div><dt>Saved exercises</dt><dd>' +
+          (learner?.completedActivities ?? 0) +
+          '</dd></div>' +
+          (!isShared
+            ? '<div><dt>Saved on this device</dt><dd>' +
+              readRememberedPersonalLearners().length +
+              ' accounts</dd></div>'
+            : '') +
+          '<div><dt>Remember this learner</dt><dd>' +
+          (isShared ? 'Current session only' : 'On this personal device') +
+          '</dd></div>' +
+          '<div><dt>Roster</dt><dd>' +
+          (learner && state.linkedRows.has(learner.profileId)
+            ? 'Metadata linked'
+            : 'Optional, later') +
+          '</dd></div>' +
+          (isShared
+            ? '<div><dt>Closed sessions retained</dt><dd>' +
+              state.sharedAttempts.length +
+              '</dd></div>'
+            : '') +
+          '</dl></section>' +
+          '<section class="reviewer-section"><h2>' +
+          (isShared ? 'Shared-device boundary' : 'The school QR is not a password') +
+          '</h2>' +
+          '<p>' +
+          (isShared
+            ? 'A public ID can start a new lesson. Resuming private history across shared or unfamiliar computers needs an official school-login integration or a private Tro credential.'
+            : 'Scanning an ID must not permanently claim an account or reveal another learner’s history. Duplicate claims stay separate until safely reconciled.') +
+          '</p>' +
+          (state.hasSeededPersonalDemo && !isShared
+            ? '<p>This scenario started with fictional saved accounts for trying the switcher. Reset clears the sample sessions and starts a fresh first visit.</p>'
+            : '') +
+          '</section>' +
+          '<details><summary>Try an edge case</summary><div class="edge-controls">' +
+          '<button type="button" data-action="invalid-qr">Unrecognized QR format</button>' +
+          '<button type="button" data-action="existing-id">Same public ID, different computer</button>' +
+          '<button type="button" data-scenario="teacher">Duplicate ID during roster sync</button></div></details>'
+        );
+      }
+
+      /** @returns {void} */
+      function renderJourney() {
+        const stages = ['Scan card', 'Name once', 'Start learning', 'Roster later'];
+        const index =
+          state.scenario === Scenario.TEACHER
+            ? 3
+            : state.scenario === Scenario.OVERVIEW
+              ? -1
+              : state.screen === StudentScreen.SCAN
+                ? 0
+                : state.screen === StudentScreen.NAME
+                  ? 1
+                  : 2;
+        getElement('journey').innerHTML = stages
+          .map((label, step) => {
+            const className = step === index ? ' active' : step < index ? ' done' : '';
+            return (
+              (step > 0 ? renderIcon('chevron') : '') +
+              '<span class="journey-step' +
+              className +
+              '"' +
+              (step === index ? ' aria-current="step"' : '') +
+              '><span class="step-dot">' +
+              (step < index ? '✓' : step + 1) +
+              '</span>' +
+              label +
+              '</span>'
+            );
+          })
+          .join('');
+      }
+
+      /** @returns {void} */
+      function render() {
+        closeAccountPopover(false);
+        /** @type {Record<ScenarioName, { title: string, subtitle: string, label: string, icon: string }>} */
+        const copy = {
+          first: {
+            title: 'A school card. A first lesson.',
+            subtitle:
+              'Students can begin before the teacher connects a roster. Try the student journey below.',
+            label: 'First-time student',
+            icon: 'qr',
+          },
+          return: {
+            title: 'Open Tro. Keep learning.',
+            subtitle:
+              'Click the bottom sidebar avatar to switch saved accounts, add a student, or sign out of the current account.',
+            label: 'Personal computer',
+            icon: 'desktop',
+          },
+          shared: {
+            title: 'Ready for the next student.',
+            subtitle:
+              'A school card starts a fresh classroom session. Previous private history stays protected.',
+            label: 'Company computer',
+            icon: 'users',
+          },
+          teacher: {
+            title: 'Connect the roster when ready.',
+            subtitle:
+              'Students have already started. The teacher reviews matches in a single batch and keeps their work.',
+            label: 'Teacher view',
+            icon: 'link',
+          },
+          overview: {
+            title: 'The whole flow, in one place.',
+            subtitle:
+              'A lightweight start for students, remembered personal devices, and a later connection to the school roster.',
+            label: 'Flow overview',
+            icon: 'book',
+          },
+        };
+        const current = copy[state.scenario];
+        getElement('scenario-heading').textContent = current.title;
+        getElement('scenario-subtitle').textContent = current.subtitle;
+        getElement('scenario-label').innerHTML = renderIcon(current.icon) + current.label;
+        const deviceLabel =
+          state.scenario === Scenario.TEACHER
+            ? 'Giáo viên'
+            : state.scenario === Scenario.SHARED
+              ? 'Máy lớp học'
+              : state.scenario === Scenario.OVERVIEW
+                ? 'Bản mẫu luồng'
+                : 'Máy cá nhân';
+        getElement('device-label').innerHTML =
+          renderIcon(state.scenario === Scenario.SHARED ? 'users' : 'desktop') + deviceLabel;
+        for (const button of document.querySelectorAll('.scenario')) {
+          if (button instanceof HTMLElement && button.dataset.scenario === state.scenario) {
+            button.setAttribute('aria-current', 'page');
+          } else {
+            button.removeAttribute('aria-current');
+          }
+        }
+        renderJourney();
+        let screen;
+        if (state.scenario === Scenario.TEACHER) {
+          screen = renderTeacherScreen();
+        } else if (state.scenario === Scenario.OVERVIEW) {
+          screen = renderOverviewScreen();
+        } else {
+          switch (state.screen) {
+            case StudentScreen.SCAN:
+              screen = renderScanScreen();
+              break;
+            case StudentScreen.ACCOUNTS:
+              screen = renderAccountChoiceScreen();
+              break;
+            case StudentScreen.NAME:
+              screen = renderNameScreen();
+              break;
+            case StudentScreen.HOME:
+              screen = renderHomeScreen();
+              break;
+            case StudentScreen.ACTIVITY:
+              screen = renderActivityScreen();
+              break;
+            case StudentScreen.COMPLETE:
+              screen = renderCompleteScreen();
+              break;
+          }
+        }
+        getElement('app-screen').innerHTML = screen;
+        getElement('reviewer').innerHTML = renderReviewer();
+      }
+
+      /** @returns {void} */
+      function focusScreenHeading() {
+        const heading = getElement('app-screen').querySelector('[data-focus-heading]');
+        if (heading instanceof HTMLElement) {
+          heading.focus({ preventScroll: true });
+        }
+      }
+
+      /** @param {string} id @param {string} [value] @returns {void} */
+      function focusInput(id, value) {
+        const input = document.getElementById(id);
+        if (input instanceof HTMLInputElement) {
+          if (value !== undefined) {
+            input.value = value;
+          }
+          input.focus({ preventScroll: true });
+        }
+      }
+
+      /** Native modal dialog provides keyboard focus containment for this account popup.
+       * @returns {void}
+       */
+      function positionAccountPopover() {
+        const dialog = document.getElementById('account-popover');
+        const trigger = document.getElementById('account-trigger');
+        if (!(dialog instanceof HTMLDialogElement) || !dialog.open || !trigger) {
+          return;
+        }
+        const anchor = trigger.getBoundingClientRect();
+        const popup = dialog.getBoundingClientRect();
+        const desiredLeft = window.innerWidth <= 700 ? 16 : anchor.right + 12;
+        const left = Math.max(16, Math.min(desiredLeft, window.innerWidth - popup.width - 16));
+        const top = Math.max(
+          16,
+          Math.min(anchor.bottom - popup.height, window.innerHeight - popup.height - 16),
+        );
+        dialog.style.left = left + 'px';
+        dialog.style.top = top + 'px';
+      }
+
+      /** Opening the popup never rebuilds the underlying name form.
+       * @returns {void}
+       */
+      function openAccountPopover() {
+        const dialog = document.getElementById('account-popover');
+        if (!(dialog instanceof HTMLDialogElement) || dialog.open) {
+          return;
+        }
+        dialog.showModal();
+        getElement('account-trigger').setAttribute('aria-expanded', 'true');
+        positionAccountPopover();
+        dialog.focus({ preventScroll: true });
+      }
+
+      /** @param {boolean} [restoreFocus] @returns {void} */
+      function closeAccountPopover(restoreFocus = true) {
+        const dialog = document.getElementById('account-popover');
+        if (!(dialog instanceof HTMLDialogElement) || !dialog.open) {
+          return;
+        }
+        dialog.close();
+        const trigger = document.getElementById('account-trigger');
+        if (trigger) {
+          trigger.setAttribute('aria-expanded', 'false');
+          if (restoreFocus) {
+            trigger.focus({ preventScroll: true });
+          }
+        }
+      }
+
+      /** Ending a shared session keeps work separate while clearing the next child's screen.
+       * @returns {void}
+       */
+      function archiveSharedSession() {
+        if (state.sharedLearner) {
+          state.sharedAttempts.push({ ...state.sharedLearner });
+          state.sharedLearner = null;
+          refreshRosterSelection();
+        }
+      }
+
+      /** A new public-ID claim may turn a previously eligible roster match into a conflict.
+       * @returns {void}
+       */
+      function refreshRosterSelection() {
+        const eligibleIds = new Set(
+          readRosterRows()
+            .filter((row) => row.match === 'ready' && !state.linkedRows.has(row.id))
+            .map((row) => row.id),
+        );
+        for (const id of state.selectedMatches) {
+          if (!eligibleIds.has(id)) {
+            state.selectedMatches.delete(id);
+          }
+        }
+      }
+
+      /** @param {string} value @returns {value is ScenarioName} */
+      function isScenarioName(value) {
+        return Object.values(Scenario).some((scenario) => scenario === value);
+      }
+
+      /** @param {ScenarioName} scenario @returns {void} */
+      function selectScenario(scenario) {
+        if (state.scenario === Scenario.SHARED) {
+          archiveSharedSession();
+        }
+        state.scenario = scenario;
+        state.isAddingLearner = false;
+        if (scenario === Scenario.RETURN) {
+          seedRememberedPersonalLearners();
+        }
+        state.screen =
+          scenario === Scenario.RETURN || scenario === Scenario.FIRST
+            ? readSavedStudentScreen()
+            : StudentScreen.SCAN;
+        state.manualEntry = false;
+        state.scanError = '';
+        state.fieldError = '';
+        state.scannedStudentId = '';
+        state.activityFeedback = '';
+        render();
+        focusScreenHeading();
+        announce('Preview scenario: ' + getElement('scenario-heading').textContent);
+      }
+
+      /** No account lookup happens here: the public ID is only an unverified claim.
+       * @param {string} studentId @returns {void}
+       */
+      function scanStudentId(studentId) {
+        state.scannedStudentId = studentId;
+        state.scanError = '';
+        state.fieldError = '';
+        state.screen = StudentScreen.NAME;
+        render();
+        focusInput('student-name');
+        announce('Đã nhận thẻ mẫu. Cho Tro biết tên của em.');
+      }
+
+      /** @returns {void} */
+      function importSampleRoster() {
+        state.teacherStage = TeacherStage.REVIEW;
+        state.selectedMatches = new Set(
+          readRosterRows()
+            .filter((row) => row.match === 'ready' && !state.linkedRows.has(row.id))
+            .map((row) => row.id),
+        );
+        render();
+        focusScreenHeading();
+        announce('Sample roster loaded. Review matched and conflicting student IDs.');
+      }
+
+      /** @returns {void} */
+      function linkSelectedRosterRows() {
+        for (const row of readRosterRows()) {
+          if (row.match === 'ready' && state.selectedMatches.has(row.id)) {
+            state.linkedRows.add(row.id);
+          }
+        }
+        state.selectedMatches.clear();
+        render();
+        focusScreenHeading();
+        announce('Roster metadata connected. Saved work and access permissions remain unchanged.');
+      }
+
+      /** @param {string} action @returns {void} */
+      function runAction(action) {
+        switch (action) {
+          case 'toggle-account':
+            openAccountPopover();
+            break;
+          case 'close-account':
+            closeAccountPopover();
+            break;
+          case 'sign-out-personal':
+            if (!state.activePersonalProfileId) {
+              break;
+            }
+            closeAccountPopover(false);
+            state.rememberedProfileIds.delete(state.activePersonalProfileId);
+            state.activePersonalProfileId = null;
+            state.isAddingLearner = false;
+            state.screen = readSavedStudentScreen();
+            state.scannedStudentId = '';
+            state.manualEntry = false;
+            state.scanError = '';
+            state.fieldError = '';
+            state.activityFeedback = '';
+            render();
+            focusScreenHeading();
+            announce('Đã đăng xuất tài khoản này trên máy. Bài làm được giữ nguyên.');
+            break;
+          case 'reset':
+            state = createPreviewState();
+            render();
+            focusScreenHeading();
+            showToast('Preview reset. All fictional profiles and sessions cleared.');
+            break;
+          case 'scan':
+            scanStudentId(readSampleStudentId());
+            break;
+          case 'add-learner':
+            closeAccountPopover(false);
+            if (state.isAddingLearner) {
+              break;
+            }
+            state.isAddingLearner = true;
+            state.screen = StudentScreen.SCAN;
+            state.scannedStudentId = '';
+            state.manualEntry = false;
+            state.scanError = '';
+            state.fieldError = '';
+            state.activityFeedback = '';
+            render();
+            focusScreenHeading();
+            announce('Quét thẻ để thêm người học. Các hồ sơ đã lưu được giữ nguyên.');
+            break;
+          case 'cancel-add':
+            state.isAddingLearner = false;
+            state.screen = readSavedStudentScreen();
+            state.scannedStudentId = '';
+            state.manualEntry = false;
+            state.scanError = '';
+            state.fieldError = '';
+            render();
+            focusScreenHeading();
+            announce('Đã quay lại hồ sơ hiện tại.');
+            break;
+          case 'open-manual':
+            state.manualEntry = true;
+            state.scanError = '';
+            render();
+            focusInput('student-id');
+            break;
+          case 'close-manual':
+            state.manualEntry = false;
+            state.scanError = '';
+            render();
+            focusScreenHeading();
+            break;
+          case 'open-lesson':
+            state.isAddingLearner = false;
+            state.screen = StudentScreen.ACTIVITY;
+            state.activityFeedback = '';
+            render();
+            focusScreenHeading();
+            break;
+          case 'home':
+            state.isAddingLearner = false;
+            state.screen = StudentScreen.HOME;
+            render();
+            focusScreenHeading();
+            break;
+          case 'reopen-personal':
+            selectScenario(Scenario.RETURN);
+            showToast('Tro reopened with the remembered sample device session.');
+            break;
+          case 'finish-shared':
+            archiveSharedSession();
+            state.screen = StudentScreen.SCAN;
+            state.scannedStudentId = '';
+            state.manualEntry = false;
+            state.activityFeedback = '';
+            state.fieldError = '';
+            state.scanError = '';
+            render();
+            focusScreenHeading();
+            showToast('Work retained separately. Shared computer ready for the next student.');
+            break;
+          case 'import-roster':
+            importSampleRoster();
+            break;
+          case 'link-roster':
+            linkSelectedRosterRows();
+            break;
+          case 'review-conflict':
+            state.conflictOpen = !state.conflictOpen;
+            render();
+            if (state.conflictOpen) {
+              const heading = getElement('app-screen').querySelector('.conflict-panel h3');
+              if (heading instanceof HTMLElement) {
+                heading.focus({ preventScroll: true });
+              }
+            } else {
+              focusScreenHeading();
+            }
+            break;
+          case 'defer-conflict':
+            state.conflictDeferred = true;
+            state.conflictOpen = false;
+            render();
+            focusScreenHeading();
+            showToast('All conflicting learner profiles and their work remain separate.');
+            break;
+          case 'invalid-qr':
+            selectScenario(Scenario.SHARED);
+            state.scanError =
+              'Tro chưa đọc được mã này. Em thử quét lại hoặc nhập mã trên thẻ nhé.';
+            render();
+            focusScreenHeading();
+            announce(state.scanError);
+            break;
+          case 'existing-id':
+            selectScenario(Scenario.SHARED);
+            scanStudentId('CS-1042');
+            showToast('Same public student ID. A fresh profile, with no private history restored.');
+            break;
+        }
+      }
+
+      document.addEventListener('click', (event) => {
+        if (!(event.target instanceof Element)) {
+          return;
+        }
+        if (
+          event.target instanceof HTMLDialogElement &&
+          event.target.id === 'account-popover' &&
+          event instanceof MouseEvent
+        ) {
+          const rect = event.target.getBoundingClientRect();
+          if (
+            event.clientX < rect.left ||
+            event.clientX > rect.right ||
+            event.clientY < rect.top ||
+            event.clientY > rect.bottom
+          ) {
+            closeAccountPopover();
+          }
+          return;
+        }
+        const button = event.target.closest('button');
+        if (!(button instanceof HTMLButtonElement) || button.disabled) {
+          return;
+        }
+        const scenario = button.dataset.scenario;
+        if (scenario && isScenarioName(scenario)) {
+          selectScenario(scenario);
+          return;
+        }
+        const profileId = button.dataset.profile;
+        if (profileId && state.scenario !== Scenario.SHARED) {
+          const learner = state.personalLearners.find((profile) => profile.profileId === profileId);
+          if (!learner || !state.rememberedProfileIds.has(learner.profileId)) {
+            return;
+          }
+          state.activePersonalProfileId = learner.profileId;
+          state.isAddingLearner = false;
+          state.screen = StudentScreen.HOME;
+          state.scannedStudentId = '';
+          state.manualEntry = false;
+          state.scanError = '';
+          state.fieldError = '';
+          state.activityFeedback = '';
+          render();
+          focusScreenHeading();
+          announce('Đang dùng hồ sơ ' + learner.name + '.');
+          return;
+        }
+        const answer = button.dataset.answer;
+        if (answer) {
+          if (answer === '360') {
+            const learner = readCurrentLearner();
+            learner.completedActivities = Math.max(learner.completedActivities, 1);
+            state.screen = StudentScreen.COMPLETE;
+            render();
+            focusScreenHeading();
+            announce('Correct answer. Exercise saved to this demo learner profile.');
+          } else {
+            state.activityFeedback = 'Gần đúng rồi! Em thử chọn góc lớn hơn nhé.';
+            render();
+            const answerButton = getElement('app-screen').querySelector(
+              '[data-answer="' + answer + '"]',
+            );
+            if (answerButton instanceof HTMLElement) {
+              answerButton.focus({ preventScroll: true });
+            }
+            announce(state.activityFeedback);
+          }
+          return;
+        }
+        if (button.dataset.action) {
+          runAction(button.dataset.action);
+        }
+      });
+
+      document.addEventListener('submit', (event) => {
+        if (!(event.target instanceof HTMLFormElement)) {
+          return;
+        }
+        event.preventDefault();
+        const form = event.target;
+        const data = new FormData(form);
+        if (form.dataset.form === 'student-id') {
+          const rawId = data.get('studentId');
+          const studentId = typeof rawId === 'string' ? rawId.trim().toUpperCase() : '';
+          if (!/^CS-[0-9]{4}$/.test(studentId)) {
+            state.scanError = 'Em kiểm tra lại mã nhé. Mã mẫu có dạng CS-1042.';
+            render();
+            focusInput('student-id', studentId);
+            announce(state.scanError);
+            return;
+          }
+          scanStudentId(studentId);
+          return;
+        }
+        if (form.dataset.form !== 'name') {
+          return;
+        }
+        const rawName = data.get('displayName');
+        const name = typeof rawName === 'string' ? rawName.trim().replace(/\s+/g, ' ') : '';
+        if (name.length === 0 || name.length > 32) {
+          state.fieldError = 'Em nhập tên từ 1 đến 32 ký tự nhé.';
+          render();
+          focusInput('student-name', name);
+          announce(state.fieldError);
+          return;
+        }
+        const learner = {
+          profileId: 'tro-demo-' + String(state.profileNumber++).padStart(3, '0'),
+          name,
+          studentId: state.scannedStudentId,
+          completedActivities: 0,
+        };
+        if (state.scenario === Scenario.SHARED) {
+          state.sharedLearner = learner;
+        } else {
+          state.personalLearners.push(learner);
+          state.rememberedProfileIds.add(learner.profileId);
+          state.activePersonalProfileId = learner.profileId;
+          state.isAddingLearner = false;
+          refreshRosterSelection();
+        }
+        state.fieldError = '';
+        state.screen = StudentScreen.HOME;
+        render();
+        focusScreenHeading();
+        announce('Sample learner profile created. Ready to start learning.');
+      });
+
+      document.addEventListener('change', (event) => {
+        if (!(event.target instanceof HTMLInputElement) || !event.target.dataset.match) {
+          return;
+        }
+        const id = event.target.dataset.match;
+        const isEligible = readRosterRows().some((row) => row.id === id && row.match === 'ready');
+        if (!isEligible || state.linkedRows.has(id)) {
+          return;
+        }
+        if (event.target.checked) {
+          state.selectedMatches.add(id);
+        } else {
+          state.selectedMatches.delete(id);
+        }
+        const button = document.querySelector('[data-action="link-roster"]');
+        if (button instanceof HTMLButtonElement) {
+          button.disabled = state.selectedMatches.size === 0;
+          button.innerHTML =
+            'Kết nối ' + state.selectedMatches.size + ' hồ sơ ' + renderIcon('link');
+        }
+      });
+
+      document.addEventListener('keydown', (event) => {
+        const dialog = document.getElementById('account-popover');
+        if (event.key !== 'Tab' || !(dialog instanceof HTMLDialogElement) || !dialog.open) {
+          return;
+        }
+        const controls = Array.from(
+          dialog.querySelectorAll(
+            'button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+          ),
+        )
+          .filter((element) => element instanceof HTMLElement)
+          .filter((element) => element.getClientRects().length > 0);
+        const first = controls.at(0);
+        const last = controls.at(-1);
+        if (!first || !last) {
+          event.preventDefault();
+          dialog.focus({ preventScroll: true });
+          return;
+        }
+        const focused = document.activeElement;
+        if (
+          event.shiftKey &&
+          (focused === first || focused === dialog || !dialog.contains(focused))
+        ) {
+          event.preventDefault();
+          last.focus({ preventScroll: true });
+        } else if (
+          !event.shiftKey &&
+          (focused === last || focused === dialog || !dialog.contains(focused))
+        ) {
+          event.preventDefault();
+          first.focus({ preventScroll: true });
+        }
+      });
+
+      document.addEventListener(
+        'cancel',
+        (event) => {
+          if (event.target instanceof HTMLDialogElement && event.target.id === 'account-popover') {
+            event.preventDefault();
+            closeAccountPopover();
+          }
+        },
+        true,
+      );
+
+      window.addEventListener('resize', positionAccountPopover);
+
+      render();
+    </script>
+  </body>
+</html>

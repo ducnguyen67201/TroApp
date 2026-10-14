@@ -6,6 +6,8 @@ import type {
   ClassroomRosterSchema,
 } from '#contracts/Classroom.js';
 import { ClassDeletion } from './ClassDeletion.js';
+import { StudentAccessSettings } from './StudentAccessSettings.js';
+import { canUseStudentAccess } from '../accounts/StudentAccessAvailability.js';
 import type { z } from 'zod';
 import type { ClassroomTranslate } from './ClassroomLabels.js';
 
@@ -34,6 +36,9 @@ export function ClassSettings({
   const [email, setEmail] = useState('');
   return (
     <Stack gap="xl">
+      {canUseStudentAccess() && (
+        <StudentAccessSettings key={classId} classId={classId} name={name} disabled={busy} t={t} />
+      )}
       <section aria-label={t('Invite students', 'Mời học sinh')}>
         <Text component="h2" fw={600} mb="xs">
           {t('Invite students', 'Mời học sinh')}

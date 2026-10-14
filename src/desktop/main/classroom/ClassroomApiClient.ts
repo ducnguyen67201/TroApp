@@ -1,3 +1,4 @@
+import { StudentAccessCapability } from '#contracts/StudentAccess.js';
 import {
   ClassroomAdminCapability,
   ClassroomCommandSchema,
@@ -73,6 +74,7 @@ export class ClassroomApiClient {
           cookie,
           'content-type': 'application/json',
           [ClassroomAdminCapability.HEADER]: ClassroomAdminCapability.VERSION,
+          [StudentAccessCapability.HEADER]: StudentAccessCapability.VERSION,
         },
         body: JSON.stringify(ClassroomCommandSchema.parse(command)),
         signal: AbortSignal.timeout(10_000),

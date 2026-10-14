@@ -50,6 +50,8 @@ import { OpenAiLiveTranscriber } from './features/transcription/infrastructure/O
 import { createPrismaTranscriptionAllowance } from './persistence/PrismaTranscriptionAllowance.js';
 import { createApi } from './CreateApi.js';
 import { createAuthDatabase } from './persistence/AuthDatabase.js';
+import { createPrismaStudentAccessStore } from './persistence/PrismaStudentAccessStore.js';
+import { registerStudentAccessRoutes } from './features/studentAccess/infrastructure/RegisterStudentAccessRoutes.js';
 import { registerAuthRoutes } from './auth/RegisterAuthRoutes.js';
 import { registerModelGateway } from './auth/RegisterModelGateway.js';
 import { readServerEnv } from './Env.js';
@@ -73,13 +75,22 @@ async function startApi(): Promise<void> {
   const database = createPrismaDatabaseStatus(environment.DATABASE_URL, logger);
   const authentication = createAuthDatabase(environment);
   const api = createApi(database);
+  const studentStore = createPrismaStudentAccessStore(environment.DATABASE_URL);
+  const studentAccess = registerStudentAccessRoutes(
+    api,
+    studentStore.store,
+    authentication.readSignedInUserId,
+    environment.AUTH_SECRET,
+    logger,
+  );
+  const readUserId = studentAccess.readUserId;
   const voiceoverAllowance = createPrismaVoiceoverAllowance(
     environment.DATABASE_URL,
     voiceoverConfig,
   );
   registerVoiceoverRoutes(
     api,
-    authentication.readSignedInUserId,
+    readUserId,
     voiceoverAllowance,
     new OpenAiSpeechProvider({
       apiKey: environment.OPENAI_API_KEY,
@@ -94,12 +105,7 @@ async function startApi(): Promise<void> {
     ...insightConfig,
   };
   const classroom = createPrismaClassroomStore(environment.DATABASE_URL, capturePolicy);
-  const readClassroomUserId = registerClassroomViewAs(
-    api,
-    authentication.readSignedInUserId,
-    classroom.store,
-    logger,
-  );
+  const readClassroomUserId = registerClassroomViewAs(api, readUserId, classroom.store, logger);
   const lessonStore = createPrismaLessonVideoStore(environment.DATABASE_URL);
   const lessonContent = new OpenAiLessonContent(environment.OPENAI_API_KEY);
   const lessonSpeech = new OpenAiLessonSpeech(environment.OPENAI_API_KEY);
@@ -167,12 +173,7 @@ async function startApi(): Promise<void> {
   );
   registerClassroomRoutes(api, readClassroomUserId, new ClassroomService(classroom.store), logger);
   const petWorld = createPrismaPetWorldStore(environment.DATABASE_URL);
-  registerPetWorldRoutes(
-    api,
-    authentication.readSignedInUserId,
-    new PetWorldService(petWorld.store),
-    logger,
-  );
+  registerPetWorldRoutes(api, readUserId, new PetWorldService(petWorld.store), logger);
   const petRetentionRunner = new ClassroomInsightRetentionRunner(
     petWorld,
     capturePolicy.retentionDays,
@@ -246,7 +247,7 @@ async function startApi(): Promise<void> {
   const transcriptionAllowance = createPrismaTranscriptionAllowance(environment.DATABASE_URL);
   await registerTranscriptionRoutes(
     api,
-    authentication.readSignedInUserId,
+    readUserId,
     transcriptionAllowance,
     new OpenAiLiveTranscriber({
       apiKey: environment.OPENAI_API_KEY ?? '',
@@ -264,7 +265,7 @@ async function startApi(): Promise<void> {
     environment.AUTH_BASE_URL,
     Boolean(environment.GOOGLE_CLIENT_ID),
   );
-  registerModelGateway(api, authentication.readSignedInUserId, environment, logger);
+  registerModelGateway(api, readUserId, environment, logger, studentAccess.service);
 
   api.addHook('onClose', async () => {
     await lessonRunner.close();
@@ -274,6 +275,7 @@ async function startApi(): Promise<void> {
     await materialRunner.close();
     await database.close();
     await authentication.close();
+    await studentStore.close();
     await transcriptionAllowance.close();
     await voiceoverAllowance.close();
     await classroom.close();

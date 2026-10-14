@@ -1,4 +1,19 @@
+import { StudentAccessKind, StudentStaffAccessKinds } from '#contracts/StudentAccess.js';
 import { DesktopAuthProtocol } from '../DesktopAuthProtocol.js';
+import {
+  EncryptedStudentDevice,
+  type StudentDeviceStorage,
+} from './accounts/EncryptedStudentDevice.js';
+import {
+  StudentAccessPath,
+  StudentAccessReplySchema,
+  StudentDeviceCredentialSchema,
+  StudentEnrollmentReplySchema,
+  StudentSessionCookie,
+  type StudentAccessCommand,
+  type StudentAccessReply,
+} from '#contracts/StudentAccess.js';
+import { StudentDeviceMode } from '#contracts/StudentIdentity.js';
 import {
   DesktopAuthCallbackError,
   ensureDesktopAuthCallback,
@@ -52,6 +67,7 @@ export class AuthClient implements AgentChatAuth {
   private readonly client: ElectronActions;
   private readonly accounts: AccountSessions;
   private loginGeneration = 0;
+  private studentDeviceLoaded = false;
 
   constructor(
     private readonly apiBaseUrl: string,
@@ -59,6 +75,7 @@ export class AuthClient implements AgentChatAuth {
     private readonly request: typeof fetch = fetch,
     vault: AccountVault = new EncryptedAccountVault(userDataPath),
     private readonly prepareCallback: () => Promise<void> = ensureDesktopAuthCallback,
+    private readonly studentDevice: StudentDeviceStorage = new EncryptedStudentDevice(userDataPath),
   ) {
     const storageDirectory = join(userDataPath, 'AuthStorage');
     const plugin = electronClient({
@@ -119,6 +136,7 @@ export class AuthClient implements AgentChatAuth {
 
   async readSession(): Promise<AuthResult> {
     try {
+      this.loadStudentDevice();
       const wasAdding = this.accounts.isAddingAccount();
       const result = await this.accounts.readSession();
       if (wasAdding && !this.accounts.isAddingAccount()) {
@@ -132,9 +150,103 @@ export class AuthClient implements AgentChatAuth {
 
   listAccounts(): AccountReply {
     try {
+      this.loadStudentDevice();
       return this.accounts.listAccounts();
     } catch {
       return { kind: 'failed', message: 'Secure account storage is unavailable.' };
+    }
+  }
+
+  private loadStudentDevice(): void {
+    if (!this.studentDeviceLoaded) {
+      const device = this.studentDevice.read();
+      this.accounts.configureStudentMode(device?.context.mode === StudentDeviceMode.SHARED);
+      this.studentDeviceLoaded = true;
+    }
+  }
+
+  isSharedStudent(): boolean {
+    return this.accounts.isSharedStudent();
+  }
+
+  async controlStudentAccess(
+    command: StudentAccessCommand,
+    beforeStudentSelection?: () => Promise<void>,
+  ): Promise<StudentAccessReply> {
+    try {
+      this.loadStudentDevice();
+      const device = this.studentDevice.read();
+      if (command.kind === StudentAccessKind.ACTIVATE && this.accounts.isSharedStudent()) {
+        return {
+          kind: 'failed',
+          message: 'End this shared lesson before configuring another class.',
+        };
+      }
+      if (command.kind === StudentAccessKind.STATUS && !device) {
+        return { kind: 'unconfigured' };
+      }
+      if (
+        command.kind === StudentAccessKind.ENROLL &&
+        (!device || !this.accounts.canAddStudent())
+      ) {
+        return {
+          kind: 'failed',
+          message: 'End the current shared lesson or remove a saved account before adding another.',
+        };
+      }
+      const staff = StudentStaffAccessKinds.includes(command.kind);
+      const cookie = staff ? this.readCookie() : null;
+      const response = await this.request(`${this.apiBaseUrl}${StudentAccessPath}/command`, {
+        method: 'POST',
+        headers: {
+          origin: 'app.tro.desktop:/',
+          'content-type': 'application/json',
+          ...(cookie ? { cookie } : {}),
+          ...(device && !staff ? { 'x-tro-student-device': device.credential } : {}),
+        },
+        body: JSON.stringify(command),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (response.status === 404) {
+        return { kind: 'failed', message: 'This server does not support student QR access yet.' };
+      }
+      const body: unknown = await response.json();
+      if (!response.ok) {
+        return StudentAccessReplySchema.parse(body);
+      }
+      if (command.kind === StudentAccessKind.ACTIVATE) {
+        const activated = StudentDeviceCredentialSchema.parse(body);
+        if (
+          device?.context.mode === StudentDeviceMode.SHARED &&
+          activated.context.mode !== StudentDeviceMode.SHARED
+        ) {
+          return {
+            kind: 'failed',
+            message: 'A shared classroom computer cannot be changed to personal mode here.',
+          };
+        }
+        this.accounts.configureStudentMode(activated.context.mode === StudentDeviceMode.SHARED);
+        this.studentDevice.save(activated);
+        return { kind: 'ready', context: activated.context };
+      }
+      if (command.kind === StudentAccessKind.ENROLL) {
+        const enrolled = StudentEnrollmentReplySchema.parse(body);
+        const result = await this.accounts.addStudent(
+          `${StudentSessionCookie}=${enrolled.credential}`,
+          enrolled.user,
+          beforeStudentSelection,
+        );
+        return result.kind === 'signed-in' || result.kind === 'failed'
+          ? result
+          : { kind: 'failed', message: 'Could not finish student sign-in.' };
+      }
+      return StudentAccessReplySchema.parse(body);
+    } catch {
+      return {
+        kind: 'failed',
+        message:
+          'Could not finish student access. Check your connection and secure device storage, then retry.',
+      };
     }
   }
 

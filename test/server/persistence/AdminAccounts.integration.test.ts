@@ -18,7 +18,7 @@ describe('administrator account permissions', () => {
     const userId = randomUUID();
     const token = randomUUID();
     const sessionSchema = z.looseObject({
-      user: AuthUserSchema.extend({ role: z.enum(AccountRole) }).loose(),
+      user: AuthUserSchema.safeExtend({ role: z.enum(AccountRole) }).loose(),
     });
 
     try {

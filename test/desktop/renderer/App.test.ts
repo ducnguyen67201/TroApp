@@ -34,12 +34,12 @@ import {
 import { LocaleProvider } from '../../../src/desktop/renderer/localization/LocaleProvider.js';
 import { desktopTheme, resolveDesktopCssVariables } from '../../../src/desktop/renderer/Theme.js';
 
-const testUser: AuthUser = {
+const testUser = {
   id: 'test-user',
   name: 'Alex Example',
   email: 'alex@example.test',
   isAdmin: false,
-};
+} satisfies AuthUser;
 const sessionId = 'a8f6d44a-5c18-4ce3-9237-44624549f63f';
 
 const microphonePreviews = vi.hoisted(() => ({
@@ -2323,12 +2323,12 @@ it.each([MaterialState.COLLECTING, MaterialState.QUEUED, MaterialState.PREPARING
 
 function createSavedAccountBridge() {
   const bridge = createDesktopBridge();
-  const student: AuthUser = {
+  const student = {
     id: 'student-user',
     name: 'Minh Nguyen',
     email: 'minh@example.test',
     isAdmin: false,
-  };
+  } satisfies AuthUser;
   const teacherId = '11111111-1111-4111-8111-111111111111';
   const studentId = '22222222-2222-4222-8222-222222222222';
   const readSavedAccounts = vi

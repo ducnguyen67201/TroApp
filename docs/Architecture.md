@@ -132,6 +132,74 @@ identities and permission grants. `DesktopPermissions` requests access in main s
 the OS attributes it to Tro. Missing grants lead to onboarding; no driver task or
 model credential is issued before admission.
 
+### Email-free student access
+
+The teacher's class settings can issue bounded setup codes for personal or shared
+learner devices. [StudentAccess.ts](../src/contracts/StudentAccess.ts) owns the
+validated desktop/API commands and capability header. One teacher-owned
+`StudentSchool` supplies the initial school boundary; this is not a multi-staff
+school-directory integration. The `school-card` source currently accepts plain
+student-ID text, preserving case and leading zeros and rejecting URLs/control
+characters. Camera frames are decoded locally with jsQR; manual entry is available.
+
+[StudentAccessService](../src/server/features/studentAccess/application/StudentAccessService.ts)
+owns dedicated learner credentials, independent of Google OAuth.
+[StudentAccessStore](../src/server/features/studentAccess/application/StudentAccessStore.ts)
+owns its persistence port and technical admission/session/usage policy.
+[PrismaStudentAccessStore](../src/server/persistence/PrismaStudentAccessStore.ts)
+enforces class ownership, enrollment, conditional counters, idempotency and audit
+writes in retryable serializable transactions. The additive student-access
+migration allows `User.email` to be null; canonical `User.id` still owns all work.
+Learners never receive synthetic email addresses or Better Auth provider accounts.
+
+A QR carries an unverified external-ID claim, not an authentication secret. Every
+new onboarding operation creates a provisional canonical user, even when another
+device claims the same school ID. Retry of the same device/operation rotates the
+credential for the same user. Roster preview/apply associates metadata and reports
+competing claims; it neither merges users nor verifies identity. Roster apply uses
+revision/digest receipts for idempotent retries. Teacher classroom rosters label
+these profiles as unverified; school-provider login and verified recovery are not
+implemented.
+
+[RegisterStudentAccessRoutes](../src/server/features/studentAccess/infrastructure/RegisterStudentAccessRoutes.ts)
+requires the desktop origin for mutations and bounds activation/onboarding
+attempts. Its learner-cookie guard allowlists session, classroom learner commands
+and model-credential access. Other routes, including teacher, admin, pets, paid
+voice and transcription, remain unavailable to these restricted sessions.
+Existing classroom services still check enrollment, resource ownership and binding
+leases. Malformed learner cookies cannot fall back to Google authorization.
+Model credentials carry a learner-session subject; provider admission rechecks
+revocation/class scope and atomically reserves school and learner daily allowances.
+These are technical limits, not commercial device/seat licensing.
+
+Personal sessions refresh only with an already valid credential, bounded by device
+authorization lifetime. `AccountSessions` stores learner accounts in vault version
+2, reads existing version-1 Google vaults and exposes only metadata. Older binaries
+cannot read a learner-containing version-2 vault and must not overwrite it.
+`EncryptedStudentDevice` keeps the school/device grant separately using native
+encryption and atomic replacement. Shared activation fails if personal accounts
+are present in the app profile; shared learner credentials remain in memory only.
+The sidebar uses the existing account popup with student ID instead of email.
+Student sign-out removes the current local credential while retaining work and
+other saved accounts; remote failure is logged without restoring the login.
+
+Shared sessions require a live meeting and become unusable when it ends. Main
+checks the session periodically and expires idle access using actual input events,
+not heartbeat traffic. Cleanup invalidates classroom, capture, worker and renderer
+state. App exit attempts revocation; restart never restores a shared learner.
+After a crash or failed remote revocation, server expiry/class closure is the
+backstop. A failed offline personal revocation can leave the remote credential
+valid until its session/device expiry. No remote-revocation queue is implemented.
+
+`StudentQrScanner` obtains a bounded main-owned camera lease for the trusted main
+frame, accepts video only and stops tracks on success, cancel, timeout and unmount,
+including late stream creation. Packaged and development macOS hosts include a
+camera purpose string; the release entitlement permits camera access. New learner
+flows currently support typed lessons. Paid voice, cross-device recovery,
+multi-staff school ownership, provider roster synchronization and commercial seat
+enforcement require separate implementation. Production retention/consent policy
+must be agreed with the school before rollout; this change does not deploy it.
+
 [EmbeddedDesktopDriver.ts](../src/desktop/main/EmbeddedDesktopDriver.ts) owns one
 unreferenced timer shared by the daemon's subscribers. It checks the SDK's
 synchronous `connection()` and generation at a fixed interval; that API refreshes

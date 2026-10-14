@@ -1,4 +1,5 @@
 import type { IncomingHttpHeaders } from 'node:http';
+import { StudentAccessCapability } from '#contracts/StudentAccess.js';
 import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import {
@@ -93,6 +94,14 @@ export function registerClassroomRoutes(
     }
     try {
       const result = ClassroomReplySchema.parse(await service.execute(userId, parsed.data));
+      if (request.headers[StudentAccessCapability.HEADER] !== StudentAccessCapability.VERSION) {
+        if (result.kind === 'admin-people') {
+          return { ...result, people: result.people.filter((person) => person.email !== null) };
+        }
+        if (result.kind === 'admin-view-as' && result.person?.email === null) {
+          return await reply.code(403).send({ kind: 'failed', code: ClassroomFailure.FORBIDDEN });
+        }
+      }
       if (
         result.kind === 'home' &&
         request.headers[ClassroomAdminCapability.HEADER] !== ClassroomAdminCapability.VERSION

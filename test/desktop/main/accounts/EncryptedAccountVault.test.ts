@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AccountRole } from '#contracts/AccountRole.js';
 import { EncryptedAccountVault } from '../../../../src/desktop/main/accounts/EncryptedAccountVault.js';
+import { EncryptedStudentDevice } from '../../../../src/desktop/main/accounts/EncryptedStudentDevice.js';
+import { StudentDeviceCredentialSchema } from '#contracts/StudentAccess.js';
 import type { AccountVaultState } from '../../../../src/desktop/main/accounts/AccountSessions.js';
 
 const native = vi.hoisted(() => ({
@@ -19,6 +21,30 @@ const native = vi.hoisted(() => ({
 vi.mock('electron', () => ({ safeStorage: native }));
 
 let directory = '';
+
+it('encrypts a school device grant independently and fails closed without native encryption', () => {
+  const storage = new EncryptedStudentDevice(directory);
+  const device = StudentDeviceCredentialSchema.parse({
+    credential: 'a'.repeat(64),
+    context: {
+      schoolId: '11111111-1111-4111-8111-111111111111',
+      schoolName: 'School',
+      classId: '22222222-2222-4222-8222-222222222222',
+      className: 'Class',
+      mode: 'shared',
+      expiresAt: '2030-01-01T00:00:00.000Z',
+    },
+  });
+  storage.save(device);
+  expect(storage.read()).toEqual(device);
+  expect(readFileSync(join(directory, 'StudentDevice'), 'utf8')).not.toContain(device.credential);
+  expect(statSync(join(directory, 'StudentDevice')).mode & 0o777).toBe(0o600);
+  native.isEncryptionAvailable.mockReturnValue(false);
+  expect(() => storage.read()).toThrow();
+  expect(() => {
+    storage.save(device);
+  }).toThrow();
+});
 const accountId = '11111111-1111-4111-8111-111111111111';
 const state: AccountVaultState = {
   version: 1,

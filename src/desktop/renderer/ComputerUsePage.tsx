@@ -1,4 +1,5 @@
 import { AgentProgressPhase } from '#contracts/CompanionHud.js';
+import { StudentDeviceMode } from '#contracts/StudentIdentity.js';
 import {
   Button,
   Group,
@@ -26,7 +27,7 @@ interface ComputerUsePageProps {
 
 /** The workspace uses the existing worker bridge; it never calls models directly. */
 export function ComputerUsePage({ controller, signInActions }: ComputerUsePageProps): ReactElement {
-  const { messages: translations } = useLocale();
+  const { messages: translations, locale } = useLocale();
   const { user, isLoading, isSigning, isSending, isSigningOut, isResetting, messages } = controller;
   const firstName = user?.name.trim().split(/\s+/)[0];
   const outcomeLabels = {
@@ -74,7 +75,11 @@ export function ComputerUsePage({ controller, signInActions }: ComputerUsePagePr
           </div>
           <Title order={2}>{translations.makeYourselfAtHome}</Title>
           <Text c="dimmed" size="sm" maw={340} ta="center">
-            {translations.googleInvitation}
+            {controller.savedAccounts?.deviceMode === StudentDeviceMode.SHARED
+              ? locale === 'vi'
+                ? 'Dùng thẻ học sinh để bắt đầu buổi học.'
+                : 'Use your student card to start the lesson.'
+              : translations.googleInvitation}
           </Text>
           {controller.canRetrySignIn && (
             <Button
@@ -85,14 +90,16 @@ export function ComputerUsePage({ controller, signInActions }: ComputerUsePagePr
               {translations.retrySignIn}
             </Button>
           )}
-          <Button
-            leftSection={<IconBrandGoogle size={16} />}
-            loading={isSigning}
-            disabled={controller.isSwitchingAccount || isSigningOut}
-            onClick={() => void controller.signInWithGoogle()}
-          >
-            {isSigning ? translations.waitingForGoogle : translations.continueWithGoogle}
-          </Button>
+          {controller.savedAccounts?.deviceMode !== StudentDeviceMode.SHARED && (
+            <Button
+              leftSection={<IconBrandGoogle size={16} />}
+              loading={isSigning}
+              disabled={controller.isSwitchingAccount || isSigningOut}
+              onClick={() => void controller.signInWithGoogle()}
+            >
+              {isSigning ? translations.waitingForGoogle : translations.continueWithGoogle}
+            </Button>
+          )}
           {signInActions}
         </div>
       ) : (
