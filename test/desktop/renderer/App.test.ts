@@ -179,7 +179,7 @@ describe('optional usage sharing', () => {
     renderDesktop();
     await screen.findByText(testUser.email);
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
-    expect(screen.getByRole('switch', { name: 'Share app usage' })).toHaveProperty(
+    expect(await screen.findByRole('switch', { name: 'Share app usage' })).toHaveProperty(
       'disabled',
       true,
     );
@@ -206,7 +206,10 @@ describe('optional usage sharing', () => {
     expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull();
     expect(screen.queryByRole('switch', { name: 'Share app usage' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
-    expect(screen.getByRole('switch', { name: 'Share app usage' })).toHaveProperty('checked', true);
+    expect(await screen.findByRole('switch', { name: 'Share app usage' })).toHaveProperty(
+      'checked',
+      true,
+    );
     expect(screen.getByText(/On by default/)).toBeTruthy();
   });
 
@@ -217,7 +220,7 @@ describe('optional usage sharing', () => {
     await screen.findByText(testUser.email);
     expect(bridge.trackScreenView).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
-    fireEvent.click(screen.getByRole('switch', { name: 'Share app usage' }));
+    fireEvent.click(await screen.findByRole('switch', { name: 'Share app usage' }));
     await waitFor(() => {
       expect(bridge.trackScreenView).toHaveBeenCalledExactlyOnceWith(AnalyticsScreen.WORKSPACE);
     });
@@ -240,7 +243,7 @@ describe('optional usage sharing', () => {
       [AnalyticsScreen.CLASSROOM],
     ]);
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
-    fireEvent.click(screen.getByRole('switch', { name: 'Share app usage' }));
+    fireEvent.click(await screen.findByRole('switch', { name: 'Share app usage' }));
     await waitFor(() => {
       expect(screen.getByRole('switch', { name: 'Share app usage' })).toHaveProperty(
         'checked',
@@ -263,7 +266,7 @@ describe('optional usage sharing', () => {
     renderDesktop();
     await screen.findByText(testUser.email);
     fireEvent.click(screen.getByRole('button', { name: 'Cài đặt' }));
-    fireEvent.click(screen.getByRole('switch', { name: 'Chia sẻ dữ liệu sử dụng' }));
+    fireEvent.click(await screen.findByRole('switch', { name: 'Chia sẻ dữ liệu sử dụng' }));
     await screen.findByText(/Không thể lưu tùy chọn này/);
     expect(screen.getByRole('switch', { name: 'Chia sẻ dữ liệu sử dụng' })).toHaveProperty(
       'checked',
