@@ -33,7 +33,7 @@ interface NotaryPorts {
   wait: (milliseconds: number) => Promise<void>;
 }
 
-/** Submit once, log the safe submission ID, and poll that same submission to a deadline. */
+/** Return the submission ID only after acceptance, stapling and successful ticket validation. */
 export async function notarizeMacDmg(
   path: string,
   settings: MacReleaseSettings,
@@ -187,13 +187,16 @@ async function inventoryMacApp(
   };
 }
 
-/** No changes to app contents after sealing; only staple the container before final hashing. */
+/** No changes to app contents after sealing; notarizeAndValidate must staple and validate the DMG. */
 export async function verifyMacRelease(
   directory: string,
   settings: MacReleaseSettings,
   version: string,
   run: MacCommand = runMacCommand,
-  notarize: (path: string, settings: MacReleaseSettings) => Promise<string> = notarizeMacDmg,
+  notarizeAndValidate: (
+    path: string,
+    settings: MacReleaseSettings,
+  ) => Promise<string> = notarizeMacDmg,
 ): Promise<void> {
   console.info(
     JSON.stringify({
@@ -248,8 +251,9 @@ export async function verifyMacRelease(
         architecture: settings.architecture,
       }),
     );
-    const submissionId = await notarize(dmg, settings);
-    await run('/usr/bin/xcrun', ['stapler', 'validate', dmg]);
+    /* The notarization port already validated this exact, unchanged DMG. Repeating
+     * the same online check adds another network failure point without new evidence. */
+    const submissionId = await notarizeAndValidate(dmg, settings);
     await run('/usr/sbin/spctl', [
       '--assess',
       '--type',

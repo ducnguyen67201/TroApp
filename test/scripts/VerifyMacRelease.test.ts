@@ -47,6 +47,16 @@ const archiveCommand: MacCommand = async (executable, args) => {
   return macCommand(executable, args);
 };
 
+const acceptedNotaryCommand: MacCommand = (executable, args) => {
+  if (args[0] === 'notarytool') {
+    return Promise.resolve({
+      stdout: JSON.stringify({ id: submissionId, status: 'Accepted' }),
+      stderr: '',
+    });
+  }
+  return archiveCommand(executable, args);
+};
+
 describe('Mac notarization', () => {
   it('submits once and staples only the accepted submission', async () => {
     let polls = 0;
@@ -86,6 +96,10 @@ describe('Mac notarization', () => {
       'json',
     ]);
     expect(wait).toHaveBeenCalledWith(15_000);
+    expect(run.mock.calls.filter(([, args]) => args[0] === 'stapler')).toEqual([
+      ['/usr/bin/xcrun', ['stapler', 'staple', '/fixture.dmg']],
+      ['/usr/bin/xcrun', ['stapler', 'validate', '/fixture.dmg']],
+    ]);
     expect(run.mock.calls.at(-1)?.[1]).toEqual(['stapler', 'validate', '/fixture.dmg']);
   });
 
@@ -371,6 +385,67 @@ describe('Mac distribution verification', () => {
     );
     expect(run.mock.calls.some(([, args]) => args[0] === 'detach')).toBe(true);
   });
+
+  it('validates the notarized DMG once while retaining both contained-app ticket checks', async () => {
+    const directory = await createRelease();
+    const dmg = join(directory, 'Tro-0.1.1-macos-arm64.dmg');
+    const run = vi.fn<MacCommand>(acceptedNotaryCommand);
+    await verifyMacRelease(directory, macSettings, '0.1.1', run, (path, settings) =>
+      notarizeMacDmg(path, settings, {
+        run,
+        now: () => 0,
+        wait: () => Promise.resolve(),
+      }),
+    );
+    const validations = run.mock.calls.filter(
+      ([, args]) => args[0] === 'stapler' && args[1] === 'validate',
+    );
+    expect(validations.filter(([, args]) => args[2] === dmg)).toEqual([
+      ['/usr/bin/xcrun', ['stapler', 'validate', dmg]],
+    ]);
+    expect(validations.filter(([, args]) => args[2]?.endsWith('/Tro.app'))).toHaveLength(2);
+    const validationIndex = run.mock.calls.findIndex(
+      ([, args]) => args[0] === 'stapler' && args[1] === 'validate' && args[2] === dmg,
+    );
+    const gatekeeperIndex = run.mock.calls.findIndex(
+      ([executable, args]) => executable.endsWith('/spctl') && args.at(-1) === dmg,
+    );
+    expect(gatekeeperIndex).toBeGreaterThan(validationIndex);
+    expect(run.mock.calls.some(([, args]) => args[0] === 'detach')).toBe(true);
+    await expect(readFile(join(directory, 'MacSignatures-arm64.json'))).resolves.toBeDefined();
+  });
+
+  it.each(['staple', 'validate'])(
+    'rejects an accepted DMG when its mandatory %s step fails',
+    async (step) => {
+      const directory = await createRelease();
+      const dmg = join(directory, 'Tro-0.1.1-macos-arm64.dmg');
+      await writeFile(join(directory, 'MacSignatures-arm64.json'), 'old-success');
+      const run = vi.fn<MacCommand>((executable, args) => {
+        if (args[0] === 'stapler' && args[1] === step && args[2] === dmg) {
+          return Promise.reject(new Error('ticket step failed'));
+        }
+        return acceptedNotaryCommand(executable, args);
+      });
+      await expect(
+        verifyMacRelease(directory, macSettings, '0.1.1', run, (path, settings) =>
+          notarizeMacDmg(path, settings, {
+            run,
+            now: () => 0,
+            wait: () => Promise.resolve(),
+          }),
+        ),
+      ).rejects.toThrow('ticket step failed');
+      expect(run).toHaveBeenCalledWith('/usr/bin/xcrun', ['stapler', 'staple', dmg]);
+      expect(
+        run.mock.calls.some(
+          ([executable, args]) => executable.endsWith('/spctl') && args.at(-1) === dmg,
+        ),
+      ).toBe(false);
+      expect(run.mock.calls.some(([, args]) => args[0] === 'attach')).toBe(false);
+      await expect(readFile(join(directory, 'MacSignatures-arm64.json'))).rejects.toThrow();
+    },
+  );
 
   it.each(['Renderer', 'GPU', 'Plugin'])(
     'checks parenthesized %s helper names as literal paths',

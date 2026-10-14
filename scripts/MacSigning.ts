@@ -35,6 +35,23 @@ const CommandFailureSchema = z.object({
   stderr: z.unknown().optional(),
 });
 
+function readMacCommandFailureOutput(
+  failure: z.infer<typeof CommandFailureSchema> | undefined,
+): string {
+  return [failure?.stdout, failure?.stderr]
+    .filter((value): value is string => typeof value === 'string')
+    .map((value) => value.slice(0, 16_384))
+    .join('\n');
+}
+
+/** Preserve only Foundation's numeric URL error code, never its URL or UserInfo. */
+function readMacUrlErrorCode(error: unknown): number | null {
+  const failure = CommandFailureSchema.safeParse(error);
+  const output = readMacCommandFailureOutput(failure.success ? failure.data : undefined);
+  const match = /\bNSURLErrorDomain\s+Code=(-\d{1,6})(?![\w.])/.exec(output);
+  return match?.[1] === undefined ? null : Number(match[1]);
+}
+
 function readMacCommandOperation(tool: string, arguments_: readonly string[]): string {
   if (tool === 'xcrun') {
     const [command, action] = arguments_;
@@ -90,10 +107,7 @@ function readMacCommandFailureReason(
     return MacCommandFailureReason.TERMINATED;
   }
   if (operation === 'stapler.validate' || operation === 'stapler.staple') {
-    const output = [failure?.stdout, failure?.stderr]
-      .filter((value): value is string => typeof value === 'string')
-      .map((value) => value.slice(0, 16_384))
-      .join('\n');
+    const output = readMacCommandFailureOutput(failure);
     for (const [phrase, reason] of [
       ['Record not found', MacCommandFailureReason.TICKET_NOT_FOUND],
       ['does not have a ticket stapled', MacCommandFailureReason.TICKET_NOT_STAPLED],
@@ -156,6 +170,7 @@ function reportMacCommandFailure(
   const operation = readMacCommandOperation(tool, arguments_);
   const parsedFailure = CommandFailureSchema.safeParse(error);
   const failure = parsedFailure.success ? parsedFailure.data : undefined;
+  const reason = readMacCommandFailureReason(operation, failure);
   const exitCode =
     typeof failure?.code === 'number' && Number.isSafeInteger(failure.code) ? failure.code : null;
   const signal =
@@ -171,7 +186,9 @@ function reportMacCommandFailure(
       exitCode,
       signal,
       durationMs,
-      reason: readMacCommandFailureReason(operation, failure),
+      reason,
+      urlErrorCode:
+        reason === MacCommandFailureReason.NETWORK_ERROR ? readMacUrlErrorCode(error) : null,
     }),
   );
   return new Error(`macOS release command failed: ${tool}.`);
@@ -179,7 +196,7 @@ function reportMacCommandFailure(
 
 /** Retry only ticket-validation network failures; every release still requires exit zero. */
 export const runMacCommand: MacCommand = async (executable, arguments_) => {
-  const retryDelaysMs = [5_000, 10_000] as const;
+  const retryDelaysMs = [5_000, 15_000, 30_000, 60_000] as const;
   for (let attempt = 1; ; attempt += 1) {
     const startedAt = performance.now();
     try {
@@ -197,6 +214,7 @@ export const runMacCommand: MacCommand = async (executable, arguments_) => {
             operation: 'stapler.validate',
             exitCode: 68,
             reason: MacCommandFailureReason.NETWORK_ERROR,
+            urlErrorCode: readMacUrlErrorCode(error),
             attempt,
             nextAttempt: attempt + 1,
             maxAttempts: retryDelaysMs.length + 1,

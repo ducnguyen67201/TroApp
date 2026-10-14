@@ -750,17 +750,23 @@ whether schema validation failed, while keeping the original error private.
 `mac.release.notary.rejected` reports that ID and issue count without raw Apple
 messages. `mac.release.command.failed` identifies the allowlisted tool/operation,
 numeric exit code, termination signal, elapsed milliseconds and a fixed failure
-category. It never includes raw command arguments, paths, tool output or errors.
+category. For network failures, `urlErrorCode` preserves only the numeric
+`NSURLErrorDomain` code when present (for example, timeout `-1001` or secure
+connection failure `-1200`); otherwise it is null. It never includes raw command
+arguments, paths, tool output or errors.
 For `stapler.validate`, distinguish `ticket-not-found`, `ticket-not-stapled`,
 `ticket-validation-failed` and `network-error`; `unknown` requires further
 diagnosis, not a guessed retry or a relaxed verification gate. Ticket validation
-retries only exit 68 with a network-error marker, at most three attempts with
-5-second then 10-second delays. Missing-ticket messages, invalid/revoked ticket
+retries only exit 68 with a network-error marker, at most five attempts with
+5-, 15-, 30- and 60-second delays. Missing-ticket messages, invalid/revoked ticket
 exit codes and terminated commands are not retried. `mac.release.command.retry` records the
 attempt, next attempt, limit and delay without raw tool output. A persistent
 network or TLS error still fails the release; other commands are not retried by
 this policy. A prior
 `notarization successful` message does not replace the separate ticket check.
+The DMG notarization step requires a successful ticket validation before returning;
+the release verifier then checks Gatekeeper and the mounted contents without
+repeating that same online ticket check on the unchanged DMG.
 `mac.release.verified` is emitted only after the inventory is written. No inventory
 is uploaded if any preceding step fails.
 
