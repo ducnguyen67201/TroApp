@@ -52,6 +52,7 @@ const FailureEventSchema = z.strictObject({
   signal: z.string().nullable(),
   durationMs: z.number().nonnegative(),
   reason: z.string(),
+  urlErrorCode: z.number().int().nullable(),
 });
 
 const RetryEventSchema = z.strictObject({
@@ -60,10 +61,11 @@ const RetryEventSchema = z.strictObject({
   operation: z.literal('stapler.validate'),
   exitCode: z.literal(68),
   reason: z.literal('network-error'),
-  attempt: z.union([z.literal(1), z.literal(2)]),
-  nextAttempt: z.union([z.literal(2), z.literal(3)]),
-  maxAttempts: z.literal(3),
-  delayMs: z.union([z.literal(5000), z.literal(10000)]),
+  urlErrorCode: z.number().int().nullable(),
+  attempt: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+  nextAttempt: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
+  maxAttempts: z.literal(5),
+  delayMs: z.union([z.literal(5000), z.literal(15000), z.literal(30000), z.literal(60000)]),
 });
 
 function readFailureEvent(): z.infer<typeof FailureEventSchema> {
@@ -147,6 +149,52 @@ describe('Mac command failure diagnostics', () => {
       exitCode: 66,
       reason: 'ticket-not-stapled',
     });
+  });
+
+  it.each([
+    { stream: 'stdout', urlErrorCode: -1001 },
+    { stream: 'stderr', urlErrorCode: -1200 },
+  ])('reports only the numeric URL error from $stream', async ({ stream, urlErrorCode }) => {
+    doubles.execute.mockRejectedValue({
+      code: 65,
+      [stream]: `NSURLErrorDomain Code=${String(urlErrorCode)} ${privateMarker}`,
+    });
+    await expect(
+      runMacCommand('/usr/bin/xcrun', ['stapler', 'validate', '/fixture.app']),
+    ).rejects.toThrow();
+    expect(readFailureEvent()).toMatchObject({ reason: 'network-error', urlErrorCode });
+  });
+
+  it.each([
+    'NSURLErrorDomain',
+    'NSURLErrorDomain Code=1001',
+    'NSURLErrorDomain Code="-1001"',
+    'NSURLErrorDomain Code=-1234567',
+    'NSURLErrorDomain Code=-1.5',
+    'NSURLErrorDomain Code=-1001suffix',
+    'OtherDomain Code=-1001 NSURLErrorDomain',
+    `${'x'.repeat(16_384)} NSURLErrorDomain Code=-1001`,
+  ])('does not report a missing, malformed or out-of-bounds URL code: %#', async (output) => {
+    doubles.execute.mockRejectedValue({ code: 65, stderr: `${output} ${privateMarker}` });
+    await expect(
+      runMacCommand('/usr/bin/xcrun', ['stapler', 'validate', '/fixture.app']),
+    ).rejects.toThrow();
+    expect(readFailureEvent()).toMatchObject({ urlErrorCode: null });
+  });
+
+  it('omits numeric URL evidence when a permanent ticket failure takes precedence', async () => {
+    doubles.execute.mockRejectedValue({
+      code: 68,
+      stderr: `Record not found NSURLErrorDomain Code=-1200 ${privateMarker}`,
+    });
+    await expect(
+      runMacCommand('/usr/bin/xcrun', ['stapler', 'validate', '/fixture.app']),
+    ).rejects.toThrow();
+    expect(readFailureEvent()).toMatchObject({
+      reason: 'ticket-not-found',
+      urlErrorCode: null,
+    });
+    expect(console.warn).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -270,9 +318,10 @@ describe('Mac stapler validation retries', () => {
       operation: 'stapler.validate',
       exitCode: 68,
       reason: 'network-error',
+      urlErrorCode: null,
       attempt: 1,
       nextAttempt: 2,
-      maxAttempts: 3,
+      maxAttempts: 5,
       delayMs: 5000,
     },
     {
@@ -281,14 +330,39 @@ describe('Mac stapler validation retries', () => {
       operation: 'stapler.validate',
       exitCode: 68,
       reason: 'network-error',
+      urlErrorCode: null,
       attempt: 2,
       nextAttempt: 3,
-      maxAttempts: 3,
-      delayMs: 10000,
+      maxAttempts: 5,
+      delayMs: 15000,
+    },
+    {
+      event: 'mac.release.command.retry',
+      tool: 'xcrun',
+      operation: 'stapler.validate',
+      exitCode: 68,
+      reason: 'network-error',
+      urlErrorCode: null,
+      attempt: 3,
+      nextAttempt: 4,
+      maxAttempts: 5,
+      delayMs: 30000,
+    },
+    {
+      event: 'mac.release.command.retry',
+      tool: 'xcrun',
+      operation: 'stapler.validate',
+      exitCode: 68,
+      reason: 'network-error',
+      urlErrorCode: null,
+      attempt: 4,
+      nextAttempt: 5,
+      maxAttempts: 5,
+      delayMs: 60000,
     },
   ];
 
-  it.each([1, 2])(
+  it.each([1, 2, 3, 4])(
     'recovers after %i network failures without logging a terminal error',
     async (failures) => {
       for (let index = 0; index < failures; index += 1) {
@@ -310,13 +384,15 @@ describe('Mac stapler validation retries', () => {
           expect.objectContaining({ timeout: 120_000, maxBuffer: 4 * 1024 * 1024 }),
         ]);
       }
-      expect(doubles.wait.mock.calls).toEqual([[5000], [10000]].slice(0, failures));
+      expect(doubles.wait.mock.calls).toEqual(
+        [[5000], [15000], [30000], [60000]].slice(0, failures),
+      );
       expect(readRetryEvents()).toEqual(expectedRetries.slice(0, failures));
       expect(console.error).not.toHaveBeenCalled();
     },
   );
 
-  it('fails closed after three attempts with two safe retry events and one final failure', async () => {
+  it('fails closed after five attempts with four safe retry events and one final failure', async () => {
     doubles.execute.mockRejectedValue(transientFailure);
     doubles.wait.mockImplementation(() => {
       expect(console.error).not.toHaveBeenCalled();
@@ -325,8 +401,8 @@ describe('Mac stapler validation retries', () => {
     await expect(runMacCommand('/usr/bin/xcrun', arguments_)).rejects.toThrow(
       /^macOS release command failed: xcrun\.$/,
     );
-    expect(doubles.execute).toHaveBeenCalledTimes(3);
-    expect(doubles.wait.mock.calls).toEqual([[5000], [10000]]);
+    expect(doubles.execute).toHaveBeenCalledTimes(5);
+    expect(doubles.wait.mock.calls).toEqual([[5000], [15000], [30000], [60000]]);
     expect(readRetryEvents()).toEqual(expectedRetries);
     expect(readFailureEvent()).toMatchObject({
       tool: 'xcrun',
@@ -334,7 +410,43 @@ describe('Mac stapler validation retries', () => {
       exitCode: 68,
       signal: null,
       reason: 'network-error',
+      urlErrorCode: null,
     });
+  });
+
+  it.each([
+    { stream: 'stdout', urlErrorCode: -1001 },
+    { stream: 'stderr', urlErrorCode: -1200 },
+  ])(
+    'includes only the numeric URL error in a retry from $stream',
+    async ({ stream, urlErrorCode }) => {
+      doubles.execute
+        .mockRejectedValueOnce({
+          ...transientFailure,
+          [stream]: `NSURLErrorDomain Code=${String(urlErrorCode)} ${privateMarker}`,
+        })
+        .mockResolvedValueOnce({ stdout: 'validated', stderr: '' });
+      await expect(runMacCommand('/usr/bin/xcrun', arguments_)).resolves.toEqual({
+        stdout: 'validated',
+        stderr: '',
+      });
+      expect(readRetryEvents()).toEqual([{ ...expectedRetries[0], urlErrorCode }]);
+      expect(doubles.wait.mock.calls).toEqual([[5000]]);
+      expect(doubles.execute).toHaveBeenCalledTimes(2);
+      expect(console.error).not.toHaveBeenCalled();
+    },
+  );
+
+  it('stops immediately when a retry encounters a permanent ticket failure', async () => {
+    doubles.execute.mockRejectedValueOnce(transientFailure).mockRejectedValueOnce({
+      ...transientFailure,
+      stderr: `Record not found NSURLErrorDomain ${privateMarker}`,
+    });
+    await expect(runMacCommand('/usr/bin/xcrun', arguments_)).rejects.toThrow();
+    expect(doubles.execute).toHaveBeenCalledTimes(2);
+    expect(doubles.wait.mock.calls).toEqual([[5000]]);
+    expect(readRetryEvents()).toEqual(expectedRetries.slice(0, 1));
+    expect(readFailureEvent()).toMatchObject({ reason: 'ticket-not-found' });
   });
 
   it.each([
