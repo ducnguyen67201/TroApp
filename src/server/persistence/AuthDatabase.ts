@@ -32,6 +32,12 @@ export function createAuthDatabase(environment: ServerEnv) {
     },
     secret: environment.AUTH_SECRET,
     baseURL: environment.AUTH_BASE_URL,
+    /* Public auth requests enter through Railway, which supplies this client IP header. */
+    advanced: {
+      ipAddress: {
+        ipAddressHeaders: ['x-real-ip'],
+      },
+    },
     /* The desktop's supported sign-in flow uses Google. */
     emailAndPassword: { enabled: false },
     disabledPaths: ['/sign-up/email', '/sign-in/email'],
