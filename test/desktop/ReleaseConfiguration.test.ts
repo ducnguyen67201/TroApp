@@ -112,25 +112,72 @@ describe('macOS release credential boundaries', () => {
   });
 });
 
-describe('shared desktop release validation', () => {
+describe('pull request validation boundaries', () => {
+  const workflow = readFileSync(
+    new URL('../../.github/workflows/PullRequestChecks.yml', import.meta.url),
+    'utf8',
+  );
+
+  it('checks proposed merges and merge queues without skipping paths or persisting credentials', () => {
+    expect(workflow).toContain('  pull_request:\n    branches: [main]\n');
+    expect(workflow).toContain('  merge_group:\n    branches: [main]\n');
+    expect(workflow).toContain('    name: PR validation\n');
+    expect(workflow).toContain('  cancel-in-progress: true\n');
+    expect(workflow).toContain('github.event.pull_request.number || github.ref');
+    expect(workflow).toContain('  contents: read\n');
+    expect(workflow).toContain('persist-credentials: false');
+    for (const forbidden of [
+      'pull_request_target:',
+      'paths:',
+      'paths-ignore:',
+      'ref:',
+      'if:',
+      'continue-on-error:',
+      'secrets.',
+      'environment:',
+      'write',
+      'package:desktop',
+      'PrepareDesktopRelease',
+      'PublishDesktopRelease',
+    ]) {
+      expect(workflow).not.toContain(forbidden);
+    }
+  });
+
+  it('runs the complete validation suite before merging', () => {
+    const pullRequestCommands = [...workflow.matchAll(/^ {6}- run: (.+)$/gm)].map(
+      (match) => match[1],
+    );
+    expect(pullRequestCommands).toEqual([
+      'pnpm install --frozen-lockfile',
+      'pnpm lint',
+      'pnpm format:check',
+      'pnpm typecheck',
+      'pnpm test',
+      'pnpm build',
+      'pnpm test:integration',
+    ]);
+  });
+});
+
+describe('shared desktop release preparation', () => {
   const desktopWorkflow = readFileSync(
     new URL('../../.github/workflows/DesktopRelease.yml', import.meta.url),
     'utf8',
   );
-  const validation =
-    desktopWorkflow.split('\n  validate:\n').at(1)?.split('\n  windows:').at(0) ?? '';
 
-  it('validates the reserved source and version once before either platform can sign', () => {
-    expect(validation).toContain('    needs: prepare\n');
-    expect(validation).toContain('ref: ${{ needs.prepare.outputs.commit }}');
-    expect(validation).toContain(
-      'TRO_DESKTOP_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}',
-    );
-    expect(validation).toContain('scripts/ApplyDesktopReleaseVersion.ts');
-    expect(validation).not.toContain('secrets.');
-    expect(validation).not.toContain('contents: write');
+  it('starts platform packaging after version preparation without repeating PR checks', () => {
+    expect(desktopWorkflow).not.toContain('  validate:\n');
     for (const platform of ['windows', 'macos']) {
-      expect(desktopWorkflow).toContain(`  ${platform}:\n    needs: [prepare, validate]\n`);
+      const platformJob =
+        desktopWorkflow
+          .split(`\n  ${platform}:\n`)
+          .at(1)
+          ?.split(/\n {2}\w+:\n/)
+          .at(0) ?? '';
+      expect(platformJob).toContain('    needs: prepare\n');
+      expect(platformJob).toContain('release-commit: ${{ needs.prepare.outputs.commit }}');
+      expect(platformJob).toContain('release-version: ${{ needs.prepare.outputs.version }}');
     }
     for (const command of [
       'pnpm lint',
@@ -140,8 +187,7 @@ describe('shared desktop release validation', () => {
       'pnpm build',
       'pnpm test:integration',
     ]) {
-      expect(validation).toContain(`run: ${command}\n`);
-      expect(desktopWorkflow.split(`run: ${command}\n`)).toHaveLength(2);
+      expect(desktopWorkflow).not.toContain(`run: ${command}\n`);
     }
   });
 
