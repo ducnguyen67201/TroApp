@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { CuaCompanionBuild, CuaCompanionBuildSchema } from '../src/contracts/CuaCompanionBuild.js';
 import { prepareCuaDriver } from './PrepareCuaDriver.js';
+import { validateWindowsCompanionExecutable } from './WindowsCompanionExecutable.js';
 
 const runFile = promisify(execFile);
 const digest = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
@@ -118,6 +119,9 @@ try {
     throw new Error('Native executable version does not match the companion build contract.');
   }
   const executable = await readFile(executablePath);
+  if (process.platform === 'win32') {
+    validateWindowsCompanionExecutable(executable);
+  }
   const metadata = CuaCompanionBuildSchema.parse({
     version: CuaCompanionBuild.VERSION,
     sourceCommit: CuaCompanionBuild.SOURCE_COMMIT,

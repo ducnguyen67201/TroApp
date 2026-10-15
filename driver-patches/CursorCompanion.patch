@@ -1,5 +1,5 @@
 diff --git a/libs/cua-driver/rust/Cargo.lock b/libs/cua-driver/rust/Cargo.lock
-index 74051d8..29ab38c 100644
+index 74051d8..088c001 100644
 --- a/libs/cua-driver/rust/Cargo.lock
 +++ b/libs/cua-driver/rust/Cargo.lock
 @@ -1205,7 +1205,7 @@ dependencies = [
@@ -7,7 +7,7 @@ index 74051d8..29ab38c 100644
  [[package]]
  name = "cua-driver"
 -version = "0.30.4"
-+version = "0.30.4-tro.25"
++version = "0.30.4-tro.26"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -16,7 +16,7 @@ index 74051d8..29ab38c 100644
  [[package]]
  name = "cua-driver-bindgen"
 -version = "0.30.4"
-+version = "0.30.4-tro.25"
++version = "0.30.4-tro.26"
  dependencies = [
   "cbindgen",
   "uniffi",
@@ -25,7 +25,7 @@ index 74051d8..29ab38c 100644
  [[package]]
  name = "cua-driver-contract"
 -version = "0.30.4"
-+version = "0.30.4-tro.25"
++version = "0.30.4-tro.26"
  dependencies = [
   "schemars",
   "serde",
@@ -34,7 +34,7 @@ index 74051d8..29ab38c 100644
  [[package]]
  name = "cua-driver-core"
 -version = "0.30.4"
-+version = "0.30.4-tro.25"
++version = "0.30.4-tro.26"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -43,7 +43,7 @@ index 74051d8..29ab38c 100644
  [[package]]
  name = "cua-driver-e2e"
 -version = "0.30.4"
-+version = "0.30.4-tro.25"
++version = "0.30.4-tro.26"
  dependencies = [
   "base64",
   "core-foundation",
@@ -52,7 +52,7 @@ index 74051d8..29ab38c 100644
  [[package]]
  name = "cua-driver-sdk"
 -version = "0.30.4"
-+version = "0.30.4-tro.25"
++version = "0.30.4-tro.26"
  dependencies = [
   "async-trait",
   "core-foundation",
@@ -61,7 +61,7 @@ index 74051d8..29ab38c 100644
  [[package]]
  name = "cua-driver-testkit"
 -version = "0.30.4"
-+version = "0.30.4-tro.25"
++version = "0.30.4-tro.26"
  dependencies = [
   "arbitrary",
   "async-trait",
@@ -70,7 +70,7 @@ index 74051d8..29ab38c 100644
  [[package]]
  name = "cua-driver-uia"
 -version = "0.30.4"
-+version = "0.30.4-tro.25"
++version = "0.30.4-tro.26"
  dependencies = [
   "anyhow",
   "cua-driver-core",
@@ -79,7 +79,7 @@ index 74051d8..29ab38c 100644
  [[package]]
  name = "cursor-overlay"
 -version = "0.30.4"
-+version = "0.30.4-tro.25"
++version = "0.30.4-tro.26"
  dependencies = [
   "anyhow",
   "cua-driver-contract",
@@ -88,7 +88,7 @@ index 74051d8..29ab38c 100644
  [[package]]
  name = "cursor-theme-cli"
 -version = "0.30.4"
-+version = "0.30.4-tro.25"
++version = "0.30.4-tro.26"
  dependencies = [
   "anyhow",
   "cursor-overlay",
@@ -97,7 +97,7 @@ index 74051d8..29ab38c 100644
  [[package]]
  name = "pip-preview"
 -version = "0.30.4"
-+version = "0.30.4-tro.25"
++version = "0.30.4-tro.26"
  dependencies = [
   "serde_json",
  ]
@@ -106,7 +106,7 @@ index 74051d8..29ab38c 100644
  [[package]]
  name = "platform-linux"
 -version = "0.30.4"
-+version = "0.30.4-tro.25"
++version = "0.30.4-tro.26"
  dependencies = [
   "anyhow",
   "ashpd",
@@ -115,7 +115,7 @@ index 74051d8..29ab38c 100644
  [[package]]
  name = "platform-macos"
 -version = "0.30.4"
-+version = "0.30.4-tro.25"
++version = "0.30.4-tro.26"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -124,12 +124,12 @@ index 74051d8..29ab38c 100644
  [[package]]
  name = "platform-windows"
 -version = "0.30.4"
-+version = "0.30.4-tro.25"
++version = "0.30.4-tro.26"
  dependencies = [
   "anyhow",
   "async-trait",
 diff --git a/libs/cua-driver/rust/Cargo.toml b/libs/cua-driver/rust/Cargo.toml
-index 53edeb0..14c32bf 100644
+index 53edeb0..f6f3377 100644
 --- a/libs/cua-driver/rust/Cargo.toml
 +++ b/libs/cua-driver/rust/Cargo.toml
 @@ -19,7 +19,7 @@ members = [
@@ -137,7 +137,7 @@ index 53edeb0..14c32bf 100644
  
  [workspace.package]
 -version = "0.30.4"
-+version = "0.30.4-tro.25"
++version = "0.30.4-tro.26"
  edition = "2021"
  authors = ["trycua"]
  license = "MIT"
@@ -1760,10 +1760,19 @@ index e785dbd..3c1c071 100644
      fn only_transports_skip_the_finite_broken_pipe_contract() {
          for transport in [
 diff --git a/libs/cua-driver/rust/crates/cua-driver/src/main.rs b/libs/cua-driver/rust/crates/cua-driver/src/main.rs
-index e1af27a..30bfff5 100644
+index e1af27a..1906a80 100644
 --- a/libs/cua-driver/rust/crates/cua-driver/src/main.rs
 +++ b/libs/cua-driver/rust/crates/cua-driver/src/main.rs
-@@ -815,8 +815,12 @@ fn main() {
+@@ -1,4 +1,8 @@
+ #![recursion_limit = "256"]
++// Tro bundles this executable as a background helper. Avoid allocating a Windows
++// console even when the native SDK starts it without CREATE_NO_WINDOW. Explicit
++// stdio pipes still carry MCP traffic and the host's parent-liveness signal.
++#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
+ 
+ //! cua-driver-rs — cross-platform background computer-use automation daemon.
+ //!
+@@ -815,8 +819,12 @@ fn main() {
          cli::Command::Diagnose => {
              cli::run_diagnose_cmd();
          }
@@ -1778,7 +1787,7 @@ index e1af27a..30bfff5 100644
          }
          cli::Command::Autostart { subcommand } => {
              autostart::run_autostart_cmd(&subcommand);
-@@ -1121,8 +1125,12 @@ fn main() -> anyhow::Result<()> {
+@@ -1121,8 +1129,12 @@ fn main() -> anyhow::Result<()> {
              cli::run_diagnose_cmd();
              return Ok(());
          }
