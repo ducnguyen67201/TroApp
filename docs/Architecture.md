@@ -83,6 +83,12 @@ stops the host when the application quits. Sign-out, account transitions and win
 closure dispose the associated tasks and presentation resources. The renderer
 stores task messages in memory; general conversation history is not persisted.
 
+The bundled Windows companion uses the GUI executable subsystem to prevent Windows
+from allocating a console when the native SDK starts it. Explicit MCP stdio and
+parent-liveness pipes remain available. Build and packaging validate the executable's
+PE subsystem through `scripts/WindowsCompanionExecutable.ts`; they reject console
+builds before staging. This changes window creation, not the driver's telemetry policy.
+
 ## Authentication and account lifetime
 
 `AuthClient` opens Google sign-in in the system browser through Better Auth.

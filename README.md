@@ -313,6 +313,13 @@ Windows input observation. Neither event includes screen content or key values.
 owns the required version/source commit. Packaged driver resources take precedence
 over development caches.
 
+Windows companion builds use the GUI subsystem so starting Tro does not open a
+driver terminal. Both native build and packaging reject console-subsystem binaries.
+After rebuilding, restart the development app; installed copies require a rebuilt
+installer/update. For the Windows smoke check, launch Tro from its Start menu
+shortcut, confirm no driver terminal appears, exercise desktop guidance, then quit
+and confirm the owned driver stops.
+
 To measure desktop memory on macOS, use Tro's main process PID from Activity
 Monitor (replace `12345` below):
 

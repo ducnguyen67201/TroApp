@@ -3,6 +3,7 @@ import { cp, mkdir, readFile, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { CuaCompanionBuildSchema } from '../src/contracts/CuaCompanionBuild.js';
+import { validateWindowsCompanionExecutable } from './WindowsCompanionExecutable.js';
 
 /** Native source never enters Electron's bundle; only its executable and runtime libraries do. */
 export async function prepareCuaCompanion(destination: string): Promise<void> {
@@ -22,6 +23,9 @@ export async function prepareCuaCompanion(destination: string): Promise<void> {
     throw new Error(
       'Native companion build does not match this source/architecture. Run pnpm build:cua.',
     );
+  }
+  if (process.platform === 'win32') {
+    validateWindowsCompanionExecutable(executable);
   }
   /* Replace only the verified staging directory, preserving the embedded layout. */
   await rm(destination, { recursive: true, force: true });
