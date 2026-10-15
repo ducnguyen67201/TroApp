@@ -54,6 +54,73 @@ function Invoke-InstallerProcess {
     } finally { $process.Dispose() }
 }
 
+function Read-InstallerCleanupState {
+    param([string]$InstallDirectory, [string]$StartMenuLink, [string]$DesktopLink)
+    $applicationFilesPresent = Test-Path -LiteralPath $InstallDirectory
+    $startMenuShortcutPresent = Test-Path -LiteralPath $StartMenuLink
+    $desktopShortcutPresent = Test-Path -LiteralPath $DesktopLink
+    return @{
+        completed = -not ($applicationFilesPresent -or $startMenuShortcutPresent -or $desktopShortcutPresent)
+        applicationFilesPresent = $applicationFilesPresent
+        startMenuShortcutPresent = $startMenuShortcutPresent
+        desktopShortcutPresent = $desktopShortcutPresent
+    }
+}
+
+# NSIS removes application files before shortcuts in its temporary child process.
+# Parent exit or Tro.exe disappearing alone does not establish cleanup completion.
+function Wait-InstallerCleanup {
+    param([string]$InstallDirectory, [string]$StartMenuLink, [string]$DesktopLink,
+          [ValidateRange(0, 120000)][int]$TimeoutMs = 30000,
+          [scriptblock]$Wait = { param([int]$Milliseconds) Start-Sleep -Milliseconds $Milliseconds })
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    $state = Read-InstallerCleanupState $InstallDirectory $StartMenuLink $DesktopLink
+    while (-not $state.completed -and $timer.ElapsedMilliseconds -lt $TimeoutMs) {
+        & $Wait ([int][Math]::Max(1, [Math]::Min(200, $TimeoutMs - $timer.ElapsedMilliseconds)))
+        $state = Read-InstallerCleanupState $InstallDirectory $StartMenuLink $DesktopLink
+    }
+    $state.elapsedMs = $timer.ElapsedMilliseconds
+    return $state
+}
+
+function Invoke-InstallerCleanupTests {
+    param([string]$TemporaryDirectory)
+    $installDirectory = Join-Path $TemporaryDirectory 'App'
+    $startMenuLink = Join-Path $TemporaryDirectory 'StartMenu.lnk'
+    $desktopLink = Join-Path $TemporaryDirectory 'Desktop.lnk'
+    $paths = @($installDirectory, $startMenuLink, $desktopLink)
+    $fields = @('applicationFilesPresent', 'startMenuShortcutPresent', 'desktopShortcutPresent')
+    $unexpectedWait = { param([int]$Milliseconds) throw 'Completed cleanup waited unnecessarily.' }
+    $state = Wait-InstallerCleanup $installDirectory $startMenuLink $desktopLink -Wait $unexpectedWait
+    if (-not $state.completed) { throw 'Empty cleanup fixture failed.' }
+
+    for ($index = 0; $index -lt $paths.Count; $index++) {
+        $remainingPath = $paths[$index]
+        if ($index -eq 0) {
+            New-Item -ItemType Directory -Path $remainingPath | Out-Null
+            # Tro.exe is already gone but other application files remain.
+            [System.IO.File]::WriteAllText((Join-Path $remainingPath 'Remaining.dll'), 'fixture')
+        } else {
+            [System.IO.File]::WriteAllText($remainingPath, 'fixture')
+        }
+        $state = Wait-InstallerCleanup $installDirectory $startMenuLink $desktopLink -TimeoutMs 0
+        if ($state.completed -or -not $state[$fields[$index]]) {
+            throw 'Persistent cleanup fixture was accepted or misreported.'
+        }
+        $waitState = @{ calls = 0 }
+        $removeRemainingPath = {
+            param([int]$Milliseconds)
+            $waitState.calls++
+            Remove-Item -LiteralPath $remainingPath -Recurse -Force
+        }
+        $state = Wait-InstallerCleanup $installDirectory $startMenuLink $desktopLink -Wait $removeRemainingPath
+        if (-not $state.completed -or $waitState.calls -ne 1) {
+            throw 'Delayed cleanup fixture failed.'
+        }
+    }
+    Write-Output 'Windows installer cleanup fixtures passed.'
+}
+
 if ($Mode -eq 'Test') {
     $temporaryRoot = [System.IO.Path]::GetTempPath()
     $temporaryDirectory = Join-Path $temporaryRoot ('TroInstallerTest-' + [guid]::NewGuid())
@@ -75,6 +142,7 @@ if ($Mode -eq 'Test') {
             if (-not $rejected) { throw 'Existing Tro registration was accepted.' }
         }
         Write-Output 'Windows installer registration fixtures passed.'
+        Invoke-InstallerCleanupTests $temporaryDirectory
         $target = Join-Path $temporaryDirectory 'Tro.exe'
         $link = Join-Path $temporaryDirectory 'Tro.lnk'
         [System.IO.File]::WriteAllBytes($target, [byte[]]@(0x4d, 0x5a))
@@ -161,13 +229,10 @@ try {
         Assert-TemporaryInstallPath $uninstaller $env:RUNNER_TEMP
         try {
             Invoke-InstallerProcess $uninstaller @('/S')
-            # NSIS can hand cleanup to a temporary copy of the uninstaller.
-            $deadline = [DateTime]::UtcNow.AddSeconds(30)
-            while ((Test-Path -LiteralPath (Join-Path $installDirectory 'Tro.exe')) -and [DateTime]::UtcNow -lt $deadline) {
-                Start-Sleep -Milliseconds 200
-            }
-            if ((Test-Path -LiteralPath (Join-Path $installDirectory 'Tro.exe')) -or
-                (Test-Path -LiteralPath $startMenuLink) -or (Test-Path -LiteralPath $desktopLink)) {
+            $cleanup = Wait-InstallerCleanup $installDirectory $startMenuLink $desktopLink
+            $cleanup.event = 'release.installer.cleanup'
+            Write-Output ($cleanup | ConvertTo-Json -Compress)
+            if (-not $cleanup.completed) {
                 throw 'Installer probe uninstallation left application files or shortcuts.'
             }
         } catch {

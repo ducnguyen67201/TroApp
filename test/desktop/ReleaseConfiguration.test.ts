@@ -50,7 +50,6 @@ describe('macOS release credential boundaries', () => {
   it('uses the main-only release environment with secrets confined to credential setup', () => {
     expect(workflow).toContain('    environment: release\n');
     expect(workflow).toContain("    if: github.ref == 'refs/heads/main'");
-    expect(workflow).toContain('    needs: validate');
     for (const name of [
       'CSC_LINK',
       'CSC_KEY_PASSWORD',
@@ -88,6 +87,79 @@ describe('macOS release credential boundaries', () => {
     expect(workflow).toContain('security delete-keychain');
     expect(workflow).not.toContain('contents: write');
   });
+});
+
+describe('shared desktop release validation', () => {
+  const desktopWorkflow = readFileSync(
+    new URL('../../.github/workflows/DesktopRelease.yml', import.meta.url),
+    'utf8',
+  );
+  const validation =
+    desktopWorkflow.split('\n  validate:\n').at(1)?.split('\n  windows:').at(0) ?? '';
+
+  it('validates the reserved source and version once before either platform can sign', () => {
+    expect(validation).toContain('    needs: prepare\n');
+    expect(validation).toContain('ref: ${{ needs.prepare.outputs.commit }}');
+    expect(validation).toContain(
+      'TRO_DESKTOP_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}',
+    );
+    expect(validation).toContain('scripts/ApplyDesktopReleaseVersion.ts');
+    expect(validation).not.toContain('secrets.');
+    expect(validation).not.toContain('contents: write');
+    for (const platform of ['windows', 'macos']) {
+      expect(desktopWorkflow).toContain(`  ${platform}:\n    needs: [prepare, validate]\n`);
+    }
+    for (const command of [
+      'pnpm lint',
+      'pnpm format:check',
+      'pnpm typecheck',
+      'pnpm test',
+      'pnpm build',
+      'pnpm test:integration',
+    ]) {
+      expect(validation).toContain(`run: ${command}\n`);
+      expect(desktopWorkflow.split(`run: ${command}\n`)).toHaveLength(2);
+    }
+  });
+
+  it.each([
+    { filename: 'MacRelease.yml', toolchain: '1.95.0', runner: '${{ matrix.runner }}' },
+    { filename: 'WindowsRelease.yml', toolchain: '1.97.1', runner: 'windows-2022' },
+  ])(
+    'caches unsigned native compilation separately for $filename',
+    ({ filename, toolchain, runner }) => {
+      const workflow = readFileSync(
+        new URL(`../../.github/workflows/${filename}`, import.meta.url),
+        'utf8',
+      );
+      expect(workflow).not.toContain('  validate:\n');
+      expect(workflow).not.toContain('run: pnpm typecheck');
+      expect(workflow).not.toContain('run: pnpm test\n');
+      expect(workflow).toContain("    if: github.ref == 'refs/heads/main'");
+      const cache =
+        workflow
+          .split('      - name: Restore native build cache\n')
+          .at(1)
+          ?.split('      - name:')
+          .at(0) ?? '';
+      expect(cache).toContain('~/.cargo/registry');
+      expect(cache).toContain('~/.cargo/git');
+      expect(cache).toContain('~/.cache/tro/cua-companion-build');
+      expect(cache).toContain(`\${{ runner.os }}-\${{ runner.arch }}-${runner}-rust-${toolchain}-`);
+      for (const input of [
+        'driver-patches/CursorCompanion.patch',
+        'src/contracts/CuaCompanionBuild.ts',
+        'scripts/BuildCuaCompanion.ts',
+      ]) {
+        expect(cache).toContain(input);
+      }
+      expect(cache).not.toContain('~/.cache/tro/cua-companion\n');
+      expect(cache).not.toContain('release/');
+      expect(cache).not.toContain('keychain');
+      expect(workflow).toMatch(/^\s+(?:run: )?pnpm build:cua$/m);
+      expect(workflow).toContain('pnpm package:desktop');
+    },
+  );
 });
 
 describe('shared desktop release publication boundaries', () => {
