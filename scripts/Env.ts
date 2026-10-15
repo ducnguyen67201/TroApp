@@ -3,6 +3,48 @@ import { createEnv } from '@t3-oss/env-core';
 import { loadEnv } from 'vite';
 import { AppUpdateUrlSchema } from '../src/contracts/AppUpdate.js';
 import { z } from 'zod';
+import { DesktopReleaseVersionSchema } from './ReleaseVersion.js';
+
+/** Only the main-branch GitHub release job may prepare a persisted version. */
+export function readReleasePreparationEnv(environment: NodeJS.ProcessEnv): {
+  sourceCommit: string;
+  runId: string;
+  outputPath: string;
+} {
+  const validated = createEnv({
+    server: {
+      GITHUB_ACTIONS: z.literal('true'),
+      GITHUB_REF: z.literal('refs/heads/main'),
+      GITHUB_SHA: z.string().regex(/^[a-f0-9]{40}$/),
+      GITHUB_RUN_ID: z.string().regex(/^[1-9]\d{0,19}$/),
+      GITHUB_OUTPUT: z.string().min(1).refine(isAbsolute),
+    },
+    runtimeEnv: environment,
+    onValidationError: () => {
+      throw new Error('Desktop release preparation configuration is invalid.');
+    },
+  });
+  return {
+    sourceCommit: validated.GITHUB_SHA,
+    runId: validated.GITHUB_RUN_ID,
+    outputPath: validated.GITHUB_OUTPUT,
+  };
+}
+
+/** A reserved release version is applied by the explicit CI build step. */
+export function readReleaseBuildEnv(environment: NodeJS.ProcessEnv): { version: string } {
+  const validated = createEnv({
+    server: {
+      GITHUB_ACTIONS: z.literal('true'),
+      TRO_DESKTOP_RELEASE_VERSION: DesktopReleaseVersionSchema,
+    },
+    runtimeEnv: environment,
+    onValidationError: () => {
+      throw new Error('Desktop release build configuration is invalid.');
+    },
+  });
+  return { version: validated.TRO_DESKTOP_RELEASE_VERSION };
+}
 
 /** Keep ps start times machine-readable without changing the launcher or service locales. */
 export function readProcessListEnv(
