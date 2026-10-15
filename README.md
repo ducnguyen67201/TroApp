@@ -889,6 +889,7 @@ presence does not mean a signed Mac release has passed hardware acceptance.
 | `MACOS_SIGNING_IDENTITY_SHA1` | Variable: exact 40-hex certificate fingerprint                |
 | `APPLE_TEAM_ID`               | Variable: expected 10-character Apple Team ID                 |
 | `MAIN_VITE_API_BASE_URL`      | Variable: production public HTTPS API URL                     |
+| `MAIN_VITE_UPDATE_FEED_URL`   | Variable: shared public HTTPS update feed; required           |
 
 Enter both passwords directly into the corresponding GitHub environment secret
 fields. Do not send passwords in chat, put them in source, or place them in
@@ -925,11 +926,12 @@ final hashes, app archive hash, native minimum OS versions, expected team, and
 Apple DMG submission ID. Its `preSigningCompanion` section records the input
 provenance verified before Developer ID signing changes the native executable.
 
-The first Mac release deliberately disables installed update feeds. Release mode
-rejects a nonempty `MAIN_VITE_UPDATE_FEED_URL` or staged update publishing config,
-because stapling the DMG changes its bytes after builder metadata generation.
-Future update support must generate hashes after final stapling and validate both
-architecture feeds; do not enable updates by setting a variable alone.
+Signed Mac builds embed the stable GitHub feed configured in
+[MacRelease.yml](.github/workflows/MacRelease.yml). Builder's `latest-mac.yml`
+contains hashes from before final DMG stapling and is never published directly.
+The final publisher regenerates one manifest covering both architectures from
+the final verified ZIP/DMG bytes. Unknown metadata and stale archives still fail
+distribution verification.
 
 On a Mac with the same validated release settings, the owning verification entry
 points are:
@@ -1043,26 +1045,77 @@ commit. Each target selects its newest uploaded attempt independently, so **Re-r
 failed jobs** can reuse earlier successful targets without rebuilding them. The
 publisher checks exact filenames and final installer hashes against the signature
 inventories, creates a new draft at the source commit, uploads all three targets,
-and compares GitHub's uploaded asset names, sizes and SHA-256 digests with the local
-files before publishing. It includes DMGs, ZIPs, the Windows installer/blockmap,
-signature inventories and any verified Windows update metadata. It never rebuilds,
+and resolves the draft's numeric release ID before comparing GitHub's uploaded
+asset names, sizes and SHA-256 digests with the local files. GitHub's REST lookup
+by tag only returns published releases. It includes DMGs, ZIPs, the Windows
+installer/blockmap, signature inventories and regenerated update manifests. It never rebuilds,
 re-signs or overwrites an existing asset. A failure before publication keeps the
 previous public downloads available and leaves any incomplete release as a draft.
+
+Both signed platform workflows read `MAIN_VITE_UPDATE_FEED_URL` from the GitHub
+`release` environment. Configure it as the repository's public Latest download
+feed; missing or invalid feeds fail signed builds rather than disabling updates.
+For production builds through Doppler, store the same public value in
+`tro-local/prd`. A Railway API runtime variable cannot change this build-time
+desktop setting. To configure Actions:
+
+```sh
+gh variable set MAIN_VITE_UPDATE_FEED_URL --repo ducnguyen67201/TroApp --env release --body 'https://github.com/ducnguyen67201/TroApp/releases/latest/download'
+```
+
+The final publisher marks a release Latest only after all installers and manifests
+pass uploaded-asset verification. `latest.yml` describes the signed Windows
+installer; `latest-mac.yml` includes Apple Silicon and Intel ZIP/DMG files. These
+manifests use final byte counts and SHA-512 checksums, with installer URLs pinned
+to the exact release tag. Builder metadata is replaced rather than trusted after
+signing/stapling. Feed generation is deterministic so resume checks identical bytes.
+
+Installed apps check at startup and every four hours. A newer version shows the
+existing update action on the welcome screen or signed-in sidebar. Download and
+restart require user actions, and restart waits until active work has stopped.
+The updater uses full downloads, verifies checksums and retains native signature
+verification; it rejects downgrades and prereleases. No GitHub credential ships in
+the app. Development and local builds without a feed keep updates disabled.
+
+Installations built before feed enablement, including 0.1.5, need one manual
+installation of a new signed build. Publishing metadata cannot enable an updater
+inside an already installed build that has no feed. Later releases can then be
+discovered in-app. Test older-to-newer signed installs on Mac (both architectures)
+and Windows before relying on unattended distribution; offline tests do not
+exercise native installation or Gatekeeper/Authenticode on user machines.
 
 Publication tags use `release-v<version>-<short-commit>-<run-id>-<attempt>`, separate
 from the immutable `desktop-v*` version reservations. Reruns therefore preserve
 published releases and incomplete drafts. `release.publish.stage` identifies the
 last operation without raw command output or credentials;
+`release.publish.command.failed` identifies the command/operation and numeric exit
+code, and `release.publish.upload.rejected` distinguishes invalid metadata from
+asset-count/hash mismatches without logging remote content.
 `release.publish.completed` records the public release URL. After an interrupted
 publish, inspect that attempt's draft/release before retrying. New workflow runs
 reserve a new app version; retries within a run retain its reserved version.
+
+To recover a fully uploaded draft, use the publisher with `--resume` in the original
+run/attempt context and with that run's downloaded `verified-release` directory
+and reserved package version:
+
+```sh
+pnpm exec tsx scripts/PublishDesktopRelease.ts --directory verified-release --resume
+```
+
+Resume skips draft creation and uploads, checks the complete local signature
+inventories and remote hashes again, then publishes the same draft. A missing,
+incomplete, changed, already published or wrong-commit release is rejected.
+Rerunning a GitHub job uses the original run's checked-out source; a local publisher
+fix is not picked up by **Re-run failed jobs**. Do not dispatch a new build to
+recover already verified installers.
 
 The marketing website reads TroApp's published GitHub Releases and caches its
 selection for five minutes. Each platform selects its newest published stable
 installer independently, falling back to a preview only if no stable installer
 exists. No webhook, website commit or redeployment is needed. GitHub/API failures
 can delay refresh while the website retains its previous cached selection. This
-flow updates website downloads, not installed-app update feeds.
+website selection is independent of the installed app's Latest update feed.
 
 ### Windows release from GitHub Actions
 
@@ -1072,7 +1125,7 @@ validates the project once without cloud credentials, then Windows uses the GitH
 environment `release` and Azure OIDC to sign during packaging.
 It retains verified build artifacts for 14 days; the final Desktop Release job
 publishes them alongside the Mac installers once every platform succeeds. It does
-not deploy the API or provision an installed-app update feed. No separate release
+not deploy the API; the final publisher updates the shared public feed. No separate release
 branch or client secret is needed.
 
 Before the first run, restrict the repository's `release` environment deployment
@@ -1099,9 +1152,11 @@ or Azure tokens in a `MAIN_VITE_*` variable.
 | `AZURE_CERTIFICATE_PROFILE` | Active Public Trust profile name                         |
 | `AZURE_SIGNING_PUBLISHER`   | Exact certificate common name (CN), including name order |
 | `MAIN_VITE_API_BASE_URL`    | Public production HTTPS API URL; required, no localhost  |
-| `MAIN_VITE_UPDATE_FEED_URL` | Optional public HTTPS generic update feed                |
+| `MAIN_VITE_UPDATE_FEED_URL` | Shared public HTTPS update feed; required                |
 
-The workflow supplies `MAIN_VITE_APP_ENV=prod` and `TRO_SIGN_WINDOWS=true`. Ordinary
+The workflow supplies `MAIN_VITE_APP_ENV=prod` and `TRO_SIGN_WINDOWS=true`, and reads
+the update feed from the `release` environment in
+[WindowsRelease.yml](.github/workflows/WindowsRelease.yml). Ordinary
 local packaging keeps signing optional. Release builds use the shared reserved
 version applied to `package.json`; local packaging uses the current checkout's baseline.
 Azure signing settings stay in the packaging process and are not copied into app
@@ -1113,7 +1168,8 @@ After the workflow is merged into `main`, open Actions → Desktop Release → R
 workflow → main. Download the successful run's
 `Tro-<version>-windows-x64-<sha>-<run-id>-<attempt>` artifact. It
 contains `Tro-<version>-windows-x64-setup.exe`, its blockmap, a signature inventory,
-and update metadata when a feed is configured. Signing failures or invalid
+and builder update metadata. The publisher regenerates the public manifest with
+the verified installer hash and a release-pinned URL. Signing failures or invalid
 signatures prevent upload. The verifier checks all loose Windows PE executables,
 DLLs and native addons, preserving valid vendor signatures where the builder has
 not already signed them. The main app and installer must match the configured

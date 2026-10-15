@@ -203,7 +203,7 @@ export function readWindowsSigningEnv(
       AZURE_SIGNING_PUBLISHER: z.string().trim().min(1).max(256),
       MAIN_VITE_API_BASE_URL: AppUpdateUrlSchema,
       MAIN_VITE_APP_ENV: z.literal('prod'),
-      MAIN_VITE_UPDATE_FEED_URL: AppUpdateUrlSchema.optional(),
+      MAIN_VITE_UPDATE_FEED_URL: AppUpdateUrlSchema,
     },
     runtimeEnv: environment,
     emptyStringAsUndefined: true,
@@ -294,7 +294,6 @@ export function readMacSigningEnv(
     platform !== 'darwin' ||
     (architecture !== 'arm64' && architecture !== 'x64') ||
     environment['TRO_SIGN_WINDOWS'] === 'true' ||
-    environment['MAIN_VITE_UPDATE_FEED_URL']?.trim() ||
     ['APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'CSC_LINK', 'CSC_NAME'].some((name) =>
       Boolean(environment[name]),
     )
@@ -320,6 +319,7 @@ export function readMacSigningEnv(
         .optional(),
       MAIN_VITE_API_BASE_URL: AppUpdateUrlSchema,
       MAIN_VITE_APP_ENV: z.literal('prod'),
+      MAIN_VITE_UPDATE_FEED_URL: AppUpdateUrlSchema,
     },
     runtimeEnv: environment,
     emptyStringAsUndefined: true,

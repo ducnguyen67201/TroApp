@@ -286,7 +286,7 @@ describe('Mac distribution verification', () => {
     }
   });
 
-  it('selects exact version/architecture and rejects stale files or feed metadata', () => {
+  it('selects exact version/architecture and rejects stale files or unknown feed metadata', () => {
     expect(selectMacArtifacts(artifactNames, '0.1.1', 'arm64')).toEqual({
       dmg: artifactNames[0],
       zip: artifactNames[1],
@@ -295,7 +295,7 @@ describe('Mac distribution verification', () => {
       [],
       artifactNames.slice(0, 1),
       [...artifactNames, 'old.dmg'],
-      [...artifactNames, 'latest-mac.yml'],
+      [...artifactNames, 'unknown-mac.yml'],
     ]) {
       expect(() => selectMacArtifacts(names, '0.1.1', 'arm64')).toThrow('artifacts');
     }
@@ -317,6 +317,7 @@ describe('Mac distribution verification', () => {
             `${zip}.blockmap`,
             'builder-debug.yml',
             'builder-effective-config.yaml',
+            'latest-mac.yml',
           ],
           '0.1.1',
           architecture,
@@ -326,7 +327,6 @@ describe('Mac distribution verification', () => {
   );
 
   it.each([
-    'latest-mac.yml',
     'beta-mac.yml',
     'unknown.yaml',
     'Builder-debug.yml',
@@ -362,6 +362,7 @@ describe('Mac distribution verification', () => {
 
   it('verifies extracted app and mounted app, then hashes final stapled bytes', async () => {
     const directory = await createRelease();
+    await writeFile(join(directory, 'latest-mac.yml'), 'stale builder hashes before stapling');
     const run = vi.fn<MacCommand>(archiveCommand);
     await verifyMacRelease(directory, macSettings, '0.1.1', run, async (path) => {
       await writeFile(path, 'stapled-final-dmg');

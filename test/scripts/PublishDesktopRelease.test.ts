@@ -1,10 +1,21 @@
 import { createHash } from 'node:crypto';
 import { cp, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
+import { MacUpdater } from 'electron-updater/out/MacUpdater.js';
+import {
+  findFile,
+  parseUpdateInfo,
+  resolveFiles,
+} from 'electron-updater/out/providers/Provider.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import { readReleasePublishingEnv } from '../../scripts/Env.js';
-import { publishDesktopRelease, type ReleaseCommand } from '../../scripts/PublishDesktopRelease.js';
+import {
+  publishDesktopRelease,
+  type ReleaseCommand,
+  type ReleasePublishOptions,
+} from '../../scripts/PublishDesktopRelease.js';
 
 const environment = {
   GITHUB_ACTIONS: 'true',
@@ -17,7 +28,15 @@ const environment = {
 };
 const temporary: string[] = [];
 
+/** Exercise the updater's protected architecture selection without constructing native Electron. */
+class FixtureMacUpdater extends MacUpdater {
+  static selectZipForArchitecture(files: ReturnType<typeof resolveFiles>, isArm64: boolean) {
+    return findFile(this.filterFilesForArch(files, isArm64), 'zip', ['dmg']);
+  }
+}
+
 afterEach(async () => {
+  vi.restoreAllMocks();
   await Promise.all(temporary.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
@@ -86,40 +105,79 @@ async function createFixture() {
         },
       ]),
   );
+  const uploadedManifests = new Map<string, Buffer>();
   const readUploadedRelease = async () => ({
     draft: true,
+    prerelease: false,
     tag_name: 'release-v0.1.1-aaaaaaaaaaaa-12345-1',
     target_commitish: environment.GITHUB_SHA,
     assets: (
       await Promise.all(
         Object.values(directories).map(async (path) =>
           Promise.all(
-            (await readdir(path)).map(async (name) => {
-              const bytes = await readFile(join(path, name));
-              return {
-                name,
-                size: bytes.length,
-                digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
-                state: 'uploaded',
-              };
-            }),
+            (await readdir(path))
+              .filter((name) => name !== 'latest.yml')
+              .map(async (name) => {
+                const bytes = await readFile(join(path, name));
+                return {
+                  name,
+                  size: bytes.length,
+                  digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
+                  state: 'uploaded',
+                };
+              }),
           ),
         ),
       )
-    ).flat(),
+    )
+      .flat()
+      .concat(
+        [...uploadedManifests].map(([name, bytes]) => ({
+          name,
+          size: bytes.length,
+          digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
+          state: 'uploaded',
+        })),
+      ),
   });
+  let releaseTag = 'release-v0.1.1-aaaaaaaaaaaa-12345-1';
   const run = vi.fn<ReleaseCommand>(async (arguments_) => {
+    if (arguments_[0] === 'release' && arguments_[1] === 'upload') {
+      for (const path of arguments_.slice(5)) {
+        if (path.endsWith('.yml')) {
+          uploadedManifests.set(basename(path), await readFile(path));
+        }
+      }
+    }
+    if (arguments_[0] === 'release' && arguments_[1] === 'view') {
+      releaseTag = z.string().parse(arguments_[2]);
+      return JSON.stringify({ databaseId: 98765 });
+    }
     if (arguments_[0] !== 'api') {
       return '';
     }
+    // Drafts cannot be fetched through the REST tag endpoint, even with write access.
+    if (arguments_[1] !== 'repos/ducnguyen67201/TroApp/releases/98765') {
+      throw new Error('Draft release lookup requires its numeric ID.');
+    }
     return JSON.stringify({
       ...(await readUploadedRelease()),
-      tag_name: arguments_[1]?.split('/').at(-1),
+      tag_name: releaseTag,
     });
   });
-  const publish = (settings: NodeJS.ProcessEnv = environment) =>
-    publishDesktopRelease(directory, packagePath, settings, run);
-  return { directory, directories, packagePath, run, publish, readUploadedRelease };
+  const publish = (
+    settings: NodeJS.ProcessEnv = environment,
+    options: ReleasePublishOptions = {},
+  ) => publishDesktopRelease(directory, packagePath, settings, run, options);
+  return {
+    directory,
+    directories,
+    packagePath,
+    run,
+    publish,
+    readUploadedRelease,
+    uploadedManifests,
+  };
 }
 
 describe('desktop release publication', () => {
@@ -131,7 +189,8 @@ describe('desktop release publication', () => {
     expect(run.mock.calls.map(([arguments_]) => arguments_.slice(0, 2))).toEqual([
       ['release', 'create'],
       ['release', 'upload'],
-      ['api', expect.any(String)],
+      ['release', 'view'],
+      ['api', 'repos/ducnguyen67201/TroApp/releases/98765'],
       ['release', 'edit'],
     ]);
     expect(run.mock.calls[0]?.[0]).toEqual(
@@ -145,17 +204,125 @@ describe('desktop release publication', () => {
       ]),
     );
     expect(run.mock.calls.at(-1)?.[0]).toContain('--draft=false');
+    expect(run.mock.calls.at(-1)?.[0]).toContain('--latest=true');
     expect(run.mock.calls.flat(2)).not.toContain('--clobber');
     // Publication tags cannot enter the version allocator's reserved desktop-v* namespace.
     expect(run.mock.calls[0]?.[0][2]).not.toMatch(/^desktop-v/);
   });
 
-  it('publishes optional Windows update metadata without changing it', async () => {
-    const { publish, directories, run } = await createFixture();
+  it('resumes a fully uploaded draft after verifying the original local files', async () => {
+    const { publish, run } = await createFixture();
+    await publish();
+    run.mockClear();
+    await publish(environment, { resume: true });
+    expect(run.mock.calls.map(([arguments_]) => arguments_.slice(0, 2))).toEqual([
+      ['release', 'view'],
+      ['api', 'repos/ducnguyen67201/TroApp/releases/98765'],
+      ['release', 'edit'],
+    ]);
+    expect(run.mock.calls[0]?.[0][2]).toBe('release-v0.1.1-aaaaaaaaaaaa-12345-1');
+    expect(run.mock.calls.at(-1)?.[0]).toContain('--draft=false');
+  });
+
+  it.each(['missing', 'invalid-id', 'incomplete', 'changed', 'commit', 'published'])(
+    'refuses to resume an unsafe draft: %s',
+    async (mode) => {
+      const { publish, run, readUploadedRelease } = await createFixture();
+      await publish();
+      run.mockClear();
+      const uploaded = await readUploadedRelease();
+      const asset = uploaded.assets[0];
+      if (!asset) {
+        throw new Error('Missing fixture asset');
+      }
+      const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      if (mode === 'missing') {
+        run.mockRejectedValueOnce(new Error('Draft not found'));
+      } else if (mode === 'invalid-id') {
+        run.mockResolvedValueOnce(JSON.stringify({ databaseId: '../tags/untrusted' }));
+      } else {
+        if (mode === 'incomplete') {
+          uploaded.assets.pop();
+        } else if (mode === 'changed') {
+          asset.digest = `sha256:${'b'.repeat(64)}`;
+        } else if (mode === 'commit') {
+          uploaded.target_commitish = 'b'.repeat(40);
+        } else {
+          uploaded.draft = false;
+        }
+        run
+          .mockResolvedValueOnce(JSON.stringify({ databaseId: 98765 }))
+          .mockResolvedValueOnce(JSON.stringify(uploaded));
+      }
+      await expect(publish(environment, { resume: true })).rejects.toThrow();
+      expect(
+        run.mock.calls.every(([arguments_]) => arguments_[0] === 'api' || arguments_[1] === 'view'),
+      ).toBe(true);
+      if (['incomplete', 'changed', 'commit', 'published'].includes(mode)) {
+        expect(diagnostic).toHaveBeenCalledWith(
+          expect.stringContaining('release.publish.upload.rejected'),
+        );
+      }
+    },
+  );
+
+  it('replaces builder metadata with a feed for the final signed installer', async () => {
+    const { publish, directories, run, uploadedManifests } = await createFixture();
     const path = join(directories.windows, 'latest.yml');
     await writeFile(path, 'verified metadata');
     await publish();
-    expect(run.mock.calls[1]?.[0]).toContain(path);
+    expect(run.mock.calls[1]?.[0]).not.toContain(path);
+    expect(uploadedManifests.get('latest.yml')?.toString()).not.toContain('verified metadata');
+  });
+
+  it('publishes feeds understood by the installed updater for both Mac architectures and Windows', async () => {
+    const { publish, uploadedManifests, directories, run } = await createFixture();
+    await publish();
+    const feedUrl = new URL('https://github.com/ducnguyen67201/TroApp/releases/latest/download/');
+    const releaseUrl =
+      'https://github.com/ducnguyen67201/TroApp/releases/download/release-v0.1.1-aaaaaaaaaaaa-12345-1/';
+    expect([...uploadedManifests.keys()].sort()).toEqual(['latest-mac.yml', 'latest.yml']);
+    for (const name of ['latest-mac.yml', 'latest.yml']) {
+      const content = uploadedManifests.get(name);
+      if (!content) {
+        throw new Error('Missing update manifest');
+      }
+      const metadata = parseUpdateInfo(content.toString(), name, new URL(name, feedUrl));
+      expect(metadata.version).toBe('0.1.1');
+      const files = resolveFiles(metadata, feedUrl);
+      expect(files).toHaveLength(name === 'latest-mac.yml' ? 4 : 1);
+      for (const file of files) {
+        expect(file.url.href.startsWith(releaseUrl)).toBe(true);
+        const artifactName = basename(file.url.pathname);
+        const directory = file.url.pathname.includes('macos-arm64')
+          ? directories.macosApple
+          : file.url.pathname.includes('macos-x64')
+            ? directories.macosIntel
+            : directories.windows;
+        const bytes = await readFile(join(directory, artifactName));
+        expect(file.info.sha512).toBe(createHash('sha512').update(bytes).digest('base64'));
+        expect(file.info.size).toBe(bytes.length);
+      }
+      if (name === 'latest-mac.yml') {
+        for (const [isArm64, architecture] of [
+          [true, 'arm64'],
+          [false, 'x64'],
+        ] as const) {
+          const selected = FixtureMacUpdater.selectZipForArchitecture(files, isArm64);
+          expect(selected?.url.href).toBe(`${releaseUrl}Tro-0.1.1-macos-${architecture}.zip`);
+        }
+      } else {
+        expect(findFile(files, 'exe')?.url.href).toBe(
+          `${releaseUrl}Tro-0.1.1-windows-x64-setup.exe`,
+        );
+      }
+    }
+    // Transient manifest files are removed after publication; resume regenerates identical bytes.
+    const paths = run.mock.calls[1]?.[0].filter((argument) => argument.endsWith('.yml')) ?? [];
+    expect(paths).toHaveLength(2);
+    for (const path of paths) {
+      await expect(readFile(path)).rejects.toThrow();
+    }
   });
 
   it('uses unique publication tags across attempts without rebuilding successful targets', async () => {
@@ -251,7 +418,7 @@ describe('desktop release publication', () => {
     expect(run).not.toHaveBeenCalled();
   });
 
-  it.each(['create', 'upload', 'api'])(
+  it.each(['create', 'upload', 'view', 'api'])(
     'never publishes when the %s command fails',
     async (stage) => {
       const { publish, run } = await createFixture();
@@ -272,38 +439,54 @@ describe('desktop release publication', () => {
     },
   );
 
-  it.each(['digest', 'size', 'missing', 'duplicate', 'commit', 'draft', 'malformed'])(
-    'leaves the release unpublished when remote metadata differs: %s',
-    async (mode) => {
-      const { publish, run, readUploadedRelease } = await createFixture();
-      const uploaded = await readUploadedRelease();
-      const asset = uploaded.assets[0];
-      if (!asset) {
-        throw new Error('Missing fixture asset');
+  it.each([
+    'digest',
+    'manifest-digest',
+    'size',
+    'missing',
+    'duplicate',
+    'commit',
+    'draft',
+    'prerelease',
+    'malformed',
+  ])('leaves the release unpublished when remote metadata differs: %s', async (mode) => {
+    const { publish, run, readUploadedRelease } = await createFixture();
+    await publish();
+    run.mockClear();
+    const uploaded = await readUploadedRelease();
+    const asset = uploaded.assets[0];
+    if (!asset) {
+      throw new Error('Missing fixture asset');
+    }
+    if (mode === 'digest') {
+      asset.digest = `sha256:${'b'.repeat(64)}`;
+    } else if (mode === 'manifest-digest') {
+      const manifest = uploaded.assets.find((candidate) => candidate.name === 'latest-mac.yml');
+      if (!manifest) {
+        throw new Error('Missing fixture manifest');
       }
-      if (mode === 'digest') {
-        asset.digest = `sha256:${'b'.repeat(64)}`;
-      } else if (mode === 'size') {
-        asset.size += 1;
-      } else if (mode === 'missing') {
-        uploaded.assets.pop();
-      } else if (mode === 'duplicate') {
-        uploaded.assets[1] = asset;
-      } else if (mode === 'commit') {
-        uploaded.target_commitish = 'b'.repeat(40);
-      } else if (mode === 'draft') {
-        uploaded.draft = false;
-      }
-      run
-        .mockResolvedValueOnce('')
-        .mockResolvedValueOnce('')
-        .mockResolvedValueOnce(JSON.stringify(mode === 'malformed' ? {} : uploaded));
-      await expect(publish()).rejects.toThrow();
-      expect(run.mock.calls.some(([arguments_]) => arguments_.includes('--draft=false'))).toBe(
-        false,
-      );
-    },
-  );
+      manifest.digest = `sha256:${'b'.repeat(64)}`;
+    } else if (mode === 'size') {
+      asset.size += 1;
+    } else if (mode === 'missing') {
+      uploaded.assets.pop();
+    } else if (mode === 'duplicate') {
+      uploaded.assets[1] = asset;
+    } else if (mode === 'commit') {
+      uploaded.target_commitish = 'b'.repeat(40);
+    } else if (mode === 'draft') {
+      uploaded.draft = false;
+    } else if (mode === 'prerelease') {
+      uploaded.prerelease = true;
+    }
+    run
+      .mockResolvedValueOnce('')
+      .mockResolvedValueOnce('')
+      .mockResolvedValueOnce(JSON.stringify({ databaseId: 98765 }))
+      .mockResolvedValueOnce(JSON.stringify(mode === 'malformed' ? {} : uploaded));
+    await expect(publish()).rejects.toThrow();
+    expect(run.mock.calls.some(([arguments_]) => arguments_.includes('--draft=false'))).toBe(false);
+  });
 
   it('never exposes environment inputs in validation failures', () => {
     expect(() => readReleasePublishingEnv({ ...environment, GITHUB_SHA: 'private-value' })).toThrow(

@@ -41,10 +41,6 @@ try {
   );
   const appPackage = z.looseObject({ build: z.record(z.string(), z.unknown()) }).parse(rawPackage);
 
-  if (macSettings.enabled && appPackage.build['publish'] != null) {
-    throw new Error('macOS release update feeds are not enabled for this rollout.');
-  }
-
   await writeFile(
     join(appDirectory, 'package.json'),
     JSON.stringify(

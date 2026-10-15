@@ -97,7 +97,7 @@ export async function notarizeMacDmg(
   throw new Error('macOS notarization deadline exceeded. Recheck the recorded submission ID.');
 }
 
-/** Require exact distribution files; known builder diagnostics are never release candidates. */
+/** Require exact archives. Builder feed metadata is regenerated after stapling by the publisher. */
 export function selectMacArtifacts(
   names: readonly string[],
   version: string,
@@ -110,6 +110,7 @@ export function selectMacArtifacts(
   const candidates = names.filter(
     (name) =>
       /\.(dmg|zip|yml|yaml)$/i.test(name) &&
+      name !== 'latest-mac.yml' &&
       name !== 'builder-debug.yml' &&
       name !== 'builder-effective-config.yaml',
   );

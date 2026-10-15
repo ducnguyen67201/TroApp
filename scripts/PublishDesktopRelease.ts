@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { lstat, readFile, readdir } from 'node:fs/promises';
+import { lstat, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
@@ -22,6 +23,8 @@ const FileDigestSchema = z.object({
 });
 type ReleaseFile = z.infer<typeof FileDigestSchema> & { path: string };
 export type ReleaseCommand = (arguments_: readonly string[]) => Promise<string>;
+
+export type ReleasePublishOptions = { resume?: boolean };
 const executeFile = promisify(execFile);
 
 /** Command output can include credentials or arbitrary remote diagnostics; keep failures bounded. */
@@ -29,8 +32,25 @@ const runReleaseCommand: ReleaseCommand = async (arguments_) => {
   try {
     const result = await executeFile('gh', [...arguments_], { timeout: 5 * 60 * 1000 });
     return result.stdout;
-  } catch {
-    throw new Error('GitHub release command failed. Inspect the last release.publish.stage event.');
+  } catch (error) {
+    const exitCode =
+      error instanceof Error && 'code' in error && typeof error.code === 'number'
+        ? error.code
+        : undefined;
+    console.error(
+      JSON.stringify({
+        event: 'release.publish.command.failed',
+        command: arguments_[0],
+        operation: arguments_[0] === 'release' ? arguments_[1] : undefined,
+        exitCode,
+      }),
+    );
+    throw new Error(
+      'GitHub release command failed. Inspect the last release.publish.stage event.',
+      {
+        cause: error,
+      },
+    );
   }
 };
 
@@ -181,12 +201,62 @@ async function readDesktopReleaseFiles(
   return files;
 }
 
+/** Hash final verified bytes, after macOS stapling and Windows signing. JSON is valid YAML. */
+async function writeUpdateManifests(
+  directory: string,
+  version: string,
+  downloadUrl: string,
+  files: readonly ReleaseFile[],
+): Promise<ReleaseFile[]> {
+  const manifests: ReleaseFile[] = [];
+  for (const [name, artifactNames] of [
+    [
+      'latest-mac.yml',
+      ['arm64', 'x64'].flatMap((architecture) =>
+        ['zip', 'dmg'].map((extension) => `Tro-${version}-macos-${architecture}.${extension}`),
+      ),
+    ],
+    ['latest.yml', [`Tro-${version}-windows-x64-setup.exe`]],
+  ] as const) {
+    const updates = [];
+    for (const artifactName of artifactNames) {
+      const file = files.find((candidate) => candidate.name === artifactName);
+      if (!file) {
+        throw new Error('A required update artifact is missing.');
+      }
+      const bytes = await readFile(file.path);
+      if (
+        bytes.length !== file.size ||
+        createHash('sha256').update(bytes).digest('hex') !== file.sha256
+      ) {
+        throw new Error('Update artifact changed after signature-inventory verification.');
+      }
+      updates.push({
+        url: new URL(file.name, downloadUrl).href,
+        sha512: createHash('sha512').update(bytes).digest('base64'),
+        size: file.size,
+      });
+    }
+    const bytes = Buffer.from(JSON.stringify({ version, files: updates }, null, 2) + '\n');
+    const path = join(directory, name);
+    await writeFile(path, bytes);
+    manifests.push({
+      name,
+      path,
+      size: bytes.length,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    });
+  }
+  return manifests;
+}
+
 /** Publish one complete desktop release after all three targets and remote asset hashes pass. */
 export async function publishDesktopRelease(
   directory: string,
   packagePath: string,
   environment: NodeJS.ProcessEnv,
   run: ReleaseCommand = runReleaseCommand,
+  options: ReleasePublishOptions = {},
 ): Promise<string> {
   const settings = readReleasePublishingEnv(environment);
   const { version } = z
@@ -196,81 +266,130 @@ export async function publishDesktopRelease(
     console.info(JSON.stringify({ event: 'release.publish.stage', stage: name }));
   };
   stage('verify-files');
-  const files = await readDesktopReleaseFiles(resolve(directory), version, settings);
+  // Builder's Windows manifest is checked in its job; regenerate public feeds with pinned URLs.
+  const files = (await readDesktopReleaseFiles(resolve(directory), version, settings)).filter(
+    (file) => file.name !== 'latest.yml',
+  );
   const tag = `release-v${version}-${settings.commit.slice(0, 12)}-${settings.runId}-${settings.attempt}`;
   const repositoryArguments = ['--repo', `github.com/${settings.repository}`];
-  stage('create-draft');
-  await run([
-    'release',
-    'create',
-    tag,
-    ...repositoryArguments,
-    '--draft',
-    '--target',
-    settings.commit,
-    '--latest=false',
-    '--title',
-    `Tro ${version}`,
-    '--notes',
-    `Signed macOS (Apple Silicon and Intel) and Windows x64 installers from commit ${settings.commit}.\n\nBuild: https://github.com/${settings.repository}/actions/runs/${settings.runId}/attempts/${settings.attempt}`,
-  ]);
-  stage('upload-assets');
-  await run(['release', 'upload', tag, ...repositoryArguments, ...files.map((file) => file.path)]);
-  stage('verify-upload');
-  const raw: unknown = JSON.parse(
-    await run([
-      'api',
-      `repos/${settings.repository}/releases/tags/${tag}`,
-      '--hostname',
-      'github.com',
-    ]),
-  );
-  const uploaded = z
-    .object({
-      draft: z.literal(true),
-      tag_name: z.literal(tag),
-      target_commitish: z.literal(settings.commit),
-      assets: z.array(
-        z.object({
-          name: z.string(),
-          size: z.number(),
-          digest: z.string(),
-          state: z.literal('uploaded'),
-        }),
-      ),
-    })
-    .parse(raw);
-  if (
-    uploaded.assets.length !== files.length ||
-    files.some((file) => {
-      const matches = uploaded.assets.filter((asset) => asset.name === file.name);
-      return (
-        matches.length !== 1 ||
-        matches[0]?.size !== file.size ||
-        matches[0].digest !== `sha256:${file.sha256}`
-      );
-    })
-  ) {
-    throw new Error(
-      'Uploaded release assets differ from the verified local files. Draft was not published.',
+  const metadataDirectory = await mkdtemp(join(tmpdir(), 'tro-release-updates-'));
+  try {
+    stage('prepare-update-manifests');
+    files.push(
+      ...(await writeUpdateManifests(
+        metadataDirectory,
+        version,
+        `https://github.com/${settings.repository}/releases/download/${tag}/`,
+        files,
+      )),
     );
+    if (!options.resume) {
+      stage('create-draft');
+      await run([
+        'release',
+        'create',
+        tag,
+        ...repositoryArguments,
+        '--draft',
+        '--target',
+        settings.commit,
+        '--latest=false',
+        '--title',
+        `Tro ${version}`,
+        '--notes',
+        `Signed macOS (Apple Silicon and Intel) and Windows x64 installers from commit ${settings.commit}.\n\nBuild: https://github.com/${settings.repository}/actions/runs/${settings.runId}/attempts/${settings.attempt}`,
+      ]);
+      stage('upload-assets');
+      await run([
+        'release',
+        'upload',
+        tag,
+        ...repositoryArguments,
+        ...files.map((file) => file.path),
+      ]);
+    }
+    /* GitHub's REST tag endpoint only resolves published releases; gh can resolve drafts. */
+    stage('resolve-draft');
+    const identity: unknown = JSON.parse(
+      await run(['release', 'view', tag, ...repositoryArguments, '--json', 'databaseId']),
+    );
+    const { databaseId } = z.object({ databaseId: z.number().int().positive() }).parse(identity);
+    stage('verify-upload');
+    const raw: unknown = JSON.parse(
+      await run([
+        'api',
+        `repos/${settings.repository}/releases/${String(databaseId)}`,
+        '--hostname',
+        'github.com',
+      ]),
+    );
+    const result = z
+      .object({
+        draft: z.literal(true),
+        prerelease: z.literal(false),
+        tag_name: z.literal(tag),
+        target_commitish: z.literal(settings.commit),
+        assets: z.array(
+          z.object({
+            name: z.string(),
+            size: z.number(),
+            digest: z.string(),
+            state: z.literal('uploaded'),
+          }),
+        ),
+      })
+      .safeParse(raw);
+    if (!result.success) {
+      console.error(
+        JSON.stringify({ event: 'release.publish.upload.rejected', reason: 'metadata' }),
+      );
+      throw new Error('Uploaded release metadata is invalid. Draft was not published.');
+    }
+    const uploaded = result.data;
+    if (
+      uploaded.assets.length !== files.length ||
+      files.some((file) => {
+        const matches = uploaded.assets.filter((asset) => asset.name === file.name);
+        return (
+          matches.length !== 1 ||
+          matches[0]?.size !== file.size ||
+          matches[0].digest !== `sha256:${file.sha256}`
+        );
+      })
+    ) {
+      console.error(
+        JSON.stringify({
+          event: 'release.publish.upload.rejected',
+          reason: 'assets',
+          expectedFileCount: files.length,
+          uploadedAssetCount: uploaded.assets.length,
+        }),
+      );
+      throw new Error(
+        'Uploaded release assets differ from the verified local files. Draft was not published.',
+      );
+    }
+    stage('publish');
+    await run(['release', 'edit', tag, ...repositoryArguments, '--draft=false', '--latest=true']);
+    const url = `https://github.com/${settings.repository}/releases/tag/${tag}`;
+    console.info(JSON.stringify({ event: 'release.publish.completed', tag, url }));
+    return url;
+  } finally {
+    await rm(metadataDirectory, { recursive: true, force: true });
   }
-  stage('publish');
-  await run(['release', 'edit', tag, ...repositoryArguments, '--draft=false', '--latest=false']);
-  const url = `https://github.com/${settings.repository}/releases/tag/${tag}`;
-  console.info(JSON.stringify({ event: 'release.publish.completed', tag, url }));
-  return url;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const { values } = parseArgs({
-      options: { directory: { type: 'string' } },
+      options: { directory: { type: 'string' }, resume: { type: 'boolean', default: false } },
     });
     await publishDesktopRelease(
       z.string().parse(values.directory),
       resolve('package.json'),
       process.env,
+      runReleaseCommand,
+      { resume: values.resume },
     );
   } catch {
     console.error(JSON.stringify({ event: 'release.publish.failed' }));
