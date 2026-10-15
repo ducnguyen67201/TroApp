@@ -1080,6 +1080,11 @@ details.
 
 ## Local presentation and app updates
 
+App keeps Settings open when the initial desktop-permission read reports ready;
+only recovery from a missing or unknown permission status closes it automatically.
+Organization setup and the introductory tour use distinct account-scoped React
+keys, so sign-in remounts their own surfaces without sibling identity collisions.
+
 Desktop release ownership starts in
 [DesktopRelease.yml](../.github/workflows/DesktopRelease.yml).
 [ReleaseVersion.ts](../scripts/ReleaseVersion.ts) persists one shared patch-version

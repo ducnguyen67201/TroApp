@@ -30,6 +30,11 @@ import { microphoneStorageKey } from '../../../src/desktop/renderer/voice/Microp
 import { App } from '../../../src/desktop/renderer/App.js';
 import { AnalyticsScreen } from '#contracts/Analytics.js';
 import {
+  DesktopPermissionState,
+  PermissionGrant,
+  type DesktopPermissionStatus,
+} from '#contracts/DesktopPermissions.js';
+import {
   DesktopLocale,
   localeStorageKey,
 } from '../../../src/desktop/renderer/localization/Locale.js';
@@ -195,6 +200,78 @@ describe('optional usage sharing', () => {
       trackScreenView: vi.fn<NonNullable<DesktopBridge['trackScreenView']>>().mockResolvedValue(),
     } satisfies DesktopBridge;
   }
+
+  it.each([
+    { locale: DesktopLocale.ENGLISH, settingsLabel: 'Settings', sharingLabel: 'Share app usage' },
+    {
+      locale: DesktopLocale.VIETNAMESE,
+      settingsLabel: 'Cài đặt',
+      sharingLabel: 'Chia sẻ dữ liệu sử dụng',
+    },
+  ])(
+    'keeps $settingsLabel open when the initial permission read finishes',
+    async ({ locale, settingsLabel, sharingLabel }) => {
+      window.localStorage.setItem(localeStorageKey, locale);
+      const bridge = createAnalyticsBridge();
+      let completePermissionRead: (status: DesktopPermissionStatus) => void = () => {
+        throw new Error('Permission read was not initialized.');
+      };
+      const permissionRead = new Promise<DesktopPermissionStatus>((resolve) => {
+        completePermissionRead = resolve;
+      });
+      bridge.readDesktopPermissions.mockReturnValue(permissionRead);
+      const reactErrors: string[] = [];
+      vi.spyOn(console, 'error').mockImplementation((message: unknown) => {
+        if (typeof message === 'string') {
+          reactErrors.push(message);
+        }
+      });
+      window.tro = bridge;
+      renderDesktop();
+      await screen.findByText(testUser.email);
+      fireEvent.click(screen.getByRole('button', { name: settingsLabel }));
+      expect(await screen.findByRole('switch', { name: sharingLabel })).toBeTruthy();
+      await act(async () => {
+        completePermissionRead({
+          kind: DesktopPermissionState.READY,
+          accessibility: PermissionGrant.GRANTED,
+          screenRecording: PermissionGrant.GRANTED,
+        });
+        await permissionRead;
+      });
+      expect(screen.getByRole('dialog', { name: settingsLabel })).toBeTruthy();
+      fireEvent.click(screen.getByRole('switch', { name: sharingLabel }));
+      await waitFor(() => {
+        expect(bridge.setAnalyticsEnabled).toHaveBeenCalledWith(true);
+      });
+      expect(reactErrors.some((message) => message.includes('same key'))).toBe(false);
+    },
+  );
+
+  it.each([DesktopPermissionState.NEEDS_PERMISSION, DesktopPermissionState.UNKNOWN])(
+    'still closes Settings after a verified recovery from %s',
+    async (initialKind) => {
+      const bridge = createAnalyticsBridge();
+      bridge.readDesktopPermissions.mockResolvedValueOnce({
+        kind: initialKind,
+        accessibility:
+          initialKind === DesktopPermissionState.NEEDS_PERMISSION
+            ? PermissionGrant.MISSING
+            : PermissionGrant.UNKNOWN,
+        screenRecording: PermissionGrant.GRANTED,
+      });
+      window.tro = bridge;
+      renderDesktop();
+      await screen.findByRole('heading', { name: 'Give Tro access to your desktop.' });
+      fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+      expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeTruthy();
+      fireEvent.focus(window);
+      await screen.findByRole('textbox', { name: 'Your message' });
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull();
+      });
+    },
+  );
 
   it('explains installation sharing and keeps it unavailable without a project', async () => {
     const bridge = createAnalyticsBridge(false);
