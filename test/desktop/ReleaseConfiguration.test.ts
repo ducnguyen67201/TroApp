@@ -87,6 +87,29 @@ describe('macOS release credential boundaries', () => {
     expect(workflow).toContain('security delete-keychain');
     expect(workflow).not.toContain('contents: write');
   });
+
+  it('prepares cached Electron headers before any signing credentials are installed', () => {
+    const preparation = 'run: pnpm exec tsx scripts/PrepareElectronHeaders.ts';
+    expect(workflow).toContain(preparation);
+    expect(workflow.indexOf(preparation)).toBeLessThan(
+      workflow.indexOf('      - name: Install temporary signing credentials'),
+    );
+    const cache =
+      workflow
+        .split('      - name: Restore Electron header cache\n')
+        .at(1)
+        ?.split('      - name:')
+        .at(0) ?? '';
+    expect(cache).toContain('path: ~/.electron-gyp\n');
+    expect(cache).toContain(
+      "${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}",
+    );
+    expect(cache).not.toContain('restore-keys:');
+    expect(cache).not.toContain('release/');
+    expect(cache).not.toContain('keychain');
+    const signing = readFileSync(new URL('../../scripts/MacSigning.ts', import.meta.url), 'utf8');
+    expect(signing).toContain('buildDependenciesFromSource: true');
+  });
 });
 
 describe('shared desktop release validation', () => {

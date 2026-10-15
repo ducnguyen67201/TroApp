@@ -949,6 +949,16 @@ bundle ID, entitlements, companion provenance, app version, Gatekeeper acceptanc
 and staples. It rejects native minimum OS versions above the currently advertised
 macOS 13.0; raising that minimum requires a reviewed website/docs change.
 Signed Mac builds compile native dependencies from source. Before signing, the
+workflow runs `pnpm exec tsx scripts/PrepareElectronHeaders.ts` to install the
+pinned Electron version's headers in the rebuild tool's `~/.electron-gyp` cache.
+The cache is separated by OS, architecture and lockfile. Fresh downloads retain
+node-gyp's checksum checks; incomplete installations are rolled back. Preparation
+retries allowlisted connection/DNS timeouts and resets up to three attempts before
+signing credentials are loaded. `desktop.headers.prepare` events report the version,
+architecture, attempt and safe failure code; compiler and integrity errors are not
+retried. If an existing run fails on a transient header download, use **Re-run failed
+jobs** to retain its successful platform artifacts and reserved version.
+Before signing, the
 hook's rebuilt `build/Release/uiohook_napi.node` must match the release architecture
 and support macOS 13.0. The shipped hook prebuilds require 13.5 and are removed;
 the native loader selects the rebuilt binary. Load-command inspection uses
