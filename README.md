@@ -826,14 +826,30 @@ build/package commands do not reserve or increment release versions.
 
 Desktop Release runs lint, formatting, type checking, unit tests, build and database
 integration checks once in a shared Linux job against the reserved source/version.
-Windows and both Mac packages start after that job succeeds. Native builds restore
-Cargo downloads and compilation outputs from separate caches per runner,
-architecture and Rust toolchain, with keys tracking the pinned companion contract,
-patch and build script. Cache misses rebuild normally; every run still checks the
-pinned source, applies the patch, runs native tests and builds before signing.
-Signed packages, staged companions and signing credentials are not cached.
-The first release fills these caches; later releases can reuse unchanged native
-dependencies. Apple notarization remains dependent on Apple's service latency.
+Windows and both Mac packages start after that job succeeds. Each platform first
+restores the tested native companion using an exact cache key. The key includes
+the architecture, hosted runner image, Rust toolchain, deployment target and owned
+build/validation inputs listed in [NativeCompanionCache.ts](scripts/NativeCompanionCache.ts).
+UI edits and the reserved desktop version do not invalidate it. Every file in the
+restored companion is checked against its receipt, and its pinned source, patch,
+executable checksum and architecture must match before reuse. Missing, stale or
+damaged outputs rebuild normally; cache reads never execute the restored binary.
+
+Only a native output miss restores the large Cargo compilation cache, installs
+the pinned Rust toolchain and runs the native regression suite/build. Windows also
+installs Spectre libraries only on this path. The resulting companion and its
+receipt are saved before signing, so later signing failures do not discard that
+work. A corrupt exact cache is rebuilt locally but cannot replace GitHub's immutable
+entry; delete that specific cache in Actions if repeated `invalid` events occur.
+`native.cache` events report `reused`, `missing`, `invalid` or `recorded` and elapsed
+milliseconds. Inspect **Validate native companion cache** to confirm the fast path.
+
+pnpm dependencies, Mac Electron headers, Electron downloads and packaging-tool
+archives are also cached separately. Packaging download caches include only the
+configured download/archive paths, never keychains, signed packages or app staging
+directories. Every release still builds the desktop, signs and verifies its final
+packages; Mac notarization remains dependent on Apple's service latency. The first
+release for a new native key fills the output cache; savings begin on matching runs.
 
 Re-run failed jobs in the existing Desktop Release run to retry the same version.
 A new manually dispatched run allocates the next patch version, even if the prior
@@ -1187,6 +1203,24 @@ Azure signing settings stay in the packaging process and are not copied into app
 metadata. The pinned electron-builder v26 uses `win.azureSignOptions`; its upstream
 PowerShell signing module and hosted runner image are not completely pinned by
 the pnpm lockfile.
+
+Windows build-tool installation, Rust setup and companion compilation run as separate
+steps. Only build-tool installation has an explicit step timeout; Rust setup and
+compilation can continue within GitHub Actions' default job limit.
+[InstallWindowsBuildTools.ps1](scripts/InstallWindowsBuildTools.ps1)
+skips the Visual Studio installer when the required Spectre libraries are already
+present. Otherwise it waits only for the installer process, bounds that wait and
+terminates its process tree on timeout. Successful installer exit codes still require
+a component check before compilation proceeds.
+Look for `windows.build_tools` JSON events in **Install Windows build tools**:
+`installer.started` includes the process ID and timeout; `installer.exited` includes
+elapsed milliseconds, exit code and reboot status; `installer.timed_out` and
+`installer.cleanup` identify timeout and cleanup results. `failed` identifies the
+stage that rejected preparation. These events omit environment values and raw
+installer configuration.
+Run `./scripts/InstallWindowsBuildTools.ps1 -Mode Test` in PowerShell 7 to exercise
+successful and failed child processes, timeout termination and diagnostic events
+without installing Visual Studio.
 
 After the workflow is merged into `main`, open Actions → Desktop Release → Run
 workflow → main. Download the successful run's

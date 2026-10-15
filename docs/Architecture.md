@@ -1407,7 +1407,16 @@ terminated commands still stop verification. Successful commands remain required
 before any release inventory can be uploaded. The native shortcut addon is rebuilt from source
 and checked for the selected architecture and supported macOS minimum before
 shipped prebuilds are removed and resources are signed. The pre-sign companion metadata remains input
-provenance; the external release inventory records final signed hashes. The GitHub
+provenance; the external release inventory records final signed hashes. Release
+workflows may reuse a tested companion before signing. `NativeCompanionCache.ts`
+owns the exact build-environment/input key and a receipt covering every companion
+file. Restore checks that receipt and the existing companion provenance without
+executing cached code. Invalid or missing outputs take the normal native-test/build
+path; receipts and output caches are saved only after that succeeds. Compiler-image,
+architecture, toolchain and owned build/validation changes invalidate reuse. Large
+Cargo caches are only restored on that rebuild path. Packaging copies the verified
+companion before release signing, keeping cached input bytes separate from signed
+outputs. No signing credentials or final signed packages enter these caches. The GitHub
 `release` environment supplies credentials only to the temporary-keychain setup
 step. Packaging and notarization use the stored notary profile, then cleanup
 restores the runner's keychain search list and deletes that keychain. Apple

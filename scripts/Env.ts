@@ -4,6 +4,44 @@ import { loadEnv } from 'vite';
 import { AppUpdateUrlSchema } from '../src/contracts/AppUpdate.js';
 import { z } from 'zod';
 import { DesktopReleaseVersionSchema } from './ReleaseVersion.js';
+import { NativeCompanionCacheSettingsSchema } from './NativeCompanionCache.js';
+
+/** CI cache identity excludes credentials and pins the hosted compiler image. */
+export function readNativeCompanionCacheEnv(
+  environment: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform,
+  architecture: string,
+): {
+  outputPath: string;
+  settings: z.infer<typeof NativeCompanionCacheSettingsSchema>;
+} {
+  const validated = createEnv({
+    server: {
+      GITHUB_ACTIONS: z.literal('true'),
+      GITHUB_REF: z.literal('refs/heads/main'),
+      GITHUB_OUTPUT: z.string().min(1).refine(isAbsolute),
+      ImageVersion: z.string().min(1),
+      TRO_NATIVE_RUNNER_LABEL: z.string().min(1),
+      RUSTUP_TOOLCHAIN: z.string().min(1),
+      MACOSX_DEPLOYMENT_TARGET: z.string().optional(),
+    },
+    runtimeEnv: environment,
+    onValidationError: () => {
+      throw new Error('Native companion cache requires a main-branch hosted release environment.');
+    },
+  });
+  return {
+    outputPath: validated.GITHUB_OUTPUT,
+    settings: NativeCompanionCacheSettingsSchema.parse({
+      platform,
+      architecture,
+      runnerImage: validated.ImageVersion,
+      runnerLabel: validated.TRO_NATIVE_RUNNER_LABEL,
+      rustToolchain: validated.RUSTUP_TOOLCHAIN,
+      deploymentTarget: validated.MACOSX_DEPLOYMENT_TARGET ?? '',
+    }),
+  };
+}
 
 /** Publishing is restricted to manually dispatched builds of the app repository's main branch. */
 export function readReleasePublishingEnv(environment: NodeJS.ProcessEnv): {
