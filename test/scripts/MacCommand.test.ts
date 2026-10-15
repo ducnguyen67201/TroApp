@@ -58,7 +58,7 @@ const FailureEventSchema = z.strictObject({
 const RetryEventSchema = z.strictObject({
   event: z.literal('mac.release.command.retry'),
   tool: z.literal('xcrun'),
-  operation: z.literal('stapler.validate'),
+  operation: z.enum(['stapler.validate', 'stapler.staple']),
   exitCode: z.literal(68),
   reason: z.literal('network-error'),
   urlErrorCode: z.number().int().nullable(),
@@ -301,8 +301,8 @@ describe('Mac command failure diagnostics', () => {
   });
 });
 
-describe('Mac stapler validation retries', () => {
-  const arguments_ = ['stapler', 'validate', `/private/${privateMarker}/Tro.app`];
+describe.each(['validate', 'staple'])('Mac stapler %s retries', (action) => {
+  const arguments_ = ['stapler', action, `/private/${privateMarker}/Tro.app`];
   const transientFailure = {
     code: 68,
     signal: null,
@@ -315,7 +315,7 @@ describe('Mac stapler validation retries', () => {
     {
       event: 'mac.release.command.retry',
       tool: 'xcrun',
-      operation: 'stapler.validate',
+      operation: `stapler.${action}`,
       exitCode: 68,
       reason: 'network-error',
       urlErrorCode: null,
@@ -327,7 +327,7 @@ describe('Mac stapler validation retries', () => {
     {
       event: 'mac.release.command.retry',
       tool: 'xcrun',
-      operation: 'stapler.validate',
+      operation: `stapler.${action}`,
       exitCode: 68,
       reason: 'network-error',
       urlErrorCode: null,
@@ -339,7 +339,7 @@ describe('Mac stapler validation retries', () => {
     {
       event: 'mac.release.command.retry',
       tool: 'xcrun',
-      operation: 'stapler.validate',
+      operation: `stapler.${action}`,
       exitCode: 68,
       reason: 'network-error',
       urlErrorCode: null,
@@ -351,7 +351,7 @@ describe('Mac stapler validation retries', () => {
     {
       event: 'mac.release.command.retry',
       tool: 'xcrun',
-      operation: 'stapler.validate',
+      operation: `stapler.${action}`,
       exitCode: 68,
       reason: 'network-error',
       urlErrorCode: null,
@@ -406,7 +406,7 @@ describe('Mac stapler validation retries', () => {
     expect(readRetryEvents()).toEqual(expectedRetries);
     expect(readFailureEvent()).toMatchObject({
       tool: 'xcrun',
-      operation: 'stapler.validate',
+      operation: `stapler.${action}`,
       exitCode: 68,
       signal: null,
       reason: 'network-error',
@@ -416,6 +416,7 @@ describe('Mac stapler validation retries', () => {
 
   it.each([
     { stream: 'stdout', urlErrorCode: -1001 },
+    { stream: 'stderr', urlErrorCode: -1005 },
     { stream: 'stderr', urlErrorCode: -1200 },
   ])(
     'includes only the numeric URL error in a retry from $stream',
@@ -450,7 +451,6 @@ describe('Mac stapler validation retries', () => {
   });
 
   it.each([
-    ['/usr/bin/xcrun', ['stapler', 'staple'], 'stapler.staple'],
     ['/usr/bin/xcrun', ['notarytool', 'submit'], 'notarytool.submit'],
     ['/usr/bin/xcrun', ['notarytool', 'info'], 'notarytool.info'],
     ['/usr/bin/codesign', ['--verify'], 'codesign.verify'],

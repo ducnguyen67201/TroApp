@@ -1379,7 +1379,10 @@ installer path or update URL capability. Signed release tooling belongs to
 workflows, outside the runtime application. The manual Mac workflow builds each
 architecture natively, signs extra Mach-O resources before sealing the outer app,
 requires Apple notarization/stapling, and verifies extracted ZIP and mounted DMG
-contents before artifact upload. The native shortcut addon is rebuilt from source
+contents before artifact upload. The command boundary retries stapling and ticket
+validation only for bounded exit-68 network failures; missing/revoked tickets and
+terminated commands still stop verification. Successful commands remain required
+before any release inventory can be uploaded. The native shortcut addon is rebuilt from source
 and checked for the selected architecture and supported macOS minimum before
 shipped prebuilds are removed and resources are signed. The pre-sign companion metadata remains input
 provenance; the external release inventory records final signed hashes. The GitHub
