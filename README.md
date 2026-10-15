@@ -766,8 +766,9 @@ build/package commands do not reserve or increment release versions.
 Re-run failed jobs in the existing Desktop Release run to retry the same version.
 A new manually dispatched run allocates the next patch version, even if the prior
 release failed; version gaps are allowed. Runs are serialized. If `main` advances
-before preparation reserves a version, start a new run. Only the preparation job
-has `contents: write`, for creating its release tag. It never pushes to `main`,
+before preparation reserves a version, start a new run. Preparation and final
+publication have `contents: write`, for their tags and GitHub Releases; platform
+builds keep read-only repository access. Preparation never pushes to `main`,
 force-updates a tag or deletes a reservation. Keep `desktop-v*` tags immutable;
 do not delete them to retry a release. Signing remains in the existing
 `release` environment, with platform validation before packaging.
@@ -793,7 +794,9 @@ with its prepared version and commit. It runs the full Linux validation suite, t
 native companion and desktop separately on Apple Silicon and Intel runners. It
 requires Developer ID signing, Apple notarization and stapling, and verifies both
 the ZIP's extracted app and the DMG's mounted app before uploading artifacts.
-It does not publish a GitHub Release or change website download links.
+Once both Mac architectures and Windows succeed, Desktop Release publishes all
+verified installers together. trohoc.site discovers the published downloads
+automatically; see [Automatic release publication](#automatic-release-publication).
 
 The workflow is prepared for activation after Apple Developer enrollment. Its
 presence does not mean a signed Mac release has passed hardware acceptance.
@@ -948,28 +951,63 @@ upgrade from the legacy app without deleting user data. New signing identity may
 require permission reauthorization. Hosted CI cannot prove these interactions.
 Do not remove quarantine or disable Gatekeeper to count a test as passing.
 
-After approval, use the reserved version and reviewed source commit identified by Desktop Release;
-never overwrite the Windows `v0.1.0` tag with different source. Publish **the exact
-verified files** from both architecture artifacts to a draft TroApp GitHub Release
-at the build SHA, compare hashes, record hardware acceptance, then publish. Keep
-existing Windows assets intact. The marketing website is a separate repository
-(`ducnguyen67201/Tro`): its Mac source migration must wait for these verified
-releases. Its resolver must select releases per platform so a Mac-only release
-cannot hide the older Windows installer. Deploy that separately reviewed website
-change only after both Mac downloads are public, then verify all three redirects.
+Complete hardware acceptance on a reviewed candidate before dispatching the public
+Desktop Release workflow, and record the result with the release review. Dispatch
+now authorizes automatic publication after all platform checks pass; it does not
+pause for a separate manual publication step. Existing release tags and assets
+are preserved. After publication, verify all three trohoc.site download redirects.
+The marketing website is maintained separately in `ducnguyen67201/Tro` and already
+selects published installers per platform.
 
 Developer ID signing and notarization do not pregrant macOS privacy permissions
 or remove the normal Internet-download confirmation. The expected outcome is
 successful Gatekeeper assessment, not the absence of every operating-system prompt.
+
+### Automatic release publication
+
+Desktop Release has one final publish job, owned by
+[PublishDesktopRelease.ts](scripts/PublishDesktopRelease.ts). It runs on `main` in
+the existing `release` environment after preparation, Windows, and both Mac builds
+succeed. Dispatch only when that source is ready for public distribution. Existing
+release-environment approval rules also apply to publishing. The built-in GitHub
+token is supplied only to the publishing step; no personal token or website
+credential is needed.
+
+The job downloads artifacts from the current run, reserved version and source
+commit. Each target selects its newest uploaded attempt independently, so **Re-run
+failed jobs** can reuse earlier successful targets without rebuilding them. The
+publisher checks exact filenames and final installer hashes against the signature
+inventories, creates a new draft at the source commit, uploads all three targets,
+and compares GitHub's uploaded asset names, sizes and SHA-256 digests with the local
+files before publishing. It includes DMGs, ZIPs, the Windows installer/blockmap,
+signature inventories and any verified Windows update metadata. It never rebuilds,
+re-signs or overwrites an existing asset. A failure before publication keeps the
+previous public downloads available and leaves any incomplete release as a draft.
+
+Publication tags use `release-v<version>-<short-commit>-<run-id>-<attempt>`, separate
+from the immutable `desktop-v*` version reservations. Reruns therefore preserve
+published releases and incomplete drafts. `release.publish.stage` identifies the
+last operation without raw command output or credentials;
+`release.publish.completed` records the public release URL. After an interrupted
+publish, inspect that attempt's draft/release before retrying. New workflow runs
+reserve a new app version; retries within a run retain its reserved version.
+
+The marketing website reads TroApp's published GitHub Releases and caches its
+selection for five minutes. Each platform selects its newest published stable
+installer independently, falling back to a preview only if no stable installer
+exists. No webhook, website commit or redeployment is needed. GitHub/API failures
+can delay refresh while the website retains its previous cached selection. This
+flow updates website downloads, not installed-app update feeds.
 
 ### Windows release from GitHub Actions
 
 The **Windows Release** workflow is called by Desktop Release to build a signed
 x64 NSIS installer from the reviewed source and shared reserved version. It validates the project without cloud credentials,
 then uses the GitHub environment `release` and Azure OIDC to sign during packaging.
-It uploads verified build artifacts for 14 days; it does not publish a GitHub
-Release, deploy the API, or provision an update feed. No separate release branch
-or client secret is needed.
+It retains verified build artifacts for 14 days; the final Desktop Release job
+publishes them alongside the Mac installers once every platform succeeds. It does
+not deploy the API or provision an installed-app update feed. No separate release
+branch or client secret is needed.
 
 Before the first run, restrict the repository's `release` environment deployment
 branches to `main`, confirm the Azure Public Trust certificate profile is Active,

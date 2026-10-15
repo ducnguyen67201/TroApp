@@ -1092,12 +1092,24 @@ namespace distinguishes published reservations from unpublished local tags.
 [ApplyDesktopReleaseVersion.ts](../scripts/ApplyDesktopReleaseVersion.ts) applies
 that version to the disposable validation/package checkouts for both platforms.
 The committed package version remains the development baseline. The serialized
-preparation job alone has repository-content write permission, for tag creation;
+preparation and publication jobs have repository-content write permission;
 signing secrets remain in platform jobs' `release` environment. The caller maps
 the four required macOS signing secrets into the reusable workflow; its package
 jobs select the `release` environment values. A failed release
 may reserve a version without producing artifacts. Local builds never allocate
 release versions. Reservations are never force-updated or deleted by the workflow.
+
+[PublishDesktopRelease.ts](../scripts/PublishDesktopRelease.ts) owns the final
+main-only publication job in the existing `release` environment. It waits for
+Windows and both Mac architectures, selects the newest successful artifact attempt
+for each target within the same run/version/source, validates signature-inventory
+hashes, and uploads all targets to a new draft at the source commit. Uploaded asset
+names, sizes and SHA-256 digests must match before publication. Publication tags
+use a separate `release-v*` namespace containing the version/source/run/attempt;
+version reservations remain immutable and retries preserve existing releases and
+drafts. Only the publishing step receives its GitHub token. The separate marketing
+website resolves published TroApp installers per platform with a five-minute cache;
+no runtime desktop or API dependency on the website is introduced.
 
 [CheckWindowsInstaller.ps1](../scripts/CheckWindowsInstaller.ps1) owns the disposable
 runner's install/uninstall check. It refuses existing Tro installations, verifies
@@ -1233,9 +1245,10 @@ step. Packaging and notarization use the stored notary profile, then cleanup
 restores the runner's keychain search list and deletes that keychain. Apple
 credentials never become app config.
 The first Mac workflow rejects update feeds because container stapling changes
-artifact hashes. Signing activation, physical Mac acceptance, public publication
-and installed-update acceptance remain separate release gates; checked-in tooling
-alone does not establish successful Apple authorization or hardware behavior.
+artifact hashes. Public workflow dispatch authorizes publication after CI checks;
+physical Mac acceptance belongs to the preceding release review. Installed-update
+acceptance remains separate. Checked-in tooling alone does not establish successful
+Apple authorization or hardware behavior.
 
 “What’s new” is a permanent action beside Settings, with manual replay also
 available on the signed-out screen. The bundled, EN/VI release catalog in
