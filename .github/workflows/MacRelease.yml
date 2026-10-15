@@ -2,6 +2,15 @@ name: macOS Release
 
 on:
   workflow_call:
+    secrets:
+      CSC_LINK:
+        required: true
+      CSC_KEY_PASSWORD:
+        required: true
+      APPLE_ID:
+        required: true
+      APPLE_APP_SPECIFIC_PASSWORD:
+        required: true
     inputs:
       release-commit:
         required: true

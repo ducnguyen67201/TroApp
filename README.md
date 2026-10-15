@@ -844,11 +844,12 @@ installed. Standard build/test/local packaging needs no Apple account.
 #### Run and inspect a candidate
 
 ```sh
-gh workflow run MacRelease.yml --repo ducnguyen67201/TroApp --ref main
+gh workflow run DesktopRelease.yml --repo ducnguyen67201/TroApp --ref main
 ```
 
-Select the resulting run in GitHub Actions and confirm **both** architecture jobs
-passed. Artifacts are named `Tro-macos-<arch>-<sha>-<run-id>-<attempt>` and contain
+Select the resulting Desktop Release run in GitHub Actions and confirm **both**
+macOS architecture jobs passed. Artifacts are named
+`Tro-<version>-macos-<arch>-<sha>-<run-id>-<attempt>` and contain
 `Tro-<version>-macos-<arch>.dmg`, the matching ZIP, and
 `MacSignatures-<arch>.json`. Download artifacts from that exact run; they expire
 after 14 days and are not permanent public release URLs. The inventory records
@@ -1004,8 +1005,9 @@ metadata. The pinned electron-builder v26 uses `win.azureSignOptions`; its upstr
 PowerShell signing module and hosted runner image are not completely pinned by
 the pnpm lockfile.
 
-After the workflow is merged into `main`, open Actions → Windows Release → Run
-workflow → main. Download the successful run's `Tro-windows-x64-…` artifact. It
+After the workflow is merged into `main`, open Actions → Desktop Release → Run
+workflow → main. Download the successful run's
+`Tro-<version>-windows-x64-<sha>-<run-id>-<attempt>` artifact. It
 contains `Tro-<version>-windows-x64-setup.exe`, its blockmap, a signature inventory,
 and update metadata when a feed is configured. Signing failures or invalid
 signatures prevent upload. The verifier checks all loose Windows PE executables,

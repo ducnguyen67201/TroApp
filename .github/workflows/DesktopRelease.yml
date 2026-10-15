@@ -63,6 +63,11 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/MacRelease.yml
+    secrets:
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
     with:
       release-commit: ${{ needs.prepare.outputs.commit }}
       release-version: ${{ needs.prepare.outputs.version }}

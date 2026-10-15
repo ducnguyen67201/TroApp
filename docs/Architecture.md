@@ -1093,7 +1093,9 @@ namespace distinguishes published reservations from unpublished local tags.
 that version to the disposable validation/package checkouts for both platforms.
 The committed package version remains the development baseline. The serialized
 preparation job alone has repository-content write permission, for tag creation;
-signing secrets remain in platform jobs' `release` environment. A failed release
+signing secrets remain in platform jobs' `release` environment. The caller maps
+the four required macOS signing secrets into the reusable workflow; its package
+jobs select the `release` environment values. A failed release
 may reserve a version without producing artifacts. Local builds never allocate
 release versions. Reservations are never force-updated or deleted by the workflow.
 
