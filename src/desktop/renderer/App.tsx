@@ -52,6 +52,7 @@ import { useCursorCompanion } from './UseCursorCompanion.js';
 import { DesktopWindowAppearance } from '../DesktopAppearance.js';
 import { OrganizationBrand } from './team/OrganizationBrand.js';
 import { AppUpdateButton } from './updates/AppUpdateButton.js';
+import { useAppUpdate } from './updates/UseAppUpdate.js';
 import { ClassroomPage } from './classroom/ClassroomPage.js';
 import { useOrganizationSetup } from './team/UseOrganizationSetup.js';
 import { OrganizationSetupDialog } from './team/OrganizationSetupDialog.js';
@@ -77,6 +78,7 @@ const DesktopDialog = {
 
 export function App(): ReactElement {
   const { messages, locale } = useLocale();
+  const update = useAppUpdate();
   const whatsNew = useWhatsNew();
   const releaseMessages = whatsNewMessages[locale];
   const hasAutoOpenedWhatsNew = useRef(false);
@@ -305,6 +307,7 @@ export function App(): ReactElement {
           }}
           onboarding={onboarding}
           analytics={analytics}
+          update={update}
           microphones={microphones}
           voiceStatus={voice.status}
           voiceover={voiceover}
@@ -459,6 +462,7 @@ export function App(): ReactElement {
             </nav>
             <div className="sidebar-bottom">
               <AppUpdateButton
+                update={update}
                 isBusy={
                   controller.isSending ||
                   controller.isResetting ||
@@ -596,7 +600,7 @@ export function App(): ReactElement {
                           </Button>
                         )}
                         <Group gap="sm" justify="center">
-                          <AppUpdateButton isBusy={accountTransition} />
+                          <AppUpdateButton update={update} isBusy={accountTransition} />
                           <Button
                             variant="subtle"
                             leftSection={<IconMessageCircleStar size={16} />}

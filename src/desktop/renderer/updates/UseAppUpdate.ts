@@ -5,6 +5,7 @@ import {
   AppUpdateState,
   type AppUpdateSnapshot,
   type AppUpdateStatus,
+  type AppUpdateReply,
 } from '#contracts/AppUpdate.js';
 import { useLocale } from '../localization/UseLocale.js';
 
@@ -12,6 +13,7 @@ export interface AppUpdateView {
   status: AppUpdateStatus;
   isRequesting: boolean;
   message: string | null;
+  checkForUpdates(): Promise<void>;
   applyUpdate(): Promise<void>;
 }
 
@@ -24,7 +26,7 @@ export function useAppUpdate(): AppUpdateView {
   });
   const [isRequesting, setIsRequesting] = useState(false);
   const [failure, setFailure] = useState<
-    keyof Pick<typeof messages, 'updateBusy' | 'updateUnavailable'> | null
+    keyof Pick<typeof messages, 'updateBusy' | 'updateUnavailable' | 'updateCheckFailed'> | null
   >(null);
   const latestRevision = useRef(-1);
   const isMounted = useRef(false);
@@ -35,6 +37,9 @@ export function useAppUpdate(): AppUpdateView {
     isMounted.current = true;
     const receive = (next: AppUpdateSnapshot): void => {
       if (isCurrent && next.revision >= latestRevision.current) {
+        if (next.revision > latestRevision.current) {
+          setFailure(null);
+        }
         latestRevision.current = next.revision;
         setSnapshot(next);
       }
@@ -51,7 +56,10 @@ export function useAppUpdate(): AppUpdateView {
     };
   }, []);
 
-  async function applyUpdate(): Promise<void> {
+  async function requestUpdate(
+    command: () => Promise<AppUpdateReply>,
+    failureMessage: 'updateUnavailable' | 'updateCheckFailed',
+  ): Promise<void> {
     if (actionPending.current) {
       return;
     }
@@ -59,17 +67,7 @@ export function useAppUpdate(): AppUpdateView {
     setIsRequesting(true);
     setFailure(null);
     try {
-      const { status } = snapshot;
-      const shouldRestart =
-        status.state === AppUpdateState.READY ||
-        (status.state === AppUpdateState.ERROR && status.phase === AppUpdatePhase.INSTALL);
-      const shouldCheck =
-        status.state === AppUpdateState.ERROR && status.phase === AppUpdatePhase.CHECK;
-      const reply = await (shouldRestart
-        ? window.tro.restartForAppUpdate()
-        : shouldCheck
-          ? window.tro.checkAppUpdate()
-          : window.tro.downloadAppUpdate());
+      const reply = await command();
       if (!isMounted.current) {
         return;
       }
@@ -79,11 +77,11 @@ export function useAppUpdate(): AppUpdateView {
           setSnapshot(reply.snapshot);
         }
       } else {
-        setFailure(reply.reason === AppUpdateFailure.BUSY ? 'updateBusy' : 'updateUnavailable');
+        setFailure(reply.reason === AppUpdateFailure.BUSY ? 'updateBusy' : failureMessage);
       }
     } catch {
       if (isMounted.current) {
-        setFailure('updateUnavailable');
+        setFailure(failureMessage);
       }
     } finally {
       actionPending.current = false;
@@ -93,10 +91,31 @@ export function useAppUpdate(): AppUpdateView {
     }
   }
 
+  function checkForUpdates(): Promise<void> {
+    return requestUpdate(() => window.tro.checkAppUpdate(), 'updateCheckFailed');
+  }
+
+  function applyUpdate(): Promise<void> {
+    const { status } = snapshot;
+    const shouldRestart =
+      status.state === AppUpdateState.READY ||
+      (status.state === AppUpdateState.ERROR && status.phase === AppUpdatePhase.INSTALL);
+    const shouldCheck =
+      status.state === AppUpdateState.ERROR && status.phase === AppUpdatePhase.CHECK;
+    if (shouldCheck) {
+      return checkForUpdates();
+    }
+    return requestUpdate(
+      () => (shouldRestart ? window.tro.restartForAppUpdate() : window.tro.downloadAppUpdate()),
+      'updateUnavailable',
+    );
+  }
+
   return {
     status: snapshot.status,
     isRequesting,
     message: failure ? messages[failure] : null,
+    checkForUpdates,
     applyUpdate,
   };
 }

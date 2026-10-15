@@ -1373,7 +1373,12 @@ disabled in development or without a feed; signed release builds embed the feed
 supplied by the release environment. Signed-build Env validation requires a public
 HTTPS feed; production Doppler desktop builds use `tro-local/prd`, while Railway
 backend runtime configuration is independent. Main checks at startup and every four hours,
-and existing welcome/sidebar controls show a newer available version. Full
+and existing welcome/sidebar controls show a newer available version. Settings →
+General provides a manual check through the same validated preload command.
+`App` owns one `useAppUpdate` subscription shared by Settings and the welcome/sidebar
+controls, keeping manual results and background progress synchronized. Settings
+reports availability, current versions, disabled updates and failures; it directs
+users to the existing download/restart controls when an update is available. Full
 downloads avoid blockmap lookups across release tags, and checksum/native signature
 checks, stable-only selection and downgrade refusal remain enabled.
 Downloads and installation require user

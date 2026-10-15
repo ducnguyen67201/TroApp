@@ -3,11 +3,16 @@ import { IconDownload, IconRefresh, IconAlertCircle } from '@tabler/icons-react'
 import { useId, type ReactElement } from 'react';
 import { AppUpdatePhase, AppUpdateState } from '#contracts/AppUpdate.js';
 import { useLocale } from '../localization/UseLocale.js';
-import { useAppUpdate } from './UseAppUpdate.js';
+import type { AppUpdateView } from './UseAppUpdate.js';
 
 /** The update action is available in the signed-in sidebar and the welcome screen. */
-export function AppUpdateButton({ isBusy }: { isBusy: boolean }): ReactElement | null {
-  const update = useAppUpdate();
+export function AppUpdateButton({
+  isBusy,
+  update,
+}: {
+  isBusy: boolean;
+  update: AppUpdateView;
+}): ReactElement | null {
   const { messages, locale } = useLocale();
   const detailId = useId();
   const { status } = update;

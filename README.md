@@ -1084,7 +1084,10 @@ manifests use final byte counts and SHA-512 checksums, with installer URLs pinne
 to the exact release tag. Builder metadata is replaced rather than trusted after
 signing/stapling. Feed generation is deterministic so resume checks identical bytes.
 
-Installed apps check at startup and every four hours. A newer version shows the
+Installed apps check at startup and every four hours. Use **Settings → General →
+Check for updates** (**Cài đặt → Chung → Kiểm tra bản cập nhật**) to check immediately
+and see whether Tro is up to date. Automatic checks continue without using this
+button. A newer version shows the
 existing update action on the welcome screen or signed-in sidebar. Download and
 restart require user actions, and restart waits until active work has stopped.
 The updater uses full downloads, verifies checksums and retains native signature
