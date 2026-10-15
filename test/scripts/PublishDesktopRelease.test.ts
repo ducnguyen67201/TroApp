@@ -3,8 +3,13 @@ import { cp, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import { readReleasePublishingEnv } from '../../scripts/Env.js';
-import { publishDesktopRelease, type ReleaseCommand } from '../../scripts/PublishDesktopRelease.js';
+import {
+  publishDesktopRelease,
+  type ReleaseCommand,
+  type ReleasePublishOptions,
+} from '../../scripts/PublishDesktopRelease.js';
 
 const environment = {
   GITHUB_ACTIONS: 'true',
@@ -18,6 +23,7 @@ const environment = {
 const temporary: string[] = [];
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await Promise.all(temporary.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
@@ -108,17 +114,28 @@ async function createFixture() {
       )
     ).flat(),
   });
+  let releaseTag = 'release-v0.1.1-aaaaaaaaaaaa-12345-1';
   const run = vi.fn<ReleaseCommand>(async (arguments_) => {
+    if (arguments_[0] === 'release' && arguments_[1] === 'view') {
+      releaseTag = z.string().parse(arguments_[2]);
+      return JSON.stringify({ databaseId: 98765 });
+    }
     if (arguments_[0] !== 'api') {
       return '';
     }
+    // Drafts cannot be fetched through the REST tag endpoint, even with write access.
+    if (arguments_[1] !== 'repos/ducnguyen67201/TroApp/releases/98765') {
+      throw new Error('Draft release lookup requires its numeric ID.');
+    }
     return JSON.stringify({
       ...(await readUploadedRelease()),
-      tag_name: arguments_[1]?.split('/').at(-1),
+      tag_name: releaseTag,
     });
   });
-  const publish = (settings: NodeJS.ProcessEnv = environment) =>
-    publishDesktopRelease(directory, packagePath, settings, run);
+  const publish = (
+    settings: NodeJS.ProcessEnv = environment,
+    options: ReleasePublishOptions = {},
+  ) => publishDesktopRelease(directory, packagePath, settings, run, options);
   return { directory, directories, packagePath, run, publish, readUploadedRelease };
 }
 
@@ -131,7 +148,8 @@ describe('desktop release publication', () => {
     expect(run.mock.calls.map(([arguments_]) => arguments_.slice(0, 2))).toEqual([
       ['release', 'create'],
       ['release', 'upload'],
-      ['api', expect.any(String)],
+      ['release', 'view'],
+      ['api', 'repos/ducnguyen67201/TroApp/releases/98765'],
       ['release', 'edit'],
     ]);
     expect(run.mock.calls[0]?.[0]).toEqual(
@@ -149,6 +167,58 @@ describe('desktop release publication', () => {
     // Publication tags cannot enter the version allocator's reserved desktop-v* namespace.
     expect(run.mock.calls[0]?.[0][2]).not.toMatch(/^desktop-v/);
   });
+
+  it('resumes a fully uploaded draft after verifying the original local files', async () => {
+    const { publish, run } = await createFixture();
+    await publish(environment, { resume: true });
+    expect(run.mock.calls.map(([arguments_]) => arguments_.slice(0, 2))).toEqual([
+      ['release', 'view'],
+      ['api', 'repos/ducnguyen67201/TroApp/releases/98765'],
+      ['release', 'edit'],
+    ]);
+    expect(run.mock.calls[0]?.[0][2]).toBe('release-v0.1.1-aaaaaaaaaaaa-12345-1');
+    expect(run.mock.calls.at(-1)?.[0]).toContain('--draft=false');
+  });
+
+  it.each(['missing', 'invalid-id', 'incomplete', 'changed', 'commit', 'published'])(
+    'refuses to resume an unsafe draft: %s',
+    async (mode) => {
+      const { publish, run, readUploadedRelease } = await createFixture();
+      const uploaded = await readUploadedRelease();
+      const asset = uploaded.assets[0];
+      if (!asset) {
+        throw new Error('Missing fixture asset');
+      }
+      const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      if (mode === 'missing') {
+        run.mockRejectedValueOnce(new Error('Draft not found'));
+      } else if (mode === 'invalid-id') {
+        run.mockResolvedValueOnce(JSON.stringify({ databaseId: '../tags/untrusted' }));
+      } else {
+        if (mode === 'incomplete') {
+          uploaded.assets.pop();
+        } else if (mode === 'changed') {
+          asset.digest = `sha256:${'b'.repeat(64)}`;
+        } else if (mode === 'commit') {
+          uploaded.target_commitish = 'b'.repeat(40);
+        } else {
+          uploaded.draft = false;
+        }
+        run
+          .mockResolvedValueOnce(JSON.stringify({ databaseId: 98765 }))
+          .mockResolvedValueOnce(JSON.stringify(uploaded));
+      }
+      await expect(publish(environment, { resume: true })).rejects.toThrow();
+      expect(
+        run.mock.calls.every(([arguments_]) => arguments_[0] === 'api' || arguments_[1] === 'view'),
+      ).toBe(true);
+      if (['incomplete', 'changed', 'commit', 'published'].includes(mode)) {
+        expect(diagnostic).toHaveBeenCalledWith(
+          expect.stringContaining('release.publish.upload.rejected'),
+        );
+      }
+    },
+  );
 
   it('publishes optional Windows update metadata without changing it', async () => {
     const { publish, directories, run } = await createFixture();
@@ -251,7 +321,7 @@ describe('desktop release publication', () => {
     expect(run).not.toHaveBeenCalled();
   });
 
-  it.each(['create', 'upload', 'api'])(
+  it.each(['create', 'upload', 'view', 'api'])(
     'never publishes when the %s command fails',
     async (stage) => {
       const { publish, run } = await createFixture();
@@ -297,6 +367,7 @@ describe('desktop release publication', () => {
       run
         .mockResolvedValueOnce('')
         .mockResolvedValueOnce('')
+        .mockResolvedValueOnce(JSON.stringify({ databaseId: 98765 }))
         .mockResolvedValueOnce(JSON.stringify(mode === 'malformed' ? {} : uploaded));
       await expect(publish()).rejects.toThrow();
       expect(run.mock.calls.some(([arguments_]) => arguments_.includes('--draft=false'))).toBe(

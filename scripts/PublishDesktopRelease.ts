@@ -22,6 +22,8 @@ const FileDigestSchema = z.object({
 });
 type ReleaseFile = z.infer<typeof FileDigestSchema> & { path: string };
 export type ReleaseCommand = (arguments_: readonly string[]) => Promise<string>;
+
+export type ReleasePublishOptions = { resume?: boolean };
 const executeFile = promisify(execFile);
 
 /** Command output can include credentials or arbitrary remote diagnostics; keep failures bounded. */
@@ -29,8 +31,25 @@ const runReleaseCommand: ReleaseCommand = async (arguments_) => {
   try {
     const result = await executeFile('gh', [...arguments_], { timeout: 5 * 60 * 1000 });
     return result.stdout;
-  } catch {
-    throw new Error('GitHub release command failed. Inspect the last release.publish.stage event.');
+  } catch (error) {
+    const exitCode =
+      error instanceof Error && 'code' in error && typeof error.code === 'number'
+        ? error.code
+        : undefined;
+    console.error(
+      JSON.stringify({
+        event: 'release.publish.command.failed',
+        command: arguments_[0],
+        operation: arguments_[0] === 'release' ? arguments_[1] : undefined,
+        exitCode,
+      }),
+    );
+    throw new Error(
+      'GitHub release command failed. Inspect the last release.publish.stage event.',
+      {
+        cause: error,
+      },
+    );
   }
 };
 
@@ -187,6 +206,7 @@ export async function publishDesktopRelease(
   packagePath: string,
   environment: NodeJS.ProcessEnv,
   run: ReleaseCommand = runReleaseCommand,
+  options: ReleasePublishOptions = {},
 ): Promise<string> {
   const settings = readReleasePublishingEnv(environment);
   const { version } = z
@@ -199,33 +219,47 @@ export async function publishDesktopRelease(
   const files = await readDesktopReleaseFiles(resolve(directory), version, settings);
   const tag = `release-v${version}-${settings.commit.slice(0, 12)}-${settings.runId}-${settings.attempt}`;
   const repositoryArguments = ['--repo', `github.com/${settings.repository}`];
-  stage('create-draft');
-  await run([
-    'release',
-    'create',
-    tag,
-    ...repositoryArguments,
-    '--draft',
-    '--target',
-    settings.commit,
-    '--latest=false',
-    '--title',
-    `Tro ${version}`,
-    '--notes',
-    `Signed macOS (Apple Silicon and Intel) and Windows x64 installers from commit ${settings.commit}.\n\nBuild: https://github.com/${settings.repository}/actions/runs/${settings.runId}/attempts/${settings.attempt}`,
-  ]);
-  stage('upload-assets');
-  await run(['release', 'upload', tag, ...repositoryArguments, ...files.map((file) => file.path)]);
+  if (!options.resume) {
+    stage('create-draft');
+    await run([
+      'release',
+      'create',
+      tag,
+      ...repositoryArguments,
+      '--draft',
+      '--target',
+      settings.commit,
+      '--latest=false',
+      '--title',
+      `Tro ${version}`,
+      '--notes',
+      `Signed macOS (Apple Silicon and Intel) and Windows x64 installers from commit ${settings.commit}.\n\nBuild: https://github.com/${settings.repository}/actions/runs/${settings.runId}/attempts/${settings.attempt}`,
+    ]);
+    stage('upload-assets');
+    await run([
+      'release',
+      'upload',
+      tag,
+      ...repositoryArguments,
+      ...files.map((file) => file.path),
+    ]);
+  }
+  /* GitHub's REST tag endpoint only resolves published releases; gh can resolve drafts. */
+  stage('resolve-draft');
+  const identity: unknown = JSON.parse(
+    await run(['release', 'view', tag, ...repositoryArguments, '--json', 'databaseId']),
+  );
+  const { databaseId } = z.object({ databaseId: z.number().int().positive() }).parse(identity);
   stage('verify-upload');
   const raw: unknown = JSON.parse(
     await run([
       'api',
-      `repos/${settings.repository}/releases/tags/${tag}`,
+      `repos/${settings.repository}/releases/${String(databaseId)}`,
       '--hostname',
       'github.com',
     ]),
   );
-  const uploaded = z
+  const result = z
     .object({
       draft: z.literal(true),
       tag_name: z.literal(tag),
@@ -239,7 +273,12 @@ export async function publishDesktopRelease(
         }),
       ),
     })
-    .parse(raw);
+    .safeParse(raw);
+  if (!result.success) {
+    console.error(JSON.stringify({ event: 'release.publish.upload.rejected', reason: 'metadata' }));
+    throw new Error('Uploaded release metadata is invalid. Draft was not published.');
+  }
+  const uploaded = result.data;
   if (
     uploaded.assets.length !== files.length ||
     files.some((file) => {
@@ -251,6 +290,14 @@ export async function publishDesktopRelease(
       );
     })
   ) {
+    console.error(
+      JSON.stringify({
+        event: 'release.publish.upload.rejected',
+        reason: 'assets',
+        expectedFileCount: files.length,
+        uploadedAssetCount: uploaded.assets.length,
+      }),
+    );
     throw new Error(
       'Uploaded release assets differ from the verified local files. Draft was not published.',
     );
@@ -265,12 +312,14 @@ export async function publishDesktopRelease(
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const { values } = parseArgs({
-      options: { directory: { type: 'string' } },
+      options: { directory: { type: 'string' }, resume: { type: 'boolean', default: false } },
     });
     await publishDesktopRelease(
       z.string().parse(values.directory),
       resolve('package.json'),
       process.env,
+      runReleaseCommand,
+      { resume: values.resume },
     );
   } catch {
     console.error(JSON.stringify({ event: 'release.publish.failed' }));

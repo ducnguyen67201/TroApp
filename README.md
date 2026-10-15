@@ -1043,8 +1043,9 @@ commit. Each target selects its newest uploaded attempt independently, so **Re-r
 failed jobs** can reuse earlier successful targets without rebuilding them. The
 publisher checks exact filenames and final installer hashes against the signature
 inventories, creates a new draft at the source commit, uploads all three targets,
-and compares GitHub's uploaded asset names, sizes and SHA-256 digests with the local
-files before publishing. It includes DMGs, ZIPs, the Windows installer/blockmap,
+and resolves the draft's numeric release ID before comparing GitHub's uploaded
+asset names, sizes and SHA-256 digests with the local files. GitHub's REST lookup
+by tag only returns published releases. It includes DMGs, ZIPs, the Windows installer/blockmap,
 signature inventories and any verified Windows update metadata. It never rebuilds,
 re-signs or overwrites an existing asset. A failure before publication keeps the
 previous public downloads available and leaves any incomplete release as a draft.
@@ -1053,9 +1054,27 @@ Publication tags use `release-v<version>-<short-commit>-<run-id>-<attempt>`, sep
 from the immutable `desktop-v*` version reservations. Reruns therefore preserve
 published releases and incomplete drafts. `release.publish.stage` identifies the
 last operation without raw command output or credentials;
+`release.publish.command.failed` identifies the command/operation and numeric exit
+code, and `release.publish.upload.rejected` distinguishes invalid metadata from
+asset-count/hash mismatches without logging remote content.
 `release.publish.completed` records the public release URL. After an interrupted
 publish, inspect that attempt's draft/release before retrying. New workflow runs
 reserve a new app version; retries within a run retain its reserved version.
+
+To recover a fully uploaded draft, use the publisher with `--resume` in the original
+run/attempt context and with that run's downloaded `verified-release` directory
+and reserved package version:
+
+```sh
+pnpm exec tsx scripts/PublishDesktopRelease.ts --directory verified-release --resume
+```
+
+Resume skips draft creation and uploads, checks the complete local signature
+inventories and remote hashes again, then publishes the same draft. A missing,
+incomplete, changed, already published or wrong-commit release is rejected.
+Rerunning a GitHub job uses the original run's checked-out source; a local publisher
+fix is not picked up by **Re-run failed jobs**. Do not dispatch a new build to
+recover already verified installers.
 
 The marketing website reads TroApp's published GitHub Releases and caches its
 selection for five minutes. Each platform selects its newest published stable

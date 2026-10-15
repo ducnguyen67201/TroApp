@@ -1221,7 +1221,11 @@ main-only publication job in the existing `release` environment. It waits for
 Windows and both Mac architectures, selects the newest successful artifact attempt
 for each target within the same run/version/source, validates signature-inventory
 hashes, and uploads all targets to a new draft at the source commit. Uploaded asset
-names, sizes and SHA-256 digests must match before publication. Publication tags
+names, sizes and SHA-256 digests must match before publication. The publisher
+resolves drafts through the CLI and verifies them through the numeric release-ID
+endpoint; the REST tag endpoint only resolves published releases. Explicit resume
+reuses the same run/attempt's fully uploaded draft without creation or upload and
+retains all local-inventory, remote-metadata and asset-hash checks. Publication tags
 use a separate `release-v*` namespace containing the version/source/run/attempt;
 version reservations remain immutable and retries preserve existing releases and
 drafts. Only the publishing step receives its GitHub token. The separate marketing
