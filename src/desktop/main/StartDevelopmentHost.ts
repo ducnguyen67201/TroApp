@@ -31,6 +31,7 @@ if (!isDevelopmentHostConfig(config)) {
 }
 app.setName(config.appName);
 app.setPath('userData', join(app.getPath('appData'), config.appName));
+app.setPath('sessionData', join(app.getPath('appData'), config.appName));
 process.chdir(config.projectDirectory);
 
 /* A cold URL launch can arrive before the dynamically imported main module

@@ -138,7 +138,12 @@ identity.
 
 On macOS, main checks Screen Recording and Accessibility before admitting computer
 use. The branded development host and installed Tro have different bundle
-identities and permission grants. `DesktopPermissions` requests access in main so
+identities and permission grants. Development also uses the `tro-dev` app name
+and separate user/session data paths, isolating its Electron encryption key from
+installed Tro. `ConfigureDevelopmentStorage` selects these before readiness in
+the main entry; the Finder bootstrap sets them before importing main. Development
+never migrates or deletes the installed profile. `DesktopPermissions` requests
+access in main so
 the OS attributes it to Tro. Missing grants lead to onboarding; no driver task or
 model credential is issued before admission.
 

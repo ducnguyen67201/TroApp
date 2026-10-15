@@ -17,7 +17,10 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { z } from 'zod';
-import { createDevelopmentBundleId } from '../src/desktop/DesktopIdentity.js';
+import {
+  createDevelopmentBundleId,
+  DesktopDevelopmentApp,
+} from '../src/desktop/DesktopIdentity.js';
 
 const runFile = promisify(execFile);
 const require = createRequire(import.meta.url);
@@ -33,9 +36,8 @@ export async function prepareDesktopDevelopmentHost(
   }
   const projectRoot = await realpath(projectDirectory);
   const metadata: unknown = JSON.parse(await readFile(join(projectRoot, 'package.json'), 'utf8'));
-  const { name, devDependencies, build } = z
+  const { devDependencies, build } = z
     .object({
-      name: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
       devDependencies: z.object({ electron: z.string() }),
       build: z.object({
         mac: z.object({
@@ -57,9 +59,9 @@ export async function prepareDesktopDevelopmentHost(
   }).outputText;
   const bundleId = createDevelopmentBundleId(projectRoot);
   const stamp = createHash('sha256')
-    .update('branded-development-v2')
+    .update('branded-development-v3')
     .update(projectRoot)
-    .update(name)
+    .update(DesktopDevelopmentApp.NAME)
     .update(bootstrap)
     .update(devDependencies.electron)
     .update(bundleId)
@@ -68,7 +70,7 @@ export async function prepareDesktopDevelopmentHost(
     .update(icon)
     .digest('hex');
   const developmentDirectory = join(projectRoot, '.tro-development');
-  const destination = join(developmentDirectory, 'Tro.app');
+  const destination = join(developmentDirectory, DesktopDevelopmentApp.BUNDLE_FILE);
   const executable = join(destination, 'Contents', 'MacOS', 'Electron');
   const stampPath = join(developmentDirectory, 'HostStamp.txt');
   try {
@@ -83,15 +85,15 @@ export async function prepareDesktopDevelopmentHost(
   await mkdir(developmentDirectory, { recursive: true });
   const stagingDirectory = await mkdtemp(join(developmentDirectory, 'stage-'));
   try {
-    const stagedApp = join(stagingDirectory, 'Tro.app');
+    const stagedApp = join(stagingDirectory, DesktopDevelopmentApp.BUNDLE_FILE);
     const sourceApp = resolve(dirname(electronPath), '../..');
     await cp(sourceApp, stagedApp, { recursive: true, verbatimSymlinks: true });
     await writeFile(join(stagedApp, 'Contents', 'Resources', 'TroIcon.icns'), icon);
     const plist = join(stagedApp, 'Contents', 'Info.plist');
     for (const [key, value] of Object.entries({
       CFBundleIdentifier: bundleId,
-      CFBundleName: 'Tro',
-      CFBundleDisplayName: 'Tro',
+      CFBundleName: DesktopDevelopmentApp.NAME,
+      CFBundleDisplayName: DesktopDevelopmentApp.NAME,
       CFBundleIconFile: 'TroIcon.icns',
       NSMicrophoneUsageDescription: build.mac.extendInfo.NSMicrophoneUsageDescription,
       NSCameraUsageDescription: build.mac.extendInfo.NSCameraUsageDescription,
@@ -111,11 +113,15 @@ export async function prepareDesktopDevelopmentHost(
     await mkdir(appDirectory, { recursive: true });
     await writeFile(
       join(appDirectory, 'package.json'),
-      JSON.stringify({ name, type: 'module', main: 'StartDevelopmentHost.js' }),
+      JSON.stringify({
+        name: DesktopDevelopmentApp.NAME,
+        type: 'module',
+        main: 'StartDevelopmentHost.js',
+      }),
     );
     await writeFile(
       join(appDirectory, 'HostConfig.json'),
-      JSON.stringify({ projectDirectory: projectRoot, appName: name }),
+      JSON.stringify({ projectDirectory: projectRoot, appName: DesktopDevelopmentApp.NAME }),
       { mode: 0o600 },
     );
     await writeFile(join(appDirectory, 'StartDevelopmentHost.js'), bootstrap);

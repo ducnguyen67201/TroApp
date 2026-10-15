@@ -328,8 +328,12 @@ for active teaching, media playback or development tooling. The API, database an
 other applications are outside this desktop process tree. The check never restarts
 Tro or starts an agent/model request.
 
-The macOS launcher uses the checkout-owned `.tro-development/Tro.app`. Quit it
-before rebuilding its static host. The development bundle has a separate identity
+The macOS launcher uses the checkout-owned `.tro-development/tro-dev.app`, shown as
+**tro-dev**. Quit it before rebuilding its static host. Development uses the
+`tro-dev` app name, OS app-data directory and Keychain namespace; the released app
+keeps `tro`. Existing `tro` data is not automatically copied or deleted. The first
+launch with the separate development profile requires signing in again. The
+development bundle has a separate identity
 from installed `app.tro.desktop`; grant each its own Screen Recording, Accessibility
 and microphone access when requested. The launcher preserves saved accounts and
 OS grants. Keep the same app instance open throughout browser OAuth. If a different
