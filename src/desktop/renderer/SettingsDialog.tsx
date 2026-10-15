@@ -10,7 +10,9 @@ import { Badge, Button, Modal, NativeSelect, Switch, Tabs, Text, Title } from '@
 import type { VoiceoverView } from './voiceover/UseVoiceover.js';
 import { VoiceoverState } from '#contracts/Voiceover.js';
 import { IconPaw, IconSettings, IconUserCircle, IconUsers } from '@tabler/icons-react';
-import { useId, type ReactElement, type ReactNode } from 'react';
+import { useId, useState, type ReactElement, type ReactNode } from 'react';
+import { AppUpdatePhase, AppUpdateState } from '#contracts/AppUpdate.js';
+import type { AppUpdateView } from './updates/UseAppUpdate.js';
 import { VoiceShortcut, type VoiceStatus } from '#contracts/VoiceInput.js';
 import type { AuthUser } from '#contracts/AuthSession.js';
 import { desktopLocales } from './localization/Locale.js';
@@ -43,6 +45,7 @@ interface SettingsDialogProps {
   onChooseMicrophone: () => void;
   onboarding?: OnboardingView;
   analytics?: AnalyticsView;
+  update: AppUpdateView;
   onTeamChanged?: () => void;
   onCreateOrganization?: (() => void) | undefined;
   teamOrganizationId?: string | null;
@@ -70,6 +73,78 @@ function SettingsRow({ label, description, children }: SettingsRowProps): ReactE
   );
 }
 
+/** Manual checks share the same lifecycle as scheduled checks and existing update actions. */
+function SettingsUpdateRow({ update }: { update: AppUpdateView }): ReactElement {
+  const { messages } = useLocale();
+  const [hasChecked, setHasChecked] = useState(false);
+  const descriptionId = useId();
+  const { status } = update;
+  const canCheck =
+    status.state === AppUpdateState.CURRENT ||
+    (status.state === AppUpdateState.ERROR && status.phase === AppUpdatePhase.CHECK);
+  const isChecking = status.state === AppUpdateState.CHECKING || (canCheck && update.isRequesting);
+  let detail = messages.updateCheckDescription;
+  switch (status.state) {
+    case AppUpdateState.DISABLED:
+      detail = messages.updateDisabled;
+      break;
+    case AppUpdateState.CURRENT:
+      detail = hasChecked ? messages.updateCurrent : messages.updateCheckDescription;
+      break;
+    case AppUpdateState.AVAILABLE:
+      detail = `${messages.updateAvailable(status.version)}. ${messages.updateAvailableHint}`;
+      break;
+    case AppUpdateState.DOWNLOADING:
+      detail = messages.updateDownloading;
+      break;
+    case AppUpdateState.READY:
+      detail = `${messages.updateReady(status.version)}. ${messages.updateReadyHint}`;
+      break;
+    case AppUpdateState.RESTARTING:
+      detail = messages.updateRestarting;
+      break;
+    case AppUpdateState.ERROR:
+      detail =
+        status.phase === AppUpdatePhase.CHECK
+          ? messages.updateCheckFailed
+          : status.phase === AppUpdatePhase.DOWNLOAD
+            ? messages.updateDownloadFailed
+            : messages.updateInstallFailed;
+      break;
+  }
+  if (isChecking) {
+    detail = messages.updateChecking;
+  }
+
+  return (
+    <SettingsRow
+      label={messages.settingsUpdates}
+      description={
+        <span
+          id={descriptionId}
+          role={update.message || status.state === AppUpdateState.ERROR ? 'alert' : 'status'}
+          aria-atomic="true"
+        >
+          {update.message ?? detail}
+        </span>
+      }
+    >
+      <Button
+        variant="default"
+        aria-describedby={descriptionId}
+        loading={isChecking}
+        disabled={!canCheck || update.isRequesting}
+        onClick={() => {
+          setHasChecked(true);
+          void update.checkForUpdates();
+        }}
+      >
+        {isChecking ? messages.updateChecking : messages.updateCheck}
+      </Button>
+    </SettingsRow>
+  );
+}
+
 /** Local preferences in a stacked dialog; the workspace and voice hooks stay mounted. */
 export function SettingsDialog({
   opened,
@@ -83,6 +158,7 @@ export function SettingsDialog({
   onChooseMicrophone,
   onboarding,
   analytics,
+  update,
   onTeamChanged,
   onCreateOrganization,
   teamOrganizationId,
@@ -184,6 +260,7 @@ export function SettingsDialog({
         <Tabs.Panel value={SettingsSection.GENERAL}>
           <Title order={3}>{messages.settingsGeneral}</Title>
           <div className="settings-rows">
+            <SettingsUpdateRow update={update} />
             <SettingsRow
               label={messages.settingsShortcut}
               description={

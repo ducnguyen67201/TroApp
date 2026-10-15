@@ -24,7 +24,11 @@ import type { AuthResult, AuthUser } from '#contracts/AuthSession.js';
 import type { AgentResult } from '#contracts/AgentSession.js';
 import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 import { VoiceShortcut, VoiceState, type VoiceReply } from '#contracts/VoiceInput.js';
-import { AppUpdateState, type AppUpdateSnapshot } from '#contracts/AppUpdate.js';
+import {
+  AppUpdateState,
+  type AppUpdateSnapshot,
+  type AppUpdateReply,
+} from '#contracts/AppUpdate.js';
 import { CompletionMode, TaskOutcomeStatus } from '#contracts/TaskOutcome.js';
 import { microphoneStorageKey } from '../../../src/desktop/renderer/voice/Microphones.js';
 import { App } from '../../../src/desktop/renderer/App.js';
@@ -1007,8 +1011,10 @@ describe('desktop language', () => {
     });
     expect(document.documentElement.lang).toBe('en');
     expect(
-      within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('status').textContent,
-    ).toContain('could not be saved');
+      within(screen.getByRole('dialog', { name: 'Settings' }))
+        .getAllByRole('status')
+        .map((status) => status.textContent),
+    ).toContain('The language changed for now, but could not be saved on this device.');
   });
 
   it('translates bridge errors and retranslates an existing alert when the language changes', async () => {
@@ -1795,6 +1801,160 @@ it('answers a retained lesson through the narrow bridge while the original task 
     });
   });
   expect(await screen.findByText('The whole ERD is ready.')).toBeTruthy();
+});
+
+describe('Settings update checks', () => {
+  it('checks on demand, prevents repeated clicks and confirms when Tro is current', async () => {
+    const bridge = createDesktopBridge();
+    bridge.readAppUpdate.mockResolvedValue({
+      revision: 1,
+      status: { state: AppUpdateState.CURRENT },
+    });
+    let finishCheck: ((reply: AppUpdateReply) => void) | undefined;
+    bridge.checkAppUpdate.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishCheck = resolve;
+        }),
+    );
+    window.tro = bridge;
+    renderDesktop();
+    fireEvent.click(await screen.findByRole('button', { name: 'Settings' }));
+    const dialog = screen.getByRole('dialog', { name: 'Settings' });
+    expect(bridge.checkAppUpdate).not.toHaveBeenCalled();
+    expect(within(dialog).queryByText('Tro is up to date.')).toBeNull();
+    const checkButton = within(dialog).getByRole('button', { name: 'Check for updates' });
+    fireEvent.click(checkButton);
+    const checkingButton = within(dialog).getByRole('button', {
+      name: 'Checking for updates…',
+    });
+    expect(checkingButton).toHaveProperty('disabled', true);
+    fireEvent.click(checkingButton);
+    expect(bridge.checkAppUpdate).toHaveBeenCalledOnce();
+    await act(async () => {
+      finishCheck?.({
+        kind: 'ok',
+        snapshot: { revision: 3, status: { state: AppUpdateState.CURRENT } },
+      });
+      await Promise.resolve();
+    });
+    expect(await within(dialog).findByText('Tro is up to date.')).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'Check for updates' })).toHaveProperty(
+      'disabled',
+      false,
+    );
+    expect(bridge.downloadAppUpdate).not.toHaveBeenCalled();
+    expect(bridge.restartForAppUpdate).not.toHaveBeenCalled();
+  });
+
+  it('makes a manually discovered update available through the existing updater', async () => {
+    const bridge = createDesktopBridge();
+    bridge.readAppUpdate.mockResolvedValue({
+      revision: 1,
+      status: { state: AppUpdateState.CURRENT },
+    });
+    bridge.checkAppUpdate.mockResolvedValue({
+      kind: 'ok',
+      snapshot: { revision: 3, status: { state: AppUpdateState.AVAILABLE, version: '0.2.0' } },
+    });
+    window.tro = bridge;
+    renderDesktop();
+    fireEvent.click(await screen.findByRole('button', { name: 'Settings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Check for updates' }));
+    expect(
+      await within(screen.getByRole('dialog', { name: 'Settings' })).findByText(
+        /Version 0.2.0 available/,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Check for updates' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    expect(bridge.downloadAppUpdate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Close settings' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Update Tro/ }));
+    await waitFor(() => {
+      expect(bridge.downloadAppUpdate).toHaveBeenCalledOnce();
+    });
+    expect(bridge.readAppUpdate).toHaveBeenCalledOnce();
+    expect(bridge.subscribeAppUpdate).toHaveBeenCalledOnce();
+  });
+
+  it('shows failed checks and lets a signed-out user retry in Vietnamese', async () => {
+    window.localStorage.setItem(localeStorageKey, DesktopLocale.VIETNAMESE);
+    const bridge = createDesktopBridge();
+    bridge.readAuthSession.mockResolvedValue({ kind: 'signed-out' });
+    bridge.readAppUpdate.mockResolvedValue({
+      revision: 1,
+      status: { state: AppUpdateState.CURRENT },
+    });
+    bridge.checkAppUpdate
+      .mockRejectedValueOnce(new Error('private update diagnostics'))
+      .mockResolvedValueOnce({
+        kind: 'ok',
+        snapshot: { revision: 3, status: { state: AppUpdateState.CURRENT } },
+      });
+    window.tro = bridge;
+    renderDesktop();
+    fireEvent.click(await screen.findByRole('button', { name: 'Cài đặt' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Kiểm tra bản cập nhật' }));
+    expect(await screen.findByRole('alert')).toHaveProperty(
+      'textContent',
+      'Không thể kiểm tra bản cập nhật.',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Kiểm tra bản cập nhật' }));
+    expect(await screen.findByText('Tro đang ở phiên bản mới nhất.')).toBeTruthy();
+    expect(bridge.checkAppUpdate).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps background update events visible without a manual check', async () => {
+    const bridge = createDesktopBridge();
+    let receive: ((snapshot: AppUpdateSnapshot) => void) | undefined;
+    bridge.readAppUpdate.mockResolvedValue({
+      revision: 1,
+      status: { state: AppUpdateState.CURRENT },
+    });
+    bridge.subscribeAppUpdate.mockImplementation((listener) => {
+      receive = listener;
+      return () => {};
+    });
+    window.tro = bridge;
+    renderDesktop();
+    fireEvent.click(await screen.findByRole('button', { name: 'Settings' }));
+    act(() => {
+      receive?.({ revision: 2, status: { state: AppUpdateState.CHECKING } });
+    });
+    expect(screen.getByRole('button', { name: 'Checking for updates…' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    act(() => {
+      receive?.({ revision: 3, status: { state: AppUpdateState.AVAILABLE, version: '0.2.0' } });
+    });
+    expect(
+      within(screen.getByRole('dialog', { name: 'Settings' })).getByText(/Version 0.2.0 available/),
+    ).toBeTruthy();
+    expect(bridge.checkAppUpdate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Close settings' }));
+    expect(await screen.findByRole('button', { name: /Update Tro/ })).toBeTruthy();
+  });
+
+  it.each([
+    { state: AppUpdateState.DISABLED },
+    { state: AppUpdateState.DOWNLOADING, version: '0.2.0', percent: 40 },
+    { state: AppUpdateState.READY, version: '0.2.0' },
+    { state: AppUpdateState.RESTARTING, version: '0.2.0' },
+  ] satisfies AppUpdateSnapshot['status'][])('prevents checking while $state', async (status) => {
+    const bridge = createDesktopBridge();
+    bridge.readAppUpdate.mockResolvedValue({ revision: 1, status });
+    window.tro = bridge;
+    renderDesktop();
+    fireEvent.click(await screen.findByRole('button', { name: 'Settings' }));
+    const checkButton = screen.getByRole('button', { name: 'Check for updates' });
+    expect(checkButton).toHaveProperty('disabled', true);
+    fireEvent.click(checkButton);
+    expect(bridge.checkAppUpdate).not.toHaveBeenCalled();
+  });
 });
 
 describe('sidebar app updates', () => {
