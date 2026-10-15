@@ -1,8 +1,9 @@
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
 
 export const ReleaseIllustration = {
-  PRACTICE: 'practice',
-  INSIGHTS: 'insights',
+  QR_LOGIN: 'qr-login',
+  TEAM: 'team',
+  ORGANIZATION_LOGO: 'organization-logo',
 } as const;
 
 export type ReleaseIllustration = (typeof ReleaseIllustration)[keyof typeof ReleaseIllustration];
@@ -34,38 +35,56 @@ export const appReleaseNotes: readonly AppReleaseNotes[] = [
     version: '0.1.0',
     highlights: [
       {
-        id: 'practice-feedback',
-        illustration: ReleaseIllustration.PRACTICE,
+        id: 'qr-login',
+        illustration: ReleaseIllustration.QR_LOGIN,
         text: {
           vi: {
-            label: 'Kiểm tra bài làm',
-            title: 'Một gợi ý, đúng lúc cần.',
+            label: 'Đăng nhập bằng QR',
+            title: 'Quét thẻ, bắt đầu học.',
             description:
-              'Chọn cửa sổ bài làm, xem lại ảnh chụp rồi gửi để nhận góp ý. Học sinh có thể xin gợi ý và tự hoàn thành bước tiếp theo.',
+              'Học sinh dùng thẻ QR để đăng nhập trên máy tính đã được tổ chức kích hoạt. Không cần email hay tài khoản Google; bài làm vẫn được lưu cho lần học tiếp theo.',
           },
           en: {
-            label: 'Practice feedback',
-            title: 'A hint when it matters.',
+            label: 'QR login',
+            title: 'Scan your card. Start learning.',
             description:
-              'Choose your work window, review the capture, then submit it for feedback. Students can ask for a hint and take the next step themselves.',
+              'Students can sign in with a QR card on a computer authorized by their organization. No email or Google account needed, and saved work is ready for the next session.',
           },
         },
       },
       {
-        id: 'learning-insights',
-        illustration: ReleaseIllustration.INSIGHTS,
+        id: 'organization-team',
+        illustration: ReleaseIllustration.TEAM,
         text: {
           vi: {
-            label: 'Tiến độ học tập',
-            title: 'Hiểu lớp mình hơn mỗi ngày.',
+            label: 'Quản lý đội nhóm',
+            title: 'Phân quyền, phân công lớp.',
             description:
-              'Theo dõi hành trình học, xem kết quả bài thực hành và nhận ra những lúc học sinh cần thêm một chút hỗ trợ.',
+              'Trong Cài đặt → Đội nhóm, chủ tổ chức có thể thêm thành viên, đặt quyền Giáo viên hoặc Học sinh và phân công giáo viên cho từng lớp. Một lớp có thể có nhiều giáo viên.',
           },
           en: {
-            label: 'Learning insights',
-            title: 'Know your class a little better.',
+            label: 'Team management',
+            title: 'Set roles. Assign classes.',
             description:
-              'Follow learning journeys, review practice results, and spot the moments when a student needs a little more support.',
+              'In Settings → Team, organization owners can add members, set Teacher or Student permissions, and assign teachers to each class. A class can have multiple teachers.',
+          },
+        },
+      },
+      {
+        id: 'organization-logo',
+        illustration: ReleaseIllustration.ORGANIZATION_LOGO,
+        text: {
+          vi: {
+            label: 'Logo tổ chức',
+            title: 'Dấu ấn riêng của tổ chức.',
+            description:
+              'Chủ tổ chức có thể tải lên hoặc thay logo trong Cài đặt → Đội nhóm. Logo hiển thị trên thanh bên, giúp thành viên dễ nhận ra tổ chức của mình.',
+          },
+          en: {
+            label: 'Organization logo',
+            title: 'Make your organization feel at home.',
+            description:
+              'Owners can upload or change their organization’s logo in Settings → Team. It appears in the sidebar so members can recognize their organization at a glance.',
           },
         },
       },

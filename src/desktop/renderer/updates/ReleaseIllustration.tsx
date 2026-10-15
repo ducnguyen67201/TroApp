@@ -1,4 +1,11 @@
-import { IconBook, IconChartBar } from '@tabler/icons-react';
+import {
+  IconBook,
+  IconCheck,
+  IconPhoto,
+  IconQrcode,
+  IconSchool,
+  IconUsers,
+} from '@tabler/icons-react';
 import type { ReactElement } from 'react';
 import { ReleaseIllustration as Illustration } from '../../updates/ReleaseNotes.js';
 import { useLocale } from '../localization/UseLocale.js';
@@ -10,59 +17,95 @@ export function ReleaseIllustration({ kind }: { kind: Illustration }): ReactElem
   const text = whatsNewMessages[locale];
   return (
     <div className="whats-new-illustration" aria-hidden="true">
-      {kind === Illustration.PRACTICE && (
+      {kind === Illustration.QR_LOGIN && (
         <>
           <div className="whats-new-mini-window">
             <div className="whats-new-mini-toolbar">
-              <span>{text.practice}</span>
-              <span className="whats-new-mini-status">{text.practicing}</span>
+              <span>{text.qrLogin}</span>
+              <span className="whats-new-mini-status">{text.authorized}</span>
             </div>
-            <div className="whats-new-code">
-              <div>total = 0</div>
-              <div>for number in range(1, 5):</div>
-              <div>
-                &nbsp;&nbsp;&nbsp; <span>total = number</span>
+            <div className="whats-new-qr-body">
+              <div className="whats-new-qr-card">
+                <IconQrcode size={70} stroke={1.5} />
+                <span>{text.qrCard}</span>
               </div>
-              <div>print(total)</div>
-            </div>
-          </div>
-          <div className="whats-new-floating-note whats-new-feedback">
-            <IconBook size={16} stroke={1.6} />
-            <div>
-              <strong>{text.feedbackTitle}</strong>
-              {text.feedback}
-            </div>
-          </div>
-        </>
-      )}
-      {kind === Illustration.INSIGHTS && (
-        <>
-          <div className="whats-new-mini-window">
-            <div className="whats-new-mini-toolbar">
-              <span>{text.class}</span>
-              <span className="whats-new-mini-status">{text.insights}</span>
-            </div>
-            <div className="whats-new-insight-body">
-              <div className="whats-new-mini-heading">{text.insightHeading}</div>
-              <div className="whats-new-journey">
-                <span>{text.complete}</span>
-                <div>
-                  <i />
-                </div>
-                <span>{text.inProgress}</span>
-                <div>
-                  <i />
-                </div>
-                <span>{text.support}</span>
-                <div>
-                  <i />
-                </div>
+              <div className="whats-new-login-result">
+                <span className="whats-new-feature-icon">
+                  <IconCheck size={24} />
+                </span>
+                <strong>{text.qrLogin}</strong>
+                <span>{text.authorized}</span>
               </div>
             </div>
           </div>
           <div className="whats-new-floating-note">
-            <IconChartBar size={15} stroke={1.6} />
-            {text.insightNote}
+            <IconBook size={16} stroke={1.6} />
+            {text.qrNote}
+          </div>
+        </>
+      )}
+      {kind === Illustration.TEAM && (
+        <>
+          <div className="whats-new-mini-window">
+            <div className="whats-new-mini-toolbar">
+              <span>{text.team}</span>
+              <IconUsers size={14} stroke={1.6} />
+            </div>
+            <div className="whats-new-team-body">
+              <div className="whats-new-member-row">
+                <span className="whats-new-avatar">A</span>
+                <span className="whats-new-mini-status">{text.teacher}</span>
+                <span className="whats-new-avatar">B</span>
+                <span className="whats-new-mini-status">{text.student}</span>
+              </div>
+              <div className="whats-new-class-assignment">
+                <IconBook size={22} stroke={1.5} />
+                <div>
+                  <strong>{text.class}</strong>
+                  <span>{text.assigned}</span>
+                </div>
+                <span className="whats-new-avatar">A</span>
+                <span className="whats-new-avatar">C</span>
+              </div>
+            </div>
+          </div>
+          <div className="whats-new-floating-note">
+            <IconCheck size={15} stroke={1.6} />
+            {text.teamNote}
+          </div>
+        </>
+      )}
+      {kind === Illustration.ORGANIZATION_LOGO && (
+        <>
+          <div className="whats-new-mini-window">
+            <div className="whats-new-mini-toolbar">
+              <span>{text.team}</span>
+              <span className="whats-new-mini-status">{text.logo}</span>
+            </div>
+            <div className="whats-new-logo-body">
+              <div className="whats-new-logo-sidebar">
+                <span className="whats-new-school-logo">
+                  <IconSchool size={30} stroke={1.5} />
+                </span>
+                <span className="whats-new-sidebar-line" />
+                <span className="whats-new-sidebar-line" />
+                <span className="whats-new-sidebar-line" />
+              </div>
+              <div className="whats-new-logo-settings">
+                <strong>{text.organization}</strong>
+                <span className="whats-new-school-logo">
+                  <IconSchool size={30} stroke={1.5} />
+                </span>
+                <span className="whats-new-logo-upload">
+                  <IconPhoto size={13} />
+                  {text.changeLogo}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="whats-new-floating-note">
+            <IconCheck size={15} stroke={1.6} />
+            {text.logoNote}
           </div>
         </>
       )}
