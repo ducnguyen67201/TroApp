@@ -24,6 +24,7 @@ import {
 import type { z } from 'zod';
 import { ClassArtwork } from './ClassArtwork.js';
 import { ClassSessionBadge } from './ClassSessionBadge.js';
+import { ClassOrganizationBadge } from './ClassOrganizationBadge.js';
 import { ClassSettings } from './ClassSettings.js';
 import { ClassView } from '../navigation/DesktopRoute.js';
 import type { DesktopNavigation } from '../navigation/UseDesktopNavigation.js';
@@ -65,6 +66,11 @@ export function TeacherClassroomPanel({
   const [className, setClassName] = useState('');
   const [createOpened, setCreateOpened] = useState(false);
   const [organizationId, setOrganizationId] = useState('');
+  const [teacherId, setTeacherId] = useState('');
+  const teachers = home.organizationTeachers ?? [];
+  const selectedTeacherId = teachers.some((teacher) => teacher.id === teacherId)
+    ? teacherId
+    : teachers[0]?.id;
   const teachingOrganizations = home.teachingOrganizations ?? [];
   const selectedOrganizationId = teachingOrganizations.some(
     (organization) => organization.id === organizationId,
@@ -167,12 +173,15 @@ export function TeacherClassroomPanel({
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            if (!className.trim() || busy) {
+            if (!className.trim() || busy || (home.adminOrganizationId && !selectedTeacherId)) {
               return;
             }
             void send({
               kind: 'create-class',
               name: className,
+              ...(home.adminOrganizationId && selectedTeacherId
+                ? { teacherId: selectedTeacherId }
+                : {}),
               ...(selectedOrganizationId ? { organizationId: selectedOrganizationId } : {}),
             }).then(() => {
               setCreateOpened(false);
@@ -191,6 +200,25 @@ export function TeacherClassroomPanel({
                 }))}
                 onChange={(event) => {
                   setOrganizationId(event.currentTarget.value);
+                }}
+              />
+            )}
+            {home.adminOrganizationId && (
+              <NativeSelect
+                label={t('Assigned teacher', 'Giáo viên phụ trách')}
+                value={selectedTeacherId ?? ''}
+                disabled={busy || teachers.length === 0}
+                data={teachers.map((teacher) => ({ value: teacher.id, label: teacher.name }))}
+                description={
+                  teachers.length === 0
+                    ? t(
+                        'Add a teacher in Settings → Team before creating a class.',
+                        'Thêm giáo viên trong Cài đặt → Đội nhóm trước khi tạo lớp.',
+                      )
+                    : undefined
+                }
+                onChange={(event) => {
+                  setTeacherId(event.currentTarget.value);
                 }}
               />
             )}
@@ -292,6 +320,7 @@ export function TeacherClassroomPanel({
                               artworkIndex === 0 ? 'lesson' : artworkIndex === 1 ? 'code' : 'design'
                             }
                           />
+                          <ClassOrganizationBadge entry={entry} t={t} />
                           <span className="classroom-card-title">{entry.schoolClass.name}</span>
                           <span className="classroom-card-copy">
                             {course?.title ??
@@ -584,6 +613,7 @@ export function TeacherClassroomPanel({
               <ClassSessionBadge live={Boolean(liveMeeting)} t={t} />
             </div>
             <ClassArtwork kind="books" className="classroom-detail-art" />
+            <ClassOrganizationBadge entry={selectedClass} t={t} />
             <div className="classroom-detail-heading">
               <Text className="classroom-eyebrow">
                 {t('Your teaching space', 'Không gian giảng dạy')}

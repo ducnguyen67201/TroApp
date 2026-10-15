@@ -13,6 +13,7 @@ import {
   findOrCreateOrganizationStudent,
   readOrganizationComputerUsage,
   requireOrganizationComputerAdmin,
+  requireComputerCodeIssuer,
 } from './OrganizationComputerAccess.js';
 import { ClassroomStatus } from '#contracts/Classroom.js';
 import { readClassroomTransactionConflict } from './RetryClassroomTransaction.js';
@@ -448,7 +449,7 @@ export function createPrismaStudentAccessStore(databaseUrl: string): {
           if (admission.revoked || admission.expiresAt <= now || !admission.issuedById) {
             throw new StudentAccessError();
           }
-          await requireOrganizationComputerAdmin(
+          await requireComputerCodeIssuer(
             transaction,
             admission.issuedById,
             admission.organizationId,

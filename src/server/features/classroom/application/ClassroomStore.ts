@@ -51,6 +51,9 @@ export interface ClassroomStore {
   readMaterialPublication(courseId: string): Promise<MaterialPublication | null>;
   updateClassCourse(classId: string, courseId: string): Promise<void>;
   readAccountRole(userId: string): Promise<AccountRole>;
+  readAdminOrganizationId(userId: string): Promise<string | null>;
+  listOrganizationTeachers(organizationId: string): Promise<{ id: string; name: string }[]>;
+  canAdministerClass(userId: string, classId: string): Promise<boolean>;
   canTeachClass(userId: string, classId: string): Promise<boolean>;
   listClassTeacherIds(classId: string): Promise<string[]>;
   readClassRole(userId: string, classId: string): Promise<AccountRole | null>;
@@ -60,6 +63,7 @@ export interface ClassroomStore {
   ): Promise<{ organizationId: string; role: AccountRole }[]>;
   listTeachingOrganizations(userId: string): Promise<{ id: string; name: string }[]>;
   readClassOrganizationId(classId: string): Promise<string | null>;
+  readClassOrganization(classId: string): Promise<{ id: string; name: string } | null>;
   readCourseOrganizationId(courseId: string): Promise<string | null>;
   /** Reads the persisted flag; missing users have no admin authority. */
   readIsAdmin(userId: string): Promise<boolean>;

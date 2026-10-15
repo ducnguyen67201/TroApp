@@ -1,6 +1,7 @@
 import type { AuthResult } from '#contracts/AuthSession.js';
 import { DesktopOrganizationRequestSchema } from '#contracts/DesktopOrganizations.js';
 import {
+  OrganizationAction,
   OrganizationFailure,
   OrganizationReplySchema,
   type OrganizationCommand,
@@ -24,6 +25,7 @@ export function registerOrganizationsHandlers<Event>(
   },
   access: OrganizationAccess<Event>,
   client: { execute(command: OrganizationCommand): Promise<OrganizationReply> },
+  selectOrganization?: (organizationId: string | null) => Promise<OrganizationReply>,
 ): void {
   ipc.handle('tro:organizations', async (event, raw): Promise<OrganizationReply> => {
     const unavailable: OrganizationReply = {
@@ -37,7 +39,7 @@ export function registerOrganizationsHandlers<Event>(
     if (!parsed.success) {
       return { kind: 'failed', code: OrganizationFailure.INVALID };
     }
-    return access.gate.runRequest(async () => {
+    const action = async (): Promise<OrganizationReply> => {
       try {
         const session = await access.readSession();
         if (
@@ -48,12 +50,20 @@ export function registerOrganizationsHandlers<Event>(
         ) {
           return unavailable;
         }
-        const reply = OrganizationReplySchema.parse(await client.execute(parsed.data.command));
+        const command = parsed.data.command;
+        const reply = OrganizationReplySchema.parse(
+          command.kind === OrganizationAction.SELECT_ADMIN_ORGANIZATION && selectOrganization
+            ? await selectOrganization(command.organizationId)
+            : await client.execute(command),
+        );
         return access.isTrustedSender(event) ? reply : unavailable;
       } catch {
         console.warn('organizations.access.failed', { stage: 'authorize' });
         return unavailable;
       }
-    }, unavailable);
+    };
+    return parsed.data.command.kind === OrganizationAction.SELECT_ADMIN_ORGANIZATION
+      ? access.gate.changeContext(action, unavailable)
+      : access.gate.runRequest(action, unavailable);
   });
 }

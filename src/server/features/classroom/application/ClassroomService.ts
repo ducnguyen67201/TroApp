@@ -74,21 +74,7 @@ export class ClassroomService {
     command: ClassroomCommand,
   ): Promise<ClassroomReply> {
     if (command.kind === 'admin-people' || command.kind === 'admin-view-as') {
-      if (!(await store.readIsAdmin(userId))) {
-        throw new ClassroomError(ClassroomFailure.FORBIDDEN);
-      }
-      if (command.kind === 'admin-people') {
-        return {
-          kind: 'admin-people',
-          ...(await store.listClassroomPeople(command.search, command.offset)),
-        };
-      }
-      const person =
-        command.userId === null ? null : await store.readClassroomPerson(command.userId);
-      if (command.userId !== null && !person) {
-        throw new ClassroomError(ClassroomFailure.NOT_FOUND);
-      }
-      return { kind: 'admin-view-as', person };
+      throw new ClassroomError(ClassroomFailure.FORBIDDEN);
     }
     if (command.kind === 'admin-classes' || command.kind === 'admin-class') {
       // Check the stored flag inside every request's transaction, including after revocation.
@@ -201,6 +187,7 @@ export class ClassroomService {
       return { kind: 'ok' };
     }
     if (command.kind === 'home') {
+      const adminOrganizationId = await store.readAdminOrganizationId(userId);
       const classes = await store.listClasses(userId);
       const teachingClasses = [];
       for (const schoolClass of classes) {
@@ -246,19 +233,26 @@ export class ClassroomService {
         kind: 'home',
         home: {
           isAdmin: await store.readIsAdmin(userId),
+          ...(adminOrganizationId
+            ? {
+                adminOrganizationId,
+                organizationTeachers: await store.listOrganizationTeachers(adminOrganizationId),
+              }
+            : {}),
           role,
           ...(teachingOrganizations.length > 0 ? { teachingOrganizations } : {}),
           courses,
           classes: await Promise.all(
             classes.map(async (schoolClass) => {
-              const organizationId = await store.readClassOrganizationId(schoolClass.id);
+              const organization = await store.readClassOrganization(schoolClass.id);
               return {
                 schoolClass,
-                ...(organizationId !== null
+                ...(organization !== null
                   ? {
                       canTeach: await store.canTeachClass(userId, schoolClass.id),
                       supportsStudentQr: false,
-                      organizationId,
+                      organizationId: organization.id,
+                      organizationName: organization.name,
                     }
                   : {}),
                 meetings: await store.listMeetings(schoolClass.id),
@@ -283,10 +277,25 @@ export class ClassroomService {
         userId,
         command.organizationId,
       );
+      const adminOrganizationId = await store.readAdminOrganizationId(userId);
+      const teacherId = command.teacherId ?? userId;
+      if (adminOrganizationId) {
+        if (
+          organizationId !== adminOrganizationId ||
+          !command.teacherId ||
+          !(await store.listOrganizationTeachers(adminOrganizationId)).some(
+            (teacher) => teacher.id === teacherId,
+          )
+        ) {
+          throw new ClassroomError(ClassroomFailure.FORBIDDEN);
+        }
+      } else if (teacherId !== userId) {
+        throw new ClassroomError(ClassroomFailure.FORBIDDEN);
+      }
       const course = command.courseRevisionId
         ? await store.readCourse(command.courseRevisionId)
         : await store.saveCourse(
-            userId,
+            teacherId,
             command.name,
             {
               modules: [
@@ -321,12 +330,14 @@ export class ClassroomService {
             organizationId,
           );
       if (
-        course?.ownerId !== userId ||
+        !course ||
+        (course.ownerId !== userId &&
+          !(adminOrganizationId !== null && adminOrganizationId === organizationId)) ||
         (await store.readCourseOrganizationId(course.id)) !== organizationId
       ) {
         throw new ClassroomError(ClassroomFailure.FORBIDDEN);
       }
-      await store.saveClass(userId, command.name, course.id, organizationId);
+      await store.saveClass(teacherId, command.name, course.id, organizationId);
       return { kind: 'ok' };
     }
     if (command.kind === ClassroomEnrollmentKind.QR_STUDENT) {
@@ -659,6 +670,16 @@ export class ClassroomService {
     userId: string,
     requestedOrganizationId?: string,
   ): Promise<string | null> {
+    const adminOrganizationId = await store.readAdminOrganizationId(userId);
+    if (adminOrganizationId !== null) {
+      if (
+        requestedOrganizationId !== undefined &&
+        requestedOrganizationId !== adminOrganizationId
+      ) {
+        throw new ClassroomError(ClassroomFailure.FORBIDDEN);
+      }
+      return adminOrganizationId;
+    }
     if (requestedOrganizationId !== undefined) {
       if (
         (await store.readOrganizationRole(userId, requestedOrganizationId)) !== AccountRole.TEACHER

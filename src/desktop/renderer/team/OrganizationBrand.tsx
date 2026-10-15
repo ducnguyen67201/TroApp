@@ -7,6 +7,7 @@ import { teamMessages } from './TeamMessages.js';
 
 interface OrganizationBrandProps {
   accountId: string;
+  administeredOrganizationId?: string | null;
   organizations: readonly OrganizationSummary[];
   onEditLogo?: ((organizationId: string) => void) | undefined;
 }
@@ -39,9 +40,10 @@ function BrandMark({
   );
 }
 
-/** Branding uses actual memberships only; choosing a logo never changes classroom authority. */
+/** Ordinary branding uses memberships; an admin scope explicitly selects its organization artwork. */
 export function OrganizationBrand({
   accountId,
+  administeredOrganizationId,
   organizations,
   onEditLogo,
 }: OrganizationBrandProps): ReactElement {
@@ -49,7 +51,10 @@ export function OrganizationBrand({
   const messages = teamMessages[locale];
   const [choice, setChoice] = useState<{ accountId: string; organizationId: string } | null>(null);
   const joined = organizations.filter(
-    (organization) => organization.role !== null && organization.isNameSet !== false,
+    (organization) =>
+      (administeredOrganizationId
+        ? organization.id === administeredOrganizationId
+        : organization.role !== null) && organization.isNameSet !== false,
   );
   const selected =
     joined.find(
@@ -57,7 +62,11 @@ export function OrganizationBrand({
         choice?.accountId === accountId && organization.id === choice.organizationId,
     ) ?? joined[0];
   const label = selected ? `${selected.name} · Tro` : 'Tro';
-  if (joined.length < 2 && selected?.isOwner && onEditLogo) {
+  if (
+    joined.length < 2 &&
+    (selected?.isOwner || (selected && administeredOrganizationId === selected.id)) &&
+    onEditLogo
+  ) {
     return (
       <UnstyledButton
         className="organization-brand"
@@ -102,18 +111,19 @@ export function OrganizationBrand({
             {organization.name}
           </Menu.Item>
         ))}
-        {selected?.isOwner && onEditLogo && (
-          <>
-            <Menu.Divider />
-            <Menu.Item
-              onClick={() => {
-                onEditLogo(selected.id);
-              }}
-            >
-              {messages.editLogo}
-            </Menu.Item>
-          </>
-        )}
+        {(selected?.isOwner || (selected && administeredOrganizationId === selected.id)) &&
+          onEditLogo && (
+            <>
+              <Menu.Divider />
+              <Menu.Item
+                onClick={() => {
+                  onEditLogo(selected.id);
+                }}
+              >
+                {messages.editLogo}
+              </Menu.Item>
+            </>
+          )}
       </Menu.Dropdown>
     </Menu>
   );

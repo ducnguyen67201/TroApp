@@ -15,6 +15,7 @@ export const OrganizationLimits = {
 
 export const OrganizationAction = {
   HOME: 'home',
+  SELECT_ADMIN_ORGANIZATION: 'select-admin-organization',
   TEAM: 'team',
   ASSIGN_CLASS_TEACHER: 'assign-class-teacher',
   SET_CLASS_TEACHERS: 'set-class-teachers',
@@ -142,6 +143,10 @@ export const OrganizationCommandSchema = z.discriminatedUnion('kind', [
     classId: z.uuid(),
   }),
   z.strictObject({ kind: z.literal(OrganizationAction.HOME) }),
+  z.strictObject({
+    kind: z.literal(OrganizationAction.SELECT_ADMIN_ORGANIZATION),
+    organizationId: OrganizationIdSchema.nullable(),
+  }),
   z.strictObject({ kind: z.literal(OrganizationAction.CONTINUE_PERSONAL) }),
   z.strictObject({
     kind: z.literal(OrganizationAction.APPROVE_OWNER),
@@ -229,9 +234,14 @@ export type OrganizationCommand = z.infer<typeof OrganizationCommandSchema>;
 
 export const OrganizationReplySchema = z.discriminatedUnion('kind', [
   z.strictObject({
+    kind: z.literal(OrganizationAction.SELECT_ADMIN_ORGANIZATION),
+    organization: OrganizationSchema.nullable(),
+  }),
+  z.strictObject({
     kind: z.literal(OrganizationAction.HOME),
     organizations: z.array(OrganizationSummarySchema).max(OrganizationLimits.ORGANIZATIONS),
     isAdmin: z.boolean(),
+    adminOrganizationId: OrganizationIdSchema.nullable().optional(),
     canCreateOrganization: z.boolean().optional(),
     hasChosenOrganization: z.boolean().optional(),
   }),

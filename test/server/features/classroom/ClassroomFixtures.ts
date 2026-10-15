@@ -71,6 +71,15 @@ export class MemoryClassroomStore implements ClassroomStore {
       this.organizationMemberships.get(`${organizationId}:${userId}`)?.role ?? null,
     );
   }
+  readAdminOrganizationId(): Promise<string | null> {
+    return Promise.resolve(null);
+  }
+  listOrganizationTeachers(): Promise<{ id: string; name: string }[]> {
+    return Promise.resolve([]);
+  }
+  canAdministerClass(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
   async canTeachClass(userId: string, classId: string): Promise<boolean> {
     const schoolClass = await this.readClass(classId);
     if (!schoolClass || (await this.readClassRole(userId, classId)) !== AccountRole.TEACHER) {
@@ -112,6 +121,13 @@ export class MemoryClassroomStore implements ClassroomStore {
     return (await this.listOrganizationMemberships(userId))
       .filter((membership) => membership.role === AccountRole.TEACHER)
       .map((membership) => ({ id: membership.organizationId, name: membership.name }));
+  }
+  readClassOrganization(classId: string) {
+    const id = this.classOrganizations.get(classId);
+    const membership = [...this.organizationMemberships.values()].find(
+      (entry) => entry.organizationId === id,
+    );
+    return Promise.resolve(id ? { id, name: membership?.name ?? 'Organization' } : null);
   }
   readClassOrganizationId(classId: string) {
     return Promise.resolve(this.classOrganizations.get(classId) ?? null);

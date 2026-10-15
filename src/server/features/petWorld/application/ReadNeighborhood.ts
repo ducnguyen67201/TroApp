@@ -11,6 +11,9 @@ export async function requireNeighborhoodAccess(
   actorId: string,
   classId: string,
 ): Promise<void> {
+  if (await transaction.canAdministerClass?.(actorId, classId)) {
+    return;
+  }
   const schoolClass = await transaction.readClassAccess(classId);
   const role = await transaction.readClassRole(actorId, classId);
   if (

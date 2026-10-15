@@ -1,3 +1,4 @@
+import { AdminOrganizationSwitcher } from './team/AdminOrganizationSwitcher.js';
 import { LessonVideosPage } from './lessonVideos/LessonVideosPage.js';
 import { AnalyticsScreen } from '#contracts/Analytics.js';
 import { DesktopPermissionState } from '#contracts/DesktopPermissions.js';
@@ -121,7 +122,26 @@ export function App(): ReactElement {
   const [teamRevision, setTeamRevision] = useState(0);
   const [logoOrganizationId, setLogoOrganizationId] = useState<string | null>(null);
   const organizationSetup = useOrganizationSetup(user?.learner ? null : activeUserId);
-  const workspaceUserId = organizationSetup.isBlocking ? null : activeUserId;
+  const [isSwitchingOrganization, setSwitchingOrganization] = useState(false);
+  const organizationScopeKey = `${activeUserId ?? 'signed-out'}:${organizationSetup.adminOrganizationId ?? 'personal'}`;
+  const workspaceUserId =
+    organizationSetup.isBlocking || isSwitchingOrganization ? null : activeUserId;
+
+  async function selectAdminOrganization(organizationId: string | null): Promise<void> {
+    setSwitchingOrganization(true);
+    closeDialog(DesktopDialog.SETTINGS);
+    try {
+      if (await organizationSetup.selectAdminOrganization(organizationId)) {
+        setLogoOrganizationId(null);
+        setAccountRole(null);
+        setTeamRevision((revision) => revision + 1);
+        navigation.openClassroom();
+      }
+    } finally {
+      setSwitchingOrganization(false);
+    }
+  }
+
   const analytics = useAnalytics(
     controller.isLoading || accountTransition
       ? null
@@ -288,6 +308,7 @@ export function App(): ReactElement {
           didFailToSave={whatsNew.didFailToSave}
         />
         <SettingsDialog
+          key={organizationScopeKey}
           {...dialogs.register(DesktopDialog.SETTINGS)}
           onExitTransitionEnd={() => {
             if (!dialogs.state.microphone) {
@@ -299,7 +320,7 @@ export function App(): ReactElement {
             closeDialog(DesktopDialog.SETTINGS);
             organizationSetup.openChoice();
           }}
-          teamOrganizationId={logoOrganizationId}
+          teamOrganizationId={organizationSetup.adminOrganizationId ?? logoOrganizationId}
           onTeamChanged={() => {
             setAccountRole(null);
             setTeamRevision((revision) => revision + 1);
@@ -359,6 +380,7 @@ export function App(): ReactElement {
             <Group gap={10} className="brand">
               <OrganizationBrand
                 accountId={user.id}
+                administeredOrganizationId={organizationSetup.adminOrganizationId}
                 organizations={accountTransition ? [] : organizationSetup.organizations}
                 onEditLogo={(organizationId) => {
                   setLogoOrganizationId(organizationId);
@@ -550,9 +572,25 @@ export function App(): ReactElement {
           )}
           <div
             className="main-panel"
-            inert={(accountTransition && Boolean(user)) || organizationSetup.isBlocking}
+            inert={
+              (accountTransition && Boolean(user)) ||
+              organizationSetup.isBlocking ||
+              isSwitchingOrganization
+            }
           >
-            <div className="panel-content">
+            {organizationSetup.isAdmin && (
+              <AdminOrganizationSwitcher
+                view={organizationSetup}
+                disabled={
+                  accountTransition ||
+                  isSwitchingOrganization ||
+                  controller.isSending ||
+                  controller.isResetting
+                }
+                onSelect={selectAdminOrganization}
+              />
+            )}
+            <div className="panel-content" hidden={isSwitchingOrganization}>
               {(controller.message || companionMessage) && (
                 <Alert
                   role="alert"
@@ -635,8 +673,9 @@ export function App(): ReactElement {
               </div>
               {user && !accountTransition && !organizationSetup.isBlocking && (
                 <ClassroomPage
-                  key={user.id}
+                  key={organizationScopeKey}
                   refreshRevision={teamRevision}
+                  organizations={organizationSetup.organizations}
                   userId={user.id}
                   userName={user.name}
                   navigation={navigation}
@@ -659,14 +698,14 @@ export function App(): ReactElement {
                 !accountTransition &&
                 !organizationSetup.isBlocking &&
                 page === DesktopPage.LESSON_VIDEOS && (
-                  <LessonVideosPage key={user.id} locale={locale} />
+                  <LessonVideosPage key={organizationScopeKey} locale={locale} />
                 )}
               {user &&
                 !accountTransition &&
                 !organizationSetup.isBlocking &&
                 page === DesktopPage.PET_WORLD && (
                   <PetWorldPage
-                    key={user.id}
+                    key={organizationScopeKey}
                     userId={user.id}
                     userName={user.name}
                     initialClassId={navigation.route.classId}

@@ -38,6 +38,9 @@ export class OrganizationService {
           kind: 'home',
           organizations: await store.listOrganizations(account),
           isAdmin: account.isAdmin,
+          ...(account.adminOrganizationId
+            ? { adminOrganizationId: account.adminOrganizationId }
+            : {}),
           ...(refreshed.hasChosenOrganization !== undefined
             ? {
                 hasChosenOrganization: refreshed.hasChosenOrganization,
@@ -46,6 +49,21 @@ export class OrganizationService {
               }
             : {}),
         };
+      }
+      if (command.kind === OrganizationAction.SELECT_ADMIN_ORGANIZATION) {
+        this.requireAdmin(account);
+        const organization =
+          command.organizationId === null
+            ? null
+            : await this.readOrganization(store, command.organizationId);
+        return { kind: OrganizationAction.SELECT_ADMIN_ORGANIZATION, organization };
+      }
+      if (
+        account.adminOrganizationId &&
+        'organizationId' in command &&
+        command.organizationId !== account.adminOrganizationId
+      ) {
+        throw new OrganizationError(OrganizationFailure.FORBIDDEN);
       }
       if (command.kind === OrganizationAction.CONTINUE_PERSONAL) {
         await store.saveOrganizationChoice(account.id, true);
@@ -252,6 +270,10 @@ export class OrganizationService {
     organizationId: string,
   ): Promise<Organization> {
     const organization = await this.readOrganization(store, organizationId);
+    const account = await store.readAccount(userId);
+    if (account?.isAdmin && account.adminOrganizationId === organizationId) {
+      return organization;
+    }
     const membership = await store.readMembership(organizationId, userId);
     if (organization.ownerUserId !== userId || !membership || membership.removedAt !== null) {
       throw new OrganizationError(OrganizationFailure.FORBIDDEN);

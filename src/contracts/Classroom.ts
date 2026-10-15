@@ -258,9 +258,20 @@ export const ClassroomOrganizationCapability = {
   VERSION: '1',
 } as const;
 
+/** Adds class organization names only for clients that can parse them. */
+export const ClassroomOrganizationLabelCapability = {
+  HEADER: 'x-tro-classroom-organization-label',
+  VERSION: '1',
+} as const;
+
 export const ClassroomHomeSchema = z.strictObject({
   viewingAs: ClassroomPersonSchema.nullable().optional(),
   isAdmin: z.boolean().default(false),
+  adminOrganizationId: z.uuid().nullable().optional(),
+  organizationTeachers: z
+    .array(z.strictObject({ id: z.string().min(1).max(256), name: z.string().max(256) }))
+    .max(500)
+    .optional(),
   role: AccountRoleSchema,
   teachingOrganizations: z
     .array(z.strictObject({ id: z.uuid(), name: shortText }))
@@ -283,6 +294,7 @@ export const ClassroomHomeSchema = z.strictObject({
         canTeach: z.boolean().optional(),
         supportsStudentQr: z.boolean().optional(),
         organizationId: z.uuid().optional(),
+        organizationName: shortText.optional(),
       }),
     )
     .max(100),
@@ -329,6 +341,7 @@ export const ClassroomCommandSchema = z.discriminatedUnion('kind', [
   }),
   z.strictObject({
     kind: z.literal('create-class'),
+    teacherId: z.string().min(1).max(256).optional(),
     organizationId: z.uuid().optional(),
     name: shortText,
     courseRevisionId: z.uuid().optional(),

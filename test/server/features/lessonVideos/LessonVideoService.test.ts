@@ -436,3 +436,33 @@ it('does not offer a recovery that still cannot fit an outstanding saved operati
   );
   expect(readLessonView(lesson).canContinue).toBe(false);
 });
+
+it('lets an explicitly authorized organization administrator read another teacher’s lesson without changing its creator', async () => {
+  const lesson = createLessonFixture();
+  const ports = createLessonPorts(lesson);
+  const adminId = randomUUID();
+  const sources = {
+    authorize: vi.fn<LessonSources['authorize']>().mockResolvedValue(),
+    canAdminister: vi.fn<NonNullable<LessonSources['canAdminister']>>().mockResolvedValue(true),
+    read: vi.fn<LessonSources['read']>().mockResolvedValue(lesson.sources),
+    list: vi
+      .fn<LessonSources['list']>()
+      .mockResolvedValue([{ id: lesson.classId, name: 'Class', materials: [] }]),
+  } satisfies LessonSources;
+  const service = new LessonVideoService(
+    ports.store,
+    sources,
+    ports.content,
+    ports.renderer,
+    lesson.settings,
+    randomUUID,
+    (value) => value,
+  );
+  expect((await service.readOwnedLesson(adminId, lesson.id)).ownerId).toBe(lesson.ownerId);
+  await service.execute(adminId, { kind: LessonCommand.LIST });
+  expect(ports.store.list).toHaveBeenCalledWith(adminId, [lesson.classId]);
+  sources.canAdminister.mockResolvedValue(false);
+  await expect(service.readOwnedLesson(adminId, lesson.id)).rejects.toMatchObject({
+    code: LessonVideoFailure.FORBIDDEN,
+  });
+});

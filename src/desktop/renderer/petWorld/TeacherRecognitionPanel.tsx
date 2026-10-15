@@ -11,6 +11,7 @@ type RecognitionView = Extract<PetWorldReply, { kind: 'class-recognition' }>;
 
 interface TeacherRecognitionPanelProps {
   userId: string;
+  canManageAll?: boolean;
   recognition: RecognitionView;
   isSaving: boolean;
   locale: DesktopLocale;
@@ -22,6 +23,7 @@ interface TeacherRecognitionPanelProps {
 /** Class recognition composes input, descriptive coverage and immutable award history. */
 export function TeacherRecognitionPanel({
   userId,
+  canManageAll = false,
   recognition,
   isSaving,
   locale,
@@ -41,6 +43,7 @@ export function TeacherRecognitionPanel({
       <RecognitionCoverage recognition={recognition} t={t} />
       <RecognitionHistory
         userId={userId}
+        canManageAll={canManageAll}
         recognition={recognition}
         isSaving={isSaving}
         locale={locale}

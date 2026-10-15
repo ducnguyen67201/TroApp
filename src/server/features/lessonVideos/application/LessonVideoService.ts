@@ -69,7 +69,10 @@ export class LessonVideoService {
   ) {}
   async readOwnedLesson(ownerId: string, id: string): Promise<StoredLesson> {
     const lesson = await this.store.read(id);
-    if (!lesson || lesson.ownerId !== ownerId) {
+    if (
+      !lesson ||
+      (lesson.ownerId !== ownerId && !(await this.sources.canAdminister?.(ownerId, lesson.classId)))
+    ) {
       throw new LessonVideoError(LessonVideoFailure.FORBIDDEN);
     }
     await this.sources.authorize(ownerId, lesson.classId);
@@ -94,9 +97,20 @@ export class LessonVideoService {
     }
     if (command.kind === LessonCommand.LIST) {
       const classes = await this.sources.list(ownerId);
+      const administeredClassIds: string[] = [];
+      for (const schoolClass of classes) {
+        if (await this.sources.canAdminister?.(ownerId, schoolClass.id)) {
+          administeredClassIds.push(schoolClass.id);
+        }
+      }
       return {
         kind: 'list',
-        lessons: (await this.store.list(ownerId))
+        lessons: (
+          await this.store.list(
+            ownerId,
+            administeredClassIds.length ? administeredClassIds : undefined,
+          )
+        )
           .filter((lesson) => classes.some((item) => item.id === lesson.classId))
           .map(readLessonView),
       };

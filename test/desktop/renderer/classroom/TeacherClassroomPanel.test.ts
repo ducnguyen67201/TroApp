@@ -449,3 +449,35 @@ describe('teacher classroom cards', () => {
     });
   });
 });
+
+it('labels class cards with their own organization rather than the first teaching organization', () => {
+  const home = createHome();
+  home.teachingOrganizations = [
+    { id: crypto.randomUUID(), name: 'Codespace Education' },
+    { id: crypto.randomUUID(), name: 'test' },
+  ];
+  home.classes = home.classes.map((entry, index) => ({
+    ...entry,
+    organizationId: crypto.randomUUID(),
+    organizationName: index === 0 ? 'Codespace Education' : 'test',
+  }));
+  render(createPanel(createProps(home)));
+  expect(
+    within(screen.getByRole('button', { name: 'Manage Class A' })).getByText('Codespace Education'),
+  ).toBeTruthy();
+  expect(
+    within(screen.getByRole('button', { name: 'Manage Class B' })).getByText('test'),
+  ).toBeTruthy();
+  expect(
+    within(screen.getByRole('complementary', { name: 'Class details' })).getByText(
+      'Codespace Education',
+    ),
+  ).toBeTruthy();
+});
+
+it('labels unscoped class cards as Personal', () => {
+  render(createPanel(createProps(createHome())));
+  expect(
+    within(screen.getByRole('button', { name: 'Manage Class A' })).getByText('Personal'),
+  ).toBeTruthy();
+});

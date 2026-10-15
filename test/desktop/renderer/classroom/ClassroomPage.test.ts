@@ -1,16 +1,13 @@
 // @vitest-environment happy-dom
 import { createElement, type ReactElement } from 'react';
 import { MantineProvider } from '@mantine/core';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AccountRole } from '#contracts/AccountRole.js';
-import {
-  ClassroomFailure,
-  type ClassroomCommand,
-  type ClassroomHome,
-} from '#contracts/Classroom.js';
-import type { ClassroomPerson } from '#contracts/ClassroomViewAs.js';
+import { type ClassroomCommand, type ClassroomHome } from '#contracts/Classroom.js';
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
+import { ClassOrganizationBadge } from '../../../../src/desktop/renderer/classroom/ClassOrganizationBadge.js';
+import type { OrganizationSummary } from '#contracts/Organizations.js';
 import { ClassroomPage } from '../../../../src/desktop/renderer/classroom/ClassroomPage.js';
 import { LocaleProvider } from '../../../../src/desktop/renderer/localization/LocaleProvider.js';
 import { useDesktopNavigation } from '../../../../src/desktop/renderer/navigation/UseDesktopNavigation.js';
@@ -18,16 +15,24 @@ import { ClassView } from '../../../../src/desktop/renderer/navigation/DesktopRo
 import type { DesktopNavigation } from '../../../../src/desktop/renderer/navigation/UseDesktopNavigation.js';
 
 interface PanelProps {
+  home: ClassroomHome;
   userId: string;
   send: (command: ClassroomCommand) => Promise<void>;
   navigation: DesktopNavigation;
 }
 vi.mock('../../../../src/desktop/renderer/classroom/TeacherClassroomPanel.js', () => ({
-  TeacherClassroomPanel: ({ userId, send }: PanelProps) =>
+  TeacherClassroomPanel: ({ userId, send, home }: PanelProps) =>
     createElement(
       'div',
       {},
       `Teacher classes: ${userId}`,
+      ...home.classes.map((entry) =>
+        createElement(ClassOrganizationBadge, {
+          key: entry.schoolClass.id,
+          entry,
+          t: (english) => english,
+        }),
+      ),
       createElement(
         'button',
         {
@@ -40,11 +45,18 @@ vi.mock('../../../../src/desktop/renderer/classroom/TeacherClassroomPanel.js', (
     ),
 }));
 vi.mock('../../../../src/desktop/renderer/classroom/StudentClassroomPanel.js', () => ({
-  StudentClassroomPanel: ({ userId, navigation }: PanelProps) =>
+  StudentClassroomPanel: ({ userId, navigation, home }: PanelProps) =>
     createElement(
       'div',
       {},
       `Student classes: ${userId}`,
+      ...home.classes.map((entry) =>
+        createElement(ClassOrganizationBadge, {
+          key: entry.schoolClass.id,
+          entry,
+          t: (english) => english,
+        }),
+      ),
       createElement(
         'button',
         {
@@ -58,44 +70,40 @@ vi.mock('../../../../src/desktop/renderer/classroom/StudentClassroomPanel.js', (
 }));
 const joinedClassId = '22222222-2222-4222-8222-222222222222';
 const onRoleChange = vi.fn<(role: AccountRole) => void>();
-const teacher: ClassroomPerson = {
-  id: 'teacher',
-  name: 'Teacher One',
-  email: 'teacher@example.test',
-  role: AccountRole.TEACHER,
-};
-const student: ClassroomPerson = {
-  id: 'student',
-  name: 'Student One',
-  email: 'student@example.test',
-  role: AccountRole.STUDENT,
-};
 
-function RoutedPage({ refreshRevision = 0 }: { refreshRevision?: number }): ReactElement {
+interface RoutedPageProps {
+  refreshRevision?: number;
+  organizations?: readonly Pick<OrganizationSummary, 'id' | 'name'>[];
+}
+
+function RoutedPage({ refreshRevision = 0, organizations }: RoutedPageProps): ReactElement {
   return createElement(ClassroomPage, {
     userId: 'admin',
     active: true,
     refreshRevision,
+    ...(organizations ? { organizations } : {}),
     navigation: useDesktopNavigation(),
     onRoleChange,
   });
 }
 
-function page(refreshRevision = 0): ReactElement {
+function page(
+  refreshRevision = 0,
+  organizations?: readonly Pick<OrganizationSummary, 'id' | 'name'>[],
+): ReactElement {
   return createElement(MantineProvider, {
     env: 'test',
     children: createElement(LocaleProvider, {
-      children: createElement(RoutedPage, { refreshRevision }),
+      children: createElement(RoutedPage, {
+        refreshRevision,
+        ...(organizations ? { organizations } : {}),
+      }),
     }),
   });
 }
 
-function home(
-  role: AccountRole,
-  isAdmin: boolean,
-  viewingAs: ClassroomPerson | null = null,
-): ClassroomHome {
-  return { isAdmin, role, courses: [], classes: [], viewingAs };
+function home(role: AccountRole, isAdmin: boolean): ClassroomHome {
+  return { isAdmin, role, courses: [], classes: [] };
 }
 
 function teacherClasses(userId: string): ClassroomHome['classes'] {
@@ -134,13 +142,13 @@ afterEach(() => {
 });
 
 it.each([AccountRole.STUDENT, AccountRole.TEACHER])(
-  'hides the person picker for ordinary %s accounts',
+  'has no impersonation controls for %s accounts, including admins',
   async (role) => {
     const send = vi
       .fn<NonNullable<DesktopBridge['controlClassroom']>>()
       .mockImplementation((command) =>
         Promise.resolve(
-          command.kind === 'home' ? { kind: 'home', home: home(role, false) } : { kind: 'ok' },
+          command.kind === 'home' ? { kind: 'home', home: home(role, true) } : { kind: 'ok' },
         ),
       );
     vi.stubGlobal('tro', { controlClassroom: send });
@@ -171,81 +179,6 @@ it('refreshes classroom permissions after a Settings team change', async () => {
   expect(onRoleChange).toHaveBeenLastCalledWith(AccountRole.TEACHER);
 });
 
-it('switches existing teacher and student screens, permits actions, and returns to the admin', async () => {
-  let selected: ClassroomPerson | null = null;
-  const send = vi
-    .fn<NonNullable<DesktopBridge['controlClassroom']>>()
-    .mockImplementation((command) => {
-      if (command.kind === 'home') {
-        return Promise.resolve({
-          kind: 'home',
-          home: {
-            ...home(selected?.role ?? AccountRole.STUDENT, true, selected),
-            classes: selected?.role === AccountRole.TEACHER ? teacherClasses(selected.id) : [],
-          },
-        });
-      }
-      if (command.kind === 'admin-people') {
-        return Promise.resolve({
-          kind: 'admin-people',
-          people: [teacher, student],
-          hasMore: false,
-        });
-      }
-      if (command.kind === 'admin-view-as') {
-        selected =
-          command.userId === teacher.id ? teacher : command.userId === student.id ? student : null;
-        return Promise.resolve({ kind: 'admin-view-as', person: selected });
-      }
-      return Promise.resolve({ kind: 'ok' });
-    });
-  vi.stubGlobal('tro', { controlClassroom: send });
-  render(page());
-  fireEvent.click(await screen.findByRole('button', { name: 'View as: Me' }));
-  fireEvent.click(await screen.findByRole('button', { name: /Teacher One · Teacher/ }));
-  await screen.findByText('Teacher classes: teacher');
-  expect(screen.queryByText('Student classes: teacher')).toBeNull();
-  expect(screen.queryByText('Student classes: admin')).toBeNull();
-  expect(screen.getByRole('heading', { name: 'Classes for Teacher One' })).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'Create a class' }));
-  await waitFor(() => {
-    expect(send).toHaveBeenCalledWith({ kind: 'create-class', name: 'New class' });
-  });
-  fireEvent.click(screen.getByRole('combobox', { name: 'Class list' }));
-  fireEvent.click(await screen.findByRole('option', { name: 'Classes joined' }));
-  await screen.findByText('Student classes: teacher');
-  expect(screen.queryByText('Teacher classes: teacher')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Open joined class' }));
-  expect(window.location.hash).toBe(`#/classroom/${joinedClassId}/activities`);
-  expect(screen.queryByText('Teacher classes: teacher')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'All classes' }));
-  expect(screen.getByRole('combobox', { name: 'Class list' }).getAttribute('value')).toBe(
-    'Classes joined',
-  );
-  fireEvent.click(screen.getByRole('button', { name: 'View as: Teacher One' }));
-  fireEvent.click(await screen.findByRole('button', { name: /Student One · Student/ }));
-  await screen.findByText('Student classes: student');
-  expect(screen.queryByText('Student classes: teacher')).toBeNull();
-  expect(screen.queryByText('Teacher classes: teacher')).toBeNull();
-  expect(onRoleChange.mock.calls.every(([role]) => role === AccountRole.STUDENT)).toBe(true);
-  let lastSelection = -1;
-  send.mock.calls.forEach(([command], index) => {
-    if (command.kind === 'admin-view-as') {
-      lastSelection = index;
-    }
-  });
-  expect(
-    send.mock.calls.slice(lastSelection + 1).some(([command]) => command.kind === 'resume'),
-  ).toBe(false);
-  fireEvent.click(screen.getByRole('button', { name: 'View as: Student One' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'Return to my account' }));
-  await screen.findByText('Student classes: admin');
-  fireEvent.click(screen.getByRole('button', { name: 'View as: Me' }));
-  fireEvent.click(await screen.findByRole('button', { name: /Teacher One · Teacher/ }));
-  await screen.findByText('Teacher classes: teacher');
-  expect(screen.queryByText('Student classes: teacher')).toBeNull();
-});
-
 it('opens an enrolled teacher class deep link in a single student panel and preserves its list on return', async () => {
   window.location.hash = `#/classroom/${joinedClassId}/activities`;
   const send = vi
@@ -272,54 +205,6 @@ it('opens an enrolled teacher class deep link in a single student panel and pres
   expect(screen.queryByText('Student classes: admin')).toBeNull();
 });
 
-it('clears selected data after access is revoked and still allows returning to self', async () => {
-  const intervals = vi.spyOn(globalThis, 'setInterval');
-  let selected: ClassroomPerson | null = null;
-  let revoked = false;
-  const send = vi
-    .fn<NonNullable<DesktopBridge['controlClassroom']>>()
-    .mockImplementation((command) => {
-      if (command.kind === 'home') {
-        return Promise.resolve(
-          revoked && selected
-            ? { kind: 'failed', code: ClassroomFailure.FORBIDDEN }
-            : {
-                kind: 'home',
-                home: home(selected?.role ?? AccountRole.STUDENT, !revoked, selected),
-              },
-        );
-      }
-      if (command.kind === 'admin-people') {
-        return Promise.resolve({ kind: 'admin-people', people: [teacher], hasMore: false });
-      }
-      if (command.kind === 'admin-view-as') {
-        selected = command.userId ? teacher : null;
-        return Promise.resolve({ kind: 'admin-view-as', person: selected });
-      }
-      return Promise.resolve({ kind: 'ok' });
-    });
-  vi.stubGlobal('tro', { controlClassroom: send });
-  render(page());
-  fireEvent.click(await screen.findByRole('button', { name: 'View as: Me' }));
-  fireEvent.click(await screen.findByRole('button', { name: /Teacher One · Teacher/ }));
-  await screen.findByText('Teacher classes: teacher');
-  revoked = true;
-  const refresh = [...intervals.mock.calls].reverse().find(([, delay]) => delay === 10_000)?.[0];
-  await act(async () => {
-    if (typeof refresh === 'function') {
-      refresh();
-    }
-    await Promise.resolve();
-  });
-  await waitFor(() => {
-    expect(screen.queryByText('Teacher classes: teacher')).toBeNull();
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'View as: Teacher One' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'Return to my account' }));
-  await screen.findByText('Student classes: admin');
-  expect(screen.queryByRole('button', { name: /View as/ })).toBeNull();
-});
-
 it('uses the enrolled screen when a retained teacher assignment has no current teaching authority', async () => {
   const classes = teacherClasses('admin').map((entry) => ({
     ...entry,
@@ -341,3 +226,56 @@ it('uses the enrolled screen when a retained teacher assignment has no current t
   await screen.findByText('Student classes: admin');
   expect(screen.queryByText('Teacher classes: admin')).toBeNull();
 });
+
+it.each([AccountRole.TEACHER, AccountRole.STUDENT])(
+  'resolves organization names for %s when an older classroom API omits them',
+  async (role) => {
+    const codespaceId = crypto.randomUUID();
+    const testId = crypto.randomUUID();
+    const legacyHome: ClassroomHome = {
+      ...home(role, false),
+      teachingOrganizations: [{ id: codespaceId, name: 'Codespace Education' }],
+      classes: [
+        ...teacherClasses('admin').map((entry, index) => ({
+          ...entry,
+          organizationId: index === 0 ? codespaceId : testId,
+        })),
+        {
+          schoolClass: {
+            id: crypto.randomUUID(),
+            teacherId: 'admin',
+            name: 'Personal Python',
+            courseRevisionId: crypto.randomUUID(),
+          },
+          meetings: [],
+        },
+      ],
+    };
+    const send = vi
+      .fn<NonNullable<DesktopBridge['controlClassroom']>>()
+      .mockImplementation((command) =>
+        Promise.resolve(
+          command.kind === 'home' ? { kind: 'home', home: legacyHome } : { kind: 'ok' },
+        ),
+      );
+    vi.stubGlobal('tro', { controlClassroom: send });
+    const view = render(page());
+    await screen.findByText('Codespace Education');
+    expect(screen.getByText('Organization name unavailable')).toBeTruthy();
+    expect(screen.getByText('Personal')).toBeTruthy();
+
+    view.rerender(
+      page(0, [
+        { id: crypto.randomUUID(), name: 'Unrelated sidebar organization' },
+        { id: testId, name: 'Test organization' },
+        { id: codespaceId, name: 'Codespace Education' },
+      ]),
+    );
+    await screen.findByText('Test organization');
+    expect(screen.getByText('Codespace Education')).toBeTruthy();
+    expect(screen.getByText('Personal')).toBeTruthy();
+    expect(screen.queryByText('Organization name unavailable')).toBeNull();
+    expect(screen.queryByText('Unrelated sidebar organization')).toBeNull();
+    expect(legacyHome.classes[0]).not.toHaveProperty('organizationName');
+  },
+);

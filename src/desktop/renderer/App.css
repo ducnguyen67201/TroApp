@@ -263,7 +263,11 @@ button.organization-brand:hover {
   max-width: 100%;
 }
 
-.desktop-shell[data-signed-out='true'] .panel-content {
+.desktop-shell[data-signed-out='true'] .panel-content[hidden] {
+  display: none;
+}
+
+.panel-content {
   padding-block: 32px;
 }
 
@@ -1675,6 +1679,24 @@ button.organization-brand:hover {
   max-width: 160px;
   height: 132px;
   margin: 15px auto 12px;
+}
+
+.classroom-organization-badge {
+  display: inline-flex;
+  align-items: baseline;
+  align-self: flex-start;
+  gap: 6px;
+  max-width: 100%;
+  width: fit-content;
+  margin-bottom: 8px;
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--tro-classroom-green), white 91%);
+  color: color-mix(in srgb, var(--tro-classroom-green), var(--tro-classroom-ink) 70%);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .classroom-card-title {

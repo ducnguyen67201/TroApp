@@ -5,6 +5,7 @@ import type { Logger } from 'pino';
 import {
   ClassroomAdminCapability,
   ClassroomOrganizationCapability,
+  ClassroomOrganizationLabelCapability,
   ClassroomCommandSchema,
   ClassroomReplySchema,
   ClassroomFailure,
@@ -104,6 +105,16 @@ export function registerClassroomRoutes(
         }
       }
       if (result.kind === 'home') {
+        if (
+          request.headers[ClassroomOrganizationLabelCapability.HEADER] !==
+          ClassroomOrganizationLabelCapability.VERSION
+        ) {
+          result.home.classes = result.home.classes.map((entry) => {
+            const legacyEntry = { ...entry };
+            delete legacyEntry.organizationName;
+            return legacyEntry;
+          });
+        }
         if (
           request.headers[CompanyComputerCapability.HEADER] !== CompanyComputerCapability.VERSION
         ) {

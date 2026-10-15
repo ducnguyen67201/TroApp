@@ -222,9 +222,13 @@ owns transactions, credentials, quotas and revocation;
 [OrganizationComputerAccess](../src/server/persistence/OrganizationComputerAccess.ts)
 owns persisted organization administration, QR identity and usage reads.
 
-The organization owner or a verified platform admin creates an organization
-activation code under Settings → Team → Company computers, without entering a
-computer name. Ordinary teachers and students cannot issue codes or view usage.
+The organization owner or a verified platform admin explicitly scoped to that
+organization creates an organization activation code under Settings → Team → Company computers, without entering a
+computer name. Platform admins, including admins who own an organization, must select
+that organization before creating/revoking codes or computers or reading usage; Personal
+workspace never grants computer administration. The UI hides these controls until selection,
+and persistence enforces the same rule inside staff transactions.
+Ordinary teachers and students cannot issue codes or view usage.
 Codes are short-lived, reusable across the organization's computers and prefixed
 `TRO-`; only their digests are persisted. Each successful new activation creates its
 own installation grant and generates a distinct name such as Computer 1. Name
@@ -235,7 +239,9 @@ reserve their names and count toward the technical installation limit.
 
 A retry with the same activation operation reconciles its existing grant without
 creating another computer or incrementing the code's activation count. The issuer
-must have current administrative authority for each new activation. Revoking or
+must have current administrative authority for each new activation. This is a separate
+persisted-authority check: redemption does not require the original issuer's selected
+workspace or live session, but revoked admin/owner authority prevents new activations. Revoking or
 expiring a code stops future activations, while existing installation grants and
 idempotent activation recovery remain valid under their own expiry and revocation
 rules. Revoking a computer disables that installation and its learner sessions
@@ -389,8 +395,8 @@ retry/sign-out. A conditional write and database trigger protect permanent names
 including ownership transfers and the legacy rename command.
 
 Settings → Team centers on direct additions and member permissions, with logo and
-admin ownership controls collapsed. Only the current active owner can add people,
-change teacher/student permissions or remove members. Verified existing accounts
+admin ownership controls collapsed. The current active owner or a platform administrator explicitly scoped to the
+organization can add people, change teacher/student permissions or remove members. Verified existing accounts
 join immediately; unknown/unverified emails reserve a place in
 `OrganizationEmailMember`. Authenticated organization HOME reconciles those records
 only with an unambiguous verified account email. Claiming and membership writes
@@ -413,7 +419,7 @@ picker prepares a static 128-pixel PNG from PNG/JPEG/WebP input before the narro
 organization bridge sends it. The backend independently bounds dimensions, decoded
 pixel bytes, PNG checksums and filters, then re-encodes without metadata; SVGs and
 remote image URLs are excluded. Prisma stores the image with the organization.
-Only the current active owner can write it; members receive it through authenticated
+The current active owner or a scoped platform administrator can write it; members receive it through authenticated
 organization reads. The compact sidebar shows organization artwork with a Tro badge;
 the assistant and app retain Tro branding. Accounts in multiple organizations can
 choose sidebar branding independently of classroom access. Platform admin directory
@@ -468,7 +474,7 @@ skip the personal organization-setup chooser and cannot call organization manage
 endpoints. Their memberships are created only through an organization-authorized
 installation login; classroom enrollment remains an explicit teacher action. Legacy personal-class
 QR grants remain class-scoped, and moving such a class revokes its old grants.
-Platform admin classroom delegation continues through its separately authorized path.
+Platform admins use the organization context described below; they never impersonate a learner.
 
 The additive migration leaves existing classes and courses unscoped, preserving
 their global account-role and ownership/enrollment rules. It creates no organizations,
@@ -488,8 +494,8 @@ class's permission, rather than applying an aggregate teacher role to every clas
 Electron main owns organization HTTP cookies. [RegisterOrganizations](../src/desktop/main/organizations/RegisterOrganizations.ts)
 checks the IPC sender, verified session and expected account ID while holding the
 account transition gate. Preload exposes only the validated organization command
-capability. Settings requests use the actual signed-in identity, independently of
-Classroom View as, and the renderer discards replies from stale account generations.
+capability. Settings requests use the actual signed-in identity and selected admin organization;
+the renderer discards replies from stale account and organization generations.
 
 ## Agent requests and model gateway
 
@@ -900,28 +906,54 @@ teacher-paced sessions bind the current activity, while self-paced sessions allo
 student selection. Class detail routes remain inside the installed renderer's hash
 router; a route does not authorize class access.
 
-Admins use the Classroom toolbar's **View as** person picker to select a teacher
-or student, then use the same classroom screens with that person's classroom
-permissions, including changes to classes, materials, sessions, practice and insights.
-The classroom renders one person's class list at a time. Teachers who also enroll
-in classes can switch between classes taught and classes joined; enrolled class
-routes open the student panel instead of appending a second dashboard.
-The signed-in account and cookies remain the administrator's. Main owns the selected
-person in memory and adds a scoped header only to classroom transports. The backend
-checks the persisted admin flag and the target account on every delegated request;
-other APIs reject that header. A target's own admin flag does not grant delegated
-admin operations. Completed requests record actor/subject IDs, operation, route,
-request ID and status, never submitted content, in `classroom.view_as.completed`.
+Platform administrators (`User.isAdmin`, separate from teacher/student roles) select
+an organization in the workspace-wide admin selector. The signed-in user remains
+the actor for every operation; no member session, membership or ownership is created.
+[AdminOrganizationController](../src/desktop/main/organizations/AdminOrganizationController.ts)
+keeps the selection in main-process memory, validates selection through the organization
+API, and attaches the contract-owned scope header only to organization, classroom,
+materials, practice, insights, lesson-video, Pet World and student-access transports.
+[RegisterAdminOrganization](../src/server/auth/RegisterAdminOrganization.ts) checks the
+persisted admin flag and organization on every scoped request. Its AsyncLocalStorage
+context preserves the actor and organization across that request's async operations,
+with independent contexts for concurrent requests. It never changes the authenticated
+user ID. Persistence adapters consume that context; application services receive
+explicit authority through their existing store ports. Teaching/member authority is
+rechecked inside transactions, including after revocation.
 
-View changes use the account transition gate, clear participation, prepared work,
-insight/export state and abort old transport requests. Active authenticated requests
-and agent work prevent switching. The renderer remounts the existing classroom
-panels and discards late replies. Selecting a student does not automatically restore
-or take over that student's live device lease; joining remains an explicit action.
-Returning to the signed-in account is possible even after admin access is revoked.
-Account changes clear the selection. Paid gateways and non-classroom features keep
-the actual signed-in identity. Legacy read-only admin class endpoints remain for
-older clients; the separate admin browser is no longer rendered.
+Scoped admins can manage the selected team's membership, logo and teacher assignments,
+and use the existing teacher screens for every class in that organization. Class and
+course listings are scoped; cross-organization IDs do not grant authority. New classes
+require an active teacher selected from that organization. The real teacher owns the
+class/course; admin auditing retains the initiating actor. Existing class ownership and
+teacher assignments are preserved during administrative edits. Insights, practice
+reviews, material preparation/publication and classroom recognition use the same scoped
+class authority. Lesson-video reads and edits can include another teacher's jobs only
+when their class is in the selected organization; creator IDs and usage allowances are
+preserved. Personal resources and credentials keep their existing ownership. Naming,
+capacity, live-session, concurrency and enrollment invariants still apply.
+
+Switching uses the account transition gate, clears participation, prepared work,
+insight/export and Pet World state, and aborts old scoped requests. Authenticated work
+and active agent/voice tasks prevent switching. Renderer pages remount by account and
+organization, hiding the old workspace during transition. Failed selections preserve
+the previous scope. Returning to Personal workspace needs no server authorization;
+account changes and app restarts clear selection. The old person picker and transport
+are removed; legacy impersonation headers and commands are rejected. Legacy read-only
+admin class APIs remain for older clients and respect a supplied organization scope.
+Completed administrative operations log actor/organization IDs, operation, route,
+request ID and status in `organization.admin.completed`, without content or credentials.
+Outside an explicit admin scope, Classroom lists the classes the account teaches or
+has joined across organizations; the sidebar brand selection does not filter that list.
+Teacher and student class cards and detail panels label the class's persisted organization,
+or Personal for an unscoped class. The classroom store reads each visible class's organization
+relation; names are sent only to clients advertising the organization-label capability,
+preserving older strict response parsers. When an older API omits the name, the
+renderer resolves the class organization ID against the current account's organization
+directory or teaching organizations. It never substitutes the selected sidebar brand
+or guesses an organization for personal classes.
+Teacher accounts can still choose between classes taught and classes joined; enrolled
+class routes open the student panel. Administrators never take over student device leases.
 
 `ClassroomSessionController` loads fresh authorized context for each class-bound
 Show me request, including pinned course revision, stage, activity, criteria,

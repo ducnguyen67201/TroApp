@@ -14,6 +14,7 @@ export interface OrganizationAccount {
   emailVerified: boolean;
   role: AccountRole;
   isAdmin: boolean;
+  adminOrganizationId?: string | null;
   canCreateOrganization?: boolean;
   hasChosenOrganization?: boolean;
 }

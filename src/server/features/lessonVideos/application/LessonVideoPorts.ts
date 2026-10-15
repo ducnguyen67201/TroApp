@@ -52,7 +52,7 @@ export interface LessonArtifact {
 
 export interface LessonVideoStore {
   findRequest(ownerId: string, requestId: string): Promise<StoredLesson | null>;
-  list(ownerId: string): Promise<StoredLesson[]>;
+  list(ownerId: string, administeredClassIds?: string[]): Promise<StoredLesson[]>;
   read(id: string): Promise<StoredLesson | null>;
   createLessonWithReservation(lesson: StoredLesson): Promise<StoredLesson>;
   saveStageResult(lesson: StoredLesson, artifact?: LessonArtifact): Promise<StoredLesson>;
@@ -71,6 +71,7 @@ export interface LessonVideoStore {
 }
 
 export interface LessonSources {
+  canAdminister?(actorId: string, classId: string): Promise<boolean>;
   list(
     ownerId: string,
   ): Promise<{ id: string; name: string; materials: { id: string; name: string }[] }[]>;
