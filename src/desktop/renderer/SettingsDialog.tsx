@@ -13,7 +13,8 @@ import { IconPaw, IconSettings, IconUserCircle, IconUsers } from '@tabler/icons-
 import { useId, useState, type ReactElement, type ReactNode } from 'react';
 import { AppUpdatePhase, AppUpdateState } from '#contracts/AppUpdate.js';
 import type { AppUpdateView } from './updates/UseAppUpdate.js';
-import { VoiceShortcut, type VoiceStatus } from '#contracts/VoiceInput.js';
+import type { VoiceStatus } from '#contracts/VoiceInput.js';
+import { VoiceShortcutLabel } from './voice/VoiceShortcutLabel.js';
 import type { AuthUser } from '#contracts/AuthSession.js';
 import { desktopLocales } from './localization/Locale.js';
 import { useLocale } from './localization/UseLocale.js';
@@ -26,12 +27,6 @@ const SettingsSection = {
   PETS: 'pets',
   TEAM: 'team',
 } as const;
-
-const shortcutLabels = {
-  [VoiceShortcut.COMMAND_CONTROL]: 'Command + Control',
-  [VoiceShortcut.CONTROL_ALT]: 'Control + Left Alt',
-  [VoiceShortcut.CONTROL_SHIFT]: 'Control + Shift',
-} satisfies Record<VoiceShortcut, string>;
 
 interface SettingsDialogProps {
   opened: boolean;
@@ -270,7 +265,7 @@ export function SettingsDialog({
               }
             >
               {user ? (
-                <kbd className="settings-shortcut">{shortcutLabels[voiceStatus.shortcut]}</kbd>
+                <kbd className="settings-shortcut">{VoiceShortcutLabel[voiceStatus.shortcut]}</kbd>
               ) : (
                 <Text size="sm" c="dimmed">
                   {messages.signIn}

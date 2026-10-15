@@ -402,8 +402,48 @@ button.organization-brand:hover {
 }
 
 .chat-message[data-role='user'] {
+  margin-left: clamp(12px, 4vw, 40px);
   border: 1px solid var(--tro-border);
-  background: var(--tro-surface);
+  background: var(--tro-muted-surface);
+  border-bottom-right-radius: 4px;
+}
+
+.chat-message[data-role='agent'] {
+  background: transparent;
+}
+
+.conversation-thread {
+  width: 100%;
+  max-width: 780px;
+  align-self: center;
+}
+
+.conversation-heading {
+  padding: 8px 0 12px;
+  border-bottom: 1px solid var(--tro-border);
+  margin-bottom: 20px;
+}
+
+.conversation-voice {
+  padding: 14px 18px;
+  margin: -16px -18px 16px;
+  border-bottom: 1px solid var(--tro-border);
+  border-radius: var(--mantine-radius-lg) var(--mantine-radius-lg) 0 0;
+  background: var(--tro-sidebar);
+  overflow-wrap: anywhere;
+}
+
+.conversation-voice[data-state='recording']:not([data-error]) {
+  background: color-mix(in srgb, var(--tro-classroom-green), var(--tro-surface) 82%);
+}
+
+.conversation-voice[data-error] {
+  background: color-mix(in srgb, var(--tro-classroom-orange), var(--tro-surface) 84%);
+}
+
+.conversation-transcript {
+  padding-top: 10px;
+  border-top: 1px solid var(--tro-border);
 }
 
 .message-text {

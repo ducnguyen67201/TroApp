@@ -1,6 +1,7 @@
 import { AgentProgressPhase } from '#contracts/CompanionHud.js';
 import { StudentDeviceMode } from '#contracts/StudentIdentity.js';
 import {
+  Badge,
   Button,
   Group,
   Loader,
@@ -11,25 +12,34 @@ import {
   Textarea,
   Title,
 } from '@mantine/core';
-import { IconArrowUp, IconBrandGoogle, IconPlus } from '@tabler/icons-react';
+import { IconArrowUp, IconBrandGoogle, IconMicrophone, IconPlus } from '@tabler/icons-react';
 import { TroIcon } from './TroIcon.js';
 import type { ReactElement, ReactNode } from 'react';
 import { AgentTaskMode, AgentTaskModeSchema } from '#contracts/CursorCompanion.js';
 import { useLocale } from './localization/UseLocale.js';
 import { TeachingOutcomeLabel } from './TeachingResultPresentation.js';
-import { MessageRole, type ComputerUseController } from './UseComputerUse.js';
+import { MessageInputSource, MessageRole, type ComputerUseController } from './UseComputerUse.js';
 import { CompletionMode, TaskOutcomeStatus } from '#contracts/TaskOutcome.js';
+
+import {
+  ConversationVoiceStatus,
+  type ConversationVoiceView,
+} from './voice/ConversationVoiceStatus.js';
 
 interface ComputerUsePageProps {
   controller: ComputerUseController;
   signInActions?: ReactNode;
+  voice?: ConversationVoiceView | null;
 }
 
 /** The workspace uses the existing worker bridge; it never calls models directly. */
-export function ComputerUsePage({ controller, signInActions }: ComputerUsePageProps): ReactElement {
+export function ComputerUsePage({
+  controller,
+  signInActions,
+  voice,
+}: ComputerUsePageProps): ReactElement {
   const { messages: translations, locale } = useLocale();
   const { user, isLoading, isSigning, isSending, isSigningOut, isResetting, messages } = controller;
-  const firstName = user?.name.trim().split(/\s+/)[0];
   const outcomeLabels = {
     [TaskOutcomeStatus.SUCCEEDED]: translations.taskSucceeded,
     [TaskOutcomeStatus.PARTIAL]: translations.taskPartial,
@@ -41,11 +51,11 @@ export function ComputerUsePage({ controller, signInActions }: ComputerUsePagePr
     <section className="workspace-page" aria-label={translations.assistant}>
       <Group justify="space-between" align="flex-start" className="page-heading">
         <Stack gap={8}>
-          <Title order={1}>
-            {user ? translations.welcome(firstName ?? user.name) : translations.workspaceHeading}
-          </Title>
+          <Title order={1}>{translations.workspaceHeading}</Title>
           <Text c="dimmed" size="sm">
-            {translations.workspaceDescription}
+            {user?.learner
+              ? translations.conversationTypedDescription
+              : translations.workspaceDescription}
           </Text>
         </Stack>
         {user && (
@@ -115,39 +125,66 @@ export function ComputerUsePage({ controller, signInActions }: ComputerUsePagePr
               </Text>
             </div>
           ) : (
-            <ol className="chat-messages" aria-label={translations.conversation} aria-live="polite">
-              {messages.map((item, index) => (
-                <Paper component="li" className="chat-message" data-role={item.role} key={index}>
-                  <Text size="xs" fw={600} mb={8}>
-                    {item.role === MessageRole.USER ? translations.you : 'Tro'}
-                  </Text>
-                  {item.outcome && (
-                    <Text size="xs" c="dimmed" mb={8}>
-                      {translations[TeachingOutcomeLabel[item.outcome]]}
-                    </Text>
-                  )}
-                  <Text size="sm" className="message-text">
-                    {item.text}
-                  </Text>
-                  {item.completion?.kind === CompletionMode.TASK && (
-                    <Stack
-                      gap={4}
-                      mt="sm"
-                      role="status"
-                      data-outcome={item.completion.outcome.status}
-                    >
+            <section className="conversation-thread" aria-label={translations.conversation}>
+              <Group justify="space-between" gap="xs" className="conversation-heading">
+                <Text size="xs" fw={600}>
+                  {translations.conversationCurrent}
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {translations.conversationSessionOnly}
+                </Text>
+              </Group>
+              <ol
+                className="chat-messages"
+                aria-label={translations.conversation}
+                aria-live="polite"
+              >
+                {messages.map((item, index) => (
+                  <Paper component="li" className="chat-message" data-role={item.role} key={index}>
+                    <Group gap="xs" mb={8}>
+                      {item.role === MessageRole.AGENT && <TroIcon size={24} />}
                       <Text size="xs" fw={600}>
-                        {outcomeLabels[item.completion.outcome.status]}
+                        {item.role === MessageRole.USER ? translations.you : 'Tro'}
                       </Text>
-                      {item.completion.outcome.limitation &&
-                        item.completion.outcome.limitation !== item.text && (
-                          <Text size="sm">{item.completion.outcome.limitation}</Text>
-                        )}
-                    </Stack>
-                  )}
-                </Paper>
-              ))}
-            </ol>
+                      {item.inputSource === MessageInputSource.VOICE && (
+                        <Badge
+                          variant="light"
+                          color="charcoal"
+                          size="sm"
+                          leftSection={<IconMicrophone size={11} aria-hidden="true" />}
+                        >
+                          {translations.conversationVoiceSource}
+                        </Badge>
+                      )}
+                    </Group>
+                    {item.outcome && (
+                      <Text size="xs" c="dimmed" mb={8}>
+                        {translations[TeachingOutcomeLabel[item.outcome]]}
+                      </Text>
+                    )}
+                    <Text size="sm" className="message-text">
+                      {item.text}
+                    </Text>
+                    {item.completion?.kind === CompletionMode.TASK && (
+                      <Stack
+                        gap={4}
+                        mt="sm"
+                        role="status"
+                        data-outcome={item.completion.outcome.status}
+                      >
+                        <Text size="xs" fw={600}>
+                          {outcomeLabels[item.completion.outcome.status]}
+                        </Text>
+                        {item.completion.outcome.limitation &&
+                          item.completion.outcome.limitation !== item.text && (
+                            <Text size="sm">{item.completion.outcome.limitation}</Text>
+                          )}
+                      </Stack>
+                    )}
+                  </Paper>
+                ))}
+              </ol>
+            </section>
           )}
           {controller.teachingStep && (
             <Paper withBorder p="md" role="status" aria-live="polite">
@@ -186,6 +223,12 @@ export function ComputerUsePage({ controller, signInActions }: ComputerUsePagePr
               )}
             </Group>
             <Paper withBorder className="message-composer">
+              {voice && (
+                <ConversationVoiceStatus
+                  voice={voice}
+                  isBusy={isSending && !controller.canAnswerLesson}
+                />
+              )}
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
