@@ -1,5 +1,6 @@
 import { LessonVideosPage } from './lessonVideos/LessonVideosPage.js';
 import { AnalyticsScreen } from '#contracts/Analytics.js';
+import { DesktopPermissionState } from '#contracts/DesktopPermissions.js';
 import { useAnalytics } from './analytics/UseAnalytics.js';
 import { OnboardingStep } from '#contracts/OnboardingValues.js';
 import { useOnboarding } from './onboarding/UseOnboarding.js';
@@ -228,7 +229,12 @@ export function App(): ReactElement {
   const previousPermissionKind = useRef(permissions.status?.kind);
 
   useEffect(() => {
-    if (permissions.status?.kind === 'ready' && previousPermissionKind.current !== 'ready') {
+    /* The first permission read can finish after the user opens Settings.
+     * Close it only when recovering from a known permission problem. */
+    const hadPermissionProblem =
+      previousPermissionKind.current === DesktopPermissionState.NEEDS_PERMISSION ||
+      previousPermissionKind.current === DesktopPermissionState.UNKNOWN;
+    if (permissions.status?.kind === DesktopPermissionState.READY && hadPermissionProblem) {
       closeDialog(DesktopDialog.SETTINGS);
     }
     previousPermissionKind.current = permissions.status?.kind;
@@ -267,7 +273,7 @@ export function App(): ReactElement {
   return (
     <>
       <OrganizationSetupDialog
-        key={activeUserId ?? 'signed-out'}
+        key={`organization-setup:${activeUserId ?? 'signed-out'}`}
         view={organizationSetup}
         onSignOut={controller.signOut}
       />
@@ -668,7 +674,7 @@ export function App(): ReactElement {
         </AppShell.Main>
       </AppShell>
       <OnboardingFlow
-        key={activeUserId ?? 'signed-out'}
+        key={`onboarding:${activeUserId ?? 'signed-out'}`}
         view={onboarding}
         anchors={onboardingAnchors}
         role={accountRole}
