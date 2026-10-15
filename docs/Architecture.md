@@ -120,6 +120,14 @@ a console; it does not recover native crashes or failures during module loading.
 
 ## Authentication and account lifetime
 
+Hosted authentication trusts the client IP header supplied by Railway's public
+HTTP ingress, configured in [AuthDatabase.ts](../src/server/persistence/AuthDatabase.ts).
+Public auth traffic must pass through that ingress; clients must not be able to
+bypass it and supply their own trusted header. Better Auth uses the resolved IP
+for rate limiting, so clients sharing a public IP share an endpoint's limit.
+Production requests without a valid trusted IP retain Better Auth's shared fallback
+bucket. This configuration does not change account or session authorization.
+
 `AuthClient` opens Google sign-in in the system browser through Better Auth.
 Google returns to the backend callback; the backend sends a short-lived code through
 `app.tro.desktop://auth/callback#token=…`. Electron main exchanges and verifies it.
