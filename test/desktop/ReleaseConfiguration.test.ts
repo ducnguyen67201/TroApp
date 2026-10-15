@@ -179,8 +179,63 @@ describe('shared desktop release validation', () => {
       expect(cache).not.toContain('~/.cache/tro/cua-companion\n');
       expect(cache).not.toContain('release/');
       expect(cache).not.toContain('keychain');
+      expect(cache).toContain("if: steps.native-cache-check.outputs.reusable != 'true'");
       expect(workflow).toMatch(/^\s+(?:run: )?pnpm build:cua$/m);
       expect(workflow).toContain('pnpm package:desktop');
+    },
+  );
+
+  it.each(['MacRelease.yml', 'WindowsRelease.yml'])(
+    'gates native reuse on validation and saves tested outputs before signing in %s',
+    (filename) => {
+      const workflow = readFileSync(
+        new URL(`../../.github/workflows/${filename}`, import.meta.url),
+        'utf8',
+      );
+      const step = (name: string): string =>
+        workflow.split(`      - name: ${name}\n`).at(1)?.split('      - name:').at(0) ?? '';
+      const outputCache = step('Restore tested native companion');
+      expect(outputCache).toContain('actions/cache/restore@');
+      expect(outputCache).toContain('path: ~/.cache/tro/cua-companion\n');
+      expect(outputCache).toContain('key: ${{ steps.native-cache-key.outputs.key }}');
+      expect(outputCache).not.toContain('restore-keys:');
+      expect(step('Validate native companion cache')).toContain(
+        'scripts/CheckNativeCompanionCache.ts --check',
+      );
+      const buildName =
+        filename === 'MacRelease.yml'
+          ? 'Build and test pinned native companion without signing credentials'
+          : 'Build Windows companion';
+      for (const name of [buildName, 'Install Rust toolchain', 'Restore native build cache']) {
+        expect(step(name)).toContain("if: steps.native-cache-check.outputs.reusable != 'true'");
+        expect(step(name)).not.toContain('native-output-cache.outputs.cache-hit');
+      }
+      const recordPosition = workflow.indexOf('      - name: Record tested native companion');
+      const savePosition = workflow.indexOf('      - name: Save tested native companion');
+      const credentialPosition = workflow.indexOf(
+        filename === 'MacRelease.yml'
+          ? '      - name: Install temporary signing credentials'
+          : '      - name: Azure OIDC login',
+      );
+      expect(recordPosition).toBeGreaterThan(workflow.indexOf(`      - name: ${buildName}`));
+      expect(savePosition).toBeGreaterThan(recordPosition);
+      expect(credentialPosition).toBeGreaterThan(savePosition);
+      expect(step('Record tested native companion')).toContain(
+        'scripts/CheckNativeCompanionCache.ts --record',
+      );
+      expect(step('Save tested native companion')).not.toContain('always()');
+      expect(step('Save tested native companion')).not.toContain('release/');
+      expect(step('Save native build cache')).toContain(
+        'steps.native-build-cache.outputs.cache-primary-key',
+      );
+      const downloads = step('Restore packaging downloads');
+      expect(downloads).toContain('tro-builder-cache/downloads');
+      expect(downloads).not.toContain('tro-builder-cache\n');
+      expect(downloads).not.toContain('keychain');
+      expect(downloads).not.toContain('release/');
+      expect(workflow.indexOf('      - name: Restore packaging downloads')).toBeLessThan(
+        workflow.indexOf('      - run: pnpm install'),
+      );
     },
   );
 
