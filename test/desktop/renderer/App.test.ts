@@ -3045,7 +3045,9 @@ describe('what’s new', () => {
     expect(screen.queryByRole('dialog', { name: 'What’s new' })).toBeNull();
     fireEvent.click(open);
     let dialog = await screen.findByRole('dialog', { name: 'What’s new' });
-    expect(within(dialog).getByRole('heading', { name: 'A hint when it matters.' })).toBeTruthy();
+    expect(
+      within(dialog).getByRole('heading', { name: 'Scan your card. Start learning.' }),
+    ).toBeTruthy();
     await waitFor(() => {
       expect(bridge.markWhatsNewSeen).toHaveBeenCalledOnce();
     });
@@ -3054,7 +3056,11 @@ describe('what’s new', () => {
       key: 'ArrowRight',
     });
     expect(
-      within(dialog).getByRole('heading', { name: 'Know your class a little better.' }),
+      within(dialog).getByRole('heading', { name: 'Set roles. Assign classes.' }),
+    ).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Next' }));
+    expect(
+      within(dialog).getByRole('heading', { name: 'Make your organization feel at home.' }),
     ).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Start exploring' }));
     await waitFor(() => {
@@ -3062,7 +3068,9 @@ describe('what’s new', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'What’s new' }));
     dialog = await screen.findByRole('dialog', { name: 'What’s new' });
-    expect(within(dialog).getByRole('heading', { name: 'A hint when it matters.' })).toBeTruthy();
+    expect(
+      within(dialog).getByRole('heading', { name: 'Scan your card. Start learning.' }),
+    ).toBeTruthy();
     expect(bridge.markWhatsNewSeen).toHaveBeenCalledOnce();
   });
 
@@ -3114,7 +3122,13 @@ describe('what’s new', () => {
     expect(screen.queryByRole('dialog', { name: 'Có gì mới' })).toBeNull();
     fireEvent.click(open);
     const dialog = await screen.findByRole('dialog', { name: 'Có gì mới' });
-    expect(within(dialog).getByRole('heading', { name: 'Một gợi ý, đúng lúc cần.' })).toBeTruthy();
+    expect(within(dialog).getByRole('heading', { name: 'Quét thẻ, bắt đầu học.' })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Tiếp theo' }));
+    expect(
+      within(dialog).getByRole('heading', { name: 'Phân quyền, phân công lớp.' }),
+    ).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Tiếp theo' }));
+    expect(within(dialog).getByRole('heading', { name: 'Dấu ấn riêng của tổ chức.' })).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Đóng phần giới thiệu' }));
     await waitFor(() => {
       expect(bridge.markWhatsNewSeen).toHaveBeenCalledOnce();
