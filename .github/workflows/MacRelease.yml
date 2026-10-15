@@ -52,6 +52,8 @@ jobs:
           TRO_DESKTOP_RELEASE_VERSION: ${{ inputs.release-version }}
         run: pnpm exec tsx scripts/ApplyDesktopReleaseVersion.ts
       - run: pnpm lint
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
       - run: pnpm format:check
       - run: pnpm typecheck
       - run: pnpm test
