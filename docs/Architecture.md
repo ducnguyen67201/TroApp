@@ -1221,7 +1221,16 @@ main-only publication job in the existing `release` environment. It waits for
 Windows and both Mac architectures, selects the newest successful artifact attempt
 for each target within the same run/version/source, validates signature-inventory
 hashes, and uploads all targets to a new draft at the source commit. Uploaded asset
-names, sizes and SHA-256 digests must match before publication. The publisher
+names, sizes and SHA-256 digests must match before publication. Both platform
+workflows read the shared `MAIN_VITE_UPDATE_FEED_URL` from the `release` environment
+and bake the validated public feed into the app and
+electron-builder's `app-update.yml`. After final signing, notarization and DMG
+stapling, the publisher generates `latest.yml` for Windows and one `latest-mac.yml`
+covering both Mac architectures. Manifests contain SHA-512 hashes and sizes from
+the verified final files, with absolute installer URLs pinned to the release tag.
+Builder manifests are never published directly. Generated JSON is valid YAML for
+the pinned updater; deterministic bytes permit resume verification. The release
+becomes Latest only with all manifest and installer hashes verified. The publisher
 resolves drafts through the CLI and verifies them through the numeric release-ID
 endpoint; the REST tag endpoint only resolves published releases. Explicit resume
 reuses the same run/attempt's fully uploaded draft without creation or upload and
@@ -1349,7 +1358,14 @@ the renderer resources.
 
 `AppUpdateController` owns update lifecycle and admission through an injected port;
 `ElectronAppUpdater` adapts the installed app's configured HTTPS feed. Updates are
-disabled in development or without a feed. Downloads and installation require user
+disabled in development or without a feed; signed release builds embed the feed
+supplied by the release environment. Signed-build Env validation requires a public
+HTTPS feed; production Doppler desktop builds use `tro-local/prd`, while Railway
+backend runtime configuration is independent. Main checks at startup and every four hours,
+and existing welcome/sidebar controls show a newer available version. Full
+downloads avoid blockmap lookups across release tags, and checksum/native signature
+checks, stable-only selection and downgrade refusal remain enabled.
+Downloads and installation require user
 actions. Restart is blocked during active work and cleans up workers/driver first.
 Main validates events before preload exposes progress; the renderer has no arbitrary
 installer path or update URL capability. Signed release tooling belongs to
@@ -1365,8 +1381,10 @@ provenance; the external release inventory records final signed hashes. The GitH
 step. Packaging and notarization use the stored notary profile, then cleanup
 restores the runner's keychain search list and deletes that keychain. Apple
 credentials never become app config.
-The first Mac workflow rejects update feeds because container stapling changes
-artifact hashes. Public workflow dispatch authorizes publication after CI checks;
+Mac verification accepts builder's expected manifest as intermediate output;
+the publisher regenerates public metadata after container stapling changes artifact
+hashes. Already installed builds without a feed require one manual installation
+of a feed-enabled signed build. Public workflow dispatch authorizes publication after CI checks;
 physical Mac acceptance belongs to the preceding release review. Installed-update
 acceptance remains separate. Checked-in tooling alone does not establish successful
 Apple authorization or hardware behavior.

@@ -11,6 +11,7 @@ const doubles = vi.hoisted(() => {
     allowPrerelease: true,
     allowDowngrade: true,
     disableWebInstaller: false,
+    disableDifferentialDownload: false,
     logger: null,
     checkForUpdates: vi.fn<AppUpdater['checkForUpdates']>().mockResolvedValue(null),
     downloadUpdate: vi.fn<AppUpdater['downloadUpdate']>().mockResolvedValue([]),
@@ -22,6 +23,7 @@ const doubles = vi.hoisted(() => {
     | 'allowPrerelease'
     | 'allowDowngrade'
     | 'disableWebInstaller'
+    | 'disableDifferentialDownload'
     | 'logger'
     | 'checkForUpdates'
     | 'downloadUpdate'
@@ -56,6 +58,7 @@ describe('Electron updater adapter', () => {
     expect(doubles.updater.allowPrerelease).toBe(false);
     expect(doubles.updater.allowDowngrade).toBe(false);
     expect(doubles.updater.disableWebInstaller).toBe(true);
+    expect(doubles.updater.disableDifferentialDownload).toBe(true);
     expect(doubles.updater.logger).toBeNull();
     await updater.checkForUpdates();
     expect(doubles.updater.downloadUpdate).not.toHaveBeenCalled();

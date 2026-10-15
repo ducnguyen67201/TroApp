@@ -15,6 +15,7 @@ const environment = {
   AZURE_SIGNING_PUBLISHER: 'Test Publisher',
   MAIN_VITE_API_BASE_URL: 'https://api.example.test',
   MAIN_VITE_APP_ENV: 'prod',
+  MAIN_VITE_UPDATE_FEED_URL: 'https://downloads.example.test/tro/',
 } satisfies NodeJS.ProcessEnv;
 
 describe('Windows release configuration', () => {

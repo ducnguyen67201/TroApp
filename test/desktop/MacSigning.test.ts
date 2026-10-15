@@ -45,6 +45,7 @@ const environment = {
   APPLE_API_ISSUER: macSettings.apiIssuer,
   MAIN_VITE_API_BASE_URL: 'https://api.example.test',
   MAIN_VITE_APP_ENV: 'prod',
+  MAIN_VITE_UPDATE_FEED_URL: 'https://downloads.example.test/tro/',
 } satisfies NodeJS.ProcessEnv;
 const profileEnvironment = {
   ...environment,
@@ -209,11 +210,26 @@ describe('Mac release configuration', () => {
     { APPLE_ID: 'secret@example.test' },
     { APPLE_KEYCHAIN_PROFILE: 'other' },
     { CSC_LINK: 'secret' },
-    { MAIN_VITE_UPDATE_FEED_URL: 'https://example.test/feed/' },
+    { MAIN_VITE_UPDATE_FEED_URL: 'http://example.test/feed/' },
+    { MAIN_VITE_UPDATE_FEED_URL: 'https://example.test/feed/?secret=value' },
   ])('fails closed without leaking configuration: %j', (overrides) => {
     expect(() => readMacSigningEnv({ ...environment, ...overrides }, 'darwin', 'arm64')).toThrow(
       /^macOS release configuration is invalid\.$/,
     );
+  });
+
+  it('allows a validated public update feed without changing signing requirements', () => {
+    expect(
+      readMacSigningEnv(
+        {
+          ...environment,
+          MAIN_VITE_UPDATE_FEED_URL:
+            'https://github.com/ducnguyen67201/TroApp/releases/latest/download',
+        },
+        'darwin',
+        'arm64',
+      ),
+    ).toEqual(macSettings);
   });
 
   it.each([

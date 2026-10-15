@@ -160,6 +160,26 @@ describe('shared desktop release validation', () => {
       expect(workflow).toContain('pnpm package:desktop');
     },
   );
+
+  it('reads the shared release environment update feed for both signed platform builds', () => {
+    const feed = '${{ vars.MAIN_VITE_UPDATE_FEED_URL }}';
+    for (const filename of ['MacRelease.yml', 'WindowsRelease.yml']) {
+      const workflow = readFileSync(
+        new URL(`../../.github/workflows/${filename}`, import.meta.url),
+        'utf8',
+      );
+      expect(workflow).toContain(`MAIN_VITE_UPDATE_FEED_URL: ${feed}\n`);
+      expect(workflow).not.toContain('releases/latest/download');
+    }
+    const packageScript = readFileSync(
+      new URL('../../scripts/PrepareDesktopPackage.ts', import.meta.url),
+      'utf8',
+    );
+    expect(packageScript).toContain("provider: 'generic', url: updateFeedUrl");
+    const main = readFileSync(new URL('../../src/desktop/main/Main.ts', import.meta.url), 'utf8');
+    expect(main).toContain("bundledUpdateUrl: import.meta.env['MAIN_VITE_UPDATE_FEED_URL']");
+    expect(main).toContain('Boolean(environment.UPDATE_FEED_URL)');
+  });
 });
 
 describe('shared desktop release publication boundaries', () => {

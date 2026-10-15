@@ -15,6 +15,8 @@ export function createElectronAppUpdater(): AppUpdaterPort {
   autoUpdater.allowPrerelease = false;
   autoUpdater.allowDowngrade = false;
   autoUpdater.disableWebInstaller = true;
+  /* Manifests pin assets to a release tag; older blockmaps live under different tags. */
+  autoUpdater.disableDifferentialDownload = true;
   autoUpdater.logger = null;
 
   return {
