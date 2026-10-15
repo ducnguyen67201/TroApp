@@ -328,6 +328,10 @@ installer/update. For the Windows smoke check, launch Tro from its Start menu
 shortcut, confirm the main window stays open without a terminal flash, submit a
 request that exercises browser/permission checks and desktop guidance, then quit
 and confirm the owned driver stops.
+Include normal telemetry settings: daemon-only opt-out does not cover MCP proxies.
+A process trace should show no version-check shell; window-event monitoring should
+show no terminal becoming visible during internal checks. Hidden console-host
+processes may still service redirected I/O. User-requested apps stay visible.
 
 Permission queries retain the upstream PowerShell workaround for a previously
 observed native integrity-level mismatch. Each explicit permission check emits a

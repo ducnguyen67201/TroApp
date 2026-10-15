@@ -94,10 +94,11 @@ status. Permission and browser inspection, ACL maintenance, browser cleanup and
 recording helpers use them. User-requested application launches
 retain their separate platform launch path. Both synchronous and Tokio helper tests
 run in the native companion regression selection; Windows probes assert that no
-console exists inside the child.
+console exists inside the child. The Windows suite also launches its own test executable
+as a child probe, checking console absence and stdio for both std and Tokio commands.
 
 Windows health and telemetry version diagnostics share `WindowsVersion.rs` in the
-native Windows adapter. It queries `RtlGetVersion` once in process and returns
+native Windows adapter. It uses the generated Windows bindings to query `RtlGetVersion` once in process and returns
 major/minor/build without guessing a marketing name or servicing revision. Failure
 remains unavailable with a bounded warning; there is no shell fallback. Telemetry
 continues deriving only the OS major version from that diagnostic string.
