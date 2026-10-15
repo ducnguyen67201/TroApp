@@ -11,20 +11,21 @@ import {
 import type { Prisma, Organization } from '../generated/prisma/client.js';
 import { StudentAccessError } from '../features/studentAccess/application/StudentAccessStore.js';
 
-/** Current owners and verified platform admins authorize computers; students never grant device access. */
-export async function requireOrganizationComputerAdmin(
+/** Checks persisted issuer authority independently of the current request or device session. */
+async function requireOrganizationComputerAuthority(
   client: Prisma.TransactionClient,
   actorId: string,
   organizationId: string,
-): Promise<Organization> {
+): Promise<{ organization: Organization; isAdmin: boolean }> {
   const organization = await client.organization.findUnique({ where: { id: organizationId } });
-  const actor = await client.user.findUnique({ where: { id: actorId } });
+  const actor = await client.user.findUnique({
+    where: { id: actorId },
+    select: { emailVerified: true, isAdmin: true },
+  });
   const membership = await client.organizationMembership.findUnique({
     where: { organizationId_userId: { organizationId, userId: actorId } },
   });
   if (
-    (readAdminOrganizationId(actorId) !== null &&
-      readAdminOrganizationId(actorId) !== organizationId) ||
     !organization ||
     organization.nameSetAt === null ||
     !actor?.emailVerified ||
@@ -35,6 +36,40 @@ export async function requireOrganizationComputerAdmin(
       'Only the organization owner or an administrator can authorize computers.',
     );
   }
+  return { organization, isAdmin: actor.isAdmin };
+}
+
+/** Staff reads and writes require an explicit organization scope whenever the actor is an admin. */
+export async function requireOrganizationComputerAdmin(
+  client: Prisma.TransactionClient,
+  actorId: string,
+  organizationId: string,
+): Promise<Organization> {
+  const { organization, isAdmin } = await requireOrganizationComputerAuthority(
+    client,
+    actorId,
+    organizationId,
+  );
+  const selectedOrganizationId = readAdminOrganizationId(actorId);
+  const hasAdminScope = isAdmin && selectedOrganizationId === organizationId;
+  const isUnscopedOwner = !isAdmin && selectedOrganizationId === null;
+  if (!hasAdminScope && !isUnscopedOwner) {
+    throw new StudentAccessError('Select this organization before administering its computers.');
+  }
+  return organization;
+}
+
+/** Redeeming a stored code rechecks its original issuer; the issuer need not have an active session. */
+export async function requireComputerCodeIssuer(
+  client: Prisma.TransactionClient,
+  issuerId: string,
+  organizationId: string,
+): Promise<Organization> {
+  const { organization } = await requireOrganizationComputerAuthority(
+    client,
+    issuerId,
+    organizationId,
+  );
   return organization;
 }
 

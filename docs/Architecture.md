@@ -222,9 +222,13 @@ owns transactions, credentials, quotas and revocation;
 [OrganizationComputerAccess](../src/server/persistence/OrganizationComputerAccess.ts)
 owns persisted organization administration, QR identity and usage reads.
 
-The organization owner or a verified platform admin creates an organization
-activation code under Settings → Team → Company computers, without entering a
-computer name. Ordinary teachers and students cannot issue codes or view usage.
+The organization owner or a verified platform admin explicitly scoped to that
+organization creates an organization activation code under Settings → Team → Company computers, without entering a
+computer name. Platform admins, including admins who own an organization, must select
+that organization before creating/revoking codes or computers or reading usage; Personal
+workspace never grants computer administration. The UI hides these controls until selection,
+and persistence enforces the same rule inside staff transactions.
+Ordinary teachers and students cannot issue codes or view usage.
 Codes are short-lived, reusable across the organization's computers and prefixed
 `TRO-`; only their digests are persisted. Each successful new activation creates its
 own installation grant and generates a distinct name such as Computer 1. Name
@@ -235,7 +239,9 @@ reserve their names and count toward the technical installation limit.
 
 A retry with the same activation operation reconciles its existing grant without
 creating another computer or incrementing the code's activation count. The issuer
-must have current administrative authority for each new activation. Revoking or
+must have current administrative authority for each new activation. This is a separate
+persisted-authority check: redemption does not require the original issuer's selected
+workspace or live session, but revoked admin/owner authority prevents new activations. Revoking or
 expiring a code stops future activations, while existing installation grants and
 idempotent activation recovery remain valid under their own expiry and revocation
 rules. Revoking a computer disables that installation and its learner sessions

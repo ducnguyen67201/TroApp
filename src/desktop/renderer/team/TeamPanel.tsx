@@ -46,6 +46,10 @@ export function TeamPanel({
     selected &&
     (selected.isOwner || (view.home?.isAdmin && view.home.adminOrganizationId === selected.id)),
   );
+  const canManageComputers = Boolean(
+    selected &&
+    (view.home?.isAdmin ? view.home.adminOrganizationId === selected.id : selected.isOwner),
+  );
   const canCreateOrganization =
     view.home?.canCreateOrganization === true &&
     !view.home.organizations.some((organization) => organization.isOwner);
@@ -123,14 +127,12 @@ export function TeamPanel({
           {canManage && selected.isNameSet !== false && (
             <AddOrganizationMember key={selected.id} organizationId={selected.id} view={view} />
           )}
-          {(selected.isOwner || view.home?.isAdmin) &&
-            selected.isNameSet !== false &&
-            canUseStudentAccess() && (
-              <OrganizationComputerPanel
-                key={`${accountId}:${selected.id}`}
-                organizationId={selected.id}
-              />
-            )}
+          {canManageComputers && selected.isNameSet !== false && canUseStudentAccess() && (
+            <OrganizationComputerPanel
+              key={`${accountId}:${selected.id}`}
+              organizationId={selected.id}
+            />
+          )}
           {canManage && view.team?.organization.id === selected.id && (
             <OwnerTeamPanel
               key={selected.id}

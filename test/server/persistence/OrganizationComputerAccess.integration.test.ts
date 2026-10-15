@@ -26,6 +26,9 @@ import {
   ClassroomPacing,
   ClassroomReplySchema,
 } from '#contracts/Classroom.js';
+import { AdminOrganization } from '#contracts/AdminOrganization.js';
+import { registerAdminOrganization } from '../../../src/server/auth/RegisterAdminOrganization.js';
+import { createPrismaOrganizationStore } from '../../../src/server/persistence/PrismaOrganizationStore.js';
 import { AccountRole } from '#contracts/AccountRole.js';
 import { StudentDeviceMode, StudentQrLimits } from '#contracts/StudentIdentity.js';
 
@@ -33,10 +36,16 @@ const environment = readServerEnv(process.env);
 const client = new PrismaClient({
   adapter: new PrismaPg({ connectionString: environment.DATABASE_URL }),
 });
+const organizations = createPrismaOrganizationStore(environment.DATABASE_URL);
 const access = createPrismaStudentAccessStore(environment.DATABASE_URL);
 const classrooms = createPrismaClassroomStore(environment.DATABASE_URL);
 afterAll(async () => {
-  await Promise.all([client.$disconnect(), access.close(), classrooms.close()]);
+  await Promise.all([
+    client.$disconnect(),
+    access.close(),
+    classrooms.close(),
+    organizations.close(),
+  ]);
 });
 
 async function fixture() {
@@ -85,6 +94,12 @@ async function fixture() {
     ['outside', outsiderId],
     ['admin', adminId],
   ]);
+  registerAdminOrganization(
+    api,
+    (headers) => Promise.resolve(staff.get(headers.cookie ?? '') ?? null),
+    organizations.store,
+    api.log,
+  );
   const routes = registerStudentAccessRoutes(
     api,
     access.store,
@@ -95,7 +110,12 @@ async function fixture() {
   registerClassroomRoutes(api, routes.readUserId, classroom, { warn() {}, error() {} });
   api.post('/api/v1/organizations/command', () => ({ kind: 'ok' }));
 
-  const command = (payload: StudentAccessCommand, device?: string, actor?: string) =>
+  const command = (
+    payload: StudentAccessCommand,
+    device?: string,
+    actor?: string,
+    scope?: string,
+  ) =>
     api.inject({
       method: 'POST',
       url: `${StudentAccessPath}/command`,
@@ -103,15 +123,17 @@ async function fixture() {
         origin: 'app.tro.desktop:/',
         ...(device ? { 'x-tro-student-device': device } : {}),
         ...(actor ? { cookie: actor } : {}),
+        ...(scope ? { [AdminOrganization.HEADER]: scope } : {}),
       },
       payload,
     });
 
-  async function createCode(actor = 'owner') {
+  async function createCode(actor = 'owner', scope?: string) {
     const response = await command(
       { kind: StudentAccessKind.CREATE_COMPUTER_CODE, organizationId },
       undefined,
       actor,
+      scope,
     );
     const reply = StudentAccessReplySchema.parse(response.json());
     if (reply.kind !== 'admission') {
@@ -229,7 +251,7 @@ describe('organization computer activation and QR login', () => {
           ).statusCode,
         ).toBe(403);
       }
-      expect(await f.createCode('admin')).toMatch(/^TRO-[A-Z2-7]{16}$/);
+      expect(await f.createCode('admin', f.organizationId)).toMatch(/^TRO-[A-Z2-7]{16}$/);
       const device = await f.activate();
       expect(device.context).toMatchObject({
         organizationId: f.organizationId,
@@ -937,4 +959,87 @@ describe('organization computer activation and QR login', () => {
       await f.api.close();
     }
   });
+});
+
+it('requires the matching admin scope for every computer staff operation without changing owner access', async () => {
+  const f = await fixture();
+  const other = await fixture();
+  try {
+    await f.activate();
+    const before = await f.usage();
+    const computer = before.computers[0];
+    const admission = before.activationCodes[0];
+    if (!computer || !admission) {
+      throw new Error('Missing computer fixture.');
+    }
+    const commands: StudentAccessCommand[] = [
+      { kind: StudentAccessKind.ORGANIZATION_ACCESS, organizationId: f.organizationId },
+      { kind: StudentAccessKind.CREATE_COMPUTER_CODE, organizationId: f.organizationId },
+      {
+        kind: StudentAccessKind.REVOKE_COMPUTER_CODE,
+        organizationId: f.organizationId,
+        admissionId: admission.id,
+      },
+      {
+        kind: StudentAccessKind.REVOKE_COMPUTER,
+        organizationId: f.organizationId,
+        deviceId: computer.id,
+      },
+    ];
+    for (const scope of [undefined, other.organizationId]) {
+      for (const command of commands) {
+        expect((await f.command(command, undefined, 'admin', scope)).statusCode).toBe(403);
+      }
+    }
+    expect(await f.usage()).toEqual(before);
+    expect(await client.studentAccessAudit.count({ where: { actorId: f.adminId } })).toBe(0);
+
+    for (const command of commands) {
+      expect((await f.command(command, undefined, 'admin', f.organizationId)).statusCode).toBe(200);
+    }
+    expect(
+      await client.studentAccessAudit.count({
+        where: { actorId: f.adminId, schoolId: f.organizationId },
+      }),
+    ).toBe(3);
+    expect((await f.usage()).computers[0]?.revoked).toBe(true);
+
+    // Platform admins who are also owners still select a scope for staff operations.
+    await client.user.update({ where: { id: f.ownerId }, data: { isAdmin: true } });
+    expect(
+      (
+        await f.command(
+          { kind: StudentAccessKind.CREATE_COMPUTER_CODE, organizationId: f.organizationId },
+          undefined,
+          'owner',
+        )
+      ).statusCode,
+    ).toBe(403);
+    expect(await f.createCode('owner', f.organizationId)).toMatch(/^TRO-[A-Z2-7]{16}$/);
+  } finally {
+    await Promise.all([f.api.close(), other.api.close()]);
+  }
+});
+
+it('redeems an admin-issued code without a scoped session and rejects new activations after issuer revocation', async () => {
+  const f = await fixture();
+  try {
+    const code = await f.createCode('admin', f.organizationId);
+    const device = await f.activate(code);
+    expect(device.context.organizationId).toBe(f.organizationId);
+    await client.user.update({ where: { id: f.adminId }, data: { isAdmin: false } });
+    expect(
+      (await f.command({ kind: StudentAccessKind.ACTIVATE, code, requestId: randomUUID() }))
+        .statusCode,
+    ).toBe(403);
+    expect(await client.studentDevice.count({ where: { organizationId: f.organizationId } })).toBe(
+      1,
+    );
+    // Existing installations retain their own grants after issuer revocation.
+    expect(
+      (await f.command({ kind: StudentAccessKind.STATUS }, device.credential)).json(),
+    ).toMatchObject({ kind: 'ready' });
+  } finally {
+    await f.api.close();
+  }
 });

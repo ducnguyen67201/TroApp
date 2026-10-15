@@ -45,13 +45,14 @@ const team: Extract<OrganizationReply, { kind: 'team' }> = {
   ],
 };
 
-function createBridge(isOwner = false, isAdmin = false) {
+function createBridge(isOwner = false, isAdmin = false, adminOrganizationId?: string) {
   const home: OrganizationReply = {
     kind: 'home',
     organizations: [
       { ...organization, role: isOwner ? AccountRole.TEACHER : AccountRole.STUDENT, isOwner },
     ],
     isAdmin,
+    ...(adminOrganizationId ? { adminOrganizationId } : {}),
   };
   return {
     controlOrganizations: vi
@@ -87,9 +88,18 @@ async function waitForTeamReady(): Promise<void> {
   });
 }
 
-it.each([false, true])(
-  'shows computer activation controls only for an owner (owner=%s)',
-  async (isOwner) => {
+it.each([
+  { isOwner: false, isAdmin: false, scope: undefined, visible: false },
+  { isOwner: true, isAdmin: false, scope: undefined, visible: true },
+  { isOwner: false, isAdmin: true, scope: undefined, visible: false },
+  { isOwner: true, isAdmin: true, scope: undefined, visible: false },
+  { isOwner: false, isAdmin: true, scope: '22222222-2222-4222-8222-222222222222', visible: false },
+  { isOwner: true, isAdmin: true, scope: '22222222-2222-4222-8222-222222222222', visible: false },
+  { isOwner: false, isAdmin: true, scope: organizationId, visible: true },
+  { isOwner: true, isAdmin: true, scope: organizationId, visible: true },
+])(
+  'computer controls respect owner/admin scope: $isOwner/$isAdmin/$scope',
+  async ({ isOwner, isAdmin, scope, visible }) => {
     const controlStudentAccess = vi
       .fn<NonNullable<DesktopBridge['controlStudentAccess']>>()
       .mockResolvedValue({
@@ -106,11 +116,11 @@ it.each([false, true])(
       });
     Object.defineProperty(window, 'tro', {
       configurable: true,
-      value: { ...createBridge(isOwner), controlStudentAccess },
+      value: { ...createBridge(isOwner, isAdmin, scope), controlStudentAccess },
     });
     renderTeam();
     await screen.findByText(isOwner ? 'Your role: Teacher' : 'Your role: Student');
-    if (isOwner) {
+    if (visible) {
       expect(
         await screen.findByRole('button', { name: 'Create organization activation code' }),
       ).toBeTruthy();
