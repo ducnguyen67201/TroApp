@@ -120,6 +120,7 @@
     "eslint": "^10.0.0",
     "eslint-config-prettier": "^10.1.8",
     "happy-dom": "^20.14.5",
+    "node-gyp": "12.4.0",
     "prettier": "^3.7.4",
     "tsx": "^4.21.0",
     "typescript-eslint": "^8.71.0",

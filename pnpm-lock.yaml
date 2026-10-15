@@ -195,6 +195,9 @@ importers:
       happy-dom:
         specifier: ^20.14.5
         version: 20.14.5
+      node-gyp:
+        specifier: 12.4.0
+        version: 12.4.0
       prettier:
         specifier: ^3.7.4
         version: 3.9.9

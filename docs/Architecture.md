@@ -1209,7 +1209,13 @@ both platform workflows depend on its success before packaging. Platform jobs
 cache only Cargo downloads and compilation outputs, separated by runner,
 architecture and toolchain and keyed by companion contract, patch and build script.
 Restored outputs never bypass pinned-source checks, patch application, native tests,
-building, signing or distribution verification. Staged companions, signed artifacts
+building, signing or distribution verification.
+[ElectronHeaders.ts](../scripts/ElectronHeaders.ts) prepares the pinned Electron
+headers through node-gyp before Mac signing credentials are installed. Its separate
+OS/architecture/lockfile cache matches electron-builder's sequential rebuild cache;
+node-gyp owns fresh-download checksums and partial-install rollback. Bounded retries
+apply only to allowlisted network failures. The subsequent source rebuild remains
+required. Staged companions, signed artifacts
 and signing credentials are excluded from these caches. The caller maps
 the four required macOS signing secrets into the reusable workflow; its package
 jobs select the `release` environment values. A failed release
