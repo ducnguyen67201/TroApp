@@ -694,6 +694,9 @@ and company-computer access. These operations save real changes. The selected
 organization remains visible above every screen. Finish active work before switching.
 Choose **Personal workspace** to exit, including after admin access is revoked.
 The old **View as someone** control is removed; legacy impersonation requests are denied.
+Outside admin organization mode, Classroom shows classes you teach or have joined across
+organizations. Each card and its details show the class’s organization name, or **Personal**
+for an unassigned class. The sidebar logo is branding and does not filter this list.
 
 The admin keeps their own account and is not added as an organization member or
 made its owner. Creating a class as an admin requires choosing an active teacher

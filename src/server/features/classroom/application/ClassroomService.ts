@@ -244,14 +244,15 @@ export class ClassroomService {
           courses,
           classes: await Promise.all(
             classes.map(async (schoolClass) => {
-              const organizationId = await store.readClassOrganizationId(schoolClass.id);
+              const organization = await store.readClassOrganization(schoolClass.id);
               return {
                 schoolClass,
-                ...(organizationId !== null
+                ...(organization !== null
                   ? {
                       canTeach: await store.canTeachClass(userId, schoolClass.id),
                       supportsStudentQr: false,
-                      organizationId,
+                      organizationId: organization.id,
+                      organizationName: organization.name,
                     }
                   : {}),
                 meetings: await store.listMeetings(schoolClass.id),

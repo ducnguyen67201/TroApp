@@ -240,3 +240,36 @@ it.each([false, true])(
     expect(send).not.toHaveBeenCalled();
   },
 );
+
+it('shows the organization on enrolled class cards and details', () => {
+  window.location.hash = '#/classroom';
+  const context = createTeachingContext();
+  const home = createHome(context);
+  home.classes = home.classes.map((entry) => ({
+    ...entry,
+    organizationId: crypto.randomUUID(),
+    organizationName: 'Codespace Education',
+  }));
+  render(
+    createElement(MantineProvider, {
+      children: createElement(RoutedStudentPanel, {
+        home,
+        userId: 'student',
+        context: null,
+        search: '',
+        busy: false,
+        send: vi.fn<(command: ClassroomCommand) => Promise<void>>().mockResolvedValue(),
+        preparation: null,
+        receipt: null,
+        t: (english) => english,
+      }),
+    }),
+  );
+  const card = screen.getByRole('button', { name: new RegExp(context.className) });
+  expect(within(card).getByText('Codespace Education')).toBeTruthy();
+  expect(
+    within(screen.getByRole('complementary', { name: 'Class details' })).getByText(
+      'Codespace Education',
+    ),
+  ).toBeTruthy();
+});

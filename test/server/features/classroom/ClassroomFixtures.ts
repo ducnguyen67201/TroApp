@@ -122,6 +122,13 @@ export class MemoryClassroomStore implements ClassroomStore {
       .filter((membership) => membership.role === AccountRole.TEACHER)
       .map((membership) => ({ id: membership.organizationId, name: membership.name }));
   }
+  readClassOrganization(classId: string) {
+    const id = this.classOrganizations.get(classId);
+    const membership = [...this.organizationMemberships.values()].find(
+      (entry) => entry.organizationId === id,
+    );
+    return Promise.resolve(id ? { id, name: membership?.name ?? 'Organization' } : null);
+  }
   readClassOrganizationId(classId: string) {
     return Promise.resolve(this.classOrganizations.get(classId) ?? null);
   }

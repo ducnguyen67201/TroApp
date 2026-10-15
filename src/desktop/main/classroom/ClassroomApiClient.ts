@@ -2,6 +2,7 @@ import { CompanyComputerCapability, StudentAccessCapability } from '#contracts/S
 import {
   ClassroomAdminCapability,
   ClassroomOrganizationCapability,
+  ClassroomOrganizationLabelCapability,
   ClassroomCommandSchema,
   ClassroomReplySchema,
   ClassroomFailure,
@@ -76,6 +77,8 @@ export class ClassroomApiClient {
           'content-type': 'application/json',
           [ClassroomAdminCapability.HEADER]: ClassroomAdminCapability.VERSION,
           [ClassroomOrganizationCapability.HEADER]: ClassroomOrganizationCapability.VERSION,
+          [ClassroomOrganizationLabelCapability.HEADER]:
+            ClassroomOrganizationLabelCapability.VERSION,
           [StudentAccessCapability.HEADER]: StudentAccessCapability.VERSION,
           [CompanyComputerCapability.HEADER]: CompanyComputerCapability.VERSION,
         },

@@ -937,6 +937,12 @@ are removed; legacy impersonation headers and commands are rejected. Legacy read
 admin class APIs remain for older clients and respect a supplied organization scope.
 Completed administrative operations log actor/organization IDs, operation, route,
 request ID and status in `organization.admin.completed`, without content or credentials.
+Outside an explicit admin scope, Classroom lists the classes the account teaches or
+has joined across organizations; the sidebar brand selection does not filter that list.
+Teacher and student class cards and detail panels label the class's persisted organization,
+or Personal for an unscoped class. The classroom store reads each visible class's organization
+relation; names are sent only to clients advertising the organization-label capability,
+preserving older strict response parsers.
 Teacher accounts can still choose between classes taught and classes joined; enrolled
 class routes open the student panel. Administrators never take over student device leases.
 

@@ -337,6 +337,14 @@ class PrismaClassroomStore implements ClassroomStore {
     return rows.map((row) => row.organization);
   }
 
+  async readClassOrganization(classId: string) {
+    const row = await this.client.classroomGroup.findFirst({
+      where: { id: classId, deletedAt: null },
+      select: { organization: { select: { id: true, name: true } } },
+    });
+    return row?.organization ?? null;
+  }
+
   async readClassOrganizationId(classId: string) {
     const row = await this.client.classroomGroup.findUnique({
       where: { id: classId },

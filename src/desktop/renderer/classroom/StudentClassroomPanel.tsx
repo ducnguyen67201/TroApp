@@ -14,6 +14,7 @@ import type { DesktopNavigation } from '../navigation/UseDesktopNavigation.js';
 import { canTeachClass } from './ClassroomAuthority.js';
 import { ClassArtwork } from './ClassArtwork.js';
 import { ClassSessionBadge } from './ClassSessionBadge.js';
+import { ClassOrganizationBadge } from './ClassOrganizationBadge.js';
 import { StudentActivityPanel } from './StudentActivityPanel.js';
 import { StudentMaterials } from './StudentMaterials.js';
 import type { ClassroomTranslate } from './ClassroomLabels.js';
@@ -216,6 +217,7 @@ export function StudentClassroomPanel({
                         kind={index % 3 === 0 ? 'lesson' : index % 3 === 1 ? 'code' : 'design'}
                         className="classroom-card-art"
                       />
+                      <ClassOrganizationBadge entry={entry} t={t} />
                       <span className="classroom-card-title">{entry.schoolClass.name}</span>
                       <span className="classroom-card-copy">
                         {linkedCourse?.title ?? t('Your classroom', 'Lớp học của bạn')}
@@ -284,6 +286,7 @@ export function StudentClassroomPanel({
             </div>
           )}
           <ClassArtwork kind="books" className="classroom-detail-art" />
+          {selected && <ClassOrganizationBadge entry={selected} t={t} />}
           {joined ? (
             <StudentActivityPanel
               context={joined}

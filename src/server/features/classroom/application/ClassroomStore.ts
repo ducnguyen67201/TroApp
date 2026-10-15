@@ -63,6 +63,7 @@ export interface ClassroomStore {
   ): Promise<{ organizationId: string; role: AccountRole }[]>;
   listTeachingOrganizations(userId: string): Promise<{ id: string; name: string }[]>;
   readClassOrganizationId(classId: string): Promise<string | null>;
+  readClassOrganization(classId: string): Promise<{ id: string; name: string } | null>;
   readCourseOrganizationId(courseId: string): Promise<string | null>;
   /** Reads the persisted flag; missing users have no admin authority. */
   readIsAdmin(userId: string): Promise<boolean>;

@@ -7,6 +7,8 @@ import { AccountRole } from '#contracts/AccountRole.js';
 import {
   ClassroomAdminCapability,
   ClassroomOrganizationCapability,
+  ClassroomOrganizationLabelCapability,
+  ClassroomReplySchema,
   ClassroomFailure,
 } from '#contracts/Classroom.js';
 import { ClassroomService } from '../../../../src/server/features/classroom/application/ClassroomService.js';
@@ -194,6 +196,48 @@ it('negotiates teaching organizations separately from existing admin metadata', 
         classes: [{ canTeach: true }],
       },
     });
+  } finally {
+    await api.close();
+  }
+});
+
+it('returns each class organization name only to clients supporting labels', async () => {
+  const { api, store, schoolClass } = await createClassroomApi();
+  const organizationId = randomUUID();
+  store.classOrganizations.set(schoolClass.id, organizationId);
+  store.organizationMemberships.set(`${organizationId}:teacher`, {
+    organizationId,
+    name: 'Codespace Education',
+    role: AccountRole.TEACHER,
+  });
+  try {
+    for (const supportsLabels of [false, true]) {
+      const response = await api.inject({
+        method: 'POST',
+        url: '/api/v1/classroom/command',
+        headers: {
+          [ClassroomAdminCapability.HEADER]: ClassroomAdminCapability.VERSION,
+          [ClassroomOrganizationCapability.HEADER]: ClassroomOrganizationCapability.VERSION,
+          ...(supportsLabels
+            ? {
+                [ClassroomOrganizationLabelCapability.HEADER]:
+                  ClassroomOrganizationLabelCapability.VERSION,
+              }
+            : {}),
+        },
+        payload: { kind: 'home' },
+      });
+      expect(response.statusCode).toBe(200);
+      const reply = ClassroomReplySchema.parse(response.json<unknown>());
+      if (reply.kind !== 'home') {
+        throw new Error('Expected classroom home.');
+      }
+      const entry = reply.home.classes[0];
+      expect(entry?.organizationName).toBe(supportsLabels ? 'Codespace Education' : undefined);
+      if (!supportsLabels) {
+        expect(entry).not.toHaveProperty('organizationName');
+      }
+    }
   } finally {
     await api.close();
   }

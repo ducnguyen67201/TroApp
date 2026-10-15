@@ -139,6 +139,12 @@ it('requires organization membership plus class assignment and applies membershi
     meeting,
     context,
   } = fixture;
+  for (const userId of [teacherId, studentId]) {
+    expect(await service.execute(userId, { kind: 'home' })).toMatchObject({
+      kind: 'home',
+      home: { classes: [{ organizationId, organizationName: 'Scoped classroom' }] },
+    });
+  }
   expect(await classrooms.store.listClasses(ownerId)).toEqual([]);
   expect(await classrooms.store.listClasses(outsideId)).toEqual([]);
   await expect(

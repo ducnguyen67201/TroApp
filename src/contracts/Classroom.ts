@@ -258,6 +258,12 @@ export const ClassroomOrganizationCapability = {
   VERSION: '1',
 } as const;
 
+/** Adds class organization names only for clients that can parse them. */
+export const ClassroomOrganizationLabelCapability = {
+  HEADER: 'x-tro-classroom-organization-label',
+  VERSION: '1',
+} as const;
+
 export const ClassroomHomeSchema = z.strictObject({
   viewingAs: ClassroomPersonSchema.nullable().optional(),
   isAdmin: z.boolean().default(false),
@@ -288,6 +294,7 @@ export const ClassroomHomeSchema = z.strictObject({
         canTeach: z.boolean().optional(),
         supportsStudentQr: z.boolean().optional(),
         organizationId: z.uuid().optional(),
+        organizationName: shortText.optional(),
       }),
     )
     .max(100),

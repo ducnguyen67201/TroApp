@@ -24,6 +24,7 @@ import {
 import type { z } from 'zod';
 import { ClassArtwork } from './ClassArtwork.js';
 import { ClassSessionBadge } from './ClassSessionBadge.js';
+import { ClassOrganizationBadge } from './ClassOrganizationBadge.js';
 import { ClassSettings } from './ClassSettings.js';
 import { ClassView } from '../navigation/DesktopRoute.js';
 import type { DesktopNavigation } from '../navigation/UseDesktopNavigation.js';
@@ -319,6 +320,7 @@ export function TeacherClassroomPanel({
                               artworkIndex === 0 ? 'lesson' : artworkIndex === 1 ? 'code' : 'design'
                             }
                           />
+                          <ClassOrganizationBadge entry={entry} t={t} />
                           <span className="classroom-card-title">{entry.schoolClass.name}</span>
                           <span className="classroom-card-copy">
                             {course?.title ??
@@ -611,6 +613,7 @@ export function TeacherClassroomPanel({
               <ClassSessionBadge live={Boolean(liveMeeting)} t={t} />
             </div>
             <ClassArtwork kind="books" className="classroom-detail-art" />
+            <ClassOrganizationBadge entry={selectedClass} t={t} />
             <div className="classroom-detail-heading">
               <Text className="classroom-eyebrow">
                 {t('Your teaching space', 'Không gian giảng dạy')}
