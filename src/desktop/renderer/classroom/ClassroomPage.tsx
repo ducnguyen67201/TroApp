@@ -1,8 +1,10 @@
+import type { OrganizationSummary } from '#contracts/Organizations.js';
+import { resolveClassOrganizationNames } from './ResolveClassOrganizationNames.js';
 import { canTeachClass } from './ClassroomAuthority.js';
 import { DesktopPage } from '../navigation/DesktopRoute.js';
 import { ClassroomInsightsPage } from './ClassroomInsightsPage.js';
 import { usePracticeShortcut } from './UsePracticeShortcut.js';
-import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import {
   ActionIcon,
   Alert,
@@ -43,6 +45,7 @@ interface ClassroomPageProps {
   userId: string;
   active: boolean;
   refreshRevision?: number;
+  organizations?: readonly Pick<OrganizationSummary, 'id' | 'name'>[];
   userName?: string;
   navigation: DesktopNavigation;
   onOpenWorkspace?: (message?: string) => void;
@@ -56,6 +59,7 @@ function ClassroomWorkspace({
   userId,
   active,
   refreshRevision = 0,
+  organizations,
   userName,
   navigation,
   onRoleChange,
@@ -74,7 +78,11 @@ function ClassroomWorkspace({
     ClassroomReply,
     { kind: 'invitation' }
   > | null>(null);
-  const [home, setHome] = useState<ClassroomHome | null>(null);
+  const [storedHome, setHome] = useState<ClassroomHome | null>(null);
+  const home = useMemo(
+    () => (storedHome ? resolveClassOrganizationNames(storedHome, organizations ?? []) : null),
+    [storedHome, organizations],
+  );
   const [context, setContext] = useState<TeachingContext | null>(null);
   const contextRef = useRef<TeachingContext | null>(null);
   const [preparation, setPreparation] = useState<Extract<

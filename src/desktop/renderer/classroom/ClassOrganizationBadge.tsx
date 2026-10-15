@@ -11,7 +11,9 @@ interface ClassOrganizationBadgeProps {
 export function ClassOrganizationBadge({ entry, t }: ClassOrganizationBadgeProps): ReactElement {
   const name =
     entry.organizationName ??
-    (entry.organizationId ? t('Organization', 'Tổ chức') : t('Personal', 'Cá nhân'));
+    (entry.organizationId
+      ? t('Organization name unavailable', 'Chưa có tên tổ chức')
+      : t('Personal', 'Cá nhân'));
   return (
     <span className="classroom-organization-badge" title={name}>
       <span aria-hidden="true">✦</span>

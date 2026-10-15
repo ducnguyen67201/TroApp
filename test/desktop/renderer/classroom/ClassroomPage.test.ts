@@ -6,6 +6,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AccountRole } from '#contracts/AccountRole.js';
 import { type ClassroomCommand, type ClassroomHome } from '#contracts/Classroom.js';
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
+import { ClassOrganizationBadge } from '../../../../src/desktop/renderer/classroom/ClassOrganizationBadge.js';
+import type { OrganizationSummary } from '#contracts/Organizations.js';
 import { ClassroomPage } from '../../../../src/desktop/renderer/classroom/ClassroomPage.js';
 import { LocaleProvider } from '../../../../src/desktop/renderer/localization/LocaleProvider.js';
 import { useDesktopNavigation } from '../../../../src/desktop/renderer/navigation/UseDesktopNavigation.js';
@@ -13,16 +15,24 @@ import { ClassView } from '../../../../src/desktop/renderer/navigation/DesktopRo
 import type { DesktopNavigation } from '../../../../src/desktop/renderer/navigation/UseDesktopNavigation.js';
 
 interface PanelProps {
+  home: ClassroomHome;
   userId: string;
   send: (command: ClassroomCommand) => Promise<void>;
   navigation: DesktopNavigation;
 }
 vi.mock('../../../../src/desktop/renderer/classroom/TeacherClassroomPanel.js', () => ({
-  TeacherClassroomPanel: ({ userId, send }: PanelProps) =>
+  TeacherClassroomPanel: ({ userId, send, home }: PanelProps) =>
     createElement(
       'div',
       {},
       `Teacher classes: ${userId}`,
+      ...home.classes.map((entry) =>
+        createElement(ClassOrganizationBadge, {
+          key: entry.schoolClass.id,
+          entry,
+          t: (english) => english,
+        }),
+      ),
       createElement(
         'button',
         {
@@ -35,11 +45,18 @@ vi.mock('../../../../src/desktop/renderer/classroom/TeacherClassroomPanel.js', (
     ),
 }));
 vi.mock('../../../../src/desktop/renderer/classroom/StudentClassroomPanel.js', () => ({
-  StudentClassroomPanel: ({ userId, navigation }: PanelProps) =>
+  StudentClassroomPanel: ({ userId, navigation, home }: PanelProps) =>
     createElement(
       'div',
       {},
       `Student classes: ${userId}`,
+      ...home.classes.map((entry) =>
+        createElement(ClassOrganizationBadge, {
+          key: entry.schoolClass.id,
+          entry,
+          t: (english) => english,
+        }),
+      ),
       createElement(
         'button',
         {
@@ -54,21 +71,33 @@ vi.mock('../../../../src/desktop/renderer/classroom/StudentClassroomPanel.js', (
 const joinedClassId = '22222222-2222-4222-8222-222222222222';
 const onRoleChange = vi.fn<(role: AccountRole) => void>();
 
-function RoutedPage({ refreshRevision = 0 }: { refreshRevision?: number }): ReactElement {
+interface RoutedPageProps {
+  refreshRevision?: number;
+  organizations?: readonly Pick<OrganizationSummary, 'id' | 'name'>[];
+}
+
+function RoutedPage({ refreshRevision = 0, organizations }: RoutedPageProps): ReactElement {
   return createElement(ClassroomPage, {
     userId: 'admin',
     active: true,
     refreshRevision,
+    ...(organizations ? { organizations } : {}),
     navigation: useDesktopNavigation(),
     onRoleChange,
   });
 }
 
-function page(refreshRevision = 0): ReactElement {
+function page(
+  refreshRevision = 0,
+  organizations?: readonly Pick<OrganizationSummary, 'id' | 'name'>[],
+): ReactElement {
   return createElement(MantineProvider, {
     env: 'test',
     children: createElement(LocaleProvider, {
-      children: createElement(RoutedPage, { refreshRevision }),
+      children: createElement(RoutedPage, {
+        refreshRevision,
+        ...(organizations ? { organizations } : {}),
+      }),
     }),
   });
 }
@@ -197,3 +226,56 @@ it('uses the enrolled screen when a retained teacher assignment has no current t
   await screen.findByText('Student classes: admin');
   expect(screen.queryByText('Teacher classes: admin')).toBeNull();
 });
+
+it.each([AccountRole.TEACHER, AccountRole.STUDENT])(
+  'resolves organization names for %s when an older classroom API omits them',
+  async (role) => {
+    const codespaceId = crypto.randomUUID();
+    const testId = crypto.randomUUID();
+    const legacyHome: ClassroomHome = {
+      ...home(role, false),
+      teachingOrganizations: [{ id: codespaceId, name: 'Codespace Education' }],
+      classes: [
+        ...teacherClasses('admin').map((entry, index) => ({
+          ...entry,
+          organizationId: index === 0 ? codespaceId : testId,
+        })),
+        {
+          schoolClass: {
+            id: crypto.randomUUID(),
+            teacherId: 'admin',
+            name: 'Personal Python',
+            courseRevisionId: crypto.randomUUID(),
+          },
+          meetings: [],
+        },
+      ],
+    };
+    const send = vi
+      .fn<NonNullable<DesktopBridge['controlClassroom']>>()
+      .mockImplementation((command) =>
+        Promise.resolve(
+          command.kind === 'home' ? { kind: 'home', home: legacyHome } : { kind: 'ok' },
+        ),
+      );
+    vi.stubGlobal('tro', { controlClassroom: send });
+    const view = render(page());
+    await screen.findByText('Codespace Education');
+    expect(screen.getByText('Organization name unavailable')).toBeTruthy();
+    expect(screen.getByText('Personal')).toBeTruthy();
+
+    view.rerender(
+      page(0, [
+        { id: crypto.randomUUID(), name: 'Unrelated sidebar organization' },
+        { id: testId, name: 'Test organization' },
+        { id: codespaceId, name: 'Codespace Education' },
+      ]),
+    );
+    await screen.findByText('Test organization');
+    expect(screen.getByText('Codespace Education')).toBeTruthy();
+    expect(screen.getByText('Personal')).toBeTruthy();
+    expect(screen.queryByText('Organization name unavailable')).toBeNull();
+    expect(screen.queryByText('Unrelated sidebar organization')).toBeNull();
+    expect(legacyHome.classes[0]).not.toHaveProperty('organizationName');
+  },
+);

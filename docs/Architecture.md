@@ -942,7 +942,10 @@ has joined across organizations; the sidebar brand selection does not filter tha
 Teacher and student class cards and detail panels label the class's persisted organization,
 or Personal for an unscoped class. The classroom store reads each visible class's organization
 relation; names are sent only to clients advertising the organization-label capability,
-preserving older strict response parsers.
+preserving older strict response parsers. When an older API omits the name, the
+renderer resolves the class organization ID against the current account's organization
+directory or teaching organizations. It never substitutes the selected sidebar brand
+or guesses an organization for personal classes.
 Teacher accounts can still choose between classes taught and classes joined; enrolled
 class routes open the student panel. Administrators never take over student device leases.
 

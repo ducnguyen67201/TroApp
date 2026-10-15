@@ -675,6 +675,7 @@ export function App(): ReactElement {
                 <ClassroomPage
                   key={organizationScopeKey}
                   refreshRevision={teamRevision}
+                  organizations={organizationSetup.organizations}
                   userId={user.id}
                   userName={user.name}
                   navigation={navigation}
