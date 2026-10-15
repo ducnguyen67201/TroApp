@@ -1,5 +1,5 @@
 diff --git a/libs/cua-driver/rust/Cargo.lock b/libs/cua-driver/rust/Cargo.lock
-index 74051d8..088c001 100644
+index 74051d8..dbdb58b 100644
 --- a/libs/cua-driver/rust/Cargo.lock
 +++ b/libs/cua-driver/rust/Cargo.lock
 @@ -1205,7 +1205,7 @@ dependencies = [
@@ -7,7 +7,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cua-driver"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.29"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -16,7 +16,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cua-driver-bindgen"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.29"
  dependencies = [
   "cbindgen",
   "uniffi",
@@ -25,7 +25,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cua-driver-contract"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.29"
  dependencies = [
   "schemars",
   "serde",
@@ -34,7 +34,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cua-driver-core"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.29"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -43,7 +43,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cua-driver-e2e"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.29"
  dependencies = [
   "base64",
   "core-foundation",
@@ -52,7 +52,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cua-driver-sdk"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.29"
  dependencies = [
   "async-trait",
   "core-foundation",
@@ -61,7 +61,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cua-driver-testkit"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.29"
  dependencies = [
   "arbitrary",
   "async-trait",
@@ -70,7 +70,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cua-driver-uia"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.29"
  dependencies = [
   "anyhow",
   "cua-driver-core",
@@ -79,7 +79,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cursor-overlay"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.29"
  dependencies = [
   "anyhow",
   "cua-driver-contract",
@@ -88,7 +88,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cursor-theme-cli"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.29"
  dependencies = [
   "anyhow",
   "cursor-overlay",
@@ -97,7 +97,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "pip-preview"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.29"
  dependencies = [
   "serde_json",
  ]
@@ -106,7 +106,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "platform-linux"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.29"
  dependencies = [
   "anyhow",
   "ashpd",
@@ -115,7 +115,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "platform-macos"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.29"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -124,12 +124,12 @@ index 74051d8..088c001 100644
  [[package]]
  name = "platform-windows"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.29"
  dependencies = [
   "anyhow",
   "async-trait",
 diff --git a/libs/cua-driver/rust/Cargo.toml b/libs/cua-driver/rust/Cargo.toml
-index 53edeb0..f6f3377 100644
+index 53edeb0..55c23a5 100644
 --- a/libs/cua-driver/rust/Cargo.toml
 +++ b/libs/cua-driver/rust/Cargo.toml
 @@ -19,7 +19,7 @@ members = [
@@ -137,7 +137,7 @@ index 53edeb0..f6f3377 100644
  
  [workspace.package]
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.29"
  edition = "2021"
  authors = ["trycua"]
  license = "MIT"
@@ -1158,6 +1158,209 @@ index 5dceca8..63b6ed5 100644
      tools.extend(verification::contracts());
      tools.extend(visual::contracts());
      tools.sort_by(|left, right| left.name.cmp(&right.name));
+diff --git a/libs/cua-driver/rust/crates/cua-driver-core/Cargo.toml b/libs/cua-driver/rust/crates/cua-driver-core/Cargo.toml
+index 32827d6..f7fb8a1 100644
+--- a/libs/cua-driver/rust/crates/cua-driver-core/Cargo.toml
++++ b/libs/cua-driver/rust/crates/cua-driver-core/Cargo.toml
+@@ -63,6 +63,7 @@ libc = "0.2"
+ [target.'cfg(windows)'.dependencies]
+ windows = { version = "0.58", features = [
+     "Win32_Foundation",
++    "Win32_System_Console",
+     "Win32_Security",
+     "Win32_System_Diagnostics_ToolHelp",
+     "Win32_System_JobObjects",
+diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/BackgroundCommand.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/BackgroundCommand.rs
+new file mode 100644
+index 0000000..2e21664
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/cua-driver-core/src/BackgroundCommand.rs
+@@ -0,0 +1,185 @@
++//! Background helpers must not allocate a Windows console. Application launches
++//! remain with their platform owner; this does not hide user-requested app windows.
++
++use std::ffi::OsStr;
++use std::process::Command;
++
++/// Configure before spawning so a console never flashes. Stdio, environment,
++/// exit status and lifetime stay under the caller's control.
++pub fn create_background_command(program: impl AsRef<OsStr>) -> Command {
++    let command = Command::new(program);
++    #[cfg(windows)]
++    let command = {
++        use std::os::windows::process::CommandExt;
++        use windows::Win32::System::Threading::CREATE_NO_WINDOW;
++        let mut command = command;
++        command.creation_flags(CREATE_NO_WINDOW.0);
++        command
++    };
++    command
++}
++
++/// Tokio inherits the same creation flags and pipe behavior from std::Command.
++pub fn create_async_background_command(program: impl AsRef<OsStr>) -> tokio::process::Command {
++    create_background_command(program).into()
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use std::io::Write;
++    use std::process::Stdio;
++
++    fn probe_command() -> Command {
++        #[cfg(windows)]
++        {
++            let mut command = create_background_command("powershell.exe");
++            command.args([
++                "-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
++                r#"Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class ConsoleProbe { [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow(); }'; if ([ConsoleProbe]::GetConsoleWindow() -ne [IntPtr]::Zero) { exit 23 }; $line = [Console]::ReadLine(); [Console]::Out.WriteLine($line); [Console]::Error.WriteLine('probe-stderr'); exit 7"#,
++            ]);
++            command
++        }
++        #[cfg(not(windows))]
++        {
++            let mut command = create_background_command("/bin/sh");
++            command.args([
++                "-c",
++                "read line; printf '%s\n' \"$line\"; printf 'probe-stderr\n' >&2; exit 7",
++            ]);
++            command
++        }
++    }
++
++    #[test]
++    fn companion_background_command_preserves_pipes_and_exit_without_console() {
++        let mut child = probe_command()
++            .stdin(Stdio::piped())
++            .stdout(Stdio::piped())
++            .stderr(Stdio::piped())
++            .spawn()
++            .expect("spawn console probe");
++        child
++            .stdin
++            .take()
++            .unwrap()
++            .write_all(b"probe-stdin\n")
++            .unwrap();
++        let output = child.wait_with_output().unwrap();
++        assert_eq!(output.status.code(), Some(7));
++        assert_eq!(
++            String::from_utf8_lossy(&output.stdout).trim(),
++            "probe-stdin"
++        );
++        assert_eq!(
++            String::from_utf8_lossy(&output.stderr).trim(),
++            "probe-stderr"
++        );
++    }
++
++    #[tokio::test]
++    async fn companion_async_background_command_preserves_pipes_and_exit_without_console() {
++        use tokio::io::AsyncWriteExt;
++        let probe = probe_command();
++        let mut command = create_async_background_command(probe.get_program());
++        command.args(probe.get_args());
++        let mut child = command
++            .stdin(Stdio::piped())
++            .stdout(Stdio::piped())
++            .stderr(Stdio::piped())
++            .spawn()
++            .expect("spawn async console probe");
++        child
++            .stdin
++            .take()
++            .unwrap()
++            .write_all(b"probe-stdin\n")
++            .await
++            .unwrap();
++        let output = child.wait_with_output().await.unwrap();
++        assert_eq!(output.status.code(), Some(7));
++        assert_eq!(
++            String::from_utf8_lossy(&output.stdout).trim(),
++            "probe-stdin"
++        );
++        assert_eq!(
++            String::from_utf8_lossy(&output.stderr).trim(),
++            "probe-stderr"
++        );
++    }
++}
++
++#[cfg(all(test, windows))]
++mod windows_tests {
++    use super::create_background_command;
++    use std::io::{Read, Write};
++    use std::process::{Command, Output, Stdio};
++    use tokio::io::AsyncWriteExt;
++    use windows::Win32::System::Console::GetConsoleWindow;
++
++    const PROBE_ENV: &str = "TRO_BACKGROUND_COMMAND_PROBE";
++    const PROBE_INPUT: &str = "background input";
++    const PROBE_OUTPUT: &str = "background output";
++
++    fn create_probe_command() -> Command {
++        let mut command = create_background_command(std::env::current_exe().unwrap());
++        command
++            .args([
++                "--exact",
++                "background_command::windows_tests::background_command_probe",
++                "--nocapture",
++            ])
++            .env(PROBE_ENV, "1")
++            .stdin(Stdio::piped())
++            .stdout(Stdio::piped())
++            .stderr(Stdio::piped());
++        command
++    }
++
++    fn assert_probe_output(output: Output) {
++        assert!(output.status.success(), "probe failed: {output:?}");
++        assert!(String::from_utf8(output.stdout)
++            .unwrap()
++            .contains(PROBE_OUTPUT));
++    }
++
++    #[test]
++    fn background_command_probe() {
++        if std::env::var(PROBE_ENV).as_deref() != Ok("1") {
++            return;
++        }
++        // SAFETY: GetConsoleWindow takes no arguments and only inspects this process.
++        assert!(unsafe { GetConsoleWindow() }.0.is_null());
++        let mut input = String::new();
++        std::io::stdin().read_to_string(&mut input).unwrap();
++        assert_eq!(input, PROBE_INPUT);
++        println!("{PROBE_OUTPUT}");
++    }
++
++    #[test]
++    fn background_command_has_no_console_and_preserves_stdio() {
++        let mut child = create_probe_command().spawn().unwrap();
++        child
++            .stdin
++            .take()
++            .unwrap()
++            .write_all(PROBE_INPUT.as_bytes())
++            .unwrap();
++        assert_probe_output(child.wait_with_output().unwrap());
++    }
++
++    #[tokio::test]
++    async fn background_command_tokio_has_no_console_and_preserves_stdio() {
++        let mut child = tokio::process::Command::from(create_probe_command())
++            .spawn()
++            .unwrap();
++        child
++            .stdin
++            .take()
++            .unwrap()
++            .write_all(PROBE_INPUT.as_bytes())
++            .await
++            .unwrap();
++        assert_probe_output(child.wait_with_output().await.unwrap());
++    }
++}
 diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs
 index b0902a0..9818e22 100644
 --- a/libs/cua-driver/rust/crates/cua-driver-core/src/authorization.rs
@@ -1238,6 +1441,19 @@ index b0902a0..9818e22 100644
      #[test]
      fn health_report_is_r0_read_only_diagnostics() {
          let risk = advertised_risk_for("health_report");
+diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/browser/prepare.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/browser/prepare.rs
+index 1d9e6d7..9f61a74 100644
+--- a/libs/cua-driver/rust/crates/cua-driver-core/src/browser/prepare.rs
++++ b/libs/cua-driver/rust/crates/cua-driver-core/src/browser/prepare.rs
+@@ -271,7 +271,7 @@ impl Drop for ManagedBrowser {
+             // transfer the browser role to a descendant. The listener owner
+             // was attested inside that driver-spawned process tree, so reap
+             // that exact process tree when its owning session ends.
+-            let _ = Command::new("taskkill.exe")
++            let _ = crate::background_command::create_background_command("taskkill.exe")
+                 .args(["/PID", &self.owned_pid.to_string(), "/T", "/F"])
+                 .stdin(Stdio::null())
+                 .stdout(Stdio::null())
 diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/capture_registry.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/capture_registry.rs
 index f7e6be0..d0c0126 100644
 --- a/libs/cua-driver/rust/crates/cua-driver-core/src/capture_registry.rs
@@ -1394,6 +1610,88 @@ index 4db0051..f41a84e 100644
 +pub fn read_cursor_position() -> Option<(f64, f64)> {
      None
  }
+diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/ffmpeg_install.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/ffmpeg_install.rs
+index b1431fd..4b2bba8 100644
+--- a/libs/cua-driver/rust/crates/cua-driver-core/src/ffmpeg_install.rs
++++ b/libs/cua-driver/rust/crates/cua-driver-core/src/ffmpeg_install.rs
+@@ -25,7 +25,7 @@ impl InstallPlan {
+ /// Is `name` an executable on PATH?
+ fn cmd_exists(name: &str) -> bool {
+     #[cfg(target_os = "windows")]
+-    let probe = Command::new("where").arg(name).output();
++    let probe = crate::background_command::create_background_command("where").arg(name).output();
+     #[cfg(not(target_os = "windows"))]
+     let probe = Command::new("sh")
+         .arg("-c")
+@@ -133,7 +133,7 @@ pub fn install_plan() -> Option<InstallPlan> {
+ 
+ /// Run an install plan. Returns `(command_succeeded, combined_output_tail)`.
+ pub fn run_install(plan: &InstallPlan) -> anyhow::Result<(bool, String)> {
+-    let out = Command::new(&plan.argv[0])
++    let out = crate::background_command::create_background_command(&plan.argv[0])
+         .args(&plan.argv[1..])
+         .output()
+         .map_err(|e| anyhow::anyhow!("failed to spawn `{}`: {e}", plan.argv[0]))?;
+diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/lib.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/lib.rs
+index b7549c1..17c61e3 100644
+--- a/libs/cua-driver/rust/crates/cua-driver-core/src/lib.rs
++++ b/libs/cua-driver/rust/crates/cua-driver-core/src/lib.rs
+@@ -44,6 +44,8 @@ pub fn parent_liveness_stdin_enabled() -> bool {
+ pub mod action_record;
+ pub mod action_target;
+ pub mod authorization;
++#[path = "BackgroundCommand.rs"]
++pub mod background_command;
+ pub mod background_input;
+ pub mod browser;
+ pub mod capture_mode;
+diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/recording_loader.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/recording_loader.rs
+index f84ec79..f8cd6a2 100644
+--- a/libs/cua-driver/rust/crates/cua-driver-core/src/recording_loader.rs
++++ b/libs/cua-driver/rust/crates/cua-driver-core/src/recording_loader.rs
+@@ -131,9 +131,8 @@ fn load_session_metadata(
+ /// parseable — the renderer falls back to 1920×1080 only as an
+ /// absolute last resort.
+ fn probe_video_dimensions(video_path: &Path) -> Option<(u32, u32)> {
+-    use std::process::Command;
+-    let ffprobe = crate::video_ffmpeg::find_ffprobe()?;
+-    let out = Command::new(ffprobe)
++        let ffprobe = crate::video_ffmpeg::find_ffprobe()?;
++    let out = crate::background_command::create_background_command(ffprobe)
+         .args([
+             "-v",
+             "error",
+diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/recording_render.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/recording_render.rs
+index 733be19..142a62f 100644
+--- a/libs/cua-driver/rust/crates/cua-driver-core/src/recording_render.rs
++++ b/libs/cua-driver/rust/crates/cua-driver-core/src/recording_render.rs
+@@ -32,7 +32,7 @@
+ //! updates.
+ 
+ use std::path::{Path, PathBuf};
+-use std::process::{Command, Stdio};
++use std::process::Stdio;
+ 
+ use crate::recording_loader::{load, LoadError};
+ use crate::recording_zoom::{generate_zoom_regions, ZoomRegion};
+@@ -144,7 +144,7 @@ pub fn render(
+     };
+ 
+     // Build ffmpeg command.
+-    let mut cmd = Command::new(&ffmpeg);
++    let mut cmd = crate::background_command::create_background_command(&ffmpeg);
+     cmd.arg("-y")
+         .arg("-loglevel")
+         .arg("error")
+@@ -255,7 +255,7 @@ fn build_zoompan_expressions(
+ /// but the sendcmd tail may stop earlier than the actual frames.
+ fn probe_duration_ms(video_path: &Path) -> Option<f64> {
+     let ffprobe = find_ffprobe()?;
+-    let out = Command::new(ffprobe)
++    let out = crate::background_command::create_background_command(ffprobe)
+         .args([
+             "-v",
+             "error",
 diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/session.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/session.rs
 index 44c331e..c0a9262 100644
 --- a/libs/cua-driver/rust/crates/cua-driver-core/src/session.rs
@@ -1573,6 +1871,28 @@ index 44c331e..c0a9262 100644
      #[derive(Default)]
      struct ProbeObserver {
          starts: Mutex<Vec<(String, SessionStartObservation)>>,
+diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/video_ffmpeg.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/video_ffmpeg.rs
+index 36d108c..78280c2 100644
+--- a/libs/cua-driver/rust/crates/cua-driver-core/src/video_ffmpeg.rs
++++ b/libs/cua-driver/rust/crates/cua-driver-core/src/video_ffmpeg.rs
+@@ -60,7 +60,7 @@ impl FfmpegVideoBackend {
+             })?;
+         }
+ 
+-        let mut cmd = Command::new(&ffmpeg);
++        let mut cmd = crate::background_command::create_background_command(&ffmpeg);
+         cmd.arg("-y").arg("-loglevel").arg("error");
+ 
+         platform_input_args(&mut cmd);
+@@ -209,7 +209,7 @@ pub fn find_ffprobe() -> Option<PathBuf> {
+ }
+ 
+ pub(crate) fn find_ffmpeg() -> Option<PathBuf> {
+-    if Command::new("ffmpeg")
++    if crate::background_command::create_background_command("ffmpeg")
+         .arg("-version")
+         .stdout(Stdio::null())
+         .stderr(Stdio::null())
 diff --git a/libs/cua-driver/rust/crates/cua-driver/src/bundle.rs b/libs/cua-driver/rust/crates/cua-driver/src/bundle.rs
 index 75331d1..1990e79 100644
 --- a/libs/cua-driver/rust/crates/cua-driver/src/bundle.rs
@@ -1759,6 +2079,91 @@ index e785dbd..3c1c071 100644
      #[test]
      fn only_transports_skip_the_finite_broken_pipe_contract() {
          for transport in [
+diff --git a/libs/cua-driver/rust/crates/cua-driver/src/extension_manager.rs b/libs/cua-driver/rust/crates/cua-driver/src/extension_manager.rs
+index 398e857..2ab009d 100644
+--- a/libs/cua-driver/rust/crates/cua-driver/src/extension_manager.rs
++++ b/libs/cua-driver/rust/crates/cua-driver/src/extension_manager.rs
+@@ -6515,7 +6515,7 @@ mod tests {
+         let root = open_directory_path_nofollow(&root_path).unwrap();
+         windows_secure_handle(&root).unwrap();
+         drop(root);
+-        let acl = std::process::Command::new("icacls")
++        let acl = cua_driver_core::background_command::create_background_command("icacls")
+             .arg(&root_path)
+             .args(["/grant", "*S-1-1-0:(W)"])
+             .output()
+@@ -6611,7 +6611,7 @@ mod tests {
+         }
+ 
+         let temp = TempDir::new().unwrap();
+-        let acl = std::process::Command::new("icacls")
++        let acl = cua_driver_core::background_command::create_background_command("icacls")
+             .arg(temp.path())
+             .args(["/grant", "*S-1-1-0:(OI)(CI)(W)"])
+             .output()
+@@ -6684,7 +6684,7 @@ mod tests {
+             temp.path().join("staged/nested"),
+             temp.path().join("staged/nested/payload"),
+         ] {
+-            let output = std::process::Command::new("icacls")
++            let output = cua_driver_core::background_command::create_background_command("icacls")
+                 .arg(&path)
+                 .arg("/grant")
+                 .arg("*S-1-15-2-1:(RX)")
+@@ -6722,7 +6722,7 @@ mod tests {
+             if injected.replace(true) {
+                 return;
+             }
+-            let output = std::process::Command::new("icacls")
++            let output = cua_driver_core::background_command::create_background_command("icacls")
+                 .arg(temp.path().join("staged"))
+                 .arg("/grant")
+                 .arg("*S-1-15-2-1:(RX)")
+@@ -6778,7 +6778,7 @@ mod tests {
+                 hardens.set(hardens.get() + 1);
+                 windows_harden_private_tree_with(&staged, &mut |_| {
+                     if !injected.replace(true) {
+-                        let output = std::process::Command::new("icacls")
++                        let output = cua_driver_core::background_command::create_background_command("icacls")
+                             .arg(temp.path().join("staged"))
+                             .arg("/grant")
+                             .arg("*S-1-15-2-1:(RX)")
+@@ -6836,7 +6836,7 @@ mod tests {
+             Some(&inspected.manifest_bytes),
+             &inspected.manifest.version,
+             || {
+-                let grant = std::process::Command::new("icacls")
++                let grant = cua_driver_core::background_command::create_background_command("icacls")
+                     .arg(temp.path().join("staging"))
+                     .arg("/grant")
+                     .arg("*S-1-15-2-1:(OI)(CI)(RX)")
+@@ -6899,7 +6899,7 @@ mod tests {
+             None,
+             &inspected.manifest.version,
+             || {
+-                let grant = std::process::Command::new("icacls")
++                let grant = cua_driver_core::background_command::create_background_command("icacls")
+                     .arg(temp.path().join("installed"))
+                     .arg("/grant")
+                     .arg("*S-1-15-2-1:(OI)(CI)(RX)")
+@@ -6957,7 +6957,7 @@ mod tests {
+         let external = temp.path().join("external");
+         fs::create_dir(&external).unwrap();
+         let junction = store.root.join("junction");
+-        let linked = std::process::Command::new("cmd")
++        let linked = cua_driver_core::background_command::create_background_command("cmd")
+             .args(["/C", "mklink", "/J"])
+             .arg(&junction)
+             .arg(&external)
+@@ -6972,7 +6972,7 @@ mod tests {
+ 
+         write_new_file_at(&root, "owned", b"content").unwrap();
+         let file = store.root.join("owned");
+-        let acl = std::process::Command::new("icacls")
++        let acl = cua_driver_core::background_command::create_background_command("icacls")
+             .arg(&file)
+             .args(["/grant", "*S-1-1-0:(W)"])
+             .output()
 diff --git a/libs/cua-driver/rust/crates/cua-driver/src/main.rs b/libs/cua-driver/rust/crates/cua-driver/src/main.rs
 index e1af27a..1906a80 100644
 --- a/libs/cua-driver/rust/crates/cua-driver/src/main.rs
@@ -2853,6 +3258,33 @@ index b963748..74d6aea 100644
          let _runtime_guard = crate::test_runtime_lock().lock().await;
          PROBE_INVOCATIONS.store(0, Ordering::SeqCst);
  
+diff --git a/libs/cua-driver/rust/crates/cua-driver/src/telemetry.rs b/libs/cua-driver/rust/crates/cua-driver/src/telemetry.rs
+index 46a44dc..38748a6 100644
+--- a/libs/cua-driver/rust/crates/cua-driver/src/telemetry.rs
++++ b/libs/cua-driver/rust/crates/cua-driver/src/telemetry.rs
+@@ -2572,9 +2572,10 @@ fn os_version() -> String {
+         .arg("-productVersion")
+         .output();
+     #[cfg(target_os = "windows")]
+-    let command = std::process::Command::new("cmd")
+-        .args(["/c", "ver"])
+-        .output();
++    {
++        return platform_windows::windows_version::read_windows_version()
++            .unwrap_or_else(|| "unknown".into());
++    }
+     #[cfg(target_os = "linux")]
+     {
+         return std::fs::read_to_string("/etc/os-release")
+@@ -2587,7 +2588,7 @@ fn os_version() -> String {
+             .map(|value| value.trim_matches('"').to_owned())
+             .unwrap_or_else(|| "unknown".into());
+     }
+-    #[cfg(not(target_os = "linux"))]
++    #[cfg(target_os = "macos")]
+     command
+         .ok()
+         .filter(|output| output.status.success())
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/examples/companion_preview.rs b/libs/cua-driver/rust/crates/cursor-overlay/examples/companion_preview.rs
 new file mode 100644
 index 0000000..7fd799e
@@ -9653,7 +10085,7 @@ index b6ec2b0..74f2153 100644
      registry.register(Box::new(get_desktop_state::GetDesktopStateTool::new(
          state.clone(),
 diff --git a/libs/cua-driver/rust/crates/platform-windows/Cargo.toml b/libs/cua-driver/rust/crates/platform-windows/Cargo.toml
-index 935d1dc..7eedf0d 100644
+index 935d1dc..e1ef01d 100644
 --- a/libs/cua-driver/rust/crates/platform-windows/Cargo.toml
 +++ b/libs/cua-driver/rust/crates/platform-windows/Cargo.toml
 @@ -17,6 +17,7 @@ cursor-overlay = { path = "../cursor-overlay" }
@@ -9664,6 +10096,14 @@ index 935d1dc..7eedf0d 100644
  # IndexMap gives the keyed cursor render collection deterministic
  # insertion-ordered iteration = stable per-session cursor z-order frame to
  # frame (mirrors platform-macos's per-session overlay).
+@@ -28,6 +29,7 @@ clipboard-rs = "0.3.5"
+ keyring = { version = "4.1.6", default-features = false, features = ["v1"] }
+ image = { workspace = true }
+ windows = { version = "0.58", features = [
++    "Wdk_System_SystemServices",
+     "Win32_Foundation",
+     "Win32_UI_Accessibility",
+     "Win32_UI_WindowsAndMessaging",
 diff --git a/libs/cua-driver/rust/crates/platform-windows/src/CompanionHud.rs b/libs/cua-driver/rust/crates/platform-windows/src/CompanionHud.rs
 new file mode 100644
 index 0000000..98e7024
@@ -10830,8 +11270,260 @@ index 0000000..eaaff70
 +        Ok(InputHooks { keyboard, mouse })
 +    }
 +}
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/PermissionComparison.rs b/libs/cua-driver/rust/crates/platform-windows/src/PermissionComparison.rs
+new file mode 100644
+index 0000000..31c8e40
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/platform-windows/src/PermissionComparison.rs
+@@ -0,0 +1,55 @@
++//! Diagnostic comparison only. The established helper remains authoritative
++//! until Windows host evidence resolves the upstream native-query regression.
++
++#[derive(Debug, PartialEq, Eq)]
++pub(crate) enum IntegrityComparison {
++    Matched,
++    Mismatched,
++    NativeUnavailable,
++    HelperUnavailable,
++    BothUnavailable,
++}
++
++pub(crate) fn compare_integrity_levels(
++    native: Option<u32>,
++    helper: Option<u32>,
++) -> IntegrityComparison {
++    match (native, helper) {
++        (Some(native), Some(helper)) if native == helper => IntegrityComparison::Matched,
++        (Some(_), Some(_)) => IntegrityComparison::Mismatched,
++        (None, Some(_)) => IntegrityComparison::NativeUnavailable,
++        (Some(_), None) => IntegrityComparison::HelperUnavailable,
++        (None, None) => IntegrityComparison::BothUnavailable,
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn companion_permission_comparison_distinguishes_disagreement_from_missing_evidence() {
++        for rid in [0, 0x1000, 0x2000, 0x2100, 0x3000, 0x4000] {
++            assert_eq!(
++                compare_integrity_levels(Some(rid), Some(rid)),
++                IntegrityComparison::Matched
++            );
++        }
++        assert_eq!(
++            compare_integrity_levels(Some(0x2000), Some(0x3000)),
++            IntegrityComparison::Mismatched
++        );
++        assert_eq!(
++            compare_integrity_levels(None, Some(0x2000)),
++            IntegrityComparison::NativeUnavailable
++        );
++        assert_eq!(
++            compare_integrity_levels(Some(0x3000), None),
++            IntegrityComparison::HelperUnavailable
++        );
++        assert_eq!(
++            compare_integrity_levels(None, None),
++            IntegrityComparison::BothUnavailable
++        );
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/WindowsVersion.rs b/libs/cua-driver/rust/crates/platform-windows/src/WindowsVersion.rs
+new file mode 100644
+index 0000000..7646643
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/platform-windows/src/WindowsVersion.rs
+@@ -0,0 +1,107 @@
++//! Version diagnostics use the OS directly, never a shell or manifest-dependent
++//! compatibility version. This is descriptive metadata, not a feature gate.
++
++fn format_windows_version(status: i32, major: u32, minor: u32, build: u32) -> Option<String> {
++    if status != 0 || major == 0 || build == 0 {
++        return None;
++    }
++    Some(format!("{major}.{minor}.{build}"))
++}
++
++/// Returns the running OS major/minor/build, without the servicing revision.
++/// Failure stays unavailable; no fabricated version or shell fallback is used.
++pub fn read_windows_version() -> Option<String> {
++    #[cfg(target_os = "windows")]
++    {
++        use std::sync::OnceLock;
++        static VERSION: OnceLock<Option<String>> = OnceLock::new();
++        VERSION.get_or_init(query_windows_version).clone()
++    }
++    #[cfg(not(target_os = "windows"))]
++    {
++        None
++    }
++}
++
++#[cfg(target_os = "windows")]
++fn query_windows_version() -> Option<String> {
++    use windows::Wdk::System::SystemServices::RtlGetVersion;
++    use windows::Win32::System::SystemInformation::OSVERSIONINFOW;
++
++    let mut version = OSVERSIONINFOW {
++        dwOSVersionInfoSize: std::mem::size_of::<OSVERSIONINFOW>() as u32,
++        ..Default::default()
++    };
++    // SAFETY: initialized SDK structure has the required size and stays alive
++    // throughout the synchronous call. Ntdll writes no more than that size.
++    let status = unsafe { RtlGetVersion(&mut version) };
++    let result = format_windows_version(
++        status.0,
++        version.dwMajorVersion,
++        version.dwMinorVersion,
++        version.dwBuildNumber,
++    );
++    if result.is_none() {
++        tracing::warn!(target: "companion", stage = "windows_version", reason = "native_query_failed", status = status.0);
++    }
++    result
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn companion_windows_version_formats_os_numbers_without_brand_guessing() {
++        assert_eq!(
++            format_windows_version(0, 10, 0, 26100).as_deref(),
++            Some("10.0.26100")
++        );
++        assert_eq!(
++            format_windows_version(0, 12, 3, 99999).as_deref(),
++            Some("12.3.99999")
++        );
++    }
++
++    #[test]
++    fn companion_windows_version_failure_remains_unavailable() {
++        assert_eq!(format_windows_version(-1, 10, 0, 26100), None);
++        assert_eq!(format_windows_version(0, 0, 0, 26100), None);
++        assert_eq!(format_windows_version(0, 10, 0, 0), None);
++    }
++
++    #[cfg(target_os = "windows")]
++    #[test]
++    fn companion_windows_version_matches_system_command_major_minor_build() {
++        let native = read_windows_version().expect("native OS version");
++        let output = cua_driver_core::background_command::create_background_command("cmd.exe")
++            .args(["/d", "/c", "ver"])
++            .output()
++            .expect("reference OS version");
++        assert!(output.status.success());
++        let numbers = |text: &str| -> Vec<u32> {
++            text.split(|character: char| !character.is_ascii_digit())
++                .filter(|part| !part.is_empty())
++                .take(3)
++                .map(|part| part.parse().unwrap())
++                .collect()
++        };
++        assert_eq!(
++            numbers(&native),
++            numbers(&String::from_utf8_lossy(&output.stdout))
++        );
++    }
++
++    #[cfg(target_os = "windows")]
++    #[test]
++    fn windows_version_reads_native_version_components() {
++        let version = super::read_windows_version().expect("Windows supplies its version");
++        let parts: Vec<u32> = version
++            .split('.')
++            .map(|part| part.parse().unwrap())
++            .collect();
++        assert_eq!(parts.len(), 3);
++        assert!(parts[0] >= 6);
++        assert!(parts[2] > 0);
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/browser_platform.rs b/libs/cua-driver/rust/crates/platform-windows/src/browser_platform.rs
+index 7dc284b..8e437b4 100644
+--- a/libs/cua-driver/rust/crates/platform-windows/src/browser_platform.rs
++++ b/libs/cua-driver/rust/crates/platform-windows/src/browser_platform.rs
+@@ -370,7 +370,7 @@ fn authenticode_output(executable: &std::path::Path) -> std::io::Result<std::pro
+         ));
+     };
+     let powershell = system32.join(r"WindowsPowerShell\v1.0\powershell.exe");
+-    std::process::Command::new(powershell)
++    cua_driver_core::background_command::create_background_command(powershell)
+         .args([
+             "-NoLogo",
+             "-NoProfile",
+@@ -674,7 +674,7 @@ async fn browser_command_line(pid: u32) -> Result<String, BrowserRefusal> {
+     let script = format!(
+         "$OutputEncoding=[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); (Get-CimInstance Win32_Process -Filter 'ProcessId = {pid}' -ErrorAction Stop).CommandLine"
+     );
+-    let output = tokio::process::Command::new(powershell)
++    let output = cua_driver_core::background_command::create_async_background_command(powershell)
+         .args([
+             "-NoLogo",
+             "-NoProfile",
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/browser_standard_user.rs b/libs/cua-driver/rust/crates/platform-windows/src/browser_standard_user.rs
+index b27e574..72f84fa 100644
+--- a/libs/cua-driver/rust/crates/platform-windows/src/browser_standard_user.rs
++++ b/libs/cua-driver/rust/crates/platform-windows/src/browser_standard_user.rs
+@@ -351,6 +351,20 @@ fn administrators_membership(token: HANDLE) -> Result<AdministratorsMembership,
+     Ok(AdministratorsMembership::Absent)
+ }
+ 
++/// Comparison-only process query. Uses the primary process token, aligned
++/// storage and owned handle cleanup; never changes the thread's impersonation.
++pub(crate) fn read_current_process_integrity_rid() -> Option<u32> {
++    let token = current_process_token(TOKEN_QUERY).ok()?;
++    let label = token_information(token.raw(), TokenIntegrityLevel).ok()?;
++    if label.len() * std::mem::size_of::<u64>() < std::mem::size_of::<TOKEN_MANDATORY_LABEL>() {
++        return None;
++    }
++    // SAFETY: successful token_information filled aligned storage large enough
++    // for the label. Its SID remains owned by this buffer until the RID is read.
++    let sid = unsafe { (*label.as_ptr().cast::<TOKEN_MANDATORY_LABEL>()).Label.Sid };
++    sid_last_rid(sid)
++}
++
+ /// Gather the security-relevant facts of `token`.
+ pub(crate) fn token_facts(token: HANDLE) -> Result<TokenFacts, String> {
+     let mut elevation = TOKEN_ELEVATION::default();
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/health_report.rs b/libs/cua-driver/rust/crates/platform-windows/src/health_report.rs
+index 0643b93..32eba03 100644
+--- a/libs/cua-driver/rust/crates/platform-windows/src/health_report.rs
++++ b/libs/cua-driver/rust/crates/platform-windows/src/health_report.rs
+@@ -173,24 +173,11 @@ fn probe_d3d11_device() -> Result<(), String> {
+     Err("not a Windows host".to_owned())
+ }
+ 
+-/// `cmd /c ver` — e.g. "Microsoft Windows [Version 10.0.19045.4170]".
+-/// Fails fast on non-Windows — returns `None`.
++/// Native OS version; unavailable outside Windows or after a failed native query.
+ fn ver_string() -> Option<String> {
+     #[cfg(target_os = "windows")]
+     {
+-        let output = std::process::Command::new("cmd")
+-            .args(["/c", "ver"])
+-            .output()
+-            .ok()?;
+-        if !output.status.success() {
+-            return None;
+-        }
+-        let v = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+-        if v.is_empty() {
+-            None
+-        } else {
+-            Some(v)
+-        }
++        crate::windows_version::read_windows_version()
+     }
+     #[cfg(not(target_os = "windows"))]
+     {
 diff --git a/libs/cua-driver/rust/crates/platform-windows/src/lib.rs b/libs/cua-driver/rust/crates/platform-windows/src/lib.rs
-index 4e56ef6..3966834 100644
+index 4e56ef6..82028f3 100644
 --- a/libs/cua-driver/rust/crates/platform-windows/src/lib.rs
 +++ b/libs/cua-driver/rust/crates/platform-windows/src/lib.rs
 @@ -21,6 +21,11 @@ use cua_driver_core::tool::ToolRegistry;
@@ -10846,8 +11538,20 @@ index 4e56ef6..3966834 100644
  pub mod pip;
  pub mod recording_hooks;
  pub mod terminal;
+@@ -118,3 +123,11 @@ pub fn register_tools_with_cursor_and_provider(
+     }
+     tools::build_registry_with_provider(compat, provider)
+ }
++
++#[cfg(any(target_os = "windows", test))]
++#[path = "WindowsVersion.rs"]
++pub mod windows_version;
++
++#[cfg(any(target_os = "windows", test))]
++#[path = "PermissionComparison.rs"]
++mod permission_comparison;
 diff --git a/libs/cua-driver/rust/crates/platform-windows/src/overlay.rs b/libs/cua-driver/rust/crates/platform-windows/src/overlay.rs
-index b7dfcd7..0586c0c 100644
+index b7dfcd7..d98f46d 100644
 --- a/libs/cua-driver/rust/crates/platform-windows/src/overlay.rs
 +++ b/libs/cua-driver/rust/crates/platform-windows/src/overlay.rs
 @@ -31,14 +31,151 @@
@@ -11010,7 +11714,7 @@ index b7dfcd7..0586c0c 100644
  }
  
  impl WinScreen {
-@@ -127,6 +265,74 @@ fn apply_msg(map: &mut RenderMap, msg: OverlayMsg) -> Option<CursorKey> {
+@@ -127,6 +265,75 @@ fn apply_msg(map: &mut RenderMap, msg: OverlayMsg) -> Option<CursorKey> {
      outcome.applied_key().cloned()
  }
  
@@ -11038,6 +11742,7 @@ index b7dfcd7..0586c0c 100644
 +    wake_overlay();
 +    true
 +}
++#[cfg(target_os = "windows")]
 +pub fn has_primary_guidance_geometry(width: i64, height: i64, scale: f64) -> bool {
 +    RENDER.lock().unwrap().as_ref().is_some_and(|map| {
 +        let primary = unsafe {
@@ -11085,7 +11790,7 @@ index b7dfcd7..0586c0c 100644
  pub fn init(cfg: CursorConfig) {
      static INITIALIZED: OnceLock<()> = OnceLock::new();
      INITIALIZED.get_or_init(|| {
-@@ -144,6 +350,7 @@ pub fn init(cfg: CursorConfig) {
+@@ -144,6 +351,7 @@ pub fn init(cfg: CursorConfig) {
                  virt_w: 1920,
                  virt_h: 1080,
                  last_tick: Instant::now(),
@@ -11093,7 +11798,7 @@ index b7dfcd7..0586c0c 100644
              },
          ));
      });
-@@ -511,6 +718,25 @@ fn run_overlay_thread(cfg: CursorConfig, rx: std::sync::mpsc::Receiver<OverlayMs
+@@ -511,6 +719,25 @@ fn run_overlay_thread(cfg: CursorConfig, rx: std::sync::mpsc::Receiver<OverlayMs
      // longer holds the global resolution at 1 ms for its whole lifetime
      // (it raises system-wide timer-interrupt/wakeup rates and power draw).
  
@@ -11119,7 +11824,7 @@ index b7dfcd7..0586c0c 100644
      // Collect virtual screen bounds (all monitors).
      let virt_x = unsafe { GetSystemMetrics(SM_XVIRTUALSCREEN) };
      let virt_y = unsafe { GetSystemMetrics(SM_YVIRTUALSCREEN) };
-@@ -527,6 +753,7 @@ fn run_overlay_thread(cfg: CursorConfig, rx: std::sync::mpsc::Receiver<OverlayMs
+@@ -527,6 +754,7 @@ fn run_overlay_thread(cfg: CursorConfig, rx: std::sync::mpsc::Receiver<OverlayMs
                  virt_w,
                  virt_h,
                  last_tick: Instant::now(),
@@ -11127,7 +11832,7 @@ index b7dfcd7..0586c0c 100644
              };
          }
      }
-@@ -851,7 +1078,7 @@ thread_local! {
+@@ -851,7 +1079,7 @@ thread_local! {
  /// window-local region that must be pushed to the screen (`None` = nothing
  /// painted and nothing stale to erase — skip the present entirely).
  #[cfg(target_os = "windows")]
@@ -11136,7 +11841,7 @@ index b7dfcd7..0586c0c 100644
      let screen = &map.platform;
      let (w, h) = (screen.virt_w.max(1), screen.virt_h.max(1));
      SURFACE.with(|cell| {
-@@ -897,6 +1124,36 @@ fn composite_dirty(map: &RenderMap) -> Option<DirtyRect> {
+@@ -897,6 +1125,36 @@ fn composite_dirty(map: &RenderMap) -> Option<DirtyRect> {
              current = DirtyRect::union(current, r);
          }
  
@@ -11173,7 +11878,7 @@ index b7dfcd7..0586c0c 100644
          let prev = PREV_DIRTY.with(std::cell::Cell::get);
          for r in [prev, current].into_iter().flatten() {
              surf.clear_rect(r);
-@@ -911,11 +1168,48 @@ fn composite_dirty(map: &RenderMap) -> Option<DirtyRect> {
+@@ -911,11 +1169,48 @@ fn composite_dirty(map: &RenderMap) -> Option<DirtyRect> {
                  1.0,
              );
          }
@@ -11223,7 +11928,7 @@ index b7dfcd7..0586c0c 100644
      })
  }
  
-@@ -923,7 +1217,10 @@ fn composite_dirty(map: &RenderMap) -> Option<DirtyRect> {
+@@ -923,7 +1218,10 @@ fn composite_dirty(map: &RenderMap) -> Option<DirtyRect> {
  /// `UpdateLayeredWindowIndirect`. The DWM copies the region into its own
  /// backing store, so the surface itself may be freed afterwards.
  #[cfg(target_os = "windows")]
@@ -11235,7 +11940,7 @@ index b7dfcd7..0586c0c 100644
      use windows::Win32::Foundation::{COLORREF, POINT, RECT, SIZE};
      use windows::Win32::Graphics::Gdi::{GetDC, ReleaseDC, BLENDFUNCTION, HDC};
      use windows::Win32::UI::WindowsAndMessaging::{
-@@ -932,7 +1229,9 @@ unsafe fn present_surface(hwnd: windows::Win32::Foundation::HWND, dirty: DirtyRe
+@@ -932,7 +1230,9 @@ unsafe fn present_surface(hwnd: windows::Win32::Foundation::HWND, dirty: DirtyRe
  
      SURFACE.with(|cell| {
          let slot = cell.borrow();
@@ -11246,7 +11951,7 @@ index b7dfcd7..0586c0c 100644
          let dirty = if FIRST_PRESENT.with(std::cell::Cell::get) {
              DirtyRect {
                  x0: 0,
-@@ -977,11 +1276,17 @@ unsafe fn present_surface(hwnd: windows::Win32::Foundation::HWND, dirty: DirtyRe
+@@ -977,11 +1277,17 @@ unsafe fn present_surface(hwnd: windows::Win32::Foundation::HWND, dirty: DirtyRe
              dwFlags: ULW_ALPHA,
              prcDirty: &rc_dirty,
          };
@@ -11266,7 +11971,7 @@ index b7dfcd7..0586c0c 100644
  }
  
  // ── Idle render gate (issue #1808) ────────────────────────────────────────
-@@ -1100,6 +1405,52 @@ unsafe extern "system" fn wnd_proc(
+@@ -1100,6 +1406,52 @@ unsafe extern "system" fn wnd_proc(
                          }
                      }
  
@@ -11319,7 +12024,7 @@ index b7dfcd7..0586c0c 100644
                      let now = Instant::now();
                      let real_dt = now.duration_since(map.platform.last_tick).as_secs_f64();
                      // Clamped dt for the motion physics: a large gap between
-@@ -1132,17 +1483,29 @@ unsafe extern "system" fn wnd_proc(
+@@ -1132,17 +1484,29 @@ unsafe extern "system" fn wnd_proc(
                      let pointer = GetCursorPos(&mut pointer)
                          .ok()
                          .map(|_| (f64::from(pointer.x), f64::from(pointer.y)));
@@ -11355,7 +12060,7 @@ index b7dfcd7..0586c0c 100644
  
                      // Render only when something can have changed pixels this
                      // frame: a fresh command, a still-running animation, or the
-@@ -1204,8 +1567,18 @@ unsafe extern "system" fn wnd_proc(
+@@ -1204,8 +1568,18 @@ unsafe extern "system" fn wnd_proc(
                  }
              };
  
@@ -11376,7 +12081,7 @@ index b7dfcd7..0586c0c 100644
  
                  // Z-order maintenance every 80ms — delegate to the cross-platform
                  // ZOrderEnforcer so the contract for "z+1 of the application under
-@@ -1506,6 +1879,7 @@ mod tests {
+@@ -1506,6 +1880,7 @@ mod tests {
                  virt_w: 100,
                  virt_h: 100,
                  last_tick: Instant::now(),
@@ -11384,7 +12089,7 @@ index b7dfcd7..0586c0c 100644
              },
          )
      }
-@@ -1627,3 +2001,145 @@ mod tests {
+@@ -1627,3 +2002,145 @@ mod tests {
          );
      }
  }
@@ -13830,7 +14535,7 @@ index 0000000..1a461e0
 +    }
 +}
 diff --git a/libs/cua-driver/rust/crates/platform-windows/src/tools/impl_.rs b/libs/cua-driver/rust/crates/platform-windows/src/tools/impl_.rs
-index 453d2ee..9a6dce0 100644
+index 453d2ee..8345b7d 100644
 --- a/libs/cua-driver/rust/crates/platform-windows/src/tools/impl_.rs
 +++ b/libs/cua-driver/rust/crates/platform-windows/src/tools/impl_.rs
 @@ -551,13 +551,18 @@ pub struct ToolState {
@@ -13883,7 +14588,40 @@ index 453d2ee..9a6dce0 100644
          if let Some(ref fp) = file_path {
              structured["screenshot_file_path"] = json!(fp);
          }
-@@ -10065,6 +10080,9 @@ pub fn build_registry_with_provider(
+@@ -8351,7 +8366,23 @@ impl Tool for CheckPermissionsTool {
+         // user-initiated diagnostic, not a hot path.
+         const HIGH_IL_RID: u32 = 0x3000;
+ 
++        let started_at = std::time::Instant::now();
++        let native_rid = crate::browser_standard_user::read_current_process_integrity_rid();
+         let il_rid: Option<u32> = read_self_integrity_level_via_powershell();
++        let comparison = crate::permission_comparison::compare_integrity_levels(native_rid, il_rid);
++        // Explicit permission requests only, never observer polls. Keep the
++        // helper's result until real Windows runs resolve the upstream mismatch.
++        // No command output, account name, token bytes or privilege list is logged.
++        if comparison == crate::permission_comparison::IntegrityComparison::Matched {
++            tracing::info!(target: "companion", stage = "permission_comparison",
++                outcome = ?comparison, native_rid = ?native_rid, helper_rid = ?il_rid,
++                duration_ms = started_at.elapsed().as_millis() as u64);
++        } else {
++            tracing::warn!(target: "companion", stage = "permission_comparison",
++                outcome = ?comparison, native_rid = ?native_rid, helper_rid = ?il_rid,
++                duration_ms = started_at.elapsed().as_millis() as u64);
++        }
++
+ 
+         let is_elevated = il_rid.map(|r| r >= HIGH_IL_RID).unwrap_or(false);
+         let il_name = match il_rid {
+@@ -8440,7 +8471,7 @@ if ($null -ne $rid) {{ Write-Output ([int]$rid) }}
+ "#,
+         pid = pid
+     );
+-    let out = std::process::Command::new("powershell.exe")
++    let out = cua_driver_core::background_command::create_background_command("powershell.exe")
+         .args([
+             "-NoProfile",
+             "-NonInteractive",
+@@ -10065,6 +10096,9 @@ pub fn build_registry_with_provider(
          cua_driver_core::session::register_scoped_session_end_hook(move |session_id| {
              zoom_registry.retire_session(session_id);
              element_cache.retire_session_screenshots(session_id);
@@ -13893,7 +14631,7 @@ index 453d2ee..9a6dce0 100644
              cursor_registry.remove(session_id);
              crate::overlay::remove_cursor(session_id.to_owned());
          });
-@@ -10080,6 +10098,9 @@ pub fn build_registry_with_provider(
+@@ -10080,6 +10114,9 @@ pub fn build_registry_with_provider(
          let prefix = format!("__cua_runtime_{runtime_scope}:");
          let cursor_registry = state.cursor_registry.clone();
          r.retain_runtime_cleanup(move || {
@@ -13903,7 +14641,7 @@ index 453d2ee..9a6dce0 100644
              for cursor in cursor_registry
                  .all_states()
                  .into_iter()
-@@ -10245,6 +10266,9 @@ pub fn build_registry_with_provider(
+@@ -10245,6 +10282,9 @@ pub fn build_registry_with_provider(
      );
      cua_driver_core::browser::register_browser_tools(&browser_engine, &mut r);
      r.register_recording_tools();
@@ -13913,6 +14651,20 @@ index 453d2ee..9a6dce0 100644
      r.register_session_tools();
      r
  }
+@@ -10275,3 +10315,13 @@ mod pid_window_target_tests;
+ 
+ #[cfg(test)]
+ mod value_write_readback_tests;
++
++#[cfg(test)]
++#[test]
++fn companion_permission_native_query_matches_helper_for_current_process() {
++    let native = crate::browser_standard_user::read_current_process_integrity_rid();
++    let helper = read_self_integrity_level_via_powershell();
++    assert!(native.is_some(), "native token query unavailable");
++    assert!(helper.is_some(), "reference token query unavailable");
++    assert_eq!(native, helper, "do not remove the permission workaround until native parity is established");
++}
 diff --git a/libs/cua-driver/rust/crates/platform-windows/src/tools/mod.rs b/libs/cua-driver/rust/crates/platform-windows/src/tools/mod.rs
 index b7c4793..88ec9d4 100644
 --- a/libs/cua-driver/rust/crates/platform-windows/src/tools/mod.rs

@@ -143,6 +143,7 @@ import { AppUpdateController } from './updates/AppUpdateController.js';
 import { runAppUpdateCommand } from './updates/AppUpdateCommand.js';
 import { configureDevelopmentStorage } from './ConfigureDevelopmentStorage.js';
 import { DesktopDevelopmentApp } from '../DesktopIdentity.js';
+import { DesktopStartupStage, reportDesktopStartupFailure } from './DesktopStartupFailure.js';
 
 configureDevelopmentStorage(app, process.execPath);
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -169,6 +170,7 @@ let isQuitting = false;
 let networkServiceFailureVersion = 0;
 let updates: AppUpdateController | undefined;
 let updateCheckTimer: ReturnType<typeof setInterval> | undefined;
+let startupStage: DesktopStartupStage = DesktopStartupStage.CONFIGURATION;
 
 app.on('child-process-gone', (_event, details) => {
   if (isQuitting) {
@@ -226,13 +228,16 @@ async function startDesktop(): Promise<void> {
   const developmentUrl = app.isPackaged ? undefined : environment.RENDERER_URL;
   const documentUrl = developmentUrl ?? pathToFileURL(rendererFile).href;
 
+  startupStage = DesktopStartupStage.AUTHENTICATION;
   const auth = new AuthClient(environment.API_BASE_URL, app.getPath('userData'));
   let cameraAllowedUntil = 0;
   let lastStudentActivityMs = Date.now();
   let endingSharedStudent = false;
   /* The OAuth protocol must be registered before Electron becomes ready. */
   auth.registerDeepLink(() => mainWindow);
+  startupStage = DesktopStartupStage.READINESS;
   await app.whenReady();
+  startupStage = DesktopStartupStage.SERVICES;
   const productAnalytics = createDesktopAnalytics({
     directory: join(app.getPath('userData'), 'analytics'),
     projectToken: environment.POSTHOG_PROJECT_TOKEN,
@@ -1523,6 +1528,7 @@ async function startDesktop(): Promise<void> {
   });
 
   async function openWindow(): Promise<void> {
+    startupStage = DesktopStartupStage.WINDOW;
     const window = new BrowserWindow({
       width: 1360,
       height: 860,
@@ -1669,6 +1675,7 @@ async function startDesktop(): Promise<void> {
       }
     });
 
+    startupStage = DesktopStartupStage.RENDERER;
     await loadDesktopWindow({
       source: developmentUrl ? DesktopWindowSource.DEVELOPMENT : DesktopWindowSource.PACKAGED,
       load: () => (developmentUrl ? window.loadURL(developmentUrl) : window.loadFile(rendererFile)),
@@ -1742,8 +1749,20 @@ app.on('will-quit', () => {
   updates?.dispose();
 });
 
-void startDesktop().catch((error: unknown) => {
-  /* Development diagnostics stay local; packaged builds avoid leaking paths. */
-  console.error(app.isPackaged ? 'Tro could not start. Check desktop configuration.' : error);
-  app.quit();
+void startDesktop().catch(async (error: unknown) => {
+  try {
+    await reportDesktopStartupFailure({
+      stage: startupStage,
+      error,
+      directory: join(app.getPath('userData'), 'Logs'),
+      log: (diagnostic) => {
+        console.error(diagnostic.event, diagnostic);
+      },
+      showError: (title, message) => {
+        dialog.showErrorBox(title, message);
+      },
+    });
+  } finally {
+    app.quit();
+  }
 });

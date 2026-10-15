@@ -88,6 +88,35 @@ from allocating a console when the native SDK starts it. Explicit MCP stdio and
 parent-liveness pipes remain available. Build and packaging validate the executable's
 PE subsystem through `scripts/WindowsCompanionExecutable.ts`; they reject console
 builds before staging. This changes window creation, not the driver's telemetry policy.
+Native background commands share the core `BackgroundCommand.rs` constructors,
+which set `CREATE_NO_WINDOW` before spawning on Windows and preserve pipes and exit
+status. Permission and browser inspection, ACL maintenance, browser cleanup and
+recording helpers use them. User-requested application launches
+retain their separate platform launch path. Both synchronous and Tokio helper tests
+run in the native companion regression selection; Windows probes assert that no
+console exists inside the child. The Windows suite also launches its own test executable
+as a child probe, checking console absence and stdio for both std and Tokio commands.
+
+Windows health and telemetry version diagnostics share `WindowsVersion.rs` in the
+native Windows adapter. It uses the generated Windows bindings to query `RtlGetVersion` once in process and returns
+major/minor/build without guessing a marketing name or servicing revision. Failure
+remains unavailable with a bounded warning; there is no shell fallback. Telemetry
+continues deriving only the OS major version from that diagnostic string.
+Permission checks keep the upstream external-query workaround: earlier in-process
+queries disagreed with observed process integrity. A comparison-only query now
+uses the existing primary-token owner, aligned buffer and handle cleanup, and
+records bounded parity evidence on explicit permission requests. It never changes
+the thread's impersonation or the established permission result. Browser signature
+and process inspection keep their existing checks. Cross-platform native tests
+cover version formatting/failure and comparison classification; Windows tests compare
+the native readings to the existing system commands. README owns the Windows
+acceptance steps required before removing the permission workaround.
+
+Main tracks startup stages and reports caught failures through
+[DesktopStartupFailure.ts](../src/desktop/main/DesktopStartupFailure.ts). It logs and
+persists only the stage and an allowlisted error code, overwriting one local report,
+then shows an error dialog before shutdown. This makes failures inspectable without
+a console; it does not recover native crashes or failures during module loading.
 
 ## Authentication and account lifetime
 

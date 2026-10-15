@@ -17,7 +17,6 @@ if (!['darwin', 'win32'].includes(process.platform) || !['arm64', 'x64'].include
 const windowsTarget =
   process.arch === 'arm64' ? 'aarch64-pc-windows-msvc' : 'x86_64-pc-windows-msvc';
 const targetArgs = process.platform === 'win32' ? ['--target', windowsTarget] : [];
-const nativePlatform = process.platform === 'win32' ? 'platform-windows' : 'platform-macos';
 const executableName = process.platform === 'win32' ? 'cua-driver.exe' : 'cua-driver';
 const cacheRoot = join(homedir(), '.cache', 'tro');
 await mkdir(cacheRoot, { recursive: true });
@@ -61,13 +60,20 @@ try {
         'cua-driver-contract',
         'cua-driver-core',
         'cursor-overlay',
-        nativePlatform,
+        'platform-windows',
+        ...(process.platform === 'darwin' ? ['platform-macos'] : []),
       ],
       filter: 'companion',
     },
     { packages: ['cua-driver'], filter: 'proxy::tests::' },
     { packages: ['cua-driver'], filter: 'mcp_envelope::tests::' },
     { packages: ['cua-driver-core'], filter: 'session::tests::' },
+    ...(process.platform === 'win32'
+      ? [
+          { packages: ['cua-driver-core'], filter: 'background_command::windows_tests::' },
+          { packages: ['platform-windows'], filter: 'windows_version::tests::' },
+        ]
+      : []),
   ] as const;
   for (const selection of nativeTestSelections) {
     const nativeTests = await runFile(

@@ -315,10 +315,43 @@ over development caches.
 
 Windows companion builds use the GUI subsystem so starting Tro does not open a
 driver terminal. Both native build and packaging reject console-subsystem binaries.
+Windows version diagnostics read the running OS major/minor/build directly through
+`RtlGetVersion`; they no longer launch `cmd /c ver`. The displayed diagnostic omits
+the servicing revision; telemetry still derives the same OS major version.
+Remaining background native helpers use `CREATE_NO_WINDOW`, including
+permission and browser checks, ACL maintenance, and recording helpers. This prevents
+console creation at launch, including during an agent request; it does not hide
+applications the user asks Tro to open. Native regression tests check console absence
+on Windows while verifying stdin, stdout, stderr and exit status still work.
 After rebuilding, restart the development app; installed copies require a rebuilt
 installer/update. For the Windows smoke check, launch Tro from its Start menu
-shortcut, confirm no driver terminal appears, exercise desktop guidance, then quit
+shortcut, confirm the main window stays open without a terminal flash, submit a
+request that exercises browser/permission checks and desktop guidance, then quit
 and confirm the owned driver stops.
+Include normal telemetry settings: daemon-only opt-out does not cover MCP proxies.
+A process trace should show no version-check shell; window-event monitoring should
+show no terminal becoming visible during internal checks. Hidden console-host
+processes may still service redirected I/O. User-requested apps stay visible.
+
+Permission queries retain the upstream PowerShell workaround for a previously
+observed native integrity-level mismatch. Each explicit permission check emits a
+bounded native `companion` event with `stage=permission_comparison`, the comparison
+outcome, native/helper integrity RIDs and elapsed milliseconds. It contains no
+account names, token bytes or command output, and does not change the returned
+permission result. Before removing that workaround, compare results on standard,
+elevated and scheduled-task Windows runs, including requests through the embedded
+daemon. `Matched` is evidence for that invocation only; mismatches or unavailable
+readings require investigation. Browser process and signature checks also retain
+their established validation while running without console windows.
+
+If desktop startup fails, Tro shows the startup stage and a safe error code, and
+overwrites `Logs/DesktopStartup.json` inside its user-data folder (normally
+`%APPDATA%/Tro` on Windows). `desktop.startup.failed` distinguishes configuration,
+authentication, Electron readiness, service setup, window creation and renderer
+loading. The report contains no raw error, URL, profile path or configuration.
+An unwritable profile still produces the error dialog. This captures failures
+caught by main startup; a native crash or failure before the main module loads
+still requires Windows crash diagnostics.
 
 To measure desktop memory on macOS, use Tro's main process PID from Activity
 Monitor (replace `12345` below):
