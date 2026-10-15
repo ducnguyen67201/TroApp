@@ -1,7 +1,7 @@
 # Tro architecture
 
 This is the single maintained description of Tro's implemented system. Updated
-October 14, 2026. Change this document when component ownership, communication or
+October 15, 2026. Change this document when component ownership, communication or
 an architectural invariant changes. Contracts and configuration in the linked code
 own exact wire shapes and policy values. Setup and validation commands live in the
 [root README](../README.md). Research and UI prototypes are reference material,
@@ -1203,7 +1203,14 @@ namespace distinguishes published reservations from unpublished local tags.
 that version to the disposable validation/package checkouts for both platforms.
 The committed package version remains the development baseline. The serialized
 preparation and publication jobs have repository-content write permission;
-signing secrets remain in platform jobs' `release` environment. The caller maps
+signing secrets remain in platform jobs' `release` environment. The caller owns a
+single credentialless Linux validation job against the reserved source/version;
+both platform workflows depend on its success before packaging. Platform jobs
+cache only Cargo downloads and compilation outputs, separated by runner,
+architecture and toolchain and keyed by companion contract, patch and build script.
+Restored outputs never bypass pinned-source checks, patch application, native tests,
+building, signing or distribution verification. Staged companions, signed artifacts
+and signing credentials are excluded from these caches. The caller maps
 the four required macOS signing secrets into the reusable workflow; its package
 jobs select the `release` environment values. A failed release
 may reserve a version without producing artifacts. Local builds never allocate

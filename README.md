@@ -813,6 +813,17 @@ reserved version to `package.json` in each disposable build checkout. The workfl
 preserves the protected `main` branch and its development baseline; local
 build/package commands do not reserve or increment release versions.
 
+Desktop Release runs lint, formatting, type checking, unit tests, build and database
+integration checks once in a shared Linux job against the reserved source/version.
+Windows and both Mac packages start after that job succeeds. Native builds restore
+Cargo downloads and compilation outputs from separate caches per runner,
+architecture and Rust toolchain, with keys tracking the pinned companion contract,
+patch and build script. Cache misses rebuild normally; every run still checks the
+pinned source, applies the patch, runs native tests and builds before signing.
+Signed packages, staged companions and signing credentials are not cached.
+The first release fills these caches; later releases can reuse unchanged native
+dependencies. Apple notarization remains dependent on Apple's service latency.
+
 Re-run failed jobs in the existing Desktop Release run to retry the same version.
 A new manually dispatched run allocates the next patch version, even if the prior
 release failed; version gaps are allowed. Runs are serialized. If `main` advances
@@ -821,7 +832,7 @@ publication have `contents: write`, for their tags and GitHub Releases; platform
 builds keep read-only repository access. Preparation never pushes to `main`,
 force-updates a tag or deletes a reservation. Keep `desktop-v*` tags immutable;
 do not delete them to retry a release. Signing remains in the existing
-`release` environment, with platform validation before packaging.
+`release` environment, with shared validation before platform packaging.
 `release.version.stage` and `release.version.failed` report a bounded preparation
 stage/reason without Git output or credentials. `source_changed` requires a new
 run; `git_operation` at `publish` requires checking tag-creation permissions or push access.
@@ -830,7 +841,11 @@ The Windows release also silently installs/uninstalls the signed installer on it
 disposable runner and checks the installed version, patched driver and both shortcut
 targets. `release.installer.failed` identifies installation, version, native-driver,
 shortcut or uninstall failure. This check refuses an existing Tro installation and cannot
-run in normal local development. Its credentialless shortcut fixtures can be run
+run in normal local development. Uninstall waits for the temporary install directory
+and both shortcuts to disappear, since NSIS removes them in separate stages.
+`release.installer.cleanup` reports completion, elapsed milliseconds and booleans
+identifying remaining application files, Start menu or desktop shortcuts. A cleanup
+timeout still fails the release. Its credentialless shortcut and cleanup fixtures can be run
 on Windows with:
 
 ```powershell
@@ -840,7 +855,7 @@ on Windows with:
 ### Signed macOS release from GitHub Actions
 
 [MacRelease.yml](.github/workflows/MacRelease.yml) is called by Desktop Release
-with its prepared version and commit. It runs the full Linux validation suite, then builds the pinned
+with its prepared version and commit after shared Linux validation. It builds the pinned
 native companion and desktop separately on Apple Silicon and Intel runners. It
 requires Developer ID signing, Apple notarization and stapling, and verifies both
 the ZIP's extracted app and the DMG's mounted app before uploading artifacts.
@@ -1052,8 +1067,9 @@ flow updates website downloads, not installed-app update feeds.
 ### Windows release from GitHub Actions
 
 The **Windows Release** workflow is called by Desktop Release to build a signed
-x64 NSIS installer from the reviewed source and shared reserved version. It validates the project without cloud credentials,
-then uses the GitHub environment `release` and Azure OIDC to sign during packaging.
+x64 NSIS installer from the reviewed source and shared reserved version. Desktop Release
+validates the project once without cloud credentials, then Windows uses the GitHub
+environment `release` and Azure OIDC to sign during packaging.
 It retains verified build artifacts for 14 days; the final Desktop Release job
 publishes them alongside the Mac installers once every platform succeeds. It does
 not deploy the API or provision an installed-app update feed. No separate release

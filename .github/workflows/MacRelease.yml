@@ -27,41 +27,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  validate:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - name: Require main
-        env:
-          RELEASE_REF: ${{ github.ref }}
-        run: test "$RELEASE_REF" = refs/heads/main
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ inputs.release-commit }}
-          persist-credentials: false
-      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-        with:
-          version: 11.16.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: '24'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Apply shared desktop version
-        env:
-          TRO_DESKTOP_RELEASE_VERSION: ${{ inputs.release-version }}
-        run: pnpm exec tsx scripts/ApplyDesktopReleaseVersion.ts
-      - run: pnpm lint
-        env:
-          NODE_OPTIONS: --max-old-space-size=6144
-      - run: pnpm format:check
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
-      - run: pnpm test:integration
-
   package:
-    needs: validate
     if: github.ref == 'refs/heads/main'
     strategy:
       fail-fast: false
@@ -112,6 +78,15 @@ jobs:
         env:
           TRO_DESKTOP_RELEASE_VERSION: ${{ inputs.release-version }}
         run: pnpm exec tsx scripts/ApplyDesktopReleaseVersion.ts
+      - name: Restore native build cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cache/tro/cua-companion-build
+          key: tro-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ matrix.runner }}-rust-1.95.0-${{ hashFiles('driver-patches/CursorCompanion.patch', 'src/contracts/CuaCompanionBuild.ts', 'scripts/BuildCuaCompanion.ts') }}
+          restore-keys: tro-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ matrix.runner }}-rust-1.95.0-
       - name: Build and test pinned native companion without signing credentials
         run: pnpm build:cua
       - name: Download Apple Developer ID intermediate certificate
