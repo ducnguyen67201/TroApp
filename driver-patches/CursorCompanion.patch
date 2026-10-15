@@ -1,5 +1,5 @@
 diff --git a/libs/cua-driver/rust/Cargo.lock b/libs/cua-driver/rust/Cargo.lock
-index 74051d8..088c001 100644
+index 74051d8..3511bda 100644
 --- a/libs/cua-driver/rust/Cargo.lock
 +++ b/libs/cua-driver/rust/Cargo.lock
 @@ -1205,7 +1205,7 @@ dependencies = [
@@ -7,7 +7,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cua-driver"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.27"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -16,7 +16,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cua-driver-bindgen"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.27"
  dependencies = [
   "cbindgen",
   "uniffi",
@@ -25,7 +25,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cua-driver-contract"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.27"
  dependencies = [
   "schemars",
   "serde",
@@ -34,7 +34,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cua-driver-core"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.27"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -43,7 +43,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cua-driver-e2e"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.27"
  dependencies = [
   "base64",
   "core-foundation",
@@ -52,7 +52,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cua-driver-sdk"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.27"
  dependencies = [
   "async-trait",
   "core-foundation",
@@ -61,7 +61,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cua-driver-testkit"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.27"
  dependencies = [
   "arbitrary",
   "async-trait",
@@ -70,7 +70,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cua-driver-uia"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.27"
  dependencies = [
   "anyhow",
   "cua-driver-core",
@@ -79,7 +79,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cursor-overlay"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.27"
  dependencies = [
   "anyhow",
   "cua-driver-contract",
@@ -88,7 +88,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "cursor-theme-cli"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.27"
  dependencies = [
   "anyhow",
   "cursor-overlay",
@@ -97,7 +97,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "pip-preview"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.27"
  dependencies = [
   "serde_json",
  ]
@@ -106,7 +106,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "platform-linux"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.27"
  dependencies = [
   "anyhow",
   "ashpd",
@@ -115,7 +115,7 @@ index 74051d8..088c001 100644
  [[package]]
  name = "platform-macos"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.27"
  dependencies = [
   "anyhow",
   "async-trait",
@@ -124,12 +124,12 @@ index 74051d8..088c001 100644
  [[package]]
  name = "platform-windows"
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.27"
  dependencies = [
   "anyhow",
   "async-trait",
 diff --git a/libs/cua-driver/rust/Cargo.toml b/libs/cua-driver/rust/Cargo.toml
-index 53edeb0..f6f3377 100644
+index 53edeb0..4c300a8 100644
 --- a/libs/cua-driver/rust/Cargo.toml
 +++ b/libs/cua-driver/rust/Cargo.toml
 @@ -19,7 +19,7 @@ members = [
@@ -137,7 +137,7 @@ index 53edeb0..f6f3377 100644
  
  [workspace.package]
 -version = "0.30.4"
-+version = "0.30.4-tro.26"
++version = "0.30.4-tro.27"
  edition = "2021"
  authors = ["trycua"]
  license = "MIT"
@@ -2853,6 +2853,33 @@ index b963748..74d6aea 100644
          let _runtime_guard = crate::test_runtime_lock().lock().await;
          PROBE_INVOCATIONS.store(0, Ordering::SeqCst);
  
+diff --git a/libs/cua-driver/rust/crates/cua-driver/src/telemetry.rs b/libs/cua-driver/rust/crates/cua-driver/src/telemetry.rs
+index 46a44dc..38748a6 100644
+--- a/libs/cua-driver/rust/crates/cua-driver/src/telemetry.rs
++++ b/libs/cua-driver/rust/crates/cua-driver/src/telemetry.rs
+@@ -2572,9 +2572,10 @@ fn os_version() -> String {
+         .arg("-productVersion")
+         .output();
+     #[cfg(target_os = "windows")]
+-    let command = std::process::Command::new("cmd")
+-        .args(["/c", "ver"])
+-        .output();
++    {
++        return platform_windows::windows_version::read_windows_version()
++            .unwrap_or_else(|| "unknown".into());
++    }
+     #[cfg(target_os = "linux")]
+     {
+         return std::fs::read_to_string("/etc/os-release")
+@@ -2587,7 +2588,7 @@ fn os_version() -> String {
+             .map(|value| value.trim_matches('"').to_owned())
+             .unwrap_or_else(|| "unknown".into());
+     }
+-    #[cfg(not(target_os = "linux"))]
++    #[cfg(target_os = "macos")]
+     command
+         .ok()
+         .filter(|output| output.status.success())
 diff --git a/libs/cua-driver/rust/crates/cursor-overlay/examples/companion_preview.rs b/libs/cua-driver/rust/crates/cursor-overlay/examples/companion_preview.rs
 new file mode 100644
 index 0000000..7fd799e
@@ -9653,7 +9680,7 @@ index b6ec2b0..74f2153 100644
      registry.register(Box::new(get_desktop_state::GetDesktopStateTool::new(
          state.clone(),
 diff --git a/libs/cua-driver/rust/crates/platform-windows/Cargo.toml b/libs/cua-driver/rust/crates/platform-windows/Cargo.toml
-index 935d1dc..7eedf0d 100644
+index 935d1dc..71c8e1e 100644
 --- a/libs/cua-driver/rust/crates/platform-windows/Cargo.toml
 +++ b/libs/cua-driver/rust/crates/platform-windows/Cargo.toml
 @@ -17,6 +17,7 @@ cursor-overlay = { path = "../cursor-overlay" }
@@ -9664,6 +9691,110 @@ index 935d1dc..7eedf0d 100644
  # IndexMap gives the keyed cursor render collection deterministic
  # insertion-ordered iteration = stable per-session cursor z-order frame to
  # frame (mirrors platform-macos's per-session overlay).
+@@ -28,6 +29,8 @@ clipboard-rs = "0.3.5"
+ keyring = { version = "4.1.6", default-features = false, features = ["v1"] }
+ image = { workspace = true }
+ windows = { version = "0.58", features = [
++    "Wdk_System_SystemServices",
++    "Win32_System_Console",
+     "Win32_Foundation",
+     "Win32_UI_Accessibility",
+     "Win32_UI_WindowsAndMessaging",
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/BackgroundCommand.rs b/libs/cua-driver/rust/crates/platform-windows/src/BackgroundCommand.rs
+new file mode 100644
+index 0000000..cbcb6ef
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/platform-windows/src/BackgroundCommand.rs
+@@ -0,0 +1,89 @@
++//! Windowless processes for internal checks; never use this for user-requested apps.
++
++use std::ffi::OsStr;
++use std::os::windows::process::CommandExt;
++use std::process::Command;
++use windows::Win32::System::Threading::CREATE_NO_WINDOW;
++
++/// Prevent console allocation at creation while retaining ordinary pipes, exit
++/// status and security context. Hiding an already-created window can still flash.
++pub(crate) fn create_background_command(program: impl AsRef<OsStr>) -> Command {
++    let mut command = Command::new(program);
++    command.creation_flags(CREATE_NO_WINDOW.0);
++    command
++}
++
++#[cfg(test)]
++mod tests {
++    use super::create_background_command;
++    use std::io::{Read, Write};
++    use std::process::{Command, Output, Stdio};
++    use tokio::io::AsyncWriteExt;
++    use windows::Win32::System::Console::GetConsoleWindow;
++
++    const PROBE_ENV: &str = "TRO_BACKGROUND_COMMAND_PROBE";
++    const PROBE_INPUT: &str = "background input";
++    const PROBE_OUTPUT: &str = "background output";
++
++    fn create_probe_command() -> Command {
++        let mut command = create_background_command(std::env::current_exe().unwrap());
++        command
++            .args([
++                "--exact",
++                "background_command::tests::background_command_probe",
++                "--nocapture",
++            ])
++            .env(PROBE_ENV, "1")
++            .stdin(Stdio::piped())
++            .stdout(Stdio::piped())
++            .stderr(Stdio::piped());
++        command
++    }
++
++    fn assert_probe_output(output: Output) {
++        assert!(output.status.success(), "probe failed: {output:?}");
++        assert!(String::from_utf8(output.stdout)
++            .unwrap()
++            .contains(PROBE_OUTPUT));
++    }
++
++    #[test]
++    fn background_command_probe() {
++        if std::env::var(PROBE_ENV).as_deref() != Ok("1") {
++            return;
++        }
++        // SAFETY: GetConsoleWindow takes no arguments and only inspects this process.
++        assert!(unsafe { GetConsoleWindow() }.0.is_null());
++        let mut input = String::new();
++        std::io::stdin().read_to_string(&mut input).unwrap();
++        assert_eq!(input, PROBE_INPUT);
++        println!("{PROBE_OUTPUT}");
++    }
++
++    #[test]
++    fn background_command_has_no_console_and_preserves_stdio() {
++        let mut child = create_probe_command().spawn().unwrap();
++        child
++            .stdin
++            .take()
++            .unwrap()
++            .write_all(PROBE_INPUT.as_bytes())
++            .unwrap();
++        assert_probe_output(child.wait_with_output().unwrap());
++    }
++
++    #[tokio::test]
++    async fn background_command_tokio_has_no_console_and_preserves_stdio() {
++        let mut child = tokio::process::Command::from(create_probe_command())
++            .spawn()
++            .unwrap();
++        child
++            .stdin
++            .take()
++            .unwrap()
++            .write_all(PROBE_INPUT.as_bytes())
++            .await
++            .unwrap();
++        assert_probe_output(child.wait_with_output().await.unwrap());
++    }
++}
 diff --git a/libs/cua-driver/rust/crates/platform-windows/src/CompanionHud.rs b/libs/cua-driver/rust/crates/platform-windows/src/CompanionHud.rs
 new file mode 100644
 index 0000000..98e7024
@@ -10830,11 +10961,117 @@ index 0000000..eaaff70
 +        Ok(InputHooks { keyboard, mouse })
 +    }
 +}
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/WindowsVersion.rs b/libs/cua-driver/rust/crates/platform-windows/src/WindowsVersion.rs
+new file mode 100644
+index 0000000..487c93f
+--- /dev/null
++++ b/libs/cua-driver/rust/crates/platform-windows/src/WindowsVersion.rs
+@@ -0,0 +1,35 @@
++//! Shared native OS version for diagnostics and content-free telemetry.
++
++use windows::Wdk::System::SystemServices::RtlGetVersion;
++use windows::Win32::System::SystemInformation::OSVERSIONINFOW;
++
++/// Read major.minor.build without a shell or a manifest-dependent GetVersionEx
++/// result. This is diagnostic data, not a capability or authorization check.
++pub fn read_windows_version() -> Option<String> {
++    let mut version = OSVERSIONINFOW {
++        dwOSVersionInfoSize: std::mem::size_of::<OSVERSIONINFOW>() as u32,
++        ..Default::default()
++    };
++    // SAFETY: version is initialized with the required size and remains writable
++    // for the synchronous call; RtlGetVersion does not retain the pointer.
++    unsafe { RtlGetVersion(&mut version) }.ok().ok()?;
++    Some(format!(
++        "{}.{}.{}",
++        version.dwMajorVersion, version.dwMinorVersion, version.dwBuildNumber
++    ))
++}
++
++#[cfg(test)]
++mod tests {
++    #[test]
++    fn windows_version_reads_native_version_components() {
++        let version = super::read_windows_version().expect("Windows supplies its version");
++        let parts: Vec<u32> = version
++            .split('.')
++            .map(|part| part.parse().unwrap())
++            .collect();
++        assert_eq!(parts.len(), 3);
++        assert!(parts[0] >= 6);
++        assert!(parts[2] > 0);
++    }
++}
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/browser_platform.rs b/libs/cua-driver/rust/crates/platform-windows/src/browser_platform.rs
+index 7dc284b..ab07ef2 100644
+--- a/libs/cua-driver/rust/crates/platform-windows/src/browser_platform.rs
++++ b/libs/cua-driver/rust/crates/platform-windows/src/browser_platform.rs
+@@ -370,7 +370,7 @@ fn authenticode_output(executable: &std::path::Path) -> std::io::Result<std::pro
+         ));
+     };
+     let powershell = system32.join(r"WindowsPowerShell\v1.0\powershell.exe");
+-    std::process::Command::new(powershell)
++    crate::background_command::create_background_command(powershell)
+         .args([
+             "-NoLogo",
+             "-NoProfile",
+@@ -674,7 +674,9 @@ async fn browser_command_line(pid: u32) -> Result<String, BrowserRefusal> {
+     let script = format!(
+         "$OutputEncoding=[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); (Get-CimInstance Win32_Process -Filter 'ProcessId = {pid}' -ErrorAction Stop).CommandLine"
+     );
+-    let output = tokio::process::Command::new(powershell)
++    let output = tokio::process::Command::from(
++        crate::background_command::create_background_command(powershell),
++    )
+         .args([
+             "-NoLogo",
+             "-NoProfile",
+diff --git a/libs/cua-driver/rust/crates/platform-windows/src/health_report.rs b/libs/cua-driver/rust/crates/platform-windows/src/health_report.rs
+index 0643b93..ec8a719 100644
+--- a/libs/cua-driver/rust/crates/platform-windows/src/health_report.rs
++++ b/libs/cua-driver/rust/crates/platform-windows/src/health_report.rs
+@@ -173,24 +173,11 @@ fn probe_d3d11_device() -> Result<(), String> {
+     Err("not a Windows host".to_owned())
+ }
+ 
+-/// `cmd /c ver` — e.g. "Microsoft Windows [Version 10.0.19045.4170]".
+-/// Fails fast on non-Windows — returns `None`.
++/// Native major.minor.build; unavailable on non-Windows hosts.
+ fn ver_string() -> Option<String> {
+     #[cfg(target_os = "windows")]
+     {
+-        let output = std::process::Command::new("cmd")
+-            .args(["/c", "ver"])
+-            .output()
+-            .ok()?;
+-        if !output.status.success() {
+-            return None;
+-        }
+-        let v = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+-        if v.is_empty() {
+-            None
+-        } else {
+-            Some(v)
+-        }
++        crate::windows_version::read_windows_version()
+     }
+     #[cfg(not(target_os = "windows"))]
+     {
 diff --git a/libs/cua-driver/rust/crates/platform-windows/src/lib.rs b/libs/cua-driver/rust/crates/platform-windows/src/lib.rs
-index 4e56ef6..3966834 100644
+index 4e56ef6..29c2d18 100644
 --- a/libs/cua-driver/rust/crates/platform-windows/src/lib.rs
 +++ b/libs/cua-driver/rust/crates/platform-windows/src/lib.rs
-@@ -21,6 +21,11 @@ use cua_driver_core::tool::ToolRegistry;
+@@ -18,9 +18,21 @@
+ 
+ use cua_driver_core::tool::ToolRegistry;
+ 
++#[cfg(target_os = "windows")]
++#[path = "BackgroundCommand.rs"]
++mod background_command;
++#[cfg(target_os = "windows")]
++#[path = "WindowsVersion.rs"]
++pub mod windows_version;
++
  pub mod diagnostics;
  pub mod health_report;
  pub mod overlay;
@@ -13830,7 +14067,7 @@ index 0000000..1a461e0
 +    }
 +}
 diff --git a/libs/cua-driver/rust/crates/platform-windows/src/tools/impl_.rs b/libs/cua-driver/rust/crates/platform-windows/src/tools/impl_.rs
-index 453d2ee..9a6dce0 100644
+index 453d2ee..002ed8b 100644
 --- a/libs/cua-driver/rust/crates/platform-windows/src/tools/impl_.rs
 +++ b/libs/cua-driver/rust/crates/platform-windows/src/tools/impl_.rs
 @@ -551,13 +551,18 @@ pub struct ToolState {
@@ -13883,6 +14120,15 @@ index 453d2ee..9a6dce0 100644
          if let Some(ref fp) = file_path {
              structured["screenshot_file_path"] = json!(fp);
          }
+@@ -8440,7 +8455,7 @@ if ($null -ne $rid) {{ Write-Output ([int]$rid) }}
+ "#,
+         pid = pid
+     );
+-    let out = std::process::Command::new("powershell.exe")
++    let out = crate::background_command::create_background_command("powershell.exe")
+         .args([
+             "-NoProfile",
+             "-NonInteractive",
 @@ -10065,6 +10080,9 @@ pub fn build_registry_with_provider(
          cua_driver_core::session::register_scoped_session_end_hook(move |session_id| {
              zoom_registry.retire_session(session_id);

@@ -87,7 +87,13 @@ The bundled Windows companion uses the GUI executable subsystem to prevent Windo
 from allocating a console when the native SDK starts it. Explicit MCP stdio and
 parent-liveness pipes remain available. Build and packaging validate the executable's
 PE subsystem through `scripts/WindowsCompanionExecutable.ts`; they reject console
-builds before staging. This changes window creation, not the driver's telemetry policy.
+builds before staging. Windows-version diagnostics and telemetry share the native
+`WindowsVersion.rs` reader in the patched platform adapter. It returns OS
+major/minor/build without a shell; these values do not authorize capabilities.
+`BackgroundCommand.rs` applies `CREATE_NO_WINDOW` to internal permission and browser
+inspection helpers, including Tokio launches, while preserving their pipes and
+security context. User-requested application launches retain their own behavior.
+These changes preserve permission checks and the driver's telemetry policy.
 
 ## Authentication and account lifetime
 

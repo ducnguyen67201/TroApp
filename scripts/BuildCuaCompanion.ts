@@ -68,6 +68,12 @@ try {
     { packages: ['cua-driver'], filter: 'proxy::tests::' },
     { packages: ['cua-driver'], filter: 'mcp_envelope::tests::' },
     { packages: ['cua-driver-core'], filter: 'session::tests::' },
+    ...(process.platform === 'win32'
+      ? [
+          { packages: ['platform-windows'], filter: 'background_command::tests::' },
+          { packages: ['platform-windows'], filter: 'windows_version::tests::' },
+        ]
+      : []),
   ] as const;
   for (const selection of nativeTestSelections) {
     const nativeTests = await runFile(

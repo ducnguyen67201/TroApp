@@ -315,10 +315,18 @@ over development caches.
 
 Windows companion builds use the GUI subsystem so starting Tro does not open a
 driver terminal. Both native build and packaging reject console-subsystem binaries.
+Windows-version diagnostics use a native API; permission and browser inspection
+helpers launch without a console while retaining their output and exit status.
+The native build also tests that synchronous and asynchronous background helpers
+have no console and retain stdin/stdout communication.
 After rebuilding, restart the development app; installed copies require a rebuilt
 installer/update. For the Windows smoke check, launch Tro from its Start menu
-shortcut, confirm no driver terminal appears, exercise desktop guidance, then quit
-and confirm the owned driver stops.
+shortcut, confirm no terminal flashes during startup, permission checks, browser
+inspection or desktop guidance, then quit and confirm the owned driver stops.
+Include normal telemetry settings: daemon-only opt-out does not cover MCP proxies.
+A process trace should show no version-check shell; window-event monitoring should
+show no terminal becoming visible during internal checks. Hidden console-host
+processes may still service redirected I/O. User-requested apps stay visible.
 
 To measure desktop memory on macOS, use Tro's main process PID from Activity
 Monitor (replace `12345` below):
