@@ -18,6 +18,7 @@ export interface PetWorldTransaction {
   readAccountRole(userId: string): Promise<AccountRole | null>;
   /** New personal worlds also belong to enrolled organization students, regardless of global role. */
   hasOrganizationStudentEnrollment(userId: string): Promise<boolean>;
+  canAdministerClass?(actorId: string, classId: string): Promise<boolean>;
   readClassRole(userId: string, classId: string): Promise<AccountRole | null>;
   readClassAccess(classId: string): Promise<PetClassAccess | null>;
   listClassRoster(classId: string): Promise<PetRosterStudent[]>;

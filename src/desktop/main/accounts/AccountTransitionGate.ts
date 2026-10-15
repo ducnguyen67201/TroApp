@@ -37,7 +37,7 @@ export class AccountTransitionGate {
     );
   }
 
-  /** Classroom delegation changes share the same exclusion as signed-in account changes. */
+  /** Organization scope changes share the same exclusion as signed-in account changes. */
   async changeContext<Result>(
     action: () => Promise<Result>,
     unavailable: Result,

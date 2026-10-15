@@ -26,8 +26,6 @@ import {
 } from '#contracts/Classroom.js';
 import { TeacherClassroomPanel } from './TeacherClassroomPanel.js';
 import { StudentClassroomPanel } from './StudentClassroomPanel.js';
-import { ClassroomPersonPicker } from './ClassroomPersonPicker.js';
-import type { ClassroomPerson } from '#contracts/ClassroomViewAs.js';
 import { IconArrowLeft, IconRefresh, IconSearch } from '@tabler/icons-react';
 import type { z } from 'zod';
 import { AccountRole } from '#contracts/AccountRole.js';
@@ -51,37 +49,19 @@ interface ClassroomPageProps {
   onRoleChange: (role: AccountRole) => void;
 }
 export function ClassroomPage(props: ClassroomPageProps): ReactElement {
-  return <ClassroomViewer key={props.userId} {...props} />;
-}
-
-function ClassroomViewer(props: ClassroomPageProps): ReactElement {
-  const [person, setPerson] = useState<ClassroomPerson | null>(null);
-  return (
-    <ClassroomWorkspace
-      key={person?.id ?? props.userId}
-      {...props}
-      viewingPerson={person}
-      onViewingPersonChange={setPerson}
-    />
-  );
+  return <ClassroomWorkspace key={props.userId} {...props} />;
 }
 
 function ClassroomWorkspace({
-  userId: signedInUserId,
+  userId,
   active,
   refreshRevision = 0,
   userName,
   navigation,
   onRoleChange,
   onOpenWorkspace,
-  viewingPerson,
-  onViewingPersonChange,
-}: ClassroomPageProps & {
-  viewingPerson: ClassroomPerson | null;
-  onViewingPersonChange: (person: ClassroomPerson | null) => void;
-}): ReactElement {
-  const userId = viewingPerson?.id ?? signedInUserId;
-  const displayName = viewingPerson?.name ?? userName;
+}: ClassroomPageProps): ReactElement {
+  const displayName = userName;
   const { locale } = useLocale();
   const t = useCallback(
     (english: string, vietnamese: string): string => (locale === 'vi' ? vietnamese : english),
@@ -95,7 +75,6 @@ function ClassroomWorkspace({
     { kind: 'invitation' }
   > | null>(null);
   const [home, setHome] = useState<ClassroomHome | null>(null);
-  const [homeUserId, setHomeUserId] = useState<string | null>(null);
   const [context, setContext] = useState<TeachingContext | null>(null);
   const contextRef = useRef<TeachingContext | null>(null);
   const [preparation, setPreparation] = useState<Extract<
@@ -120,10 +99,7 @@ function ClassroomWorkspace({
     (reply: ClassroomReply, rosterSessionId?: string): void => {
       if (reply.kind === 'home') {
         setHome(reply.home);
-        setHomeUserId(userId);
-        if (!viewingPerson) {
-          onRoleChange(reply.home.role);
-        }
+        onRoleChange(reply.home.role);
       }
       if (reply.kind === 'context') {
         const previous = contextRef.current;
@@ -156,7 +132,7 @@ function ClassroomWorkspace({
         setRoster({ sessionId: rosterSessionId, students: reply.roster });
       }
     },
-    [onRoleChange, userId, viewingPerson],
+    [onRoleChange],
   );
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -194,28 +170,18 @@ function ClassroomWorkspace({
       return;
     }
     setError(null);
-    if (
-      reply.kind === 'home' &&
-      (reply.home.viewingAs?.id ?? null) !== (viewingPerson?.id ?? null)
-    ) {
-      onViewingPersonChange(reply.home.viewingAs ?? null);
-      return;
-    }
     accept(reply);
     const current = contextRef.current;
-    const updated: ClassroomReply =
-      viewingPerson && !current
-        ? { kind: 'ok' }
-        : await bridge(
-            current
-              ? {
-                  kind: 'context',
-                  participationId: current.participation.id,
-                  deviceId: current.participation.deviceId,
-                  activityId: current.activity.id,
-                }
-              : { kind: 'resume', deviceId: crypto.randomUUID() },
-          );
+    const updated: ClassroomReply = await bridge(
+      current
+        ? {
+            kind: 'context',
+            participationId: current.participation.id,
+            deviceId: current.participation.deviceId,
+            activityId: current.activity.id,
+          }
+        : { kind: 'resume', deviceId: crypto.randomUUID() },
+    );
     if (currentGeneration !== generation.current) {
       return;
     }
@@ -243,14 +209,13 @@ function ClassroomWorkspace({
     if (currentGeneration === generation.current) {
       setPreparation(prepared?.kind === 'prepared' ? prepared : null);
     }
-  }, [accept, t, viewingPerson, onViewingPersonChange]);
+  }, [accept, t]);
 
   useEffect(() => {
     generation.current += 1;
     contextRef.current = null;
     setContext(null);
     setHome(null);
-    setHomeUserId(null);
     setPreparation(null);
     setReceipt(null);
     return () => {
@@ -338,7 +303,6 @@ function ClassroomWorkspace({
   }
 
   const showsInsights = navigation.route.page === DesktopPage.INSIGHTS;
-  const canViewAllClasses = home?.isAdmin === true && homeUserId === userId;
   const participantClasses = home
     ? home.classes.filter((entry) => !canTeachClass(home, entry, userId))
     : [];
@@ -418,13 +382,10 @@ function ClassroomWorkspace({
           <h1>
             {showsInsights
               ? t('Learning insights', 'Tiến độ học tập')
-              : viewingPerson
-                ? (routeClass?.schoolClass.name ??
-                  t(`Classes for ${viewingPerson.name}`, `Lớp học của ${viewingPerson.name}`))
-                : home?.role === AccountRole.TEACHER
-                  ? (home.classes.find((entry) => entry.schoolClass.id === navigation.route.classId)
-                      ?.schoolClass.name ?? t('Your classroom', 'Lớp học của bạn'))
-                  : `${t('Welcome', 'Chào bạn')}${displayName ? `, ${displayName.trim().split(' ')[0] ?? ''}` : ''}`}
+              : home?.role === AccountRole.TEACHER
+                ? (home.classes.find((entry) => entry.schoolClass.id === navigation.route.classId)
+                    ?.schoolClass.name ?? t('Your classroom', 'Lớp học của bạn'))
+                : `${t('Welcome', 'Chào bạn')}${displayName ? `, ${displayName.trim().split(' ')[0] ?? ''}` : ''}`}
           </h1>
         </header>
         {!showsInsights &&
@@ -455,35 +416,6 @@ function ClassroomWorkspace({
             value={search}
             onChange={(event) => {
               setSearch(event.currentTarget.value);
-            }}
-          />
-        )}
-        {(canViewAllClasses || viewingPerson) && (
-          <ClassroomPersonPicker
-            person={viewingPerson}
-            t={t}
-            onSelect={async (personId) => {
-              const nextId = personId === signedInUserId ? null : personId;
-              if (nextId === (viewingPerson?.id ?? null)) {
-                return true;
-              }
-              const reply = await window.tro.controlClassroom?.({
-                kind: 'admin-view-as',
-                userId: nextId,
-              });
-              if (reply?.kind !== 'admin-view-as') {
-                setError(
-                  t(
-                    'Could not switch views. Finish active work, then try again.',
-                    'Chưa thể chuyển chế độ xem. Hoàn tất thao tác đang chạy rồi thử lại.',
-                  ),
-                );
-                return false;
-              }
-              generation.current += 1;
-              navigation.openClassroom(showsInsights);
-              onViewingPersonChange(reply.person);
-              return true;
             }}
           />
         )}

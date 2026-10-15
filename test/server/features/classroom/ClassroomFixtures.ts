@@ -71,6 +71,15 @@ export class MemoryClassroomStore implements ClassroomStore {
       this.organizationMemberships.get(`${organizationId}:${userId}`)?.role ?? null,
     );
   }
+  readAdminOrganizationId(): Promise<string | null> {
+    return Promise.resolve(null);
+  }
+  listOrganizationTeachers(): Promise<{ id: string; name: string }[]> {
+    return Promise.resolve([]);
+  }
+  canAdministerClass(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
   async canTeachClass(userId: string, classId: string): Promise<boolean> {
     const schoolClass = await this.readClass(classId);
     if (!schoolClass || (await this.readClassRole(userId, classId)) !== AccountRole.TEACHER) {

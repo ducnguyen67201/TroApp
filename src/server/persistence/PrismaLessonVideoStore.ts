@@ -97,10 +97,16 @@ export function createPrismaLessonVideoStore(databaseUrl: string): LessonVideoSt
       });
       return row ? readLesson(row) : null;
     },
-    async list(ownerId) {
+    async list(ownerId, administeredClassIds) {
       return (
         await client.lessonVideo.findMany({
-          where: { ownerId },
+          where: administeredClassIds
+            ? {
+                OR: administeredClassIds.map((classId) => ({
+                  state: { path: ['classId'], equals: classId },
+                })),
+              }
+            : { ownerId },
           include: { screens: true },
           orderBy: { createdAt: 'desc' },
           take: 100,

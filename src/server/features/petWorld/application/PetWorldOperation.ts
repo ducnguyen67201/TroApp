@@ -67,6 +67,9 @@ export async function requireOwnedClass(
   actorId: string,
   classId: string,
 ): Promise<void> {
+  if (await transaction.canAdministerClass?.(actorId, classId)) {
+    return;
+  }
   requireTeacherClassAccess(
     actorId,
     await transaction.readClassRole(actorId, classId),

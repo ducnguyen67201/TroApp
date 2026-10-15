@@ -1,4 +1,4 @@
-import { registerClassroomViewAs } from './features/classroom/infrastructure/RegisterClassroomViewAs.js';
+import { registerAdminOrganization } from './auth/RegisterAdminOrganization.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { readLessonVideoConfig } from './config/Index.js';
 import { createPrismaLessonVideoStore } from './persistence/PrismaLessonVideoStore.js';
@@ -79,6 +79,7 @@ async function startApi(): Promise<void> {
   const authentication = createAuthDatabase(environment);
   const api = createApi(database);
   const organizations = createPrismaOrganizationStore(environment.DATABASE_URL);
+  registerAdminOrganization(api, authentication.readSignedInUserId, organizations.store, logger);
   registerOrganizationRoutes(
     api,
     authentication.readSignedInUserId,
@@ -115,7 +116,7 @@ async function startApi(): Promise<void> {
     ...insightConfig,
   };
   const classroom = createPrismaClassroomStore(environment.DATABASE_URL, capturePolicy);
-  const readClassroomUserId = registerClassroomViewAs(api, readUserId, classroom.store, logger);
+  const readClassroomUserId = readUserId;
   const lessonStore = createPrismaLessonVideoStore(environment.DATABASE_URL);
   const lessonContent = new OpenAiLessonContent(environment.OPENAI_API_KEY);
   const lessonSpeech = new OpenAiLessonSpeech(environment.OPENAI_API_KEY);

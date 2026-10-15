@@ -319,6 +319,7 @@ export function PetWorldPage({
                 <TeacherRecognitionPanel
                   key={view.recognition.classId}
                   userId={userId}
+                  canManageAll={Boolean(view.classroom?.adminOrganizationId)}
                   recognition={view.recognition}
                   isSaving={disabled}
                   locale={locale}

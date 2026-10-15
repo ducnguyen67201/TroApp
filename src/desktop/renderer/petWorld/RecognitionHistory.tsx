@@ -20,6 +20,7 @@ type RecognitionView = Extract<PetWorldReply, { kind: 'class-recognition' }>;
 
 interface RecognitionHistoryProps {
   userId: string;
+  canManageAll?: boolean;
   recognition: RecognitionView;
   isSaving: boolean;
   locale: DesktopLocale;
@@ -31,6 +32,7 @@ interface RecognitionHistoryProps {
 /** Corrections explicitly distinguish a financial reversal from voiding recognition alone. */
 export function RecognitionHistory({
   userId,
+  canManageAll = false,
   recognition,
   isSaving,
   locale,
@@ -90,7 +92,7 @@ export function RecognitionHistory({
                         <br />
                         {entry.correction.reason}
                       </Text>
-                    ) : entry.teacherId === userId ? (
+                    ) : entry.teacherId === userId || canManageAll ? (
                       <Stack gap={4}>
                         <Button
                           size="compact-xs"

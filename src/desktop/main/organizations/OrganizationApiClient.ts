@@ -6,7 +6,7 @@ import {
   type OrganizationReply,
 } from '#contracts/Organizations.js';
 
-/** Organization authority always uses the real session, never classroom View as. */
+/** Organization authority uses the real session and an explicitly verified admin scope. */
 export class OrganizationApiClient {
   constructor(
     private readonly baseUrl: string,

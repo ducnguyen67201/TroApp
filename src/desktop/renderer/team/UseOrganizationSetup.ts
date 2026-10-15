@@ -16,6 +16,9 @@ interface SetupState {
 
 export interface OrganizationSetupView {
   organization: OrganizationSummary | null;
+  isAdmin: boolean;
+  adminOrganizationId: string | null;
+  selectAdminOrganization(organizationId: string | null): Promise<boolean>;
   organizations: readonly OrganizationSummary[];
   canCreateOrganization: boolean;
   canContinuePersonal: boolean;
@@ -152,9 +155,20 @@ export function useOrganizationSetup(accountId: string | null): OrganizationSetu
       if (!isCurrent()) {
         return false;
       }
-      const succeeded = reply.kind === 'ok';
+      const succeeded =
+        reply.kind === 'ok' || reply.kind === OrganizationAction.SELECT_ADMIN_ORGANIZATION;
       if (succeeded) {
         setForcedChoice(null);
+        if (reply.kind === OrganizationAction.SELECT_ADMIN_ORGANIZATION) {
+          setState((previous) =>
+            previous?.accountId === accountId && previous.home
+              ? {
+                  ...previous,
+                  home: { ...previous.home, adminOrganizationId: reply.organization?.id ?? null },
+                }
+              : previous,
+          );
+        }
       }
       await loadHome(
         requestGeneration,
@@ -187,6 +201,10 @@ export function useOrganizationSetup(accountId: string | null): OrganizationSetu
   }
 
   return {
+    isAdmin: visible?.home?.isAdmin === true,
+    adminOrganizationId: visible?.home?.adminOrganizationId ?? null,
+    selectAdminOrganization: (organizationId) =>
+      sendSetupCommand({ kind: OrganizationAction.SELECT_ADMIN_ORGANIZATION, organizationId }),
     organization,
     organizations: visible?.home?.organizations ?? [],
     canCreateOrganization,

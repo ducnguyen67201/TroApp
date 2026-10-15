@@ -393,3 +393,32 @@ it('locks preexisting names and lets a replacement owner finish pending setup', 
     isNameSet: true,
   });
 });
+
+it('lets scoped admins manage team permissions while preserving ownership and rejecting another scope', async () => {
+  const { service, store, organization, admin, owner, member } = await createOrganizationFixture();
+  store.accounts.set(admin.id, { ...admin, adminOrganizationId: organization.id });
+  expect(
+    (
+      await service.execute(admin.id, {
+        kind: OrganizationAction.TEAM,
+        organizationId: organization.id,
+      })
+    ).kind,
+  ).toBe('team');
+  await service.execute(admin.id, {
+    kind: OrganizationAction.ADD_MEMBER,
+    organizationId: organization.id,
+    email: member.email,
+    role: AccountRole.TEACHER,
+  });
+  expect((await store.readMembership(organization.id, member.id))?.role).toBe(AccountRole.TEACHER);
+  expect(await store.readMembership(organization.id, admin.id)).toBeNull();
+  expect((await store.readOrganization(organization.id))?.ownerUserId).toBe(owner.id);
+  await expect(
+    service.execute(admin.id, { kind: OrganizationAction.TEAM, organizationId: randomUUID() }),
+  ).rejects.toMatchObject({ code: OrganizationFailure.FORBIDDEN });
+  store.accounts.set(admin.id, { ...admin, isAdmin: false, adminOrganizationId: organization.id });
+  await expect(
+    service.execute(admin.id, { kind: OrganizationAction.TEAM, organizationId: organization.id }),
+  ).rejects.toMatchObject({ code: OrganizationFailure.FORBIDDEN });
+});

@@ -686,19 +686,34 @@ not establish simultaneous two-device behavior.
 Accounts also have a separate `User.isAdmin` boolean, defaulting to false. After
 applying the committed migration, an operator can set it in the backend database
 for the intended account (the Prisma `User` model maps to the `user` table).
-Refresh Classroom to pick up a change, then use **View as: Me** to search teachers
-and students by name or email. Selecting a person opens their existing classroom
-screens with full classroom permissions: actions save real changes for that person.
-Use **Return to my account** to leave the selected view. Finish active work before
-switching. The admin remains signed in; other product areas keep the admin identity.
-Selecting a student does not join a session until you choose **Join session**.
-Setting the field back to false revokes delegated access on the next request.
-Backend `classroom.view_as.completed` events record the admin ID, selected person
-ID, operation, request ID and result without logging submitted classroom content. No
-account is granted admin access by the migration. Apply it with `pnpm db:deploy`
-against the intended backend before deploying the updated API. Existing desktop
-releases retain their original classroom response; admin viewing requires the
-updated desktop.
+Reopen the app or refresh its organization data after changing the flag. Admins see
+an **Admin organization** selector above the workspace. Select an organization to
+view and edit its team, member roles, teacher assignments, classes, materials,
+sessions, practice results, insights/reports, lesson videos, classroom recognition
+and company-computer access. These operations save real changes. The selected
+organization remains visible above every screen. Finish active work before switching.
+Choose **Personal workspace** to exit, including after admin access is revoked.
+The old **View as someone** control is removed; legacy impersonation requests are denied.
+
+The admin keeps their own account and is not added as an organization member or
+made its owner. Creating a class as an admin requires choosing an active teacher
+from that organization; add a teacher in **Settings → Team** first if necessary.
+Classroom rules still apply, including permanent organization names and ending live
+sessions before changing teacher assignments. Personal classes, account credentials,
+private pet purchases and model credentials retain their existing ownership.
+No users, classes or courses are moved automatically.
+
+For a local smoke check, use an admin and two organizations with different owners,
+teachers and classes. Switch between them and confirm Team, Classroom, Insights,
+lesson videos and class recognition show the selected organization. Edit a membership
+or class in one and verify the other is unchanged. Switch back to Personal workspace,
+then sign out/in and verify the selection clears. Revoke `User.isAdmin` while scoped;
+the next request must fail, and exiting must still work. Confirm an ordinary teacher
+cannot select an admin organization. Backend `organization.admin.completed` events
+record the real actor ID, organization ID, operation, route, request ID and status;
+`organization.admin.refused` and `organization.admin.authorization_failed` report
+scope rejection and lookup failures without submitted content. Deploy the matching
+API and desktop builds; this feature needs no database migration.
 
 Enable and approve a practice checkpoint before testing **Check my work**. In a
 joined Practice activity, choose a work window, then use **Check current window**,

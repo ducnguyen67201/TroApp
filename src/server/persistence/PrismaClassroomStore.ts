@@ -1,4 +1,8 @@
 import {
+  adminOrganizationContext,
+  readAdminOrganizationId,
+} from '../auth/AdminOrganizationContext.js';
+import {
   readClassroomRole,
   canTeachClassroom,
   readAuthorizedClassTeacherIds,
@@ -257,6 +261,31 @@ class PrismaClassroomStore implements ClassroomStore {
     return AccountRoleSchema.parse(user.role);
   }
 
+  async readAdminOrganizationId(userId: string): Promise<string | null> {
+    const organizationId = readAdminOrganizationId(userId);
+    if (organizationId !== null && !(await this.readIsAdmin(userId))) {
+      throw new ClassroomError(ClassroomFailure.FORBIDDEN);
+    }
+    return organizationId;
+  }
+
+  async listOrganizationTeachers(organizationId: string): Promise<{ id: string; name: string }[]> {
+    const memberships = await this.client.organizationMembership.findMany({
+      where: { organizationId, role: AccountRole.TEACHER, removedAt: null },
+      select: { user: { select: { id: true, name: true } } },
+      orderBy: { user: { name: 'asc' } },
+      take: 500,
+    });
+    return memberships.map((membership) => membership.user);
+  }
+
+  async canAdministerClass(userId: string, classId: string): Promise<boolean> {
+    return (
+      readAdminOrganizationId(userId) !== null &&
+      (await canTeachClassroom(this.client, userId, classId))
+    );
+  }
+
   canTeachClass(userId: string, classId: string): Promise<boolean> {
     return canTeachClassroom(this.client, userId, classId);
   }
@@ -289,6 +318,16 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async listTeachingOrganizations(userId: string) {
+    const organizationId = readAdminOrganizationId(userId);
+    if (organizationId !== null) {
+      if ((await this.readOrganizationRole(userId, organizationId)) !== AccountRole.TEACHER) {
+        return [];
+      }
+      return this.client.organization.findMany({
+        where: { id: organizationId },
+        select: { id: true, name: true },
+      });
+    }
     const rows = await this.client.organizationMembership.findMany({
       where: { userId, removedAt: null, role: AccountRole.TEACHER },
       select: { organization: { select: { id: true, name: true } } },
@@ -354,9 +393,11 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async listClassesForAdmin(search: string, offset: number) {
+    const scope = adminOrganizationContext.getStore();
     const rows = await this.client.classroomGroup.findMany({
       where: {
         deletedAt: null,
+        ...(scope ? { organizationId: scope.organizationId } : {}),
         ...(search
           ? {
               OR: [
@@ -390,8 +431,13 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async readClassForAdmin(classId: string) {
+    const scope = adminOrganizationContext.getStore();
     const row = await this.client.classroomGroup.findFirst({
-      where: { id: classId, deletedAt: null },
+      where: {
+        id: classId,
+        deletedAt: null,
+        ...(scope ? { organizationId: scope.organizationId } : {}),
+      },
       include: { teacher: { select: { name: true, email: true } } },
     });
     return row
@@ -435,8 +481,9 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async listCourses(ownerId: string) {
+    const organizationId = await this.readAdminOrganizationId(ownerId);
     const rows = await this.client.classroomCourseRevision.findMany({
-      where: { ownerId },
+      where: organizationId ? { organizationId } : { ownerId },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
@@ -502,6 +549,7 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async listClasses(userId: string) {
+    const organizationId = await this.readAdminOrganizationId(userId);
     const learner = await this.client.studentLearnerProfile.findUnique({
       where: { userId },
       select: { organizationId: true },
@@ -510,11 +558,15 @@ class PrismaClassroomStore implements ClassroomStore {
       where: {
         deletedAt: null,
         ...(learner?.organizationId ? { organizationId: learner.organizationId } : {}),
-        OR: [
-          { teacherId: userId },
-          { organizationId: { not: null }, teachers: { some: { userId } } },
-          { enrollments: { some: { studentId: userId, active: true } } },
-        ],
+        ...(organizationId
+          ? { organizationId }
+          : {
+              OR: [
+                { teacherId: userId },
+                { organizationId: { not: null }, teachers: { some: { userId } } },
+                { enrollments: { some: { studentId: userId, active: true } } },
+              ],
+            }),
       },
       include: { enrollments: { where: { studentId: userId, active: true } } },
       take: 100,

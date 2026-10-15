@@ -589,3 +589,174 @@ it('revokes stored legacy QR codes when an owner links their class to an organiz
   ).toBe(true);
   expect(await client.studentAdmission.count({ where: { classId: personal.id } })).toBe(1);
 });
+
+it('scopes an administrator across classroom, materials, insights, practice, team and lesson sources without impersonation', async () => {
+  const { adminOrganizationContext } =
+    await import('../../../src/server/auth/AdminOrganizationContext.js');
+  const first = await createOrganizationClassroom();
+  const second = await createOrganizationClassroom();
+  const adminId = randomUUID();
+  await client.user.create({
+    data: {
+      id: adminId,
+      name: 'Platform administrator',
+      email: `${adminId}@example.test`,
+      emailVerified: true,
+      isAdmin: true,
+    },
+  });
+  // Finish permanent name setup so all team mutations are available.
+  await client.organization.update({
+    where: { id: first.organizationId },
+    data: { nameSetAt: new Date() },
+  });
+  const sources = new ClassroomLessonSources(classrooms.store);
+  expect(await classrooms.store.canTeachClass(adminId, first.schoolClass.id)).toBe(false);
+  await adminOrganizationContext.run(
+    { actorId: adminId, organizationId: first.organizationId },
+    async () => {
+      const home = await first.service.execute(adminId, { kind: 'home' });
+      expect(home).toMatchObject({
+        kind: 'home',
+        home: {
+          role: AccountRole.TEACHER,
+          adminOrganizationId: first.organizationId,
+        },
+      });
+      if (home.kind !== 'home') {
+        throw new Error('Missing home');
+      }
+      expect(home.home.organizationTeachers?.map((teacher) => teacher.id)).toContain(
+        first.teacherId,
+      );
+      expect(home.home.classes.map((entry) => entry.schoolClass.id)).toEqual([
+        first.schoolClass.id,
+      ]);
+      expect(home.home.classes[0]?.schoolClass.teacherId).toBe(first.teacherId);
+      expect(
+        (
+          await first.service.execute(adminId, {
+            kind: 'session-roster',
+            classSessionId: first.meeting.id,
+          })
+        ).kind,
+      ).toBe('roster');
+      await expect(
+        second.service.execute(adminId, {
+          kind: 'session-roster',
+          classSessionId: second.meeting.id,
+        }),
+      ).rejects.toMatchObject({ code: ClassroomFailure.FORBIDDEN });
+      expect(await classrooms.store.canTeachClass(adminId, second.schoolClass.id)).toBe(false);
+      const materials = new MaterialService(
+        classrooms.store,
+        { extract: () => Promise.resolve([]) },
+        { available: false, prepare: () => Promise.reject(new Error('No provider needed')) },
+      );
+      expect(
+        (await materials.execute(adminId, { kind: 'read', classId: first.schoolClass.id })).kind,
+      ).toBe('collection');
+      await expect(
+        materials.execute(adminId, { kind: 'read', classId: second.schoolClass.id }),
+      ).rejects.toMatchObject({ code: ClassroomFailure.FORBIDDEN });
+      const petService = new PetWorldService(pets.store);
+      expect(
+        (
+          await petService.execute(adminId, {
+            kind: PetWorldCommandKind.CLASS_NEIGHBORHOOD,
+            classId: first.schoolClass.id,
+          })
+        ).kind,
+      ).toBe('neighborhood');
+      await expect(
+        petService.execute(adminId, {
+          kind: PetWorldCommandKind.CLASS_NEIGHBORHOOD,
+          classId: second.schoolClass.id,
+        }),
+      ).rejects.toMatchObject({ code: PetWorldFailure.FORBIDDEN });
+
+      expect((await insights.store.readAccess(adminId, first.schoolClass.id))?.isTeacher).toBe(
+        true,
+      );
+      expect(await insights.store.readAccess(adminId, second.schoolClass.id)).toBeNull();
+      expect(await practice.store.readTeacherHistory(adminId, first.meeting.id)).not.toBeNull();
+      expect(await practice.store.readTeacherHistory(adminId, second.meeting.id)).toBeNull();
+      expect((await sources.list(adminId)).map((entry) => entry.id)).toEqual([
+        first.schoolClass.id,
+      ]);
+      expect(await sources.canAdminister(adminId, first.schoolClass.id)).toBe(true);
+      expect(await sources.canAdminister(adminId, second.schoolClass.id)).toBe(false);
+      await expect(sources.authorize(adminId, second.schoolClass.id)).rejects.toMatchObject({
+        code: 'forbidden',
+      });
+      expect(
+        (
+          await organizationService.execute(adminId, {
+            kind: OrganizationAction.TEAM,
+            organizationId: first.organizationId,
+          })
+        ).kind,
+      ).toBe('team');
+      await expect(
+        organizationService.execute(adminId, {
+          kind: OrganizationAction.TEAM,
+          organizationId: second.organizationId,
+        }),
+      ).rejects.toMatchObject({ code: OrganizationFailure.FORBIDDEN });
+      await organizationService.execute(adminId, {
+        kind: OrganizationAction.ADD_MEMBER,
+        organizationId: first.organizationId,
+        email: 'reserved-admin-test@example.test',
+        role: AccountRole.STUDENT,
+      });
+      await first.service.execute(adminId, {
+        kind: 'create-class',
+        name: 'Admin-created class',
+        organizationId: first.organizationId,
+        teacherId: first.teacherId,
+      });
+      const created = (await classrooms.store.listClasses(adminId)).find(
+        (entry) => entry.name === 'Admin-created class',
+      );
+      expect(created?.teacherId).toBe(first.teacherId);
+      await expect(
+        first.service.execute(adminId, {
+          kind: 'create-class',
+          name: 'Invalid assignment',
+          organizationId: first.organizationId,
+          teacherId: second.teacherId,
+        }),
+      ).rejects.toMatchObject({ code: ClassroomFailure.FORBIDDEN });
+      await expect(
+        first.service.execute(adminId, {
+          kind: 'create-class',
+          name: 'No teacher',
+          organizationId: first.organizationId,
+        }),
+      ).rejects.toMatchObject({ code: ClassroomFailure.FORBIDDEN });
+      expect(await client.organizationMembership.count({ where: { userId: adminId } })).toBe(0);
+      expect(
+        (await client.organization.findUnique({ where: { id: first.organizationId } }))
+          ?.ownerUserId,
+      ).toBe(first.ownerId);
+      await client.user.update({ where: { id: adminId }, data: { isAdmin: false } });
+      expect(await classrooms.store.canTeachClass(adminId, first.schoolClass.id)).toBe(false);
+      await expect(
+        organizationService.execute(adminId, {
+          kind: OrganizationAction.TEAM,
+          organizationId: first.organizationId,
+        }),
+      ).rejects.toMatchObject({ code: OrganizationFailure.FORBIDDEN });
+    },
+  );
+  await client.user.update({ where: { id: adminId }, data: { isAdmin: true } });
+  await adminOrganizationContext.run(
+    { actorId: adminId, organizationId: second.organizationId },
+    async () => {
+      expect((await classrooms.store.listClasses(adminId)).map((entry) => entry.id)).toEqual([
+        second.schoolClass.id,
+      ]);
+      expect(await classrooms.store.canTeachClass(adminId, first.schoolClass.id)).toBe(false);
+    },
+  );
+});

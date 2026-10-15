@@ -1,3 +1,4 @@
+import { readAdminOrganizationId } from '../auth/AdminOrganizationContext.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { ClassroomStatus } from '#contracts/Classroom.js';
 import { AccountRoleSchema } from '#contracts/AccountRole.js';
@@ -212,7 +213,13 @@ class PrismaOrganizationStore implements OrganizationStore {
       where: { id: userId },
       select: OrganizationAccountSelection,
     });
-    return row ? { ...row, role: AccountRoleSchema.parse(row.role) } : null;
+    return row
+      ? {
+          ...row,
+          adminOrganizationId: row.isAdmin ? readAdminOrganizationId(row.id) : null,
+          role: AccountRoleSchema.parse(row.role),
+        }
+      : null;
   }
 
   async readVerifiedAccountByEmail(email: string): Promise<OrganizationAccount | null> {

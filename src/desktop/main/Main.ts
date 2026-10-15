@@ -1,5 +1,5 @@
 import { StudentAccessKind } from '#contracts/StudentAccess.js';
-import { ClassroomViewAsController } from './classroom/ClassroomViewAsController.js';
+import { AdminOrganizationController } from './organizations/AdminOrganizationController.js';
 import {
   DesktopWindowSource,
   loadDesktopWindow,
@@ -229,7 +229,18 @@ async function startDesktop(): Promise<void> {
   const documentUrl = developmentUrl ?? pathToFileURL(rendererFile).href;
 
   startupStage = DesktopStartupStage.AUTHENTICATION;
-  const auth = new AuthClient(environment.API_BASE_URL, app.getPath('userData'));
+  const organizationScope: { controller: AdminOrganizationController | null } = {
+    controller: null,
+  };
+  const requestWithOrganization: typeof fetch = (input, init) =>
+    organizationScope.controller
+      ? organizationScope.controller.fetch(input, init)
+      : fetch(input, init);
+  const auth = new AuthClient(
+    environment.API_BASE_URL,
+    app.getPath('userData'),
+    requestWithOrganization,
+  );
   let cameraAllowedUntil = 0;
   let lastStudentActivityMs = Date.now();
   let endingSharedStudent = false;
@@ -601,11 +612,6 @@ async function startDesktop(): Promise<void> {
           voice.readStatus().state !== VoiceState.DISABLED),
       ),
   );
-  registerOrganizationsHandlers(
-    ipcMain,
-    { isTrustedSender, readSession: () => auth.readSession(), gate: accountGate },
-    new OrganizationApiClient(environment.API_BASE_URL, () => auth.readCookie()),
-  );
   registerOnboardingHandlers(
     ipcMain,
     { isTrustedSender, readSession: () => auth.readSession(), gate: accountGate },
@@ -616,7 +622,11 @@ async function startDesktop(): Promise<void> {
   );
 
   const worldController = new PetWorldController(
-    new PetWorldApiClient(environment.API_BASE_URL, () => auth.readCookie()),
+    new PetWorldApiClient(
+      environment.API_BASE_URL,
+      () => auth.readCookie(),
+      requestWithOrganization,
+    ),
     accountGate,
     new PetWorldPreferences(join(app.getPath('userData'), 'pet-world')),
     petController,
@@ -639,20 +649,33 @@ async function startDesktop(): Promise<void> {
   const practiceCapture = new PracticeCaptureController(new ElectronPracticeWindowCapture(), () =>
     classroomController.readPracticeContext(),
   );
-  const classroomViewAs = new ClassroomViewAsController(
-    new ClassroomApiClient(environment.API_BASE_URL, () => auth.readCookie()),
+  const organizationController = new AdminOrganizationController(
+    new OrganizationApiClient(environment.API_BASE_URL, () => auth.readCookie()),
     () => auth.readCookie(),
     () => {
       classroomController.dispose();
       insightController.dispose();
       reportExports.dispose();
+      worldController.dispose();
+      practiceCapture.dispose();
     },
+  );
+  organizationScope.controller = organizationController;
+  registerOrganizationsHandlers(
+    ipcMain,
+    { isTrustedSender, readSession: () => auth.readSession(), gate: accountGate },
+    new OrganizationApiClient(
+      environment.API_BASE_URL,
+      () => auth.readCookie(),
+      requestWithOrganization,
+    ),
+    (organizationId) => organizationController.selectOrganization(organizationId),
   );
   const classroomController: ClassroomSessionController = new ClassroomSessionController(
     new ClassroomApiClient(
       environment.API_BASE_URL,
       () => auth.readCookie(),
-      classroomViewAs.fetch,
+      requestWithOrganization,
     ),
     () => {
       chat?.cancelClassroomTask();
@@ -753,7 +776,7 @@ async function startDesktop(): Promise<void> {
   const insightApi = new ClassroomInsightApiClient(
     environment.API_BASE_URL,
     () => auth.readCookie(),
-    classroomViewAs.fetch,
+    requestWithOrganization,
   );
   const insightController = new ClassroomInsightController(
     insightApi,
@@ -786,7 +809,11 @@ async function startDesktop(): Promise<void> {
   agentWorker.setClassroomToolHandler((command, context) =>
     classroomController.executeTool(command, context),
   );
-  const lessonApi = new LessonVideoApiClient(environment.API_BASE_URL, () => auth.readCookie());
+  const lessonApi = new LessonVideoApiClient(
+    environment.API_BASE_URL,
+    () => auth.readCookie(),
+    requestWithOrganization,
+  );
   ipcMain.handle('tro:lesson-videos', async (event, raw: unknown) => {
     const command = LessonVideoCommandSchema.safeParse(raw);
     if (!isTrustedSender(event) || !command.success) {
@@ -833,7 +860,7 @@ async function startDesktop(): Promise<void> {
   const materialApi = new MaterialApiClient(
     environment.API_BASE_URL,
     () => auth.readCookie(),
-    classroomViewAs.fetch,
+    requestWithOrganization,
     (event) => {
       console.warn('classroom.materials.request.failed', event);
     },
@@ -891,7 +918,7 @@ async function startDesktop(): Promise<void> {
   const practiceApi = new PracticeCheckApiClient(
     environment.API_BASE_URL,
     () => auth.readCookie(),
-    classroomViewAs.fetch,
+    requestWithOrganization,
   );
   ipcMain.handle('tro:practice-check', async (event, raw: unknown): Promise<PracticeReply> => {
     if (!isTrustedSender(event)) {
@@ -956,16 +983,10 @@ async function startDesktop(): Promise<void> {
     const startedAt = performance.now();
     const command = parsed.data;
     const unavailable: ClassroomReply = { kind: 'failed', code: ClassroomFailure.UNAVAILABLE };
-    const reply =
-      command.kind === 'admin-view-as'
-        ? await accountGate.changeContext(
-            () => classroomViewAs.selectPerson(command.userId),
-            unavailable,
-          )
-        : await accountGate.runRequest(
-            () => classroomViewAs.execute(command, classroomController),
-            unavailable,
-          );
+    const reply = await accountGate.runRequest(
+      () => classroomController.execute(command),
+      unavailable,
+    );
     recordClassroomUsage(
       (usage) => {
         productAnalytics.capture(usage);
@@ -1274,7 +1295,7 @@ async function startDesktop(): Promise<void> {
     worldController.dispose();
     petController.dispose();
     overlay.closePet();
-    classroomViewAs.reset();
+    organizationController.reset();
     practiceCapture.dispose();
     insightController.dispose();
     reportExports.dispose();

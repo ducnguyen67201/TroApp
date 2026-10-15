@@ -42,6 +42,10 @@ export function TeamPanel({
   const selected = view.home?.organizations.find(
     (organization) => organization.id === view.selectedOrganizationId,
   );
+  const canManage = Boolean(
+    selected &&
+    (selected.isOwner || (view.home?.isAdmin && view.home.adminOrganizationId === selected.id)),
+  );
   const canCreateOrganization =
     view.home?.canCreateOrganization === true &&
     !view.home.organizations.some((organization) => organization.isOwner);
@@ -85,7 +89,7 @@ export function TeamPanel({
           {view.isSaving ? messages.saving : messages.loading}
         </Text>
       )}
-      {view.home && view.home.organizations.length > 1 && (
+      {view.home && !view.home.isAdmin && view.home.organizations.length > 1 && (
         <NativeSelect
           label={messages.organization}
           value={view.selectedOrganizationId ?? ''}
@@ -116,7 +120,7 @@ export function TeamPanel({
           <Text size="sm" c="dimmed">
             {messages.classroomAccessHint}
           </Text>
-          {selected.isOwner && selected.isNameSet !== false && (
+          {canManage && selected.isNameSet !== false && (
             <AddOrganizationMember key={selected.id} organizationId={selected.id} view={view} />
           )}
           {(selected.isOwner || view.home?.isAdmin) &&
@@ -127,7 +131,7 @@ export function TeamPanel({
                 organizationId={selected.id}
               />
             )}
-          {selected.isOwner && view.team?.organization.id === selected.id && (
+          {canManage && view.team?.organization.id === selected.id && (
             <OwnerTeamPanel
               key={selected.id}
               team={view.team}

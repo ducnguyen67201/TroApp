@@ -1,3 +1,4 @@
+import { readAdminOrganizationId } from '../auth/AdminOrganizationContext.js';
 import { randomUUID } from 'node:crypto';
 import { AccountRole } from '#contracts/AccountRole.js';
 import { OrganizationLimits } from '#contracts/Organizations.js';
@@ -22,6 +23,8 @@ export async function requireOrganizationComputerAdmin(
     where: { organizationId_userId: { organizationId, userId: actorId } },
   });
   if (
+    (readAdminOrganizationId(actorId) !== null &&
+      readAdminOrganizationId(actorId) !== organizationId) ||
     !organization ||
     organization.nameSetAt === null ||
     !actor?.emailVerified ||

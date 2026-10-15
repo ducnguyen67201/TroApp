@@ -263,7 +263,11 @@ button.organization-brand:hover {
   max-width: 100%;
 }
 
-.desktop-shell[data-signed-out='true'] .panel-content {
+.desktop-shell[data-signed-out='true'] .panel-content[hidden] {
+  display: none;
+}
+
+.panel-content {
   padding-block: 32px;
 }
 

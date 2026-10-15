@@ -1,3 +1,4 @@
+import { readAdminOrganizationId } from '../auth/AdminOrganizationContext.js';
 import { AccountRole, AccountRoleSchema } from '#contracts/AccountRole.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
@@ -7,6 +8,14 @@ export async function readClassroomRole(
   userId: string,
   organizationId: string | null,
 ): Promise<AccountRole | null> {
+  const adminOrganizationId = readAdminOrganizationId(userId);
+  if (adminOrganizationId !== null) {
+    const actor = await client.user.findUnique({
+      where: { id: userId },
+      select: { isAdmin: true },
+    });
+    return actor?.isAdmin && adminOrganizationId === organizationId ? AccountRole.TEACHER : null;
+  }
   if (organizationId === null) {
     const user = await client.user.findUnique({ where: { id: userId }, select: { role: true } });
     return user ? AccountRoleSchema.parse(user.role) : null;
@@ -62,6 +71,12 @@ export async function canTeachClassroom(
       teachers: { where: { userId }, select: { userId: true }, take: 1 },
     },
   });
+  if (readAdminOrganizationId(userId) !== null) {
+    return (
+      schoolClass !== null &&
+      (await readClassroomRole(client, userId, schoolClass.organizationId)) === AccountRole.TEACHER
+    );
+  }
   if (
     !schoolClass ||
     (schoolClass.organizationId === null

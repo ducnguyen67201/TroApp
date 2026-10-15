@@ -261,6 +261,11 @@ export const ClassroomOrganizationCapability = {
 export const ClassroomHomeSchema = z.strictObject({
   viewingAs: ClassroomPersonSchema.nullable().optional(),
   isAdmin: z.boolean().default(false),
+  adminOrganizationId: z.uuid().nullable().optional(),
+  organizationTeachers: z
+    .array(z.strictObject({ id: z.string().min(1).max(256), name: z.string().max(256) }))
+    .max(500)
+    .optional(),
   role: AccountRoleSchema,
   teachingOrganizations: z
     .array(z.strictObject({ id: z.uuid(), name: shortText }))
@@ -329,6 +334,7 @@ export const ClassroomCommandSchema = z.discriminatedUnion('kind', [
   }),
   z.strictObject({
     kind: z.literal('create-class'),
+    teacherId: z.string().min(1).max(256).optional(),
     organizationId: z.uuid().optional(),
     name: shortText,
     courseRevisionId: z.uuid().optional(),

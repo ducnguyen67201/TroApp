@@ -81,8 +81,10 @@ export function useTeam(
         return;
       }
       const selected =
-        home.organizations.find((organization) => organization.id === selectedOrganizationId) ??
-        home.organizations[0];
+        home.organizations.find(
+          (organization) =>
+            organization.id === (home.adminOrganizationId ?? selectedOrganizationId),
+        ) ?? home.organizations[0];
       const nextState: TeamState = {
         accountId,
         home,
@@ -90,7 +92,10 @@ export function useTeam(
         selectedOrganizationId: selected?.id ?? null,
       };
       setState(nextState);
-      if (!selected?.isOwner) {
+      if (
+        !selected ||
+        (!selected.isOwner && !(home.isAdmin && home.adminOrganizationId === selected.id))
+      ) {
         return;
       }
       let team: OrganizationReply;

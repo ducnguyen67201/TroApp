@@ -8,6 +8,10 @@ import type { LessonSources, LessonSource } from '../application/LessonVideoPort
 /** Source reads always follow teacher assignment checks; the model cannot expand their scope. */
 export class ClassroomLessonSources implements LessonSources {
   constructor(private readonly store: ClassroomStore) {}
+  async canAdminister(actorId: string, classId: string): Promise<boolean> {
+    return this.store.canAdministerClass(actorId, classId);
+  }
+
   async authorize(ownerId: string, classId: string): Promise<void> {
     if (!(await this.store.canTeachClass(ownerId, classId))) {
       throw new LessonVideoError(LessonVideoFailure.FORBIDDEN);

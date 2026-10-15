@@ -25,7 +25,11 @@ export async function correctRecognition(
 ): Promise<PetWorldMutationReply> {
   const { transaction, actorId, createdAt } = context;
   const recognition = await transaction.readRecognition(command.recognitionId);
-  if (!recognition || recognition.teacherId !== actorId) {
+  if (
+    !recognition ||
+    (recognition.teacherId !== actorId &&
+      !(await transaction.canAdministerClass?.(actorId, recognition.classId)))
+  ) {
     throw new PetWorldError(PetWorldFailure.FORBIDDEN);
   }
   await requireOwnedClass(transaction, actorId, recognition.classId);

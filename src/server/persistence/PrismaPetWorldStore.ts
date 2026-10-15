@@ -1,5 +1,6 @@
+import { readAdminOrganizationId } from '../auth/AdminOrganizationContext.js';
 import { AccountRole } from '#contracts/AccountRole.js';
-import { readClassroomRole } from './OrganizationClassroomAccess.js';
+import { canTeachClassroom, readClassroomRole } from './OrganizationClassroomAccess.js';
 import { z } from 'zod';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { CourseContentSchema } from '#contracts/Classroom.js';
@@ -70,6 +71,13 @@ class PrismaPetWorldTransaction implements PetWorldTransaction {
       select: { classId: true },
     });
     return enrollment !== null;
+  }
+
+  async canAdministerClass(actorId: string, classId: string): Promise<boolean> {
+    return (
+      readAdminOrganizationId(actorId) !== null &&
+      (await canTeachClassroom(this.client, actorId, classId))
+    );
   }
 
   async readClassRole(userId: string, classId: string) {
