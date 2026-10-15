@@ -32,7 +32,7 @@ it('loads the checkout without a CLI app argument and forwards early callbacks e
   );
   await writeFile(
     join(directory, 'HostConfig.json'),
-    JSON.stringify({ projectDirectory: directory, appName: 'tro' }),
+    JSON.stringify({ projectDirectory: directory, appName: 'tro-dev' }),
   );
   /* A standalone fixture exercises Node's real ESM loader and early event timing.
      It never launches Electron, registers an OS handler or accesses user data. */
@@ -44,10 +44,11 @@ import { tmpdir } from 'node:os';
 export class Host extends EventEmitter {
   appName = '';
   userData = '';
+  sessionData = '';
   /** @param {string} name */
   setName(name) { this.appName = name; }
   /** @param {string} key @param {string} path */
-  setPath(key, path) { if (key === 'userData') this.userData = path; }
+  setPath(key, path) { if (key === 'userData') this.userData = path; if (key === 'sessionData') this.sessionData = path; }
   /** @param {string} key */
   getPath(key) { if (key !== 'appData') throw new Error('Unexpected path'); return tmpdir(); }
 }
@@ -64,7 +65,7 @@ let callbacks = 0;
 app.on('open-url', () => { callbacks += 1; });
 process.on('beforeExit', () => console.log(JSON.stringify({
   callbacks, appName: app.appName,
-  userData: app.userData, workingDirectory: process.cwd(),
+  userData: app.userData, sessionData: app.sessionData, workingDirectory: process.cwd(),
 })));
 `,
   );
@@ -77,13 +78,15 @@ process.on('beforeExit', () => console.log(JSON.stringify({
       callbacks: z.number(),
       appName: z.string(),
       userData: z.string(),
+      sessionData: z.string(),
       workingDirectory: z.string(),
     })
     .parse(body);
   expect(result).toEqual({
     callbacks: 1,
-    appName: 'tro',
-    userData: join(tmpdir(), 'tro'),
+    appName: 'tro-dev',
+    userData: join(tmpdir(), 'tro-dev'),
+    sessionData: join(tmpdir(), 'tro-dev'),
     workingDirectory: await realpath(directory),
   });
 });

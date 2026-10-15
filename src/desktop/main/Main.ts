@@ -141,7 +141,10 @@ import { DesktopWindowAppearance } from '../DesktopAppearance.js';
 import { AppUpdateState, AppUpdatePhase, type AppUpdateReply } from '#contracts/AppUpdate.js';
 import { AppUpdateController } from './updates/AppUpdateController.js';
 import { runAppUpdateCommand } from './updates/AppUpdateCommand.js';
+import { configureDevelopmentStorage } from './ConfigureDevelopmentStorage.js';
+import { DesktopDevelopmentApp } from '../DesktopIdentity.js';
 
+configureDevelopmentStorage(app, process.execPath);
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 const mainDirectory = dirname(fileURLToPath(import.meta.url));
@@ -1525,7 +1528,7 @@ async function startDesktop(): Promise<void> {
       height: 860,
       minWidth: 680,
       minHeight: 520,
-      title: 'Tro',
+      title: app.getName() === DesktopDevelopmentApp.NAME ? DesktopDevelopmentApp.NAME : 'Tro',
       icon: applicationIcon,
       backgroundColor: DesktopWindowAppearance.BACKGROUND,
       titleBarStyle: 'hidden',
@@ -1543,6 +1546,11 @@ async function startDesktop(): Promise<void> {
         backgroundThrottling: false,
       },
     });
+    if (app.getName() === DesktopDevelopmentApp.NAME) {
+      window.on('page-title-updated', (event) => {
+        event.preventDefault();
+      });
+    }
     mainWindow = window;
     window.webContents.on('render-process-gone', (_event, details) => {
       if (!isQuitting && details.reason !== AnalyticsRendererFailure.CLEAN_EXIT) {

@@ -10,7 +10,7 @@ it('attributes permissions to the installed, branded development, or direct Elec
     DesktopBundleId.INSTALLED,
   );
   expect(
-    selectDesktopHostBundleId(false, '/repo/.tro-development/Tro.app/Contents/MacOS/Electron'),
+    selectDesktopHostBundleId(false, '/repo/.tro-development/tro-dev.app/Contents/MacOS/Electron'),
   ).toBe(createDevelopmentBundleId('/repo'));
   expect(
     selectDesktopHostBundleId(
@@ -29,6 +29,6 @@ it('keeps each checkout identity stable and separates it from other Tro checkout
   expect(createDevelopmentBundleId('/repo')).toBe(first);
   expect(createDevelopmentBundleId('/other/repo')).not.toBe(first);
   expect(
-    selectDesktopHostBundleId(true, '/repo/.tro-development/Tro.app/Contents/MacOS/Electron'),
+    selectDesktopHostBundleId(true, '/repo/.tro-development/tro-dev.app/Contents/MacOS/Electron'),
   ).toBe(first);
 });

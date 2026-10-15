@@ -6,7 +6,12 @@ export const DesktopBundleId = {
   ELECTRON: 'com.github.Electron',
 } as const;
 
-const developmentExecutableSuffix = '/.tro-development/Tro.app/Contents/MacOS/Electron';
+export const DesktopDevelopmentApp = {
+  NAME: 'tro-dev',
+  BUNDLE_FILE: 'tro-dev.app',
+} as const;
+
+const developmentExecutableSuffix = `/.tro-development/${DesktopDevelopmentApp.BUNDLE_FILE}/Contents/MacOS/Electron`;
 
 /** Different checkouts need distinct LaunchServices identities to receive their own callbacks. */
 export function createDevelopmentBundleId(projectDirectory: string): string {

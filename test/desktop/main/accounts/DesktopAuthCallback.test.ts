@@ -7,7 +7,7 @@ import {
 
 vi.mock('electron', () => ({ app: {} }));
 
-const bundlePath = '/repo/.tro-development/Tro.app';
+const bundlePath = '/repo/.tro-development/tro-dev.app';
 const registration = {
   platform: 'darwin',
   executablePath: `${bundlePath}/Contents/MacOS/Electron`,
@@ -36,7 +36,7 @@ it('registers the active bundle and verifies the actual macOS callback destinati
 
 it('rejects a stale checkout instead of starting a browser login it cannot finish', async () => {
   registration.readApplication.mockResolvedValue({
-    path: '/old-checkout/.tro-development/Tro.app',
+    path: '/old-checkout/.tro-development/tro-dev.app',
   });
   await expect(ensureDesktopAuthCallback(registration)).rejects.toThrow(
     DesktopAuthCallbackError.WRONG_APP,
