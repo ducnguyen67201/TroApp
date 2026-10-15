@@ -1,3 +1,4 @@
+import { AgentWorkerLifecycle } from './agent/AgentWorkerLifecycle.js';
 import { readClassroomMessages } from '../localization/ClassroomMessages.js';
 import type { VoiceoverController } from './voiceover/VoiceoverController.js';
 import type { TeachingMessage } from '#contracts/TeachingStep.js';
@@ -15,9 +16,9 @@ import type {
   AgentChatPermissions,
   AgentChatWorker,
   AgentCancelShortcut,
+  AgentCursorPresentation,
 } from './AgentChatPorts.js';
 
-const idleMs = 15 * 60_000;
 const credentialBufferMs = 60_000;
 
 /** Main owns login and one warm worker; an active lesson retains its goal across SDK runs. */
@@ -123,13 +124,11 @@ export class AgentChatController {
 
   private activeSessionId: string | null = null;
   private credentialExpiresAt = 0;
-  private idleTimer: NodeJS.Timeout | null = null;
+  private readonly lifecycle: AgentWorkerLifecycle;
   private turnInProgress = false;
   private pendingSessionId: string | null = null;
   private taskGeneration = 0;
-  private companionRequested = false;
   private authChangeInProgress = false;
-  private companionStartup: Promise<AgentResult> | null = null;
   private classroomTask = false;
 
   constructor(
@@ -141,7 +140,12 @@ export class AgentChatController {
     private readonly voiceover?: VoiceoverController,
     private readonly classroom?: ClassroomTaskContext,
     private readonly recordUsage?: (event: AnalyticsEventInput) => void,
-  ) {}
+    private readonly cursor?: AgentCursorPresentation,
+  ) {
+    this.lifecycle = new AgentWorkerLifecycle(() => {
+      this.worker.dispose();
+    });
+  }
 
   cancelClassroomTask(): void {
     if (this.classroomTask && this.pendingSessionId) {
@@ -169,7 +173,7 @@ export class AgentChatController {
   async changeAccount(action: () => Promise<AuthResult>): Promise<AuthResult> {
     this.voiceover?.clearTask();
     this.authChangeInProgress = true;
-    this.companionRequested = false;
+    this.lifecycle.invalidate();
     this.taskGeneration += 1;
     try {
       await this.stopWorker();
@@ -179,41 +183,34 @@ export class AgentChatController {
     }
   }
 
-  /** Start only local pointer presentation; no gateway credential or model call. */
-  startCursorCompanion(): Promise<AgentResult> {
-    if (this.authChangeInProgress) {
-      return Promise.resolve({ kind: 'failed', message: 'Sign in to use Tro.' });
-    }
-    this.companionRequested = true;
-    if (this.companionStartup) return this.companionStartup;
-    if (this.turnInProgress) return Promise.resolve({ kind: 'stopped' });
+  /** Content-free speculative work; permission checks do not delay voice capture. */
+  beginAgentPreparation(userId: string): { release(): void } {
+    const lease = this.lifecycle.acquireWork(false);
     const generation = this.taskGeneration;
-    this.companionStartup = (async (): Promise<AgentResult> => {
-      const accessFailure = await this.checkTaskAccess();
-      if (generation !== this.taskGeneration)
-        return { kind: 'failed', message: 'The agent session ended.' };
-      if (accessFailure) return accessFailure;
-      if (this.activeSessionId && this.worker.isRunning()) {
-        return { kind: 'started', sessionId: this.activeSessionId };
+    void (async () => {
+      const session = await this.auth.readSession();
+      if (
+        !lease.isCurrent() ||
+        generation !== this.taskGeneration ||
+        session.kind !== 'signed-in' ||
+        session.user.id !== userId ||
+        this.authChangeInProgress
+      ) {
+        return;
       }
-      const sessionId = randomUUID();
-      const result = await this.worker.startCompanion(sessionId);
-      if (generation !== this.taskGeneration)
-        return { kind: 'failed', message: 'The agent session ended.' };
-      if (result.kind === 'started') {
-        this.activeSessionId = sessionId;
-        this.credentialExpiresAt = 0;
+      const failure = await this.checkTaskAccess();
+      if (failure || !lease.isCurrent() || generation !== this.taskGeneration) {
+        return;
       }
-      return result;
-    })()
-      .catch((): AgentResult => ({
-        kind: 'failed',
-        message: 'Could not start the cursor companion.',
-      }))
-      .finally(() => {
-        this.companionStartup = null;
-      });
-    return this.companionStartup;
+      await this.worker.prepare();
+    })().catch(() => {
+      console.warn('agent.worker.warmup.failed', { stage: 'prepare' });
+    });
+    return {
+      release: () => {
+        lease.release();
+      },
+    };
   }
 
   async startTaskSession(): Promise<AgentResult> {
@@ -274,8 +271,11 @@ export class AgentChatController {
     this.voiceover?.startTask(sessionId, locale);
     this.turnInProgress = true;
     this.pendingSessionId = sessionId;
-    const generation = this.taskGeneration;
-    this.clearIdleTimer();
+    const generation = ++this.taskGeneration;
+    const work = this.lifecycle.acquireWork(true);
+    let taskBound = false;
+    let cleanupConfirmed = true;
+    let cursorSuspended = false;
     const escapeCancellation = { requested: false };
     const readInterruptedResult = (): AgentResult =>
       escapeCancellation.requested
@@ -293,7 +293,6 @@ export class AgentChatController {
           }
         });
       }
-      await this.companionStartup;
       if (generation !== this.taskGeneration) {
         return readInterruptedResult();
       }
@@ -315,27 +314,41 @@ export class AgentChatController {
         return readInterruptedResult();
       }
 
-      if (
-        this.activeSessionId !== sessionId ||
-        !this.worker.isRunning() ||
-        Date.now() + credentialBufferMs >= this.credentialExpiresAt
-      ) {
-        await this.stopWorker();
-        if (generation !== this.taskGeneration) {
-          return readInterruptedResult();
-        }
-        const credential = await this.auth.fetchModelCredential();
-        if (generation !== this.taskGeneration) {
-          return readInterruptedResult();
-        }
-        const result = await this.worker.start(sessionId, credential.token, this.gatewayBaseUrl);
-        if (generation !== this.taskGeneration) {
-          return readInterruptedResult();
-        }
-        if (result.kind !== 'started') return result;
-        this.activeSessionId = sessionId;
-        this.credentialExpiresAt = Date.parse(credential.expiresAt);
+      await this.worker.prepare();
+      if (generation !== this.taskGeneration || !work.isCurrent()) {
+        return readInterruptedResult();
       }
+      const credential = await this.auth.fetchModelCredential();
+      if (generation !== this.taskGeneration || !work.isCurrent()) {
+        return readInterruptedResult();
+      }
+      const refreshedFailure = await this.checkTaskAccess();
+      if (generation !== this.taskGeneration || !work.isCurrent()) {
+        return readInterruptedResult();
+      }
+      if (refreshedFailure) {
+        return refreshedFailure;
+      }
+      if (classroomContext && !this.classroom?.isContextCurrent(classroomContext)) {
+        return { kind: 'failed', message: readClassroomMessages(locale).errorClassroomTeachMode };
+      }
+      cursorSuspended = true;
+      await this.cursor?.suspendFollowing();
+      if (generation !== this.taskGeneration || !work.isCurrent()) {
+        return readInterruptedResult();
+      }
+      cleanupConfirmed = false;
+      const started = await this.worker.start(sessionId, credential.token, this.gatewayBaseUrl);
+      if (generation !== this.taskGeneration || !work.isCurrent()) {
+        return readInterruptedResult();
+      }
+      if (started.kind !== 'started') {
+        this.worker.dispose();
+        return started;
+      }
+      taskBound = true;
+      this.activeSessionId = sessionId;
+      this.credentialExpiresAt = Date.parse(credential.expiresAt);
 
       if (mode === AgentTaskMode.TEACH) {
         this.startCredentialRenewal();
@@ -375,13 +388,28 @@ export class AgentChatController {
       }
       this.waitingLessonId = null;
       this.cancelShortcut?.disable();
+      if (generation === this.taskGeneration) {
+        if (taskBound) {
+          try {
+            await this.worker.finish(sessionId);
+            cleanupConfirmed = true;
+          } catch {
+            this.worker.dispose();
+          }
+        }
+        this.activeSessionId = null;
+        this.credentialExpiresAt = 0;
+        if (cursorSuspended && cleanupConfirmed) {
+          try {
+            await this.cursor?.resumeFollowing();
+          } catch {
+            console.warn('companion.following.failed', { stage: 'resume' });
+          }
+        }
+      }
       this.turnInProgress = false;
       this.pendingSessionId = null;
-      if (this.companionRequested) {
-        if (!this.worker.isRunning()) void this.startCursorCompanion();
-      } else if (this.worker.isRunning()) {
-        this.scheduleIdleStop();
-      }
+      work.release();
     }
   }
 
@@ -392,9 +420,13 @@ export class AgentChatController {
     if (this.activeSessionId === sessionId || this.pendingSessionId === sessionId) {
       this.cancelShortcut?.disable();
       this.taskGeneration += 1;
-      await this.stopWorker();
+      const stopped = await this.stopWorker();
+      if (stopped) {
+        await this.cursor?.resumeFollowing().catch(() => {
+          console.warn('companion.following.failed', { stage: 'cancel-resume' });
+        });
+      }
     }
-    if (this.companionRequested) await this.startCursorCompanion();
     return { kind: 'stopped' };
   }
 
@@ -406,10 +438,9 @@ export class AgentChatController {
     }
     this.waitingLessonId = null;
     this.cancelShortcut?.disable();
-    this.companionRequested = false;
+    this.lifecycle.invalidate();
     this.taskGeneration += 1;
     this.pendingSessionId = null;
-    this.clearIdleTimer();
     this.worker.dispose();
     this.activeSessionId = null;
     this.credentialExpiresAt = 0;
@@ -432,33 +463,21 @@ export class AgentChatController {
     return null;
   }
 
-  private scheduleIdleStop(): void {
-    this.clearIdleTimer();
-    this.idleTimer = setTimeout(() => {
-      if (!this.turnInProgress) void this.stopWorker();
-    }, idleMs);
-    this.idleTimer.unref();
-  }
-
-  private clearIdleTimer(): void {
-    if (this.idleTimer) clearTimeout(this.idleTimer);
-    this.idleTimer = null;
-  }
-
-  private async stopWorker(): Promise<void> {
+  private async stopWorker(): Promise<boolean> {
+    this.lifecycle.invalidate();
     this.waitingLessonId = null;
     if (this.credentialTimer) {
       clearInterval(this.credentialTimer);
       this.credentialTimer = null;
     }
-    this.clearIdleTimer();
     const sessionId = this.activeSessionId;
     this.activeSessionId = null;
     this.credentialExpiresAt = 0;
     if (sessionId && this.worker.isRunning()) {
-      await this.worker.stop(sessionId);
-    } else {
-      this.worker.dispose();
+      const result = await this.worker.stop(sessionId);
+      return result.kind === 'stopped';
     }
+    this.worker.dispose();
+    return true;
   }
 }

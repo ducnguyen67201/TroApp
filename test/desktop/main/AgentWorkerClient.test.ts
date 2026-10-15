@@ -45,18 +45,21 @@ describe('agent connection to the shared desktop host', () => {
     };
     const receiveProgress = vi.fn<(progress: AgentProgress) => void>();
     const worker = new AgentWorkerClient('/worker', false, driver, group, receiveProgress);
-    const starting = worker.startCompanion(sessionId);
+    const starting = worker.prepare();
     await forked;
     child.emit('spawn');
     await Promise.resolve();
     const initial = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
     expect(initial.command).toMatchObject({
-      kind: 'follow',
+      kind: 'prepare',
       desktopDriver: connection,
       hudGroup: group,
     });
-    child.emit('message', { requestId: initial.requestId, result: { kind: 'started', sessionId } });
-    expect(await starting).toEqual({ kind: 'started', sessionId });
+    child.emit('message', {
+      requestId: initial.requestId,
+      result: { kind: 'started', sessionId: initial.command.sessionId },
+    });
+    await starting;
     const turning = worker.sendMessage(sessionId, 'Show me', DesktopLocale.ENGLISH);
     const turn = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
     child.emit('message', {
@@ -95,10 +98,11 @@ describe('agent connection to the shared desktop host', () => {
       ),
     };
     const worker = new AgentWorkerClient('/worker', false, driver);
-    const starting = worker.startCompanion(sessionId);
+    const starting = worker.prepare();
+    await Promise.resolve();
     worker.dispose();
     finishConnection(connection);
-    expect(await starting).toEqual({ kind: 'failed', message: 'The agent session ended.' });
+    await expect(starting).rejects.toThrow('Could not prepare');
     expect(doubles.fork).not.toHaveBeenCalled();
   });
 });
@@ -109,12 +113,15 @@ it('keeps a teaching request alive past ten minutes while accepting a separate l
   doubles.fork.mockReturnValue(child);
   const driver = { start: vi.fn<DesktopDriverPort['start']>().mockResolvedValue(connection) };
   const worker = new AgentWorkerClient('/worker', false, driver);
-  const starting = worker.startCompanion(sessionId);
+  const starting = worker.prepare();
   await vi.advanceTimersByTimeAsync(0);
   child.emit('spawn');
   await vi.advanceTimersByTimeAsync(0);
   const initial = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
-  child.emit('message', { requestId: initial.requestId, result: { kind: 'started', sessionId } });
+  child.emit('message', {
+    requestId: initial.requestId,
+    result: { kind: 'started', sessionId: initial.command.sessionId },
+  });
   await starting;
   const turning = worker.sendMessage(sessionId, 'Open YouTube', DesktopLocale.ENGLISH, 'teach');
   const turn = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
@@ -131,5 +138,92 @@ it('keeps a teaching request alive past ten minutes while accepting a separate l
     result: { kind: 'teaching', result: { outcome: 'goal_reached', answer: 'YouTube is open.' } },
   });
   expect(await turning).toMatchObject({ kind: 'teaching', result: { outcome: 'goal_reached' } });
+  worker.dispose();
+});
+
+it('deduplicates preparation and rebinds tasks without forking again', async () => {
+  vi.useFakeTimers();
+  const child = new Child();
+  doubles.fork.mockReturnValue(child);
+  const driver = { start: vi.fn<DesktopDriverPort['start']>().mockResolvedValue(connection) };
+  const worker = new AgentWorkerClient('/worker', false, driver);
+  const first = worker.prepare();
+  expect(worker.prepare()).toBe(first);
+  await vi.advanceTimersByTimeAsync(0);
+  child.emit('spawn');
+  await vi.advanceTimersByTimeAsync(0);
+  const prepared = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
+  child.emit('message', {
+    requestId: prepared.requestId,
+    result: { kind: 'started', sessionId: prepared.command.sessionId },
+  });
+  await first;
+  for (const id of [sessionId, group]) {
+    const starting = worker.start(id, 'token', 'https://gateway.example.test');
+    await vi.advanceTimersByTimeAsync(0);
+    const start = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
+    expect(start.command.kind).toBe('start');
+    child.emit('message', {
+      requestId: start.requestId,
+      result: { kind: 'started', sessionId: id },
+    });
+    await starting;
+    const finishing = worker.finish(id);
+    const finish = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
+    child.emit('message', { requestId: finish.requestId, result: { kind: 'stopped' } });
+    await finishing;
+  }
+  expect(doubles.fork).toHaveBeenCalledOnce();
+  expect(child.kill).not.toHaveBeenCalled();
+  worker.dispose();
+});
+
+it('bounds driver startup and fences its late completion before forking', async () => {
+  vi.useFakeTimers();
+  let finish: (value: typeof connection) => void = () => {};
+  const driver = {
+    start: vi.fn<DesktopDriverPort['start']>().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    ),
+  };
+  const worker = new AgentWorkerClient('/worker', false, driver);
+  const rejection = expect(worker.prepare()).rejects.toThrow('Could not prepare');
+  await vi.advanceTimersByTimeAsync(10_000);
+  await rejection;
+  finish(connection);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(doubles.fork).not.toHaveBeenCalled();
+});
+
+it('waits for the retiring process to exit and ignores its late startup before replacing it', async () => {
+  vi.useFakeTimers();
+  const oldChild = new Child();
+  oldChild.kill.mockImplementation(() => {});
+  const currentChild = new Child();
+  doubles.fork.mockReturnValueOnce(oldChild).mockReturnValueOnce(currentChild);
+  const driver = { start: vi.fn<DesktopDriverPort['start']>().mockResolvedValue(connection) };
+  const worker = new AgentWorkerClient('/worker', false, driver);
+  const oldStart = expect(worker.prepare()).rejects.toThrow('Could not prepare');
+  await vi.advanceTimersByTimeAsync(0);
+  worker.dispose();
+  const currentStart = worker.prepare();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(doubles.fork).toHaveBeenCalledOnce();
+  oldChild.emit('exit');
+  await vi.advanceTimersByTimeAsync(0);
+  expect(doubles.fork).toHaveBeenCalledTimes(2);
+  currentChild.emit('spawn');
+  await vi.advanceTimersByTimeAsync(0);
+  const prepared = AgentWorkerRequestSchema.parse(currentChild.postMessage.mock.calls.at(-1)?.[0]);
+  currentChild.emit('message', {
+    requestId: prepared.requestId,
+    result: { kind: 'started', sessionId: prepared.command.sessionId },
+  });
+  await currentStart;
+  await oldStart;
+  expect(currentChild.kill).not.toHaveBeenCalled();
   worker.dispose();
 });

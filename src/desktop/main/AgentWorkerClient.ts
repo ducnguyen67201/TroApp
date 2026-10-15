@@ -1,3 +1,4 @@
+import { AgentWorkerPolicy } from './agent/AgentWorkerPolicy.js';
 import type { StudentInputPort } from './input/GlobalStudentInput.js';
 import {
   ClassroomToolRequestSchema,
@@ -27,13 +28,17 @@ interface PendingRequest {
 }
 
 const turnTimeoutMs = 120_000;
-const startTimeoutMs = 30_000;
-const stopTimeoutMs = 10_000;
+const startTimeoutMs = AgentWorkerPolicy.STARTUP_TIMEOUT_MS;
+const stopTimeoutMs = AgentWorkerPolicy.SHUTDOWN_TIMEOUT_MS;
 
 /** Owns the one local computer-use process for the active chat session. */
 export class AgentWorkerClient implements AgentChatWorker {
   private worker: UtilityProcess | null = null;
   private generation = 0;
+  private preparing: Promise<void> | null = null;
+  private connection: DesktopDriverConnection | null = null;
+  private ready = false;
+  private stopping: Promise<void> = Promise.resolve();
   private readonly onDriverExit = (): void => {
     this.dispose();
   };
@@ -62,30 +67,117 @@ export class AgentWorkerClient implements AgentChatWorker {
     return this.worker !== null;
   }
 
-  startCompanion(sessionId: string): Promise<AgentResult> {
-    return this.startWorker({
-      kind: 'follow',
-      sessionId,
-      debugEnabled: this.debugEnabled,
-      ...(this.hudGroup ? { hudGroup: this.hudGroup } : {}),
+  prepare(): Promise<void> {
+    if (this.ready) {
+      return Promise.resolve();
+    }
+    if (this.preparing) {
+      return this.preparing;
+    }
+    const generation = this.generation;
+    const startedAt = performance.now();
+    const attemptId = randomUUID();
+    console.info('agent.worker.starting', { attemptId, generation });
+    let timer: NodeJS.Timeout | null = null;
+    const operation = this.stopping.then(async () => {
+      if (generation !== this.generation) {
+        throw new Error('Worker preparation canceled.');
+      }
+      const result = await this.startWorker({
+        kind: 'prepare',
+        sessionId: attemptId,
+        debugEnabled: this.debugEnabled,
+        ...(this.hudGroup ? { hudGroup: this.hudGroup } : {}),
+      });
+      if (
+        result.kind !== 'started' ||
+        result.sessionId !== attemptId ||
+        generation !== this.generation
+      ) {
+        throw new Error('Worker preparation failed.');
+      }
+      this.ready = true;
+      console.info('agent.worker.ready', {
+        attemptId,
+        generation,
+        pid: this.worker?.pid,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
     });
+    const deadline = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        if (generation === this.generation) {
+          this.dispose();
+        }
+        reject(new Error('Worker preparation timed out.'));
+      }, startTimeoutMs);
+    });
+    const preparing = Promise.race([operation, deadline])
+      .catch(() => {
+        if (generation === this.generation) {
+          this.dispose();
+        }
+        console.warn('agent.worker.start.failed', {
+          attemptId,
+          generation,
+          durationMs: Math.round(performance.now() - startedAt),
+        });
+        throw new Error('Could not prepare the local agent.');
+      })
+      .finally(() => {
+        if (timer) {
+          clearTimeout(timer);
+        }
+        if (this.preparing === preparing) {
+          this.preparing = null;
+        }
+      });
+    this.preparing = preparing;
+    return preparing;
   }
 
-  start(sessionId: string, gatewayToken: string, gatewayBaseUrl: string): Promise<AgentResult> {
-    return this.startWorker({
-      kind: 'start',
+  async start(
+    sessionId: string,
+    gatewayToken: string,
+    gatewayBaseUrl: string,
+  ): Promise<AgentResult> {
+    const generation = this.generation;
+    try {
+      await this.prepare();
+      if (!this.connection || generation !== this.generation) {
+        return { kind: 'failed', message: 'The agent session ended.' };
+      }
+      return await this.send({
+        kind: 'start',
+        sessionId,
+        gatewayToken,
+        gatewayBaseUrl,
+        desktopDriver: this.connection,
+        debugEnabled: this.debugEnabled,
+        ...(this.hudGroup ? { hudGroup: this.hudGroup } : {}),
+      });
+    } catch {
+      return { kind: 'failed', message: 'Could not prepare the local agent.' };
+    }
+  }
+
+  async finish(sessionId: string): Promise<void> {
+    this.classroomContext = null;
+    const startedAt = performance.now();
+    const result = await this.send({ kind: 'finish', sessionId });
+    if (result.kind !== 'stopped') {
+      this.dispose();
+      throw new Error('Agent task cleanup failed.');
+    }
+    console.info('agent.worker.task.cleaned', {
       sessionId,
-      gatewayToken,
-      gatewayBaseUrl,
-      debugEnabled: this.debugEnabled,
-      ...(this.hudGroup ? { hudGroup: this.hudGroup } : {}),
+      generation: this.generation,
+      durationMs: Math.round(performance.now() - startedAt),
     });
   }
 
   private async startWorker(
-    command:
-      | Omit<Extract<AgentWorkerCommand, { kind: 'start' }>, 'desktopDriver'>
-      | Omit<Extract<AgentWorkerCommand, { kind: 'follow' }>, 'desktopDriver'>,
+    command: Omit<Extract<AgentWorkerCommand, { kind: 'prepare' }>, 'desktopDriver'>,
   ): Promise<AgentResult> {
     if (this.worker !== null) {
       return { kind: 'failed', message: 'An agent session is already active.' };
@@ -96,13 +188,17 @@ export class AgentWorkerClient implements AgentChatWorker {
     try {
       connection = await this.desktopDriver.start(this.onDriverExit);
     } catch {
-      this.dispose();
+      if (generation === this.generation) {
+        this.dispose();
+      }
       return { kind: 'failed', message: 'Could not start Tro desktop control.' };
     }
 
     if (generation !== this.generation) {
       return { kind: 'failed', message: 'The agent session ended.' };
     }
+
+    this.connection = connection;
 
     /* Electron main starts this only after app.whenReady(). The agent and Cua
        MCP client run in the utility child, never in renderer or preload. */
@@ -174,8 +270,11 @@ export class AgentWorkerClient implements AgentChatWorker {
     });
     child.on('exit', () => {
       if (this.worker === child) {
+        this.generation += 1;
         this.failPending('The local agent worker stopped.');
         this.worker = null;
+        this.connection = null;
+        this.ready = false;
       }
     });
 
@@ -188,12 +287,14 @@ export class AgentWorkerClient implements AgentChatWorker {
       });
     });
     if (!ready || generation !== this.generation || this.worker !== child) {
-      this.dispose();
+      if (generation === this.generation && this.worker === child) {
+        this.dispose();
+      }
       return { kind: 'failed', message: 'Could not start the local agent worker.' };
     }
 
     const result = await this.send({ ...command, desktopDriver: connection });
-    if (result.kind !== 'started') {
+    if (result.kind !== 'started' && generation === this.generation && this.worker === child) {
       this.dispose();
     }
     return result;
@@ -256,11 +357,23 @@ export class AgentWorkerClient implements AgentChatWorker {
 
   dispose(): void {
     this.classroomContext = null;
+    this.connection = null;
+    this.ready = false;
+    this.preparing = null;
     this.studentInput?.stop();
     this.generation += 1;
     this.failPending('The agent session ended.');
-    this.worker?.kill();
+    const child = this.worker;
     this.worker = null;
+    if (child) {
+      this.stopping = new Promise<void>((resolve) => {
+        child.once('exit', () => {
+          console.info('agent.worker.stopped', { generation: this.generation });
+          resolve();
+        });
+      });
+      child.kill();
+    }
     /* Main owns the shared daemon; HUD transport survives task-worker replacement. */
   }
 
@@ -273,11 +386,11 @@ export class AgentWorkerClient implements AgentChatWorker {
     const requestId = randomUUID();
     return new Promise<AgentResult>((resolve) => {
       let timeoutMs = turnTimeoutMs;
-      if (command.kind === 'start' || command.kind === 'follow') {
+      if (command.kind === 'start' || command.kind === 'prepare') {
         timeoutMs = startTimeoutMs;
       } else if (command.kind === 'turn' && command.mode === AgentTaskMode.TEACH) {
         timeoutMs = 0;
-      } else if (command.kind === 'stop') {
+      } else if (command.kind === 'stop' || command.kind === 'finish') {
         timeoutMs = stopTimeoutMs;
       }
       const timeout =

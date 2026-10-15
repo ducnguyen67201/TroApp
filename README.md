@@ -353,20 +353,49 @@ An unwritable profile still produces the error dialog. This captures failures
 caught by main startup; a native crash or failure before the main module loads
 still requires Windows crash diagnostics.
 
-To measure desktop memory on macOS, use Tro's main process PID from Activity
-Monitor (replace `12345` below):
+To measure desktop memory, use Tro's main process PID from Activity Monitor on
+macOS or Task Manager's Details view on Windows (replace `12345` below):
 
 ```sh
 pnpm check:desktop-memory --pid 12345 --duration-seconds 60
 ```
 
-The read-only check reports physical footprint for main and all current helper
-processes, including compressed/swapped allocations. It reports growth and whether
+The read-only check reports macOS physical footprint for main and current helper
+processes, including compressed/swapped allocations. On Windows it uses PowerShell
+to report private committed bytes and working set per process. The summed working
+set can count shared pages more than once; it is not a unique physical-memory total.
+Windows private commit is not interchangeable with macOS physical footprint or the
+Task Manager app-group number. Changing process trees and missing counters reject
+the sample instead of reporting an incomplete total. On macOS, It reports growth and whether
 the combined footprint is below a 1 GB idle target. Measure after startup settles
 and again during the intended workload; the target is not a guaranteed ceiling
 for active teaching, media playback or development tooling. The API, database and
 other applications are outside this desktop process tree. The check never restarts
 Tro or starts an agent/model request.
+
+For agent lifecycle checks, run `pnpm test:worker`. It builds both development and
+production bundles, checks that presentation cannot reach task orchestration, and
+uses a scripted local MCP peer to measure preparation plus two task bindings on
+one PID. It makes no model request. These fixture timings exclude native driver
+startup, authentication, transcription and model latency; they are not Windows
+first-action latency.
+
+The initial worker retention policy is two minutes after a task settles, or
+15 seconds after an abandoned capture that only prepared the worker. Active
+captures, admissions and teaching waits hold it awake. Startup fails after ten
+seconds; unresponsive task cleanup is retired after two seconds. The owning values
+are in [AgentWorkerPolicy](src/desktop/main/agent/AgentWorkerPolicy.ts).
+`agent.worker.starting`, `agent.worker.ready`, `agent.worker.start.failed`,
+`agent.worker.task.cleaned` and `agent.worker.stopped` report safe IDs, generations,
+PID/readiness or cleanup duration. Match the preparation attempt ID across startup
+logs. No task text, audio, screenshots or credentials enter these events.
+
+For Windows acceptance, record at least 30 cold preparations and 30 warm tasks on
+the same packaged build and PC. Measure preparation request to ready separately
+from final transcript to first admitted action, including authorization and model
+latency. Compare idle process trees before any task, after a task, and after the
+idle deadline. The p95 readiness target is one second; it remains unverified until
+those measurements are collected. Do not infer a memory saving from process count.
 
 The macOS launcher uses the checkout-owned `.tro-development/tro-dev.app`, shown as
 **tro-dev**. Quit it before rebuilding its static host. Development uses the

@@ -4,8 +4,8 @@ import { ClassroomToolClient } from './teaching/ClassroomToolClient.js';
 import { AgentProgressPhase, AgentProgressSchema } from '#contracts/CompanionHud.js';
 import { TeachingLessonPhase } from '#contracts/DesktopObservation.js';
 import { AgentFailureCode } from '#contracts/AgentSession.js';
-import { setDefaultOpenAIClient, setTracingDisabled } from '@openai/agents';
-import OpenAI from 'openai';
+import { setTracingDisabled } from '@openai/agents';
+import { TaskModelClient, runWithTaskModel } from './agent/TaskModelClient.js';
 import {
   AgentWorkerRequestSchema,
   AgentWorkerResponseSchema,
@@ -19,7 +19,8 @@ const parentPort = process.parentPort;
 
 let runner: ComputerUseTaskRunner | null = null;
 let sessionId: string | null = null;
-let hasModelCredential = false;
+let model: TaskModelClient | null = null;
+let connecting = false;
 let activeRun: ReturnType<ComputerUseTaskRunner['runTask']> | null = null;
 let activeRequestId: string | null = null;
 let dailyLimitReached = false;
@@ -51,6 +52,11 @@ function sendResult(requestId: string, result: AgentResult): void {
   parentPort.postMessage(AgentWorkerResponseSchema.parse({ requestId, result }));
 }
 
+function clearModel(): void {
+  model?.dispose();
+  model = null;
+}
+
 function configureModelCredential(
   gatewayToken: string,
   gatewayBaseUrl: string,
@@ -58,28 +64,22 @@ function configureModelCredential(
 ): void {
   const log = createAgentDebugLogger(debugEnabled);
   const modelFetch = createLoggedModelFetch(log);
-  setDefaultOpenAIClient(
-    new OpenAI({
-      apiKey: gatewayToken,
-      baseURL: gatewayBaseUrl,
-      maxRetries: 0,
-      fetch: async (input, init) => {
-        reportThinking();
-        const response = await modelFetch(input, init);
-        if (response.status === 429) {
-          try {
-            const raw: unknown = await response.clone().json();
-            const parsed = z.object({ message: z.string() }).safeParse(raw);
-            dailyLimitReached ||=
-              parsed.success && parsed.data.message === 'Daily model allowance reached.';
-          } catch {
-            /* Failure classification is optional. */
-          }
-        }
-        return response;
-      },
-    }),
-  );
+  model?.dispose();
+  model = new TaskModelClient(gatewayToken, gatewayBaseUrl, async (input, init) => {
+    reportThinking();
+    const response = await modelFetch(input, init);
+    if (response.status === 429) {
+      try {
+        const raw: unknown = await response.clone().json();
+        const parsed = z.object({ message: z.string() }).safeParse(raw);
+        dailyLimitReached ||=
+          parsed.success && parsed.data.message === 'Daily model allowance reached.';
+      } catch {
+        /* Failure classification is optional. */
+      }
+    }
+    return response;
+  });
 }
 
 async function runCommand(command: AgentWorkerCommand, requestId: string): Promise<AgentResult> {
@@ -96,7 +96,10 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
       if (!runner || sessionId !== command.sessionId) {
         return { kind: 'failed', message: 'The agent session ended.' };
       }
-      configureModelCredential(command.gatewayToken, command.gatewayBaseUrl, command.debugEnabled);
+      if (!model) {
+        return { kind: 'failed', message: 'No model task is bound.' };
+      }
+      model.refreshCredential(command.gatewayToken);
       return { kind: 'started', sessionId: command.sessionId };
     }
     case 'answer': {
@@ -107,44 +110,50 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
         ? { kind: 'accepted', lessonId: command.lessonId }
         : { kind: 'failed', message: 'The lesson is not waiting for an answer.' };
     }
-    case 'follow':
+    case 'prepare':
     case 'start': {
-      if (runner !== null) {
-        return { kind: 'failed', message: 'An agent session is already active.' };
+      if (activeRun || connecting || model) {
+        return { kind: 'failed', message: 'An agent task is already active.' };
       }
-
-      /* This short-lived token authorizes only Tro's model gateway. The
-         product's OpenAI provider key stays on the backend. */
-      const log = createAgentDebugLogger(command.debugEnabled);
-      if (command.kind === 'start') {
-        configureModelCredential(
-          command.gatewayToken,
-          command.gatewayBaseUrl,
-          command.debugEnabled,
-        );
-      }
+      connecting = true;
       try {
-        runner = await ComputerUseTaskRunner.connect(
-          log,
+        runner ??= await ComputerUseTaskRunner.connect(
+          createAgentDebugLogger(command.debugEnabled),
           command.desktopDriver,
-          command.kind === 'follow',
+          false,
           command.hudGroup,
         );
+        if (command.kind === 'start') {
+          configureModelCredential(
+            command.gatewayToken,
+            command.gatewayBaseUrl,
+            command.debugEnabled,
+          );
+        }
+        sessionId = command.sessionId;
+        return { kind: 'started', sessionId };
       } catch {
+        clearModel();
         return {
           kind: 'failed',
-          message:
-            process.platform === 'darwin'
-              ? 'Desktop control could not start. Allow Tro Screen Recording and Accessibility in System Settings, then try again.'
-              : 'Desktop control could not start. Restart Tro or reinstall the desktop app, then try again.',
+          message: 'Desktop control could not start. Check desktop permissions.',
         };
+      } finally {
+        connecting = false;
       }
-      hasModelCredential = command.kind === 'start';
-      sessionId = command.sessionId;
-      return { kind: 'started', sessionId };
+    }
+    case 'finish': {
+      if (command.sessionId !== sessionId || activeRun || connecting || !model) {
+        return { kind: 'failed', message: 'The agent task is not settled.' };
+      }
+      clearModel();
+      classroomTools?.dispose();
+      classroomTools = null;
+      sessionId = null;
+      return { kind: 'stopped' };
     }
     case 'turn': {
-      if (runner === null || sessionId !== command.sessionId || !hasModelCredential) {
+      if (runner === null || sessionId !== command.sessionId || !model) {
         return { kind: 'failed', message: 'Start an agent session first.' };
       }
       if (activeRun !== null) {
@@ -153,7 +162,8 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
 
       activeRequestId = requestId;
       dailyLimitReached = false;
-      activeAbort = new AbortController();
+      const abort = new AbortController();
+      activeAbort = abort;
       const context = command.classroomContext;
       const toolClient = context
         ? new ClassroomToolClient(
@@ -162,68 +172,73 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
             },
             requestId,
             context.participation.id,
-            activeAbort.signal,
+            abort.signal,
           )
         : null;
       classroomTools = toolClient;
-      const run = runner.runTask(
-        command.message,
-        command.locale,
-        activeAbort.signal,
-        command.mode,
-        (phase) => {
-          parentPort.postMessage(
-            AgentProgressSchema.parse({
-              kind: 'progress',
-              requestId,
-              sessionId: command.sessionId,
-              phase,
-            }),
-          );
-        },
-        (
-          instruction,
-          phase,
-          lessonId,
-          teachingMessage,
-          locale,
-          presentationPending,
-          presentationRevoked,
-          canAcceptAnswer,
-        ) => {
-          parentPort.postMessage(
-            AgentProgressSchema.parse({
-              kind: 'progress',
-              requestId,
-              sessionId: command.sessionId,
-              phase:
-                phase === TeachingLessonPhase.WAITING
-                  ? AgentProgressPhase.WAITING
-                  : phase === TeachingLessonPhase.NEEDS_INPUT
-                    ? AgentProgressPhase.NEEDS_INPUT
-                    : phase === TeachingLessonPhase.PAUSED
-                      ? AgentProgressPhase.PAUSED
-                      : phase === TeachingLessonPhase.OBSERVING
-                        ? AgentProgressPhase.THINKING
-                        : AgentProgressPhase.SHOWING,
-              ...(lessonId ? { lessonId } : {}),
-              teachingStep: instruction,
-              ...(teachingMessage ? { teachingMessage } : {}),
-              ...(presentationPending ? { presentationPending } : {}),
-              ...(presentationRevoked ? { presentationRevoked } : {}),
-              ...(canAcceptAnswer ? { canAcceptAnswer } : {}),
-              ...(locale ? { locale } : {}),
-            }),
-          );
-        },
-        context && toolClient
-          ? { context, callTool: (command) => toolClient.request(command) }
-          : undefined,
+      const activeRunner = runner;
+      const run = runWithTaskModel(model, () =>
+        activeRunner.runTask(
+          command.message,
+          command.locale,
+          abort.signal,
+          command.mode,
+          (phase) => {
+            parentPort.postMessage(
+              AgentProgressSchema.parse({
+                kind: 'progress',
+                requestId,
+                sessionId: command.sessionId,
+                phase,
+              }),
+            );
+          },
+          (
+            instruction,
+            phase,
+            lessonId,
+            teachingMessage,
+            locale,
+            presentationPending,
+            presentationRevoked,
+            canAcceptAnswer,
+          ) => {
+            parentPort.postMessage(
+              AgentProgressSchema.parse({
+                kind: 'progress',
+                requestId,
+                sessionId: command.sessionId,
+                phase:
+                  phase === TeachingLessonPhase.WAITING
+                    ? AgentProgressPhase.WAITING
+                    : phase === TeachingLessonPhase.NEEDS_INPUT
+                      ? AgentProgressPhase.NEEDS_INPUT
+                      : phase === TeachingLessonPhase.PAUSED
+                        ? AgentProgressPhase.PAUSED
+                        : phase === TeachingLessonPhase.OBSERVING
+                          ? AgentProgressPhase.THINKING
+                          : AgentProgressPhase.SHOWING,
+                ...(lessonId ? { lessonId } : {}),
+                teachingStep: instruction,
+                ...(teachingMessage ? { teachingMessage } : {}),
+                ...(presentationPending ? { presentationPending } : {}),
+                ...(presentationRevoked ? { presentationRevoked } : {}),
+                ...(canAcceptAnswer ? { canAcceptAnswer } : {}),
+                ...(locale ? { locale } : {}),
+              }),
+            );
+          },
+          context && toolClient
+            ? { context, callTool: (command) => toolClient.request(command) }
+            : undefined,
+        ),
       );
       activeRun = run;
       try {
         return await run;
       } catch {
+        // Uncertain task/native cleanup must never be reused. Main retires this worker.
+        clearModel();
         if (hasReachedDailyLimit()) {
           return {
             kind: 'failed',
@@ -257,7 +272,7 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
       await runner.close();
       runner = null;
       sessionId = null;
-      hasModelCredential = false;
+      clearModel();
       return { kind: 'stopped' };
     }
   }

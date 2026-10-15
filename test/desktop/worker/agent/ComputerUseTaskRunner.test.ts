@@ -120,7 +120,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-it('starts companion following on the main-owned endpoint without a model run', async () => {
+it('prepares the main-owned endpoint without cursor ownership or a model run', async () => {
   vi.useFakeTimers();
   vi.spyOn(MCPServerStdio.prototype, 'connect').mockResolvedValue(undefined);
   vi.spyOn(MCPServerStdio.prototype, 'close').mockResolvedValue(undefined);
@@ -134,10 +134,7 @@ it('starts companion following on the main-owned endpoint without a model run', 
     },
     true,
   );
-  expect(native).toHaveBeenCalledWith(CursorCompanionTool.SET_MODE, {
-    mode: 'follow',
-    label: 'Tro',
-  });
+  expect(native).not.toHaveBeenCalled();
   await runner.close();
   expect(native).toHaveBeenCalledWith(CursorCompanionTool.SET_MODE, { mode: 'hidden' });
 });

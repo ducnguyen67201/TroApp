@@ -79,6 +79,14 @@ for (const file of await collectFiles(root)) {
             .join('/')
         : specifier;
 
+      if (
+        (ownerPath.startsWith('src/desktop/worker/companion/') ||
+          ownerPath === 'src/desktop/worker/StartCompanionHudWorker.ts') &&
+        /src\/desktop\/worker\/(?:agent|execution|teaching|cua|observation)\//.test(importPath)
+      ) {
+        failures.push(`${filePath}: idle presentation cannot import task orchestration.`);
+      }
+
       if (filePath.startsWith('src/') && importPath.startsWith('test/')) {
         failures.push(`${filePath}: production code cannot import test implementation.`);
       }
