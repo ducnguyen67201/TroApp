@@ -176,10 +176,40 @@ export class AuthClient implements AgentChatAuth {
     try {
       this.loadStudentDevice();
       const device = this.studentDevice.read();
-      if (command.kind === StudentAccessKind.ACTIVATE && this.accounts.isSharedStudent()) {
+      if (command.kind === StudentAccessKind.ACTIVATE && device) {
         return {
           kind: 'failed',
-          message: 'End this shared lesson before configuring another class.',
+          message: 'Remove the current computer authorization before activating another code.',
+        };
+      }
+      if (
+        command.kind === StudentAccessKind.ACTIVATE &&
+        command.mode !== StudentDeviceMode.PERSONAL &&
+        !this.accounts.canAuthorizeCompanyComputer()
+      ) {
+        return {
+          kind: 'failed',
+          message: 'Sign out all saved personal accounts before authorizing a company computer.',
+        };
+      }
+      if (
+        command.kind === StudentAccessKind.ACTIVATE &&
+        command.mode === StudentDeviceMode.PERSONAL &&
+        !this.accounts.canStartStudentSignIn()
+      ) {
+        return {
+          kind: 'failed',
+          message: 'Finish the current sign-in before authorizing QR access.',
+        };
+      }
+      if (
+        (command.kind === StudentAccessKind.ACTIVATE ||
+          command.kind === StudentAccessKind.DEACTIVATE) &&
+        this.accounts.isSharedStudent()
+      ) {
+        return {
+          kind: 'failed',
+          message: 'Sign out the current student before changing computer authorization.',
         };
       }
       if (command.kind === StudentAccessKind.STATUS && !device) {
@@ -187,11 +217,11 @@ export class AuthClient implements AgentChatAuth {
       }
       if (
         command.kind === StudentAccessKind.ENROLL &&
-        (!device || !this.accounts.canAddStudent())
+        (!device || !this.accounts.canStartStudentSignIn())
       ) {
         return {
           kind: 'failed',
-          message: 'End the current shared lesson or remove a saved account before adding another.',
+          message: 'Set up this device and end the current shared lesson before signing in.',
         };
       }
       const staff = StudentStaffAccessKinds.includes(command.kind);
@@ -216,13 +246,10 @@ export class AuthClient implements AgentChatAuth {
       }
       if (command.kind === StudentAccessKind.ACTIVATE) {
         const activated = StudentDeviceCredentialSchema.parse(body);
-        if (
-          device?.context.mode === StudentDeviceMode.SHARED &&
-          activated.context.mode !== StudentDeviceMode.SHARED
-        ) {
+        if (activated.context.mode !== (command.mode ?? StudentDeviceMode.SHARED)) {
           return {
             kind: 'failed',
-            message: 'A shared classroom computer cannot be changed to personal mode here.',
+            message: 'The computer authorization mode did not match this sign-in.',
           };
         }
         this.accounts.configureStudentMode(activated.context.mode === StudentDeviceMode.SHARED);
@@ -239,6 +266,14 @@ export class AuthClient implements AgentChatAuth {
         return result.kind === 'signed-in' || result.kind === 'failed'
           ? result
           : { kind: 'failed', message: 'Could not finish student sign-in.' };
+      }
+      if (command.kind === StudentAccessKind.DEACTIVATE) {
+        const result = StudentAccessReplySchema.parse(body);
+        if (result.kind === 'done') {
+          this.studentDevice.clear();
+          this.accounts.configureStudentMode(false);
+        }
+        return result;
       }
       return StudentAccessReplySchema.parse(body);
     } catch {

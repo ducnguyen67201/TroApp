@@ -6,6 +6,7 @@ import {
 } from '../../../../src/desktop/main/accounts/AccountSessions.js';
 import { AuthUserSchema } from '#contracts/AuthSession.js';
 import { StudentDeviceMode } from '#contracts/StudentIdentity.js';
+import { DesktopAccountLimits } from '#contracts/DesktopAccounts.js';
 
 function learner(mode: StudentDeviceMode = StudentDeviceMode.PERSONAL) {
   return AuthUserSchema.parse({
@@ -59,6 +60,45 @@ function harness() {
 }
 
 describe('remembered and shared student sessions', () => {
+  it('replaces an expired saved student login without duplicating the account even at capacity', async () => {
+    const f = harness();
+    const student = learner();
+    f.users.set('tro_student=original', student);
+    await f.accounts.addStudent('tro_student=original', student);
+    const originalId = f.accounts.listAccounts().activeAccountId;
+    f.users.delete('tro_student=original');
+    expect(await f.accounts.readSession()).toEqual({ kind: 'signed-out' });
+    for (let index = 1; index < DesktopAccountLimits.MAX_ACCOUNTS; index += 1) {
+      const otherStudent = learner();
+      const cookie = `tro_student=other-${String(index)}`;
+      f.users.set(cookie, otherStudent);
+      await f.accounts.addStudent(cookie, otherStudent);
+    }
+    const before = f.accounts.listAccounts();
+    f.users.set('tro_student=recovered', student);
+    expect((await f.accounts.addStudent('tro_student=recovered', student)).kind).toBe('signed-in');
+    expect(f.accounts.listAccounts().accounts).toHaveLength(DesktopAccountLimits.MAX_ACCOUNTS);
+    expect(f.accounts.listAccounts().activeAccountId).toBe(originalId);
+    expect(
+      f.accounts.listAccounts().accounts.find((account) => account.id === originalId)
+        ?.requiresSignIn,
+    ).toBe(false);
+    expect(f.accounts.readCookie()).toBe('tro_student=recovered');
+    expect(
+      f.accounts.listAccounts().accounts.filter((account) => account.id !== originalId),
+    ).toEqual(before.accounts.filter((account) => account.id !== originalId));
+    const extraStudent = learner();
+    f.users.set('tro_student=extra', extraStudent);
+    expect((await f.accounts.addStudent('tro_student=extra', extraStudent)).kind).toBe('failed');
+    const restarted = new AccountSessions(
+      f.vault,
+      () => null,
+      f.request,
+      'https://api.example.test',
+    );
+    expect(await restarted.readSession()).toEqual({ kind: 'signed-in', user: student });
+  });
+
   it('remembers independent learner credentials, verifies switching and never exposes secrets', async () => {
     const f = harness();
     const first = learner();

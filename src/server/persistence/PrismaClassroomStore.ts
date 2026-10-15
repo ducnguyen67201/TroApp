@@ -502,9 +502,14 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async listClasses(userId: string) {
+    const learner = await this.client.studentLearnerProfile.findUnique({
+      where: { userId },
+      select: { organizationId: true },
+    });
     const rows = await this.client.classroomGroup.findMany({
       where: {
         deletedAt: null,
+        ...(learner?.organizationId ? { organizationId: learner.organizationId } : {}),
         OR: [
           { teacherId: userId },
           { organizationId: { not: null }, teachers: { some: { userId } } },
@@ -573,6 +578,29 @@ class PrismaClassroomStore implements ClassroomStore {
     );
   }
 
+  async readOrganizationStudentByExternalId(
+    organizationId: string,
+    externalId: string,
+  ): Promise<string | null> {
+    const profile = await this.client.studentLearnerProfile.findFirst({
+      where: {
+        organizationId,
+        externalId,
+        source: 'school-card',
+        user: {
+          role: AccountRole.STUDENT,
+          isAdmin: false,
+          email: null,
+          organizationMemberships: {
+            some: { organizationId, role: AccountRole.STUDENT, removedAt: null },
+          },
+        },
+      },
+      select: { userId: true },
+    });
+    return profile?.userId ?? null;
+  }
+
   async enrollStudent(classId: string, studentId: string, active: boolean) {
     if (this.transact) {
       return this.runAtomically((store) => store.enrollStudent(classId, studentId, active));
@@ -594,6 +622,13 @@ class PrismaClassroomStore implements ClassroomStore {
 
   async isEnrolled(classId: string, studentId: string) {
     const organizationId = await this.readClassOrganizationId(classId);
+    const learner = await this.client.studentLearnerProfile.findUnique({
+      where: { userId: studentId },
+      select: { organizationId: true },
+    });
+    if (learner?.organizationId && learner.organizationId !== organizationId) {
+      return false;
+    }
     if (
       organizationId !== null &&
       (await this.readOrganizationRole(studentId, organizationId)) === null
@@ -669,8 +704,21 @@ class PrismaClassroomStore implements ClassroomStore {
   }
 
   async listJoinedParticipations(studentId: string) {
+    const learner = await this.client.studentLearnerProfile.findUnique({
+      where: { userId: studentId },
+      select: { organizationId: true },
+    });
     const rows = await this.client.classroomParticipation.findMany({
-      where: { studentId, left: false, meeting: { status: ClassroomStatus.LIVE } },
+      where: {
+        studentId,
+        left: false,
+        meeting: {
+          status: ClassroomStatus.LIVE,
+          ...(learner?.organizationId
+            ? { schoolClass: { organizationId: learner.organizationId } }
+            : {}),
+        },
+      },
       orderBy: { leaseUntil: 'desc' },
       take: 100,
     });

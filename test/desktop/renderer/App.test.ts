@@ -2493,6 +2493,93 @@ it('adds an account through Google and allows cancellation back to the original 
   expect(fixture.bridge.signOut).not.toHaveBeenCalled();
 });
 
+it('offers QR alongside Google in Add account and preserves the Google login when selecting a QR student', async () => {
+  const fixture = createSavedAccountBridge();
+  const organizationId = '33333333-3333-4333-8333-333333333333';
+  const student: AuthUser = {
+    id: 'qr-student',
+    name: 'QR student',
+    email: null,
+    isAdmin: false,
+    learner: {
+      schoolId: organizationId,
+      organizationId,
+      schoolName: 'School',
+      classId: null,
+      externalId: '001Ab',
+      mode: StudentDeviceMode.PERSONAL,
+      provisional: true,
+    },
+  };
+  const control = vi
+    .fn<NonNullable<DesktopBridge['controlStudentAccess']>>()
+    .mockImplementation((command) => {
+      if (command.kind === 'status') {
+        return Promise.resolve({
+          kind: 'ready',
+          context: {
+            schoolId: organizationId,
+            organizationId,
+            schoolName: 'School',
+            classId: null,
+            className: null,
+            mode: StudentDeviceMode.PERSONAL,
+            expiresAt: '2030-01-01T00:00:00.000Z',
+          },
+        });
+      }
+      if (command.kind === 'enroll') {
+        fixture.readSavedAccounts.mockResolvedValue({
+          kind: 'accounts',
+          activeAccountId: fixture.studentId,
+          accounts: [
+            {
+              id: '11111111-1111-4111-8111-111111111111',
+              user: testUser,
+              role: AccountRole.TEACHER,
+              requiresSignIn: false,
+            },
+            {
+              id: fixture.studentId,
+              user: student,
+              role: AccountRole.STUDENT,
+              requiresSignIn: false,
+            },
+          ],
+        });
+        return Promise.resolve({ kind: 'signed-in', user: student });
+      }
+      return Promise.resolve({ kind: 'done' });
+    });
+  window.tro = { ...window.tro, controlStudentAccess: control };
+  renderDesktop();
+  fireEvent.click(await screen.findByRole('button', { name: 'Switch account' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Add account' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Add an account' });
+  expect(within(dialog).getByRole('button', { name: 'Continue with Google' })).toBeTruthy();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Sign in with QR' }));
+  fireEvent.change(await within(dialog).findByLabelText(/Student ID/), {
+    target: { value: '001Ab' },
+  });
+  expect(within(dialog).getByRole('button', { name: 'Scan your student card' })).toBeTruthy();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Start learning' }));
+  await waitFor(() => {
+    expect(control).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'enroll', externalId: '001Ab', name: '' }),
+    );
+  });
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog', { name: 'Add an account' })).toBeNull();
+  });
+  expect(fixture.addGoogleAccount).not.toHaveBeenCalled();
+  expect(fixture.bridge.signOut).not.toHaveBeenCalled();
+  const accounts = await fixture.readSavedAccounts();
+  if (accounts.kind !== 'accounts') {
+    throw new Error('Missing saved accounts.');
+  }
+  expect(accounts.accounts.some((account) => account.user.id === testUser.id)).toBe(true);
+});
+
 it('keeps the current account on an expired target and translates the error', async () => {
   const fixture = createSavedAccountBridge();
   window.localStorage.setItem(localeStorageKey, DesktopLocale.VIETNAMESE);

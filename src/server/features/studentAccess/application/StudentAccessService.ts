@@ -61,6 +61,7 @@ export class StudentAccessService {
         command.requestId,
         credential,
         this.now(),
+        command.mode,
       );
       return result.kind === 'ready'
         ? { credential: credential.credential, context: result.context }
@@ -70,6 +71,26 @@ export class StudentAccessService {
       return deviceToken
         ? this.store.readDevice(this.digest(deviceToken), this.now())
         : ({ kind: 'unconfigured' } as const);
+    }
+    if (command.kind === StudentAccessKind.DEACTIVATE && deviceToken) {
+      await this.store.deactivateDevice(this.digest(deviceToken));
+      return { kind: 'done' } as const;
+    }
+    if (teacherId && command.kind === StudentAccessKind.ORGANIZATION_ACCESS) {
+      return this.store.readOrganizationAccess(teacherId, command.organizationId, this.now());
+    }
+    if (teacherId && command.kind === StudentAccessKind.REVOKE_COMPUTER) {
+      await this.store.revokeComputer(
+        teacherId,
+        command.organizationId,
+        command.deviceId,
+        this.now(),
+      );
+      return { kind: 'done' } as const;
+    }
+    if (teacherId && command.kind === StudentAccessKind.REVOKE_COMPUTER_CODE) {
+      await this.store.revokeComputerCode(teacherId, command.organizationId, command.admissionId);
+      return { kind: 'done' } as const;
     }
     if (command.kind === StudentAccessKind.ENROLL && deviceToken) {
       const credential = this.issueCredential();
@@ -86,17 +107,6 @@ export class StudentAccessService {
         expiresAt: principal.expiresAt.toISOString(),
         credential: credential.credential,
       };
-    }
-    if (teacherId && command.kind === StudentAccessKind.REVOKE_ADMISSION) {
-      await this.store.revokeAdmissions(teacherId, command.classId);
-      return { kind: 'done' } as const;
-    }
-    if (
-      teacherId &&
-      (command.kind === StudentAccessKind.PREVIEW_ROSTER ||
-        command.kind === StudentAccessKind.APPLY_ROSTER)
-    ) {
-      return this.store.reviewRoster(teacherId, command);
     }
     return { kind: 'failed', message: 'Student access is unavailable.' } as const;
   }

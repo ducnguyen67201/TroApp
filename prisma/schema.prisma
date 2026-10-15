@@ -79,19 +79,27 @@ model StudentSchool {
 model StudentAdmission {
   id String @id @db.Uuid
   schoolId String @db.Uuid
-  classId String @db.Uuid
+  classId String? @db.Uuid
+  organizationId String? @db.Uuid
+  issuedById String?
+  /// Historical per-code label; installations now generate their own names.
+  computerName String?
   codeDigest String @unique
   mode String
   uses Int @default(0)
   revoked Boolean @default(false)
   expiresAt DateTime
   @@index([classId, revoked])
+  @@index([organizationId, revoked])
 }
 
 model StudentDevice {
   id String @id @db.Uuid
   schoolId String @db.Uuid
-  classId String @db.Uuid
+  classId String? @db.Uuid
+  organizationId String? @db.Uuid
+  computerName String?
+  lastSignInAt DateTime?
   admissionId String @db.Uuid
   requestId String @unique @db.Uuid
   credentialDigest String @unique
@@ -100,17 +108,20 @@ model StudentDevice {
   expiresAt DateTime
   createdAt DateTime @default(now())
   @@index([classId])
+  @@index([organizationId])
 }
 
 model StudentLearnerProfile {
   userId String @id
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
   schoolId String @db.Uuid
+  organizationId String? @db.Uuid
   source String @default("school-card")
   externalId String
   rosterName String?
   createdAt DateTime @default(now())
   @@index([schoolId, source, externalId])
+  @@unique([organizationId, source, externalId])
 }
 
 model StudentLearnerSession {

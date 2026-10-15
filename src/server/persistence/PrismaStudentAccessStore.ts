@@ -1,10 +1,21 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
+import { setTimeout as waitForRetry } from 'node:timers/promises';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Prisma } from '../generated/prisma/client.js';
 import { AuthUserSchema } from '#contracts/AuthSession.js';
 import { StudentDeviceMode } from '#contracts/StudentIdentity.js';
-import { StudentDeviceContextSchema } from '#contracts/StudentAccess.js';
+import {
+  OrganizationComputerLimits,
+  StudentDeviceContextSchema,
+  type StudentEnrollment,
+} from '#contracts/StudentAccess.js';
+import {
+  findOrCreateOrganizationStudent,
+  readOrganizationComputerUsage,
+  requireOrganizationComputerAdmin,
+} from './OrganizationComputerAccess.js';
 import { ClassroomStatus } from '#contracts/Classroom.js';
+import { readClassroomTransactionConflict } from './RetryClassroomTransaction.js';
 import {
   StudentAccessError,
   StudentAccessPolicy,
@@ -14,26 +25,44 @@ import {
 
 type Client = Prisma.TransactionClient;
 
-async function assertClassOwner(client: Client, teacherId: string, classId: string): Promise<void> {
-  const schoolClass = await client.classroomGroup.findFirst({
-    where: {
-      id: classId,
-      organizationId: null,
-      teacherId,
-      deletedAt: null,
-      teacher: { role: 'teacher', emailVerified: true },
-    },
+const StudentSignInAuditEvent = {
+  CREATE_LEARNER: 'create-provisional-learner',
+  SIGN_IN: 'sign-in-existing-learner',
+} as const;
+
+const StudentAccessTransactionRetry = { MAX_ATTEMPTS: 4, BASE_DELAY_MS: 10 } as const;
+
+const StudentComputerAuditEvent = {
+  CREATE_CODE: 'create-computer-code',
+  REVOKE_CODE: 'revoke-computer-code',
+  REVOKE_COMPUTER: 'revoke-computer',
+  DEACTIVATE: 'deactivate-computer',
+} as const;
+
+/** Serializable organization reads keep automatic names distinct, including concurrent activations. */
+async function generateComputerName(client: Client, organizationId: string): Promise<string> {
+  const computers = await client.studentDevice.findMany({
+    where: { organizationId },
+    select: { computerName: true },
+    take: OrganizationComputerLimits.COMPUTERS,
   });
-  if (!schoolClass) {
-    throw new StudentAccessError();
+  if (computers.length >= OrganizationComputerLimits.COMPUTERS) {
+    throw new StudentAccessError('The organization has reached its computer allowance.');
   }
+  const names = new Set(computers.map((computer) => computer.computerName));
+  let number = computers.length + 1;
+  while (names.has(`Computer ${String(number)}`)) {
+    number += 1;
+  }
+  return `Computer ${String(number)}`;
 }
 
 async function readDeviceContext(
   client: Client,
   device: {
     schoolId: string;
-    classId: string;
+    classId: string | null;
+    organizationId: string | null;
     mode: string;
     expiresAt: Date;
     revoked: boolean;
@@ -41,7 +70,45 @@ async function readDeviceContext(
   },
   now: Date,
 ) {
-  const [school, schoolClass, admission] = await Promise.all([
+  const admission = await client.studentAdmission.findUnique({ where: { id: device.admissionId } });
+  if (
+    !admission ||
+    (device.organizationId === null && admission.revoked) ||
+    device.revoked ||
+    device.expiresAt <= now ||
+    admission.schoolId !== device.schoolId ||
+    admission.classId !== device.classId ||
+    admission.organizationId !== device.organizationId ||
+    (device.organizationId === null && admission.mode !== device.mode)
+  ) {
+    throw new StudentAccessError();
+  }
+  if (device.organizationId !== null) {
+    const organization = await client.organization.findUnique({
+      where: { id: device.organizationId },
+    });
+    if (
+      !organization ||
+      organization.nameSetAt === null ||
+      device.classId !== null ||
+      device.schoolId !== organization.id
+    ) {
+      throw new StudentAccessError();
+    }
+    return StudentDeviceContextSchema.parse({
+      schoolId: organization.id,
+      schoolName: organization.name,
+      organizationId: organization.id,
+      classId: null,
+      className: null,
+      mode: device.mode,
+      expiresAt: device.expiresAt.toISOString(),
+    });
+  }
+  if (device.classId === null) {
+    throw new StudentAccessError();
+  }
+  const [school, schoolClass] = await Promise.all([
     client.studentSchool.findUnique({ where: { id: device.schoolId } }),
     client.classroomGroup.findFirst({
       where: {
@@ -51,17 +118,8 @@ async function readDeviceContext(
         teacher: { role: 'teacher', emailVerified: true },
       },
     }),
-    client.studentAdmission.findUnique({ where: { id: device.admissionId } }),
   ]);
-  if (
-    !school ||
-    !schoolClass ||
-    !admission ||
-    admission.revoked ||
-    device.revoked ||
-    device.expiresAt <= now ||
-    school.ownerId !== schoolClass.teacherId
-  ) {
+  if (!school || !schoolClass || school.ownerId !== schoolClass.teacherId) {
     throw new StudentAccessError();
   }
   return StudentDeviceContextSchema.parse({
@@ -100,7 +158,7 @@ async function readPrincipal(
     }
     throw error;
   }
-  if (context.mode === StudentDeviceMode.SHARED) {
+  if (context.mode === StudentDeviceMode.SHARED && !context.organizationId) {
     const meeting = session.meetingId
       ? await client.classroomMeeting.findUnique({ where: { id: session.meetingId } })
       : null;
@@ -112,15 +170,32 @@ async function readPrincipal(
       return null;
     }
   }
-  const enrollment = await client.classroomEnrollment.findUnique({
-    where: { classId_studentId: { classId: context.classId, studentId: profile.userId } },
-  });
-  const otherEnrollment = await client.classroomEnrollment.findFirst({
-    where: { studentId: profile.userId, active: true, classId: { not: context.classId } },
-  });
+  let hasAccess: boolean;
+  if (context.organizationId) {
+    const membership = await client.organizationMembership.findUnique({
+      where: {
+        organizationId_userId: { organizationId: context.organizationId, userId: profile.userId },
+      },
+    });
+    hasAccess =
+      profile.organizationId === context.organizationId &&
+      membership !== null &&
+      membership.removedAt === null &&
+      membership.role === 'student';
+  } else {
+    if (context.classId === null || profile.organizationId !== null) {
+      return null;
+    }
+    const enrollment = await client.classroomEnrollment.findUnique({
+      where: { classId_studentId: { classId: context.classId, studentId: profile.userId } },
+    });
+    const otherEnrollment = await client.classroomEnrollment.findFirst({
+      where: { studentId: profile.userId, active: true, classId: { not: context.classId } },
+    });
+    hasAccess = Boolean(enrollment?.active) && !otherEnrollment;
+  }
   if (
-    !enrollment?.active ||
-    otherEnrollment ||
+    !hasAccess ||
     profile.user.role !== 'student' ||
     profile.user.isAdmin ||
     profile.user.email !== null
@@ -132,6 +207,7 @@ async function readPrincipal(
     deviceId: device.id,
     schoolId: context.schoolId,
     classId: context.classId,
+    ...(context.organizationId ? { organizationId: context.organizationId } : {}),
     mode: context.mode,
     meetingId: session.meetingId,
     expiresAt: session.expiresAt,
@@ -144,6 +220,7 @@ async function readPrincipal(
         schoolId: context.schoolId,
         schoolName: context.schoolName,
         classId: context.classId,
+        ...(context.organizationId ? { organizationId: context.organizationId } : {}),
         externalId: profile.externalId,
         mode: context.mode,
         provisional: true,
@@ -165,6 +242,50 @@ async function reserveCounter(client: Client, id: string, limit: number): Promis
   }
 }
 
+/** QR login is limited to the configured class, including its existing enrollment revocations. */
+async function findOrCreateStudentForQrSignIn(
+  client: Client,
+  schoolId: string,
+  classId: string,
+  command: StudentEnrollment,
+): Promise<{ userId: string; created: boolean }> {
+  const profiles = await client.studentLearnerProfile.findMany({
+    where: {
+      schoolId,
+      organizationId: null,
+      source: 'school-card',
+      externalId: command.externalId,
+      user: { classEnrollments: { some: { classId } } },
+    },
+    take: 2,
+  });
+  if (profiles.length > 1) {
+    throw new StudentAccessError(
+      'This student ID is linked to multiple accounts. Ask your teacher for help.',
+    );
+  }
+  const profile = profiles[0];
+  if (profile) {
+    return { userId: profile.userId, created: false };
+  }
+  if (!command.name) {
+    throw new StudentAccessError('Enter your name for your first sign-in.');
+  }
+  const userId = randomUUID();
+  await client.user.create({
+    data: {
+      id: userId,
+      name: command.name,
+      email: null,
+      role: 'student',
+      emailVerified: false,
+      learnerProfile: { create: { schoolId, externalId: command.externalId } },
+    },
+  });
+  await client.classroomEnrollment.create({ data: { classId, studentId: userId } });
+  return { userId, created: true };
+}
+
 /** Dedicated learner sessions share canonical users, never Better Auth's email-based OAuth identities. */
 export function createPrismaStudentAccessStore(databaseUrl: string): {
   store: StudentAccessStore;
@@ -175,19 +296,25 @@ export function createPrismaStudentAccessStore(databaseUrl: string): {
   async function transact<Result>(
     operation: (transaction: Client) => Promise<Result>,
   ): Promise<Result> {
-    for (let attempt = 0; attempt < 4; attempt += 1) {
+    for (let attempt = 1; attempt <= StudentAccessTransactionRetry.MAX_ATTEMPTS; attempt += 1) {
       try {
         return await client.$transaction(operation, {
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
         });
       } catch (error) {
-        if (
-          !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-          !['P2034', 'P2002'].includes(error.code) ||
-          attempt === 3
-        ) {
+        const reason = readClassroomTransactionConflict(error);
+        if (reason === null) {
           throw error;
         }
+        if (attempt === StudentAccessTransactionRetry.MAX_ATTEMPTS) {
+          console.warn('student.access.transaction.failed', {
+            stage: 'transaction-retry-exhausted',
+            reason,
+            attempts: attempt,
+          });
+          throw error;
+        }
+        await waitForRetry(StudentAccessTransactionRetry.BASE_DELAY_MS * attempt);
       }
     }
     throw new StudentAccessError();
@@ -205,47 +332,130 @@ export function createPrismaStudentAccessStore(databaseUrl: string): {
   }
 
   const store: StudentAccessStore = {
-    async createAdmission(teacherId, command, digest, now) {
+    async createComputerCode(actorId, command, digest, now) {
       await transact(async (transaction) => {
-        await assertClassOwner(transaction, teacherId, command.classId);
-        const school = await transaction.studentSchool.upsert({
-          where: { ownerId: teacherId },
-          create: { id: randomUUID(), ownerId: teacherId, name: command.schoolName },
-          update: { name: command.schoolName },
+        await requireOrganizationComputerAdmin(transaction, actorId, command.organizationId);
+        const computers = await transaction.studentDevice.count({
+          where: { organizationId: command.organizationId },
         });
+        const codes = await transaction.studentAdmission.count({
+          where: {
+            organizationId: command.organizationId,
+            revoked: false,
+            expiresAt: { gt: now },
+          },
+        });
+        if (
+          computers >= OrganizationComputerLimits.COMPUTERS ||
+          codes >= OrganizationComputerLimits.ACTIVE_CODES
+        ) {
+          throw new StudentAccessError('The organization has reached its computer allowance.');
+        }
         await transaction.studentAdmission.create({
           data: {
             id: randomUUID(),
-            schoolId: school.id,
-            classId: command.classId,
+            schoolId: command.organizationId,
+            organizationId: command.organizationId,
+            issuedById: actorId,
             codeDigest: digest,
-            mode: command.mode,
+            mode: StudentDeviceMode.SHARED,
             expiresAt: new Date(now.getTime() + StudentAccessPolicy.ACTIVATION_MS),
           },
         });
-        await audit(transaction, school.id, teacherId, 'create-admission');
+        await audit(
+          transaction,
+          command.organizationId,
+          actorId,
+          StudentComputerAuditEvent.CREATE_CODE,
+        );
       });
     },
-    async activateDevice(codeDigest, requestId, credential, now) {
+    readOrganizationAccess(actorId, organizationId, now) {
+      return transact((transaction) =>
+        readOrganizationComputerUsage(transaction, actorId, organizationId, now),
+      );
+    },
+    async revokeComputer(actorId, organizationId, deviceId, now) {
+      await transact(async (transaction) => {
+        await requireOrganizationComputerAdmin(transaction, actorId, organizationId);
+        const changed = await transaction.studentDevice.updateMany({
+          where: { id: deviceId, organizationId },
+          data: { revoked: true },
+        });
+        if (changed.count !== 1) {
+          throw new StudentAccessError();
+        }
+        await transaction.studentLearnerSession.updateMany({
+          where: { deviceId },
+          data: { revoked: true, expiresAt: now },
+        });
+        await audit(
+          transaction,
+          organizationId,
+          actorId,
+          StudentComputerAuditEvent.REVOKE_COMPUTER,
+        );
+      });
+    },
+    async revokeComputerCode(actorId, organizationId, admissionId) {
+      await transact(async (transaction) => {
+        await requireOrganizationComputerAdmin(transaction, actorId, organizationId);
+        const changed = await transaction.studentAdmission.updateMany({
+          where: { id: admissionId, organizationId },
+          data: { revoked: true },
+        });
+        if (changed.count !== 1) {
+          throw new StudentAccessError();
+        }
+        await audit(transaction, organizationId, actorId, StudentComputerAuditEvent.REVOKE_CODE);
+      });
+    },
+    async deactivateDevice(digest) {
+      await transact(async (transaction) => {
+        const device = await transaction.studentDevice.findUnique({
+          where: { credentialDigest: digest },
+        });
+        if (!device) {
+          throw new StudentAccessError();
+        }
+        await transaction.studentDevice.update({
+          where: { id: device.id },
+          data: { revoked: true },
+        });
+        await transaction.studentLearnerSession.updateMany({
+          where: { deviceId: device.id },
+          data: { revoked: true },
+        });
+        await audit(transaction, device.schoolId, device.id, StudentComputerAuditEvent.DEACTIVATE);
+      });
+    },
+    async activateDevice(codeDigest, requestId, credential, now, mode = StudentDeviceMode.SHARED) {
       return transact(async (transaction) => {
         const admission = await transaction.studentAdmission.findUnique({ where: { codeDigest } });
-        if (!admission || admission.revoked || admission.expiresAt <= now) {
+        if (!admission || admission.organizationId === null) {
           throw new StudentAccessError();
         }
         let device = await transaction.studentDevice.findUnique({ where: { requestId } });
         if (
           device &&
-          (device.admissionId !== admission.id || device.credentialDigest !== credential.digest)
+          (device.admissionId !== admission.id ||
+            device.credentialDigest !== credential.digest ||
+            device.mode !== mode)
         ) {
           throw new StudentAccessError();
         }
         if (!device) {
-          const limit =
-            admission.mode === StudentDeviceMode.SHARED
-              ? 1
-              : StudentAccessPolicy.PERSONAL_DEVICES_PER_CODE;
+          if (admission.revoked || admission.expiresAt <= now || !admission.issuedById) {
+            throw new StudentAccessError();
+          }
+          await requireOrganizationComputerAdmin(
+            transaction,
+            admission.issuedById,
+            admission.organizationId,
+          );
+          const computerName = await generateComputerName(transaction, admission.organizationId);
           const consumed = await transaction.studentAdmission.updateMany({
-            where: { id: admission.id, revoked: false, uses: { lt: limit } },
+            where: { id: admission.id, revoked: false, expiresAt: { gt: now } },
             data: { uses: { increment: 1 } },
           });
           if (consumed.count !== 1) {
@@ -258,8 +468,10 @@ export function createPrismaStudentAccessStore(databaseUrl: string): {
               admissionId: admission.id,
               schoolId: admission.schoolId,
               classId: admission.classId,
+              organizationId: admission.organizationId,
+              computerName,
               credentialDigest: credential.digest,
-              mode: admission.mode,
+              mode,
               expiresAt: new Date(now.getTime() + StudentAccessPolicy.DEVICE_MS),
             },
           });
@@ -302,17 +514,17 @@ export function createPrismaStudentAccessStore(databaseUrl: string): {
           const count = await transaction.studentLearnerSession.count({
             where: { deviceId: device.id },
           });
-          if (count >= StudentAccessPolicy.PROFILES_PER_DEVICE) {
+          if (!context.organizationId && count >= StudentAccessPolicy.PROFILES_PER_DEVICE) {
             throw new StudentAccessError();
           }
           const meeting =
-            context.mode === StudentDeviceMode.SHARED
+            context.mode === StudentDeviceMode.SHARED && context.classId !== null
               ? await transaction.classroomMeeting.findFirst({
                   where: { classId: context.classId, status: ClassroomStatus.LIVE },
                   orderBy: { createdAt: 'desc' },
                 })
               : null;
-          if (context.mode === StudentDeviceMode.SHARED && !meeting) {
+          if (context.mode === StudentDeviceMode.SHARED && !context.organizationId && !meeting) {
             throw new StudentAccessError(
               'Your teacher needs to start the class before you can join.',
             );
@@ -322,22 +534,24 @@ export function createPrismaStudentAccessStore(databaseUrl: string): {
             `admission:${context.schoolId}:${now.toISOString().slice(0, 10)}`,
             StudentAccessPolicy.DAILY_SCHOOL_ADMISSIONS,
           );
-          const userId = randomUUID();
-          await transaction.user.create({
-            data: {
-              id: userId,
-              name: command.name,
-              email: null,
-              role: 'student',
-              emailVerified: false,
-              learnerProfile: {
-                create: { schoolId: context.schoolId, externalId: command.externalId },
-              },
-            },
-          });
-          await transaction.classroomEnrollment.create({
-            data: { classId: context.classId, studentId: userId },
-          });
+          let student: { userId: string; created: boolean };
+          if (context.organizationId) {
+            student = await findOrCreateOrganizationStudent(
+              transaction,
+              context.organizationId,
+              command,
+            );
+          } else if (context.classId !== null) {
+            student = await findOrCreateStudentForQrSignIn(
+              transaction,
+              context.schoolId,
+              context.classId,
+              command,
+            );
+          } else {
+            throw new StudentAccessError();
+          }
+          const { userId, created } = student;
           session = await transaction.studentLearnerSession.create({
             data: {
               id: randomUUID(),
@@ -355,7 +569,16 @@ export function createPrismaStudentAccessStore(databaseUrl: string): {
               ),
             },
           });
-          await audit(transaction, context.schoolId, userId, 'create-provisional-learner');
+          await audit(
+            transaction,
+            context.schoolId,
+            userId,
+            created ? StudentSignInAuditEvent.CREATE_LEARNER : StudentSignInAuditEvent.SIGN_IN,
+          );
+          await transaction.studentDevice.update({
+            where: { id: device.id },
+            data: { lastSignInAt: now },
+          });
         }
         const principal = await readPrincipal(transaction, session.id, now);
         if (!principal) {
@@ -419,22 +642,6 @@ export function createPrismaStudentAccessStore(databaseUrl: string): {
         }
       });
     },
-    async revokeAdmissions(teacherId, classId) {
-      await transact(async (transaction) => {
-        await assertClassOwner(transaction, teacherId, classId);
-        await transaction.studentAdmission.updateMany({
-          where: { classId },
-          data: { revoked: true },
-        });
-        await transaction.studentDevice.updateMany({ where: { classId }, data: { revoked: true } });
-        const school = await transaction.studentSchool.findUnique({
-          where: { ownerId: teacherId },
-        });
-        if (school) {
-          await audit(transaction, school.id, teacherId, 'revoke-class-access');
-        }
-      });
-    },
     async reserveModelRequest(sessionId, now) {
       try {
         return await transact(async (transaction) => {
@@ -463,6 +670,21 @@ export function createPrismaStudentAccessStore(databaseUrl: string): {
       }
     },
     async canAccessClassroom(principal, command) {
+      async function canAccessClass(classId: string): Promise<boolean> {
+        if (!principal.organizationId) {
+          return classId === principal.classId;
+        }
+        const schoolClass = await client.classroomGroup.findFirst({
+          where: {
+            id: classId,
+            organizationId: principal.organizationId,
+            deletedAt: null,
+            enrollments: { some: { studentId: principal.user.id, active: true } },
+          },
+        });
+        return schoolClass !== null;
+      }
+
       if (command.kind === 'home' || command.kind === 'resume') {
         return true;
       }
@@ -471,7 +693,8 @@ export function createPrismaStudentAccessStore(databaseUrl: string): {
           where: { id: command.classSessionId },
         });
         return (
-          meeting?.classId === principal.classId &&
+          meeting !== null &&
+          (await canAccessClass(meeting.classId)) &&
           (!principal.meetingId || principal.meetingId === meeting.id)
         );
       }
@@ -482,90 +705,11 @@ export function createPrismaStudentAccessStore(databaseUrl: string): {
         });
         return (
           participation?.studentId === principal.user.id &&
-          participation.meeting.classId === principal.classId &&
+          (await canAccessClass(participation.meeting.classId)) &&
           (!principal.meetingId || participation.meeting.id === principal.meetingId)
         );
       }
       return false;
-    },
-    async reviewRoster(teacherId, command) {
-      return transact(async (transaction) => {
-        await assertClassOwner(transaction, teacherId, command.classId);
-        const school = await transaction.studentSchool.findUnique({
-          where: { ownerId: teacherId },
-        });
-        if (!school) {
-          throw new StudentAccessError();
-        }
-        const identifiers = command.rows.map((row) => row.externalId);
-        if (new Set(identifiers).size !== identifiers.length) {
-          throw new StudentAccessError('The roster contains duplicate student IDs.');
-        }
-        const claims = await transaction.studentLearnerProfile.findMany({
-          where: { schoolId: school.id, source: 'school-card', externalId: { in: identifiers } },
-        });
-        const conflicts = identifiers.filter(
-          (id) => claims.filter((claim) => claim.externalId === id).length > 1,
-        );
-        const matched = identifiers.filter((id) =>
-          claims.some((claim) => claim.externalId === id),
-        ).length;
-        if (command.kind === 'apply-roster') {
-          const payloadDigest = createHash('sha256')
-            .update(JSON.stringify(command.rows))
-            .digest('hex');
-          const previous = await transaction.studentRosterBatch.findUnique({
-            where: {
-              schoolId_revision_payloadDigest: {
-                schoolId: school.id,
-                revision: command.revision,
-                payloadDigest,
-              },
-            },
-          });
-          if (previous) {
-            return { kind: 'done' };
-          }
-          if (command.revision !== school.rosterRevision || conflicts.length) {
-            throw new StudentAccessError(
-              'The roster changed or contains competing claims. Review it again.',
-            );
-          }
-          for (const row of command.rows) {
-            await transaction.studentRosterRecord.upsert({
-              where: {
-                schoolId_source_externalId: {
-                  schoolId: school.id,
-                  source: 'school-card',
-                  externalId: row.externalId,
-                },
-              },
-              create: { schoolId: school.id, externalId: row.externalId, name: row.name },
-              update: { name: row.name },
-            });
-            await transaction.studentLearnerProfile.updateMany({
-              where: { schoolId: school.id, source: 'school-card', externalId: row.externalId },
-              data: { rosterName: row.name },
-            });
-          }
-          await transaction.studentSchool.update({
-            where: { id: school.id },
-            data: { rosterRevision: { increment: 1 } },
-          });
-          await transaction.studentRosterBatch.create({
-            data: { schoolId: school.id, revision: command.revision, payloadDigest },
-          });
-          await audit(transaction, school.id, teacherId, 'associate-roster-metadata');
-          return { kind: 'done' };
-        }
-        return {
-          kind: 'roster-preview',
-          revision: school.rosterRevision,
-          matched,
-          missing: command.rows.length - matched,
-          conflicts,
-        };
-      });
     },
   };
   return { store, close: () => client.$disconnect() };

@@ -1,5 +1,5 @@
 import type { IncomingHttpHeaders } from 'node:http';
-import { StudentAccessCapability } from '#contracts/StudentAccess.js';
+import { CompanyComputerCapability, StudentAccessCapability } from '#contracts/StudentAccess.js';
 import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import {
@@ -104,6 +104,15 @@ export function registerClassroomRoutes(
         }
       }
       if (result.kind === 'home') {
+        if (
+          request.headers[CompanyComputerCapability.HEADER] !== CompanyComputerCapability.VERSION
+        ) {
+          result.home.classes = result.home.classes.map((entry) => {
+            const legacyEntry = { ...entry };
+            delete legacyEntry.organizationId;
+            return legacyEntry;
+          });
+        }
         const { teachingOrganizations, ...currentHome } = result.home;
         const legacyHome = {
           ...currentHome,

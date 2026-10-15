@@ -560,7 +560,7 @@ export function TeacherClassroomPanel({
               <ClassSettings
                 key={selectedClass.schoolClass.id}
                 classId={selectedClass.schoolClass.id}
-                supportsStudentQr={selectedClass.supportsStudentQr ?? true}
+                organizationId={selectedClass.organizationId}
                 name={selectedClass.schoolClass.name}
                 live={Boolean(liveMeeting)}
                 busy={busy}

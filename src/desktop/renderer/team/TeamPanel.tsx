@@ -17,6 +17,8 @@ import { AdminOrganizationPanel } from './AdminOrganizationPanel.js';
 import { OwnerTeamPanel } from './OwnerTeamPanel.js';
 import { teamMessages } from './TeamMessages.js';
 import { useTeam } from './UseTeam.js';
+import { OrganizationComputerPanel } from './OrganizationComputerPanel.js';
+import { canUseStudentAccess } from '../accounts/StudentAccessAvailability.js';
 
 interface TeamPanelProps {
   accountId: string;
@@ -117,6 +119,14 @@ export function TeamPanel({
           {selected.isOwner && selected.isNameSet !== false && (
             <AddOrganizationMember key={selected.id} organizationId={selected.id} view={view} />
           )}
+          {(selected.isOwner || view.home?.isAdmin) &&
+            selected.isNameSet !== false &&
+            canUseStudentAccess() && (
+              <OrganizationComputerPanel
+                key={`${accountId}:${selected.id}`}
+                organizationId={selected.id}
+              />
+            )}
           {selected.isOwner && view.team?.organization.id === selected.id && (
             <OwnerTeamPanel
               key={selected.id}

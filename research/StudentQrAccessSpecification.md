@@ -1,9 +1,10 @@
-# Student QR access — engineering specification
+# Historical student QR access design
 
-Status: **Engineering specification. Core QR admission and account flows are
-implemented locally; remaining requirements are proposed.** See the
-[implemented architecture](Architecture.md#email-free-student-access) for current
-scope and limitations. This document does not certify production readiness.
+Status: **Historical research, superseded by organization computer activation.**
+This records an earlier class-scoped design and its abandoned requirements. It does
+not describe current behavior or authorize implementation. Read the maintained
+[architecture](../docs/Architecture.md#email-free-student-access) and the
+[current setup steps](../README.md#company-computers-and-student-qr-login).
 
 Date: 2026-10-14. Audience: product, desktop, API and persistence engineers.
 
@@ -11,7 +12,7 @@ The requested specification records the product discussion and
 [interactive prototype](../examples/previews/StudentQrOnboarding.html).
 The prototype uses fictional students, simulated scans and in-memory state; it
 does not implement authentication or save accounts after reload.
-[Architecture.md](Architecture.md) remains the description of implemented runtime
+[Architecture.md](../docs/Architecture.md) remains the description of implemented runtime
 behavior. This document defines the proposed change, not a second architecture.
 
 ## Capability
@@ -453,4 +454,4 @@ implementation requires unit/contract checks for authorization and transitions,
 disposable-database integration coverage for migration/idempotency/isolation, and
 desktop interaction checks for account switching, permissions and cleanup. Keep
 all routine checks independent of private credentials or paid providers. Update
-[Architecture.md](Architecture.md) only when the runtime changes are implemented.
+[Architecture.md](../docs/Architecture.md) only when the runtime changes are implemented.

@@ -7,6 +7,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { AccountRole } from '#contracts/AccountRole.js';
 import {
   ClassroomFailure,
+  ClassroomEnrollmentKind,
   ClassroomPhase,
   ClassroomStatus,
   ClassroomPacing,
@@ -249,16 +250,20 @@ export class ClassroomService {
           ...(teachingOrganizations.length > 0 ? { teachingOrganizations } : {}),
           courses,
           classes: await Promise.all(
-            classes.map(async (schoolClass) => ({
-              schoolClass,
-              ...((await store.readClassOrganizationId(schoolClass.id)) !== null
-                ? {
-                    canTeach: await store.canTeachClass(userId, schoolClass.id),
-                    supportsStudentQr: false,
-                  }
-                : {}),
-              meetings: await store.listMeetings(schoolClass.id),
-            })),
+            classes.map(async (schoolClass) => {
+              const organizationId = await store.readClassOrganizationId(schoolClass.id);
+              return {
+                schoolClass,
+                ...(organizationId !== null
+                  ? {
+                      canTeach: await store.canTeachClass(userId, schoolClass.id),
+                      supportsStudentQr: false,
+                      organizationId,
+                    }
+                  : {}),
+                meetings: await store.listMeetings(schoolClass.id),
+              };
+            }),
           ),
         },
       };
@@ -322,6 +327,23 @@ export class ClassroomService {
         throw new ClassroomError(ClassroomFailure.FORBIDDEN);
       }
       await store.saveClass(userId, command.name, course.id, organizationId);
+      return { kind: 'ok' };
+    }
+    if (command.kind === ClassroomEnrollmentKind.QR_STUDENT) {
+      await this.readTeachingClass(store, userId, command.classId);
+      const organizationId = await store.readClassOrganizationId(command.classId);
+      if (organizationId === null) {
+        throw new ClassroomError(ClassroomFailure.FORBIDDEN);
+      }
+      const studentId = await store.readOrganizationStudentByExternalId(
+        organizationId,
+        command.externalId,
+      );
+      if (!studentId) {
+        throw new ClassroomError(ClassroomFailure.NOT_FOUND);
+      }
+      await this.requireClassMembership(store, studentId, command.classId);
+      await store.enrollStudent(command.classId, studentId, true);
       return { kind: 'ok' };
     }
     if (command.kind === 'enroll' || command.kind === 'revoke') {

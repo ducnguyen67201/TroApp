@@ -144,71 +144,176 @@ model credential is issued before admission.
 
 ### Email-free student access
 
-The teacher's class settings can issue bounded setup codes for personal or shared
-learner devices. [StudentAccess.ts](../src/contracts/StudentAccess.ts) owns the
-validated desktop/API commands and capability header. One teacher-owned
-`StudentSchool` supplies the initial school boundary; this is not a multi-staff
-school-directory integration. The `school-card` source currently accepts plain
-student-ID text, preserving case and leading zeros and rejecting URLs/control
-characters. Camera frames are decoded locally with jsQR; manual entry is available.
+Computer authorization and student identity are separate. Personal computers use
+Google and the existing encrypted saved-account switcher. Add account also offers
+QR login; an organization code authorizes that personal installation once, and QR
+accounts are remembered alongside Google. Company computers are activated once for
+an organization, then students log in with their existing school QR cards. A class invitation enrolls an already authenticated Google account; it
+cannot activate a computer or sign in a QR student.
 
+```mermaid
+flowchart LR
+  Owner[Organization owner or platform admin] -->|Reusable organization TRO- code| Computer[Authorized company installation]
+  Computer -->|School QR + first-time name| Student[Organization student account]
+  Student -->|Same QR on any authorized computer| Returning[Same account and saved work]
+  Student -->|Assigned teacher enrolls QR text| Class[Explicitly enrolled organization classes]
+  Personal[Personal computer] --> Google[Google login and saved personal accounts]
+  Personal -->|Add account + organization code| PersonalQr[Remembered QR login alongside Google]
+  PersonalQr --> Student
+```
+
+[StudentAccess.ts](../src/contracts/StudentAccess.ts) owns the validated desktop/API
+commands, computer-code format, capability header and usage replies.
+Organization IDs in classroom home replies are advertised only to clients with the
+company-computer capability header, preserving older strict response schemas.
 [StudentAccessService](../src/server/features/studentAccess/application/StudentAccessService.ts)
-owns dedicated learner credentials, independent of Google OAuth.
+owns credential issuance and dispatch through the
 [StudentAccessStore](../src/server/features/studentAccess/application/StudentAccessStore.ts)
-owns its persistence port and technical admission/session/usage policy.
-[PrismaStudentAccessStore](../src/server/persistence/PrismaStudentAccessStore.ts)
-enforces class ownership, enrollment, conditional counters, idempotency and audit
-writes in retryable serializable transactions. The additive student-access
-migration allows `User.email` to be null; canonical `User.id` still owns all work.
-Learners never receive synthetic email addresses or Better Auth provider accounts.
+port. [PrismaStudentAccessStore](../src/server/persistence/PrismaStudentAccessStore.ts)
+owns transactions, credentials, quotas and revocation;
+[OrganizationComputerAccess](../src/server/persistence/OrganizationComputerAccess.ts)
+owns persisted organization administration, QR identity and usage reads.
 
-A QR carries an unverified external-ID claim, not an authentication secret. Every
-new onboarding operation creates a provisional canonical user, even when another
-device claims the same school ID. Retry of the same device/operation rotates the
-credential for the same user. Roster preview/apply associates metadata and reports
-competing claims; it neither merges users nor verifies identity. Roster apply uses
-revision/digest receipts for idempotent retries. Teacher classroom rosters label
-these profiles as unverified; school-provider login and verified recovery are not
-implemented.
+The organization owner or a verified platform admin creates an organization
+activation code under Settings → Team → Company computers, without entering a
+computer name. Ordinary teachers and students cannot issue codes or view usage.
+Codes are short-lived, reusable across the organization's computers and prefixed
+`TRO-`; only their digests are persisted. Each successful new activation creates its
+own installation grant and generates a distinct name such as Computer 1. Name
+allocation, organization capacity, the code's activation counter and grant creation
+share a serializable transaction; concurrent activations cannot duplicate generated
+names or exceed capacity. Retained installation records, including revoked ones,
+reserve their names and count toward the technical installation limit.
+
+A retry with the same activation operation reconciles its existing grant without
+creating another computer or incrementing the code's activation count. The issuer
+must have current administrative authority for each new activation. Revoking or
+expiring a code stops future activations, while existing installation grants and
+idempotent activation recovery remain valid under their own expiry and revocation
+rules. Revoking a computer disables that installation and its learner sessions
+without affecting other computers using the same code. Device authorization also
+persists independently of student logins and live classes. Only installation
+metadata and counts reach the management UI; active code metadata includes its
+activation count even after use. The raw code is shown only when created.
+
+The activation command carries an optional persisted installation mode. Existing
+callers default to shared company mode; Add account explicitly requests personal
+mode. The encrypted device context and server learner identity validate both modes
+within the same organization scope. Replay requires the original mode as well as
+the code, request ID and derived credential; an existing company grant cannot be
+switched to personal mode by reusing an activation operation.
+
+Company activation requires a clean app profile without saved personal accounts or
+an active Google sign-in. The preflight checks this before creating an installation
+grant. Personal QR authorization permits saved Google accounts, excludes pending
+sign-in/shared-student transitions, and preserves those accounts when adding a QR
+login. The returned mode must match the requested mode before main stores the grant.
+[EncryptedStudentDevice](../src/desktop/main/accounts/EncryptedStudentDevice.ts)
+stores the installation credential using OS encryption and atomic replacement;
+it never crosses preload. Google sign-in and saved personal accounts are unavailable
+while a company profile is active. Personal QR accounts use independent encrypted
+vault sessions with the personal refresh policy; company sessions retain their
+memory-only and idle-expiry policy. Revoking either installation invalidates its QR
+sessions; unrelated Google sessions remain independent. Signed-out company computers
+can remove their authorization, revoking the server grant before deleting local
+storage and returning to personal mode. A failed online revocation leaves the local grant available for
+retry. A revoked or expired grant cannot admit another student.
+
+The first successful QR login creates one canonical email-less student and an
+active Student membership in the organization. The unique organization/card-source/
+exact-ID key selects that same account for subsequent sign-ins, including after
+sign-out, expiry, restart or using another authorized computer. The stored display
+name and work are retained; a new name is needed only on first sign-in. QR contents
+are opaque text, including URLs, random values and multiline data. No URL is opened,
+no embedded JSON is interpreted and no value can choose a role or organization.
+The exact text, including case, leading zeros, whitespace and line breaks, selects
+the account; two people presenting the same QR select the same identity. The schema
+and text bound are owned by [StudentIdentity](../src/contracts/StudentIdentity.ts)
+and shared by login, learner metadata, encrypted vaults and teacher enrollment.
+The bound also keeps indexed identity values within PostgreSQL's B-tree entry size.
+Empty/whitespace-only, oversized and null-bearing values are rejected. The scanner
+emits `student.qr.rejected` once per rejected decode with validation stage, Zod reason
+and character count; it excludes the value and pixels. Removed memberships, elevated roles, Google accounts
+and other organizations cannot be recovered through this path. No existing users,
+work or private Google identities are merged. QR possession is the classroom login
+mechanism, not verified school-provider identity: a person with the same QR text
+on an authorized computer can access that organization's associated learner account.
+
+Organization membership grants no classroom enrollment. An assigned teacher adds an
+already registered QR student by exact QR text or school ID in class settings. Login
+works before a live class starts; only explicitly enrolled classes in the current organization are
+visible and joinable. Revoking an enrollment stops access to that class without
+removing the student's organization account. Removing the student from the team or
+revoking the computer invalidates subsequent session, classroom and model requests.
+The classroom contract, `ClassroomService` and `ClassroomStore` own QR enrollment,
+including the existing capacity and insight invalidation rules; student-access
+management does not write classroom enrollment directly.
+
+Company learner sessions remain in memory, end through Change student, idle expiry
+or app exit, and are not restored after restart. The encrypted installation grant
+remains for the next student. Cleanup clears worker, classroom, capture and renderer
+state before another account is selected. An abrupt exit or failed remote logout is
+bounded by server session/device expiry. No remote-revocation queue is implemented.
+Legacy personal learner accounts retain encrypted saved logins in vault version 2;
+re-scanning replaces the same vault entry, including at the saved-account limit.
+
+Usage reports distinguish authorized installations, all registered organization QR
+student accounts, distinct students signed in during the current UTC day, and
+successful sign-in operations today/all time. Retrying an operation rotates its
+credential but adds neither a student nor a sign-in. Repeated new sign-ins add login
+events while the student count stays one. Revoked computers and removed students
+retain historical usage. These are QR account/installation counts, not verified
+people, hardware attestation, continuous presence, Google usage or billing seats.
+Technical limits are owned by the contracts and application policy; no commercial
+licensing or billing is implemented.
+
+The PersonalOrganizationQrLogin migration permits personal organization grants
+without changing existing installation modes, users or work. Admission codes remain
+organization scoped; the installation mode controls session retention, never the
+student's identity, role or classroom authorization.
+
+The ReusableOrganizationCodes migration relaxes the historical per-code name
+constraint without deleting or rewriting existing codes, names, grants, accounts
+or usage. Existing unexpired organization codes gain reusable activation behavior;
+stored computer names remain unchanged and future names avoid those labels.
+Historical per-code labels remain stored for compatibility but are not read by the
+current activation or management flow.
+
+The additive OrganizationComputerAccess migration preserves old class grants,
+users, sessions and work. Nullable organization scope leaves legacy duplicate claims
+unchanged; a new unique organization QR key enforces the new account boundary.
+Existing personal-class grants remain readable for compatibility and keep their
+class/live-meeting restrictions. Class setup-code issuance, redemption and roster
+association commands are retired at the contract, API and persistence boundaries.
+Bare class setup codes and class invitations cannot authorize new installations;
+new activation accepts only organization-issued `TRO-` codes. Historical roster
+records are retained without exposing the old import workflow. Moving a personal
+class into an organization revokes its legacy grants; it does not silently
+move or merge those learner identities. The historical design is archived in
+[StudentQrAccessSpecification](../research/StudentQrAccessSpecification.md).
+
+All writes, including membership, usage and audit records, share serializable
+transactions. Conflict classification includes Prisma query and adapter commit
+conflicts with bounded backoff. Exhaustion emits
+`student.access.transaction.failed` with stage, safe conflict reason and attempt
+count. `student.access.failed` records the rejected operation and request ID.
+Neither includes QR contents, raw configuration or credentials.
 
 [RegisterStudentAccessRoutes](../src/server/features/studentAccess/infrastructure/RegisterStudentAccessRoutes.ts)
-requires the desktop origin for mutations and bounds activation/onboarding
-attempts. Its learner-cookie guard allowlists session, classroom learner commands
-and model-credential access. Other routes, including teacher, admin, pets, paid
-voice and transcription, remain unavailable to these restricted sessions.
-Existing classroom services still check enrollment, resource ownership and binding
-leases. Malformed learner cookies cannot fall back to Google authorization.
-Model credentials carry a learner-session subject; provider admission rechecks
-revocation/class scope and atomically reserves school and learner daily allowances.
-These are technical limits, not commercial device/seat licensing.
-
-Personal sessions refresh only with an already valid credential, bounded by device
-authorization lifetime. `AccountSessions` stores learner accounts in vault version
-2, reads existing version-1 Google vaults and exposes only metadata. Older binaries
-cannot read a learner-containing version-2 vault and must not overwrite it.
-`EncryptedStudentDevice` keeps the school/device grant separately using native
-encryption and atomic replacement. Shared activation fails if personal accounts
-are present in the app profile; shared learner credentials remain in memory only.
-The sidebar uses the existing account popup with student ID instead of email.
-Student sign-out removes the current local credential while retaining work and
-other saved accounts; remote failure is logged without restoring the login.
-
-Shared sessions require a live meeting and become unusable when it ends. Main
-checks the session periodically and expires idle access using actual input events,
-not heartbeat traffic. Cleanup invalidates classroom, capture, worker and renderer
-state. App exit attempts revocation; restart never restores a shared learner.
-After a crash or failed remote revocation, server expiry/class closure is the
-backstop. A failed offline personal revocation can leave the remote credential
-valid until its session/device expiry. No remote-revocation queue is implemented.
-
-`StudentQrScanner` obtains a bounded main-owned camera lease for the trusted main
-frame, accepts video only and stops tracks on success, cancel, timeout and unmount,
-including late stream creation. Packaged and development macOS hosts include a
-camera purpose string; the release entitlement permits camera access. New learner
-flows currently support typed lessons. Paid voice, cross-device recovery,
-multi-staff school ownership, provider roster synchronization and commercial seat
-enforcement require separate implementation. Production retention/consent policy
-must be agreed with the school before rollout; this change does not deploy it.
+checks the desktop origin and bounds activation/login attempts. Learner cookies
+allow only session, classroom learner commands and model-credential access. They
+cannot call organization management, teacher/admin, pets, paid voice or transcription
+routes, and malformed learner cookies cannot fall back to Google authorization.
+Model credentials bind to a learner session; admission rechecks organization,
+membership and computer scope and reserves organization/learner daily allowances.
+Camera frames are decoded locally by `StudentQrScanner`; manual ID entry is available.
+Camera leases end on success, cancel, timeout, unmount or late stream creation.
+QR identifiers preserve opaque text, including URLs and line breaks, within the
+shared length limit; blank values and NUL characters are rejected. New learner flows
+currently support typed lessons; provider roster synchronization, verified school
+login, commercial seats and paid voice need separate implementation. Production
+retention/consent policy remains a school rollout decision; this local change does
+not deploy the app.
 
 [EmbeddedDesktopDriver.ts](../src/desktop/main/EmbeddedDesktopDriver.ts) owns one
 unreferenced timer shared by the daemon's subscribers. It checks the SDK's
@@ -310,12 +415,12 @@ class boundary. Access requires active membership as well as explicit teacher
 assignment or enrollment. Teachers can create classes only for organizations where
 they hold a teacher role; multiple teaching organizations require a selected scope.
 Organization membership alone exposes no classes, submissions or student progress.
-Personal accounts and pet entitlements remain personal. Email-free QR learner sessions
-retain their personal-class capability scope and skip organization setup; they cannot
-call organization endpoints or create organization membership. QR admissions are not
-issued for organization classes. Scoped class settings explain the verified team/email
-enrollment flow instead; moving a personal class revokes its old QR admissions/devices. Platform admin classroom
-delegation continues through its separately authorized path.
+Personal accounts and pet entitlements remain personal. Organization QR learners
+skip the personal organization-setup chooser and cannot call organization management
+endpoints. Their memberships are created only through an organization-authorized
+installation login; classroom enrollment remains an explicit teacher action. Legacy personal-class
+QR grants remain class-scoped, and moving such a class revokes its old grants.
+Platform admin classroom delegation continues through its separately authorized path.
 
 The additive migration leaves existing classes and courses unscoped, preserving
 their global account-role and ownership/enrollment rules. It creates no organizations,

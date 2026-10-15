@@ -5,7 +5,7 @@ import jsQR from 'jsqr';
 import { StudentDeviceLimits } from '#contracts/StudentIdentity.js';
 import { useLocale } from '../localization/UseLocale.js';
 
-/** Decode bounded frames locally. No camera image or QR payload leaves this component. */
+/** Decode bounded frames locally. Camera images stay local; only decoded text is passed to the sign-in form. */
 export function StudentQrScanner({
   onRead,
   onClose,
@@ -108,8 +108,8 @@ export function StudentQrScanner({
       {failed ? (
         <Alert role="alert">
           {locale === 'vi'
-            ? 'Không dùng được camera. Em có thể nhập mã học sinh bên dưới.'
-            : 'Camera unavailable. You can enter your student ID instead.'}
+            ? 'Không dùng được camera. Em có thể nhập nội dung QR bên dưới.'
+            : 'Camera unavailable. You can enter the QR text instead.'}
         </Alert>
       ) : (
         <>
@@ -126,7 +126,7 @@ export function StudentQrScanner({
         </>
       )}
       <Button variant="default" onClick={onClose}>
-        {locale === 'vi' ? 'Nhập mã học sinh' : 'Enter student ID instead'}
+        {locale === 'vi' ? 'Nhập nội dung QR' : 'Enter QR text instead'}
       </Button>
     </Stack>
   );

@@ -91,6 +91,10 @@ export interface ClassroomStore {
   /** Removes a class from active use while retaining its submissions and history. */
   deleteClass(classId: string, deletedAt: Date): Promise<void>;
   readStudentByEmail(email: string): Promise<string | null>;
+  readOrganizationStudentByExternalId(
+    organizationId: string,
+    externalId: string,
+  ): Promise<string | null>;
   enrollStudent(classId: string, studentId: string, active: boolean): Promise<void>;
   isEnrolled(classId: string, studentId: string): Promise<boolean>;
   listMeetings(classId: string): Promise<ClassMeeting[]>;
