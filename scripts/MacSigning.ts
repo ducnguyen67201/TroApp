@@ -123,12 +123,13 @@ function readMacCommandFailureReason(
 }
 
 /** Error 68 also covers missing tickets; require the network marker and no rejection. */
-function canRetryMacTicketValidation(
+function canRetryMacTicketOperation(
   executable: string,
   arguments_: readonly string[],
   error: unknown,
 ): boolean {
-  if (readMacCommandOperation(basename(executable), arguments_) !== 'stapler.validate') {
+  const operation = readMacCommandOperation(basename(executable), arguments_);
+  if (operation !== 'stapler.validate' && operation !== 'stapler.staple') {
     return false;
   }
   const parsedFailure = CommandFailureSchema.safeParse(error);
@@ -140,8 +141,7 @@ function canRetryMacTicketValidation(
     failure.code === 68 &&
     failure.killed !== true &&
     (failure.signal === undefined || failure.signal === null) &&
-    readMacCommandFailureReason('stapler.validate', failure) ===
-      MacCommandFailureReason.NETWORK_ERROR
+    readMacCommandFailureReason(operation, failure) === MacCommandFailureReason.NETWORK_ERROR
   );
 }
 
@@ -194,7 +194,7 @@ function reportMacCommandFailure(
   return new Error(`macOS release command failed: ${tool}.`);
 }
 
-/** Retry only ticket-validation network failures; every release still requires exit zero. */
+/** Retry only stapling/validation network failures; every release still requires exit zero. */
 export const runMacCommand: MacCommand = async (executable, arguments_) => {
   const retryDelaysMs = [5_000, 15_000, 30_000, 60_000] as const;
   for (let attempt = 1; ; attempt += 1) {
@@ -206,12 +206,12 @@ export const runMacCommand: MacCommand = async (executable, arguments_) => {
       });
     } catch (error) {
       const delayMs = retryDelaysMs[attempt - 1];
-      if (delayMs !== undefined && canRetryMacTicketValidation(executable, arguments_, error)) {
+      if (delayMs !== undefined && canRetryMacTicketOperation(executable, arguments_, error)) {
         console.warn(
           JSON.stringify({
             event: 'mac.release.command.retry',
             tool: 'xcrun',
-            operation: 'stapler.validate',
+            operation: readMacCommandOperation(basename(executable), arguments_),
             exitCode: 68,
             reason: MacCommandFailureReason.NETWORK_ERROR,
             urlErrorCode: readMacUrlErrorCode(error),
