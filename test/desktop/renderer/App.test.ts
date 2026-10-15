@@ -1718,16 +1718,6 @@ it('releases the automatic preview before retrying voice startup and resumes aft
 it('does not revive a comparison after the picker closes and reopens while releasing its preview', async () => {
   const bridge = createDesktopBridge();
   let finishRelease: (() => void) | undefined;
-  bridge.controlMicrophoneTest.mockImplementation((command) => {
-    if (command.kind === 'stop') {
-      return new Promise((resolve) => {
-        finishRelease = () => {
-          resolve({ kind: 'ok' });
-        };
-      });
-    }
-    return Promise.resolve({ kind: 'ok' });
-  });
   window.tro = bridge;
   const events = new EventTarget();
   const device: MediaDeviceInfo = {
@@ -1746,11 +1736,36 @@ it('does not revive a comparison after the picker closes and reopens while relea
     },
   });
   try {
-    renderDesktop();
+    /* Settle voice startup and its inventory refresh before opening the picker. */
+    await act(async () => {
+      renderDesktop();
+      await Promise.resolve();
+    });
     fireEvent.click(await screen.findByRole('button', { name: 'Microphone' }));
     const dialog = await screen.findByRole('dialog', { name: 'Microphone' });
     await waitFor(() => {
-      expect(microphonePreviews.startPreview).toHaveBeenCalledWith('default');
+      expect(microphonePreviews.startPreview).toHaveBeenCalledExactlyOnceWith('default');
+    });
+    const previewCommand = bridge.controlMicrophoneTest.mock.calls.at(-1)?.[0];
+    if (previewCommand?.kind !== 'start') {
+      throw new Error('Missing automatic microphone preview lease');
+    }
+    /* Delay only the comparison's release, not startup cleanup or later teardown. */
+    let shouldDelayRelease = true;
+    bridge.controlMicrophoneTest.mockImplementation((command) => {
+      if (
+        command.kind === 'stop' &&
+        command.testId === previewCommand.testId &&
+        shouldDelayRelease
+      ) {
+        shouldDelayRelease = false;
+        return new Promise((resolve) => {
+          finishRelease = () => {
+            resolve({ kind: 'ok' });
+          };
+        });
+      }
+      return Promise.resolve({ kind: 'ok' });
     });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Compare microphones' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Test USB microphone' }));
@@ -1759,6 +1774,10 @@ it('does not revive a comparison after the picker closes and reopens while relea
     });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
     fireEvent.click(screen.getByRole('button', { name: 'Microphone' }));
+    expect(microphonePreviews.startPreview).toHaveBeenCalledOnce();
+    expect(
+      bridge.controlMicrophoneTest.mock.calls.filter(([command]) => command.kind === 'start'),
+    ).toHaveLength(1);
     await act(async () => {
       finishRelease?.();
       await Promise.resolve();
