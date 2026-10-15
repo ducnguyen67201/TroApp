@@ -48,42 +48,8 @@ jobs:
         run: |
           printf '## Desktop %s\n\nTag: `%s`\n\nCommit: `%s`\n' "$RELEASE_VERSION" "$RELEASE_TAG" "$RELEASE_COMMIT" >> "$GITHUB_STEP_SUMMARY"
 
-  validate:
-    needs: prepare
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - name: Require main
-        env:
-          RELEASE_REF: ${{ github.ref }}
-        run: test "$RELEASE_REF" = refs/heads/main
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ needs.prepare.outputs.commit }}
-          persist-credentials: false
-      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-        with:
-          version: 11.16.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: '24'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Apply shared desktop version
-        env:
-          TRO_DESKTOP_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
-        run: pnpm exec tsx scripts/ApplyDesktopReleaseVersion.ts
-      - run: pnpm lint
-        env:
-          NODE_OPTIONS: --max-old-space-size=6144
-      - run: pnpm format:check
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
-      - run: pnpm test:integration
-
   windows:
-    needs: [prepare, validate]
+    needs: prepare
     permissions:
       contents: read
       id-token: write
@@ -93,7 +59,7 @@ jobs:
       release-version: ${{ needs.prepare.outputs.version }}
 
   macos:
-    needs: [prepare, validate]
+    needs: prepare
     permissions:
       contents: read
     uses: ./.github/workflows/MacRelease.yml

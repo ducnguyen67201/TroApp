@@ -760,6 +760,26 @@ and create/migrate/remove a disposable PostgreSQL container. Run
 `pnpm test:worker` for worker bundling/startup changes. These checks use local
 fixtures and do not call a paid provider.
 
+### Pull requests into main
+
+[Pull Request Checks](.github/workflows/PullRequestChecks.yml) runs lint, formatting,
+type checks, unit tests, the API/desktop build and disposable-PostgreSQL integration
+tests on every pull request targeting `main`. It checks the proposed merge, runs
+for merge queues too, and cancels obsolete runs when a PR receives new commits.
+There are no path filters, so documentation-only PRs also report the check.
+
+After the workflow first runs on GitHub, select **PR validation** as a required
+status check in the branch protection rule or ruleset for `main`. Require the
+branch to be up to date before merging, or use a merge queue. Adding the workflow
+alone does not configure GitHub's merge protection.
+
+These checks compile and stage application files, but create no DMG, ZIP or EXE
+installer and do not publish, reserve a release version or access signing secrets.
+They run on Linux; native macOS/Windows compilation, signing, notarization,
+stapling and installed-app checks remain part of release verification. A green PR
+check cannot predict a later Apple service outage. Desktop Release relies on these
+PR checks and does not repeat the suite or query their status before packaging.
+
 Security overrides in [pnpm-workspace.yaml](pnpm-workspace.yaml) constrain affected
 transitive dependencies until their parent packages adopt fixed releases. The
 Electron downloader's proxy adapter uses a release without the unpatched
@@ -857,9 +877,9 @@ reserved version to `package.json` in each disposable build checkout. The workfl
 preserves the protected `main` branch and its development baseline; local
 build/package commands do not reserve or increment release versions.
 
-Desktop Release runs lint, formatting, type checking, unit tests, build and database
-integration checks once in a shared Linux job against the reserved source/version.
-Windows and both Mac packages start after that job succeeds. Each platform first
+Lint, formatting, type checking, unit tests, build and database integration checks
+run in Pull Request Checks before merging. Desktop Release starts Windows and both
+Mac packages immediately after version preparation. Each platform first
 restores the tested native companion using an exact cache key. The key includes
 the architecture, hosted runner image, Rust toolchain, deployment target and owned
 build/validation inputs listed in [NativeCompanionCache.ts](scripts/NativeCompanionCache.ts).
@@ -892,7 +912,7 @@ publication have `contents: write`, for their tags and GitHub Releases; platform
 builds keep read-only repository access. Preparation never pushes to `main`,
 force-updates a tag or deletes a reservation. Keep `desktop-v*` tags immutable;
 do not delete them to retry a release. Signing remains in the existing
-`release` environment, with shared validation before platform packaging.
+`release` environment; platform packaging retains its signing and artifact checks.
 `release.version.stage` and `release.version.failed` report a bounded preparation
 stage/reason without Git output or credentials. `source_changed` requires a new
 run; `git_operation` at `publish` requires checking tag-creation permissions or push access.
@@ -915,7 +935,7 @@ on Windows with:
 ### Signed macOS release from GitHub Actions
 
 [MacRelease.yml](.github/workflows/MacRelease.yml) is called by Desktop Release
-with its prepared version and commit after shared Linux validation. It builds the pinned
+with its prepared version and commit. It builds the pinned
 native companion and desktop separately on Apple Silicon and Intel runners. It
 requires Developer ID signing, Apple notarization and stapling, and verifies both
 the ZIP's extracted app and the DMG's mounted app before uploading artifacts.
@@ -1193,8 +1213,7 @@ website selection is independent of the installed app's Latest update feed.
 ### Windows release from GitHub Actions
 
 The **Windows Release** workflow is called by Desktop Release to build a signed
-x64 NSIS installer from the reviewed source and shared reserved version. Desktop Release
-validates the project once without cloud credentials, then Windows uses the GitHub
+x64 NSIS installer from the reviewed source and shared reserved version. Windows uses the GitHub
 environment `release` and Azure OIDC to sign during packaging.
 It retains verified build artifacts for 14 days; the final Desktop Release job
 publishes them alongside the Mac installers once every platform succeeds. It does

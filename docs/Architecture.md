@@ -1236,6 +1236,13 @@ only recovery from a missing or unknown permission status closes it automaticall
 Organization setup and the introductory tour use distinct account-scoped React
 keys, so sign-in remounts their own surfaces without sibling identity collisions.
 
+[PullRequestChecks.yml](../.github/workflows/PullRequestChecks.yml) validates proposed
+merges into `main` and merge-queue commits with read-only repository access and no
+release credentials. It owns the Linux lint, formatting, type checks, unit tests,
+application build and disposable-database integration tests.
+It does not package installers or exercise native signing/notarization. README owns
+the required-check setup; the workflow itself does not change branch protection.
+
 Desktop release ownership starts in
 [DesktopRelease.yml](../.github/workflows/DesktopRelease.yml).
 [ReleaseVersion.ts](../scripts/ReleaseVersion.ts) persists one shared patch-version
@@ -1246,12 +1253,12 @@ counter. Preparation rejects stale source or dirty workspaces and pushes only
 the reserved tag, preserving owner-only updates to `main`. A separate fetched
 namespace distinguishes published reservations from unpublished local tags.
 [ApplyDesktopReleaseVersion.ts](../scripts/ApplyDesktopReleaseVersion.ts) applies
-that version to the disposable validation/package checkouts for both platforms.
+that version to the disposable package checkouts for both platforms.
 The committed package version remains the development baseline. The serialized
 preparation and publication jobs have repository-content write permission;
-signing secrets remain in platform jobs' `release` environment. The caller owns a
-single credentialless Linux validation job against the reserved source/version;
-both platform workflows depend on its success before packaging. Platform jobs
+signing secrets remain in platform jobs' `release` environment. Both platform
+workflows start after version preparation. Release dispatch relies on pre-merge
+PR checks; it neither repeats their suite nor queries their status. Platform jobs
 cache only Cargo downloads and compilation outputs, separated by runner,
 architecture and toolchain and keyed by companion contract, patch and build script.
 Restored outputs never bypass pinned-source checks, patch application, native tests,
