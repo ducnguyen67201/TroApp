@@ -8,6 +8,15 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Assert-NoTroRegistration {
+    param([Microsoft.Win32.RegistryKey]$Registration)
+    # Uninstall entries such as AddressBook legitimately omit DisplayName.
+    $displayName = $Registration.GetValue('DisplayName', $null)
+    if ($displayName -match '^Tro(?:\s|$)') {
+        throw 'Installer probe refuses an existing Tro registration.'
+    }
+}
+
 function Assert-ShortcutTarget {
     param([string]$Path, [string]$ExpectedTarget)
     $bytes = [System.IO.File]::ReadAllBytes($Path)
@@ -50,7 +59,22 @@ if ($Mode -eq 'Test') {
     $temporaryDirectory = Join-Path $temporaryRoot ('TroInstallerTest-' + [guid]::NewGuid())
     Assert-TemporaryInstallPath $temporaryDirectory $temporaryRoot
     New-Item -ItemType Directory -Path $temporaryDirectory | Out-Null
+    $registryFixturePath = 'HKCU:\Software\TroInstallerTest-' + [guid]::NewGuid()
     try {
+        New-Item -Path $registryFixturePath | Out-Null
+        Assert-NoTroRegistration (Get-Item -LiteralPath $registryFixturePath)
+        foreach ($displayName in @('', 'Other application', 'Trojan')) {
+            New-ItemProperty -LiteralPath $registryFixturePath -Name DisplayName -Value $displayName -PropertyType String -Force | Out-Null
+            Assert-NoTroRegistration (Get-Item -LiteralPath $registryFixturePath)
+        }
+        foreach ($displayName in @('Tro', 'Tro 0.1.0', 'tro')) {
+            New-ItemProperty -LiteralPath $registryFixturePath -Name DisplayName -Value $displayName -PropertyType String -Force | Out-Null
+            $rejected = $false
+            try { Assert-NoTroRegistration (Get-Item -LiteralPath $registryFixturePath) }
+            catch { $rejected = $_.Exception.Message -eq 'Installer probe refuses an existing Tro registration.' }
+            if (-not $rejected) { throw 'Existing Tro registration was accepted.' }
+        }
+        Write-Output 'Windows installer registration fixtures passed.'
         $target = Join-Path $temporaryDirectory 'Tro.exe'
         $link = Join-Path $temporaryDirectory 'Tro.lnk'
         [System.IO.File]::WriteAllBytes($target, [byte[]]@(0x4d, 0x5a))
@@ -70,6 +94,9 @@ if ($Mode -eq 'Test') {
         if (-not $rejected) { throw 'Wrong shortcut target was accepted.' }
         Write-Output 'Windows installer shortcut fixtures passed.'
     } finally {
+        if (Test-Path -LiteralPath $registryFixturePath) {
+            Remove-Item -LiteralPath $registryFixturePath -Force
+        }
         Assert-TemporaryInstallPath $temporaryDirectory $temporaryRoot
         Remove-Item -LiteralPath $temporaryDirectory -Recurse -Force
     }
@@ -95,8 +122,7 @@ foreach ($registryRoot in @('HKCU:\Software\Microsoft\Windows\CurrentVersion\Uni
     'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
     'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall')) {
     foreach ($registration in @(Get-ChildItem -LiteralPath $registryRoot -ErrorAction SilentlyContinue)) {
-        $displayName = Get-ItemPropertyValue -LiteralPath $registration.PSPath -Name DisplayName -ErrorAction SilentlyContinue
-        if ($displayName -match '^Tro(?:\s|$)') { throw 'Installer probe refuses an existing Tro registration.' }
+        Assert-NoTroRegistration $registration
     }
 }
 $root = (Resolve-Path -LiteralPath $Directory).Path
