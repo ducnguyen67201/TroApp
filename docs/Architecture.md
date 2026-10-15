@@ -1080,6 +1080,30 @@ details.
 
 ## Local presentation and app updates
 
+Desktop release ownership starts in
+[DesktopRelease.yml](../.github/workflows/DesktopRelease.yml).
+[ReleaseVersion.ts](../scripts/ReleaseVersion.ts) persists one shared patch-version
+reservation per workflow run in an immutable annotated `desktop-v*` tag pointing
+to the reviewed source commit. Run/source trailers make retries idempotent,
+including after later main commits. Only published reservations advance the
+counter. Preparation rejects stale source or dirty workspaces and pushes only
+the reserved tag, preserving owner-only updates to `main`. A separate fetched
+namespace distinguishes published reservations from unpublished local tags.
+[ApplyDesktopReleaseVersion.ts](../scripts/ApplyDesktopReleaseVersion.ts) applies
+that version to the disposable validation/package checkouts for both platforms.
+The committed package version remains the development baseline. The serialized
+preparation job alone has repository-content write permission, for tag creation;
+signing secrets remain in platform jobs' `release` environment. A failed release
+may reserve a version without producing artifacts. Local builds never allocate
+release versions. Reservations are never force-updated or deleted by the workflow.
+
+[CheckWindowsInstaller.ps1](../scripts/CheckWindowsInstaller.ps1) owns the disposable
+runner's install/uninstall check. It refuses existing Tro installations, verifies
+the installed version and native driver against the packaged files, and validates
+Start menu/desktop shortcut headers and targets. These checks detect broken
+shortcuts without claiming their cause or proving physical desktop behavior.
+README owns release dispatch, retry, setup and validation commands.
+
 The account-scoped introductory tour is separate from OS permission onboarding.
 Framework-free rules and locale-content selection belong in
 [onboarding/domain](../src/desktop/onboarding/domain/OnboardingProgress.ts).

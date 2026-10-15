@@ -202,7 +202,7 @@ project token and `MAIN_VITE_POSTHOG_HOST` to `https://us.i.posthog.com` or
 `https://eu.i.posthog.com`. Supply both or neither; personal API keys are rejected.
 Restart development or rebuild the desktop after changing these build settings.
 For installed releases, set the same two public variables in the GitHub `release`
-environment before running the Mac or Windows release workflow. No backend secret
+environment before running Desktop Release. No backend secret
 or PostHog management credential belongs in the desktop.
 
 Sharing is on by default when PostHog is configured, with no first-launch prompt,
@@ -748,10 +748,48 @@ Set the HTTPS update feed during the same build/package invocation. Development
 updates remain disabled. Signing/notarization and distribution require a separate
 reviewed release; ad hoc local signing is not release signing.
 
+### Shared desktop release version
+
+Run **Actions → Desktop Release → Run workflow** on reviewed `main`.
+[DesktopRelease.yml](.github/workflows/DesktopRelease.yml) reserves one shared
+patch version in an annotated `desktop-v<version>` tag, then builds Windows x64
+and macOS Apple Silicon/Intel from the reviewed source commit. For example, the
+first release from the `0.1.0` baseline builds all three targets as `0.1.1`.
+The next run uses the highest reserved version or committed baseline, whichever
+is newer, before incrementing the patch. Artifact names and installer filenames
+include the version; the run summary identifies its tag and source commit.
+[ApplyDesktopReleaseVersion.ts](scripts/ApplyDesktopReleaseVersion.ts) applies the
+reserved version to `package.json` in each disposable build checkout. The workflow
+preserves the protected `main` branch and its development baseline; local
+build/package commands do not reserve or increment release versions.
+
+Re-run failed jobs in the existing Desktop Release run to retry the same version.
+A new manually dispatched run allocates the next patch version, even if the prior
+release failed; version gaps are allowed. Runs are serialized. If `main` advances
+before preparation reserves a version, start a new run. Only the preparation job
+has `contents: write`, for creating its release tag. It never pushes to `main`,
+force-updates a tag or deletes a reservation. Keep `desktop-v*` tags immutable;
+do not delete them to retry a release. Signing remains in the existing
+`release` environment, with platform validation before packaging.
+`release.version.stage` and `release.version.failed` report a bounded preparation
+stage/reason without Git output or credentials. `source_changed` requires a new
+run; `git_operation` at `publish` requires checking tag-creation permissions or push access.
+
+The Windows release also silently installs/uninstalls the signed installer on its
+disposable runner and checks the installed version, patched driver and both shortcut
+targets. `release.installer.failed` identifies installation, version, native-driver,
+shortcut or uninstall failure. This check refuses an existing Tro installation and cannot
+run in normal local development. Its credentialless shortcut fixtures can be run
+on Windows with:
+
+```powershell
+./scripts/CheckWindowsInstaller.ps1 -Mode Test
+```
+
 ### Signed macOS release from GitHub Actions
 
-[MacRelease.yml](.github/workflows/MacRelease.yml) is manually dispatched from
-reviewed `main`. It runs the full Linux validation suite, then builds the pinned
+[MacRelease.yml](.github/workflows/MacRelease.yml) is called by Desktop Release
+with its prepared version and commit. It runs the full Linux validation suite, then builds the pinned
 native companion and desktop separately on Apple Silicon and Intel runners. It
 requires Developer ID signing, Apple notarization and stapling, and verifies both
 the ZIP's extracted app and the DMG's mounted app before uploading artifacts.
@@ -909,7 +947,7 @@ upgrade from the legacy app without deleting user data. New signing identity may
 require permission reauthorization. Hosted CI cannot prove these interactions.
 Do not remove quarantine or disable Gatekeeper to count a test as passing.
 
-After approval, choose a new unused release version committed before the build;
+After approval, use the reserved version and reviewed source commit identified by Desktop Release;
 never overwrite the Windows `v0.1.0` tag with different source. Publish **the exact
 verified files** from both architecture artifacts to a draft TroApp GitHub Release
 at the build SHA, compare hashes, record hardware acceptance, then publish. Keep
@@ -925,8 +963,8 @@ successful Gatekeeper assessment, not the absence of every operating-system prom
 
 ### Windows release from GitHub Actions
 
-The **Windows Release** workflow builds a signed x64 NSIS installer from `main`
-when manually dispatched. It validates the project without cloud credentials,
+The **Windows Release** workflow is called by Desktop Release to build a signed
+x64 NSIS installer from the reviewed source and shared reserved version. It validates the project without cloud credentials,
 then uses the GitHub environment `release` and Azure OIDC to sign during packaging.
 It uploads verified build artifacts for 14 days; it does not publish a GitHub
 Release, deploy the API, or provision an update feed. No separate release branch
@@ -959,8 +997,8 @@ or Azure tokens in a `MAIN_VITE_*` variable.
 | `MAIN_VITE_UPDATE_FEED_URL` | Optional public HTTPS generic update feed                |
 
 The workflow supplies `MAIN_VITE_APP_ENV=prod` and `TRO_SIGN_WINDOWS=true`. Ordinary
-local packaging keeps signing optional. Source version comes from committed
-`package.json`; change it through normal review before producing a new version.
+local packaging keeps signing optional. Release builds use the shared reserved
+version applied to `package.json`; local packaging uses the current checkout's baseline.
 Azure signing settings stay in the packaging process and are not copied into app
 metadata. The pinned electron-builder v26 uses `win.azureSignOptions`; its upstream
 PowerShell signing module and hosted runner image are not completely pinned by

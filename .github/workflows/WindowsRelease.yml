@@ -1,7 +1,14 @@
 name: Windows Release
 
 on:
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      release-commit:
+        required: true
+        type: string
+      release-version:
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -21,7 +28,7 @@ jobs:
         run: test "$RELEASE_REF" = refs/heads/main
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.release-commit }}
           persist-credentials: false
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
@@ -31,6 +38,10 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Apply shared desktop version
+        env:
+          TRO_DESKTOP_RELEASE_VERSION: ${{ inputs.release-version }}
+        run: pnpm exec tsx scripts/ApplyDesktopReleaseVersion.ts
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm typecheck
@@ -64,7 +75,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.release-commit }}
           persist-credentials: false
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
@@ -74,10 +85,16 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Apply shared desktop version
+        env:
+          TRO_DESKTOP_RELEASE_VERSION: ${{ inputs.release-version }}
+        run: pnpm exec tsx scripts/ApplyDesktopReleaseVersion.ts
       - name: Check release settings
         run: pnpm exec tsx scripts/WindowsSigning.ts --check-windows-release
       - name: Test Windows verifier
-        run: ./scripts/VerifyWindowsRelease.ps1 -Mode Test
+        run: |
+          ./scripts/VerifyWindowsRelease.ps1 -Mode Test
+          ./scripts/CheckWindowsInstaller.ps1 -Mode Test
       - name: Build Windows companion
         run: |
           $installerDirectory = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer'
@@ -99,10 +116,14 @@ jobs:
         run: |
           $requireMetadata = -not [string]::IsNullOrWhiteSpace($env:MAIN_VITE_UPDATE_FEED_URL)
           ./scripts/VerifyWindowsRelease.ps1 -Directory release -RequireUpdateMetadata:$requireMetadata
+      - name: Check installed version and shortcuts
+        env:
+          RELEASE_VERSION: ${{ inputs.release-version }}
+        run: ./scripts/CheckWindowsInstaller.ps1 -Version $env:RELEASE_VERSION
       - name: Upload verified Windows artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: Tro-windows-x64-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: Tro-${{ inputs.release-version }}-windows-x64-${{ inputs.release-commit }}-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: error
           retention-days: 14
           path: |
