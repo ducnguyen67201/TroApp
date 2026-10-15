@@ -13,11 +13,16 @@ import type { StudentEnrollment, StudentAccessReply } from '#contracts/StudentAc
 
 export const MessageRole = { USER: 'user', AGENT: 'agent' } as const;
 
+export const MessageInputSource = { TYPED: 'typed', VOICE: 'voice' } as const;
+
+export type MessageInputSource = (typeof MessageInputSource)[keyof typeof MessageInputSource];
+
 const SessionRestorePolicy = { RETRY_DELAY_MS: 1000, RETRY_WINDOW_MS: 15_000 } as const;
 
 interface TaskMessage {
   role: (typeof MessageRole)[keyof typeof MessageRole];
   text: string;
+  inputSource?: MessageInputSource;
   outcome?: TeachingOutcome;
   completion?: AgentCompletion;
 }
@@ -554,7 +559,10 @@ export function useComputerUse(): ComputerUseController {
       if (result.kind === 'accepted') {
         setAnswerLessonId(null);
         setMessageInput('');
-        setMessages((current) => [...current, { role: MessageRole.USER, text: submittedAnswer }]);
+        setMessages((current) => [
+          ...current,
+          { role: MessageRole.USER, text: submittedAnswer, inputSource: MessageInputSource.TYPED },
+        ]);
       } else if (result.kind === 'failed') {
         setMessage(resolveBridgeError(result.message, 'errorCompleteTask'));
       }
@@ -599,7 +607,10 @@ export function useComputerUse(): ComputerUseController {
         currentSessionId.current = activeId;
       }
       setMessageInput('');
-      setMessages((current) => [...current, { role: MessageRole.USER, text: submittedMessage }]);
+      setMessages((current) => [
+        ...current,
+        { role: MessageRole.USER, text: submittedMessage, inputSource: MessageInputSource.TYPED },
+      ]);
       const result = await window.tro.sendAgentMessage(
         activeId,
         submittedMessage,
@@ -741,7 +752,10 @@ export function useComputerUse(): ComputerUseController {
       voiceCaptureId.current = event.captureId;
       currentSessionId.current = event.sessionId;
       setMessage(null);
-      setMessages((current) => [...current, { role: MessageRole.USER, text: event.text }]);
+      setMessages((current) => [
+        ...current,
+        { role: MessageRole.USER, text: event.text, inputSource: MessageInputSource.VOICE },
+      ]);
     } else if (
       event.kind === 'result' &&
       (voiceCaptureId.current === event.captureId ||

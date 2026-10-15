@@ -421,7 +421,7 @@ describe('startup sign-in checks', () => {
       await advanceSignInCheckTime(999);
       expect(bridge.readAuthSession).toHaveBeenCalledTimes(1);
       await advanceSignInCheckTime(1);
-      expect(screen.getByRole('heading', { name: 'Welcome back, Alex' })).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'Talk to Tro' })).toBeTruthy();
       expect(screen.getByText(testUser.email)).toBeTruthy();
       expect(screen.queryByRole('alert')).toBeNull();
       expect(bridge.readAuthSession).toHaveBeenCalledTimes(2);
@@ -487,7 +487,7 @@ describe('startup sign-in checks', () => {
     });
     bridge.readAuthSession.mockResolvedValue({ kind: 'signed-in', user: testUser });
     await advanceSignInCheckTime(1000);
-    expect(screen.getByRole('heading', { name: 'Welcome back, Alex' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Talk to Tro' })).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
     expect(bridge.readAuthSession).toHaveBeenCalledTimes(completedChecks + 2);
     expect(readSavedAccounts).toHaveBeenCalledTimes(2);
@@ -498,7 +498,7 @@ describe('startup sign-in checks', () => {
       await pendingSavedAccounts;
     });
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(screen.getByRole('heading', { name: 'Welcome back, Alex' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Talk to Tro' })).toBeTruthy();
   });
 
   it('offers a manual retry when the initial session stays pending past the startup window', async () => {
@@ -602,7 +602,7 @@ describe('desktop scaffold', () => {
       },
       { timeout: 2500 },
     );
-    await screen.findByRole('heading', { name: 'Welcome back, Alex' });
+    await screen.findByRole('heading', { name: 'Talk to Tro' });
     expect(bridge.signInWithGoogle).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull();
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeTruthy();
@@ -615,12 +615,12 @@ describe('desktop scaffold', () => {
     expect(within(account).getByText(testUser.name)).toBeTruthy();
     expect(within(account).getByRole('button', { name: 'Switch account' })).toBeTruthy();
     expect(within(account).queryByRole('button', { name: 'Sign out' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Workspace' }).getAttribute('aria-current')).toBe(
+    expect(screen.getByRole('button', { name: 'Conversation' }).getAttribute('aria-current')).toBe(
       'page',
     );
     expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Guided Lessons (Beta)' })).toBeNull();
-    expect(await screen.findByRole('heading', { name: 'Welcome back, Alex' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Talk to Tro' })).toBeTruthy();
   });
 
   it('does not offer retired lesson navigation for Vietnamese accounts', async () => {
@@ -810,7 +810,7 @@ describe('desktop scaffold', () => {
       expect(bridge.requestDesktopPermissions).toHaveBeenCalledTimes(1);
     });
     fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
-    await screen.findByRole('heading', { name: 'Welcome back, Alex' });
+    await screen.findByRole('heading', { name: 'Talk to Tro' });
     expect(screen.getByRole('textbox', { name: 'Your message' })).toBeTruthy();
   });
 
@@ -917,7 +917,7 @@ describe('desktop language', () => {
     expect(window.localStorage.getItem(localeStorageKey)).toBe('vi');
     cleanup();
     renderDesktop();
-    expect(await screen.findByRole('heading', { name: 'Chào mừng trở lại, Alex' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Trò chuyện với Tro' })).toBeTruthy();
   });
 
   it('keeps an active task running while switching languages in Settings', async () => {
@@ -994,7 +994,7 @@ describe('desktop language', () => {
     async (value) => {
       window.localStorage.setItem(localeStorageKey, value);
       renderDesktop();
-      expect(await screen.findByRole('heading', { name: 'Chào mừng trở lại, Alex' })).toBeTruthy();
+      expect(await screen.findByRole('heading', { name: 'Trò chuyện với Tro' })).toBeTruthy();
       expect(document.documentElement.lang).toBe('vi');
     },
   );
@@ -1004,7 +1004,7 @@ describe('desktop language', () => {
       throw new Error('Blocked');
     });
     renderDesktop();
-    await screen.findByRole('heading', { name: 'Chào mừng trở lại, Alex' });
+    await screen.findByRole('heading', { name: 'Trò chuyện với Tro' });
     fireEvent.click(screen.getByRole('button', { name: 'Cài đặt' }));
     fireEvent.change(screen.getByRole('combobox', { name: 'Ngôn ngữ' }), {
       target: { value: 'en' },
@@ -1055,8 +1055,8 @@ describe('desktop language', () => {
       bridge.sendAgentMessage.mockResolvedValue({ kind: 'failed', message: vietnameseMessage });
       window.tro = bridge;
       renderDesktop();
-      await screen.findByRole('heading', { name: 'Chào mừng trở lại, Alex' });
-      fireEvent.change(screen.getByRole('textbox', { name: 'Tin nhắn của bạn' }), {
+      await screen.findByRole('heading', { name: 'Trò chuyện với Tro' });
+      fireEvent.change(await screen.findByRole('textbox', { name: 'Tin nhắn của bạn' }), {
         target: { value: 'Help with my class' },
       });
       fireEvent.click(screen.getByRole('button', { name: 'Gửi cho Tro' }));
@@ -1161,6 +1161,121 @@ describe('desktop language', () => {
   });
 });
 
+it('presents existing voice states and temporary speech without adding capture commands', async () => {
+  const bridge = createDesktopBridge();
+  window.tro = bridge;
+  renderDesktop();
+  await screen.findByText('Ready to listen');
+  const input = screen.getByRole('textbox', { name: 'Your message' });
+  fireEvent.change(input, { target: { value: 'Keep this typed draft' } });
+  const emit = bridge.subscribeVoiceInput.mock.calls.at(-1)?.[0];
+  if (!emit) {
+    throw new Error('Missing voice subscription.');
+  }
+  const commandCount = bridge.controlVoiceInput.mock.calls.length;
+  const captureId = '33333333-3333-4333-8333-333333333333';
+  act(() => {
+    emit({
+      kind: 'status',
+      status: {
+        state: VoiceState.PREPARING,
+        shortcut: VoiceShortcut.COMMAND_CONTROL,
+        globalShortcutAvailable: true,
+      },
+    });
+  });
+  expect(screen.getByText('Preparing microphone…')).toBeTruthy();
+  expect(screen.queryByText('Tro is listening')).toBeNull();
+  act(() => {
+    emit({
+      kind: 'status',
+      status: {
+        state: VoiceState.RECORDING,
+        shortcut: VoiceShortcut.COMMAND_CONTROL,
+        globalShortcutAvailable: true,
+      },
+    });
+    emit({ kind: 'preview', captureId, text: 'Help with exercise two' });
+  });
+  expect(screen.getByText('Tro is listening')).toBeTruthy();
+  expect(screen.getByText('What Tro is hearing · Temporary transcript')).toBeTruthy();
+  expect(screen.getByText('Help with exercise two')).toBeTruthy();
+  expect(screen.getByDisplayValue('Keep this typed draft')).toBeTruthy();
+  act(() => {
+    emit({
+      kind: 'status',
+      status: {
+        state: VoiceState.FINALIZING,
+        shortcut: VoiceShortcut.COMMAND_CONTROL,
+        globalShortcutAvailable: true,
+      },
+    });
+  });
+  expect(screen.getByText('Recording stopped. Finishing the transcript.')).toBeTruthy();
+  act(() => {
+    emit({ kind: 'submitted', captureId, sessionId, text: 'Help with exercise two.' });
+    emit({
+      kind: 'status',
+      status: {
+        state: VoiceState.RUNNING,
+        shortcut: VoiceShortcut.COMMAND_CONTROL,
+        globalShortcutAvailable: true,
+      },
+    });
+  });
+  expect(screen.queryByText('What Tro is hearing · Temporary transcript')).toBeNull();
+  expect(screen.getByText('Help with exercise two.')).toBeTruthy();
+  expect(screen.getByText('Voice')).toBeTruthy();
+  expect(screen.getByText('Tro is working on your request…')).toBeTruthy();
+  expect(bridge.controlVoiceInput).toHaveBeenCalledTimes(commandCount);
+  expect(bridge.sendAgentMessage).not.toHaveBeenCalled();
+});
+
+it.each([VoiceShortcut.COMMAND_CONTROL, VoiceShortcut.CONTROL_ALT, VoiceShortcut.CONTROL_SHIFT])(
+  'shows the configured %s shortcut and hides stale speech when voice is unavailable',
+  async (shortcut) => {
+    const bridge = createDesktopBridge();
+    window.tro = bridge;
+    renderDesktop();
+    await screen.findByText('Ready to listen');
+    const emit = bridge.subscribeVoiceInput.mock.calls.at(-1)?.[0];
+    if (!emit) {
+      throw new Error('Missing voice subscription.');
+    }
+    const labels = {
+      [VoiceShortcut.COMMAND_CONTROL]: 'Command + Control',
+      [VoiceShortcut.CONTROL_ALT]: 'Control + Left Alt',
+      [VoiceShortcut.CONTROL_SHIFT]: 'Control + Shift',
+    };
+    act(() => {
+      emit({
+        kind: 'status',
+        status: { state: VoiceState.IDLE, shortcut, globalShortcutAvailable: true },
+      });
+    });
+    expect(screen.getByText(`Hold ${labels[shortcut]} to speak · Release to send`)).toBeTruthy();
+    act(() => {
+      emit({
+        kind: 'preview',
+        captureId: '33333333-3333-4333-8333-333333333333',
+        text: 'Stale speech',
+      });
+      emit({
+        kind: 'status',
+        status: { state: VoiceState.DISABLED, shortcut, globalShortcutAvailable: false },
+      });
+    });
+    expect(screen.getByText('Voice is not ready')).toBeTruthy();
+    expect(screen.queryByText('Stale speech')).toBeNull();
+    expect(screen.queryByText('Ready to listen')).toBeNull();
+    act(() => {
+      emit({ kind: 'failed' });
+    });
+    expect(screen.getByText('Could not receive speech')).toBeTruthy();
+    expect(screen.queryByText('Ready to listen')).toBeNull();
+  },
+);
+
 it('displays a voice instruction immediately and preserves the separately typed draft', async () => {
   const bridge = createDesktopBridge();
   window.tro = bridge;
@@ -1180,6 +1295,7 @@ it('displays a voice instruction immediately and preserves the separately typed 
     emit({ kind: 'submitted', captureId, sessionId, text: 'Mở Chrome' });
   });
   expect(screen.getByText('Mở Chrome')).toBeTruthy();
+  expect(screen.getByText('Voice')).toBeTruthy();
   expect(input.getAttribute('disabled')).not.toBeNull();
   act(() => {
     emit({
@@ -1286,7 +1402,7 @@ it('keeps voice active across navigation without a duplicate workspace panel', a
   await screen.findByRole('textbox', { name: 'Your message' });
   expect(screen.queryByText('Hold to talk; release to send')).toBeNull();
   expect(screen.queryByRole('button', { name: 'Hold to talk' })).toBeNull();
-  expect(screen.queryByText('Command + Control')).toBeNull();
+  expect(await screen.findByText('Hold Command + Control to speak · Release to send')).toBeTruthy();
   expect(bridge.controlVoiceInput).toHaveBeenCalledWith({
     kind: 'enable',
     shortcut: 'command-control',
@@ -2187,7 +2303,7 @@ it('shows the student role and code enrollment page while preserving the workspa
       code: 'AABBCCDDEEFF',
     });
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Workspace' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Conversation' }));
   expect(screen.getByRole('textbox', { name: 'Your message' })).toHaveProperty(
     'value',
     'Keep my work',
@@ -3288,6 +3404,13 @@ it('lets a QR learner reach their class without requesting organization setup or
   });
   expect(controlOrganizations).not.toHaveBeenCalled();
   expect(screen.queryByRole('dialog', { name: 'How will you use Tro?' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Conversation' }));
+  expect(screen.getByText('Type a request and follow Tro’s response here.')).toBeTruthy();
+  expect(screen.queryByText('Ready to listen')).toBeNull();
+  expect(screen.queryByText('Voice is not ready')).toBeNull();
+  expect(bridge.controlVoiceInput.mock.calls.some(([command]) => command.kind === 'enable')).toBe(
+    false,
+  );
   fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
   expect(screen.queryByRole('tab', { name: 'Team' })).toBeNull();
 });

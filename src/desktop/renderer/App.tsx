@@ -36,7 +36,7 @@ import {
   IconSchool,
   IconChartBar,
   IconMicrophone,
-  IconLayoutSidebar,
+  IconMessageCircle,
   IconSettings,
   IconPaw,
   IconPlayerPlay,
@@ -392,7 +392,7 @@ export function App(): ReactElement {
                   navigation.openWorkspace();
                 }}
               >
-                <IconLayoutSidebar size={19} stroke={1.6} />
+                <IconMessageCircle size={19} stroke={1.6} />
                 <span>{messages.workspace}</span>
               </UnstyledButton>
               <UnstyledButton
@@ -578,6 +578,7 @@ export function App(): ReactElement {
                 ) : (
                   <ComputerUsePage
                     controller={controller}
+                    voice={voiceUserId ? voice : null}
                     signInActions={
                       <Stack gap="sm" align="center" className="sign-in-controls">
                         {window.tro.controlStudentAccess && (

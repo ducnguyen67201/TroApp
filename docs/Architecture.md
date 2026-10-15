@@ -456,6 +456,12 @@ Classroom View as, and the renderer discards replies from stale account generati
 
 ## Agent requests and model gateway
 
+The desktop labels this surface **Trò chuyện / Conversation**. `ComputerUsePage`
+displays the current in-memory exchange and marks submitted voice messages from
+existing events. `ConversationVoiceStatus` presents the app-owned voice status and
+partial transcript without adding subscriptions or capture controls. It does not
+provide saved conversation history or change the cursor-following HUD.
+
 Typed instructions and completed voice transcripts enter `AgentChatController`.
 Main checks account, permissions and exclusivity, obtains a scoped model credential,
 and sends one task to the utility worker. With the native companion, the local

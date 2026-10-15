@@ -4,7 +4,7 @@ const english = {
   title: 'Get to know Tro',
   welcomeTitle: 'A little help getting started.',
   welcomeBody:
-    'Explore your workspace, classes, learning progress, lessons, microphone and pets. Watch the short introductions or follow the text at your own pace.',
+    'Explore conversations, classes, learning progress, lessons, microphone and pets. Watch the short introductions or follow the text at your own pace.',
   welcomeHint: 'You can skip and restart from Settings whenever you like.',
   start: 'Show me around',
   skip: 'Skip tour',
@@ -41,7 +41,7 @@ const vietnamese: OnboardingMessages = {
   title: 'Làm quen với Tro',
   welcomeTitle: 'Cùng làm quen với Tro nhé.',
   welcomeBody:
-    'Làm quen với không gian làm việc, lớp học, tiến độ, bài giảng, micrô và thú cưng. Xem video ngắn hoặc đọc hướng dẫn theo nhịp của bạn.',
+    'Làm quen với mục Trò chuyện, lớp học, tiến độ, bài giảng, micrô và thú cưng. Xem video ngắn hoặc đọc hướng dẫn theo nhịp của bạn.',
   welcomeHint: 'Bạn có thể bỏ qua và bắt đầu lại trong Cài đặt bất cứ lúc nào.',
   start: 'Bắt đầu hướng dẫn',
   skip: 'Bỏ qua',
