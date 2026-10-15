@@ -181,6 +181,17 @@ afterEach(() => {
 });
 
 describe('optional usage sharing', () => {
+  /** Permission readiness starts the companion and closes startup dialogs. Wait
+   * for that boundary before opening settings to exercise analytics preferences. */
+  async function waitForAnalyticsWorkspace(
+    bridge: ReturnType<typeof createAnalyticsBridge>,
+  ): Promise<void> {
+    await screen.findByText(testUser.email);
+    await waitFor(() => {
+      expect(bridge.startCursorCompanion).toHaveBeenCalled();
+    });
+  }
+
   function createAnalyticsBridge(configured = true) {
     return {
       ...createDesktopBridge(),
@@ -200,7 +211,7 @@ describe('optional usage sharing', () => {
     const bridge = createAnalyticsBridge(false);
     window.tro = bridge;
     renderDesktop();
-    await screen.findByText(testUser.email);
+    await waitForAnalyticsWorkspace(bridge);
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     expect(await screen.findByRole('switch', { name: 'Share app usage' })).toHaveProperty(
       'disabled',
@@ -221,7 +232,7 @@ describe('optional usage sharing', () => {
     });
     window.tro = bridge;
     renderDesktop();
-    await screen.findByText(testUser.email);
+    await waitForAnalyticsWorkspace(bridge);
     await waitFor(() => {
       expect(bridge.trackScreenView).toHaveBeenCalledExactlyOnceWith(AnalyticsScreen.WORKSPACE);
     });
@@ -240,7 +251,7 @@ describe('optional usage sharing', () => {
     const bridge = createAnalyticsBridge();
     window.tro = bridge;
     renderDesktop();
-    await screen.findByText(testUser.email);
+    await waitForAnalyticsWorkspace(bridge);
     expect(bridge.trackScreenView).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     fireEvent.click(await screen.findByRole('switch', { name: 'Share app usage' }));
@@ -287,7 +298,7 @@ describe('optional usage sharing', () => {
     bridge.setAnalyticsEnabled.mockResolvedValueOnce({ kind: 'failed' });
     window.tro = bridge;
     renderDesktop();
-    await screen.findByText(testUser.email);
+    await waitForAnalyticsWorkspace(bridge);
     fireEvent.click(screen.getByRole('button', { name: 'Cài đặt' }));
     fireEvent.click(await screen.findByRole('switch', { name: 'Chia sẻ dữ liệu sử dụng' }));
     await screen.findByText(/Không thể lưu tùy chọn này/);
