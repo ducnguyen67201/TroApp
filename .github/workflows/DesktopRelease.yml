@@ -71,3 +71,41 @@ jobs:
     with:
       release-commit: ${{ needs.prepare.outputs.commit }}
       release-version: ${{ needs.prepare.outputs.version }}
+
+  publish:
+    needs: [prepare, windows, macos]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply shared desktop version
+        env:
+          TRO_DESKTOP_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: pnpm exec tsx scripts/ApplyDesktopReleaseVersion.ts
+      - name: Download verified desktop artifacts from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: Tro-${{ needs.prepare.outputs.version }}-*-${{ needs.prepare.outputs.commit }}-${{ github.run_id }}-*
+          path: verified-release
+          merge-multiple: false
+      - name: Publish verified desktop release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_HOST: github.com
+          GH_PROMPT_DISABLED: '1'
+        run: pnpm exec tsx scripts/PublishDesktopRelease.ts --directory verified-release

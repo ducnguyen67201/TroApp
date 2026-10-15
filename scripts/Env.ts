@@ -5,6 +5,36 @@ import { AppUpdateUrlSchema } from '../src/contracts/AppUpdate.js';
 import { z } from 'zod';
 import { DesktopReleaseVersionSchema } from './ReleaseVersion.js';
 
+/** Publishing is restricted to manually dispatched builds of the app repository's main branch. */
+export function readReleasePublishingEnv(environment: NodeJS.ProcessEnv): {
+  repository: string;
+  commit: string;
+  runId: string;
+  attempt: string;
+} {
+  const validated = createEnv({
+    server: {
+      GITHUB_ACTIONS: z.literal('true'),
+      GITHUB_EVENT_NAME: z.literal('workflow_dispatch'),
+      GITHUB_REF: z.literal('refs/heads/main'),
+      GITHUB_REPOSITORY: z.literal('ducnguyen67201/TroApp'),
+      GITHUB_SHA: z.string().regex(/^[a-f0-9]{40}$/),
+      GITHUB_RUN_ID: z.string().regex(/^[1-9][0-9]*$/),
+      GITHUB_RUN_ATTEMPT: z.string().regex(/^[1-9][0-9]*$/),
+    },
+    runtimeEnv: environment,
+    onValidationError: () => {
+      throw new Error('Release publishing requires a main-branch TroApp workflow dispatch.');
+    },
+  });
+  return {
+    repository: validated.GITHUB_REPOSITORY,
+    commit: validated.GITHUB_SHA,
+    runId: validated.GITHUB_RUN_ID,
+    attempt: validated.GITHUB_RUN_ATTEMPT,
+  };
+}
+
 /** Only the main-branch GitHub release job may prepare a persisted version. */
 export function readReleasePreparationEnv(environment: NodeJS.ProcessEnv): {
   sourceCommit: string;

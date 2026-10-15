@@ -89,3 +89,33 @@ describe('macOS release credential boundaries', () => {
     expect(workflow).not.toContain('contents: write');
   });
 });
+
+describe('shared desktop release publication boundaries', () => {
+  const workflow = readFileSync(
+    new URL('../../.github/workflows/DesktopRelease.yml', import.meta.url),
+    'utf8',
+  );
+  const publishing = workflow.split('\n  publish:').at(1) ?? '';
+
+  it('publishes only after preparation and both reusable platform workflows succeed', () => {
+    expect(publishing).toContain('    needs: [prepare, windows, macos]\n');
+    expect(publishing).toContain("    if: github.ref == 'refs/heads/main'\n");
+    expect(publishing).toContain('    environment: release\n');
+    expect(publishing).toContain('      contents: write\n');
+    expect(publishing).not.toContain('always()');
+    expect(publishing).not.toContain('continue-on-error');
+    expect(publishing).toContain('ref: ${{ needs.prepare.outputs.commit }}');
+    expect(publishing).toContain('persist-credentials: false');
+    expect(publishing).toContain(
+      'TRO_DESKTOP_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}',
+    );
+    expect(publishing).toContain('scripts/ApplyDesktopReleaseVersion.ts');
+    expect(publishing).toContain(
+      'pattern: Tro-${{ needs.prepare.outputs.version }}-*-${{ needs.prepare.outputs.commit }}-${{ github.run_id }}-*',
+    );
+    expect(publishing).toContain('merge-multiple: false');
+    expect(publishing).toContain('scripts/PublishDesktopRelease.ts --directory verified-release');
+    expect(publishing).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(publishing).not.toContain('CSC_LINK');
+  });
+});
