@@ -17,9 +17,10 @@ export const vietnamese = {
   accountRoleUnknown: 'Tài khoản',
   accountExpired: 'Đăng nhập lại',
   accountSignInHeading: 'Thêm tài khoản',
-  accountSignInDescription:
-    'Đăng nhập bằng tài khoản Google khác. Tài khoản hiện tại vẫn được lưu trên máy này.',
+  accountSignInDescription: 'Chọn cách đăng nhập. Tài khoản hiện tại vẫn được lưu trên máy này.',
   accountContinueGoogle: 'Tiếp tục với Google',
+  accountContinueQr: 'Đăng nhập bằng QR',
+  accountSignInOptions: 'Quay lại chọn cách đăng nhập',
   accountWaitingGoogle: 'Hoàn tất đăng nhập trong trình duyệt.',
   accountCancelSignIn: 'Hủy đăng nhập',
   accountCancel: 'Hủy',

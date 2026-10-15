@@ -1,5 +1,13 @@
 import { safeStorage } from 'electron';
-import { existsSync, readFileSync, statSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
+import {
+  existsSync,
+  readFileSync,
+  statSync,
+  mkdirSync,
+  writeFileSync,
+  renameSync,
+  rmSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { StudentDeviceCredentialSchema } from '#contracts/StudentAccess.js';
 import type { z } from 'zod';
@@ -7,6 +15,7 @@ import type { z } from 'zod';
 export interface StudentDeviceStorage {
   read(): z.infer<typeof StudentDeviceCredentialSchema> | null;
   save(device: z.infer<typeof StudentDeviceCredentialSchema>): void;
+  clear(): void;
 }
 
 /** Device admission is independent of the personal login vault; credentials never cross preload. */
@@ -37,6 +46,11 @@ export class EncryptedStudentDevice implements StudentDeviceStorage {
     mkdirSync(this.directory, { recursive: true });
     writeFileSync(`${this.file}.pending`, bytes, { mode: 0o600 });
     renameSync(`${this.file}.pending`, this.file);
+  }
+
+  clear(): void {
+    rmSync(this.file, { force: true });
+    rmSync(`${this.file}.pending`, { force: true });
   }
 
   private requireEncryption(): void {

@@ -6,7 +6,7 @@ import type {
   ClassroomRosterSchema,
 } from '#contracts/Classroom.js';
 import { ClassDeletion } from './ClassDeletion.js';
-import { StudentAccessSettings } from './StudentAccessSettings.js';
+import { OrganizationStudentEnrollment } from './OrganizationStudentEnrollment.js';
 import { canUseStudentAccess } from '../accounts/StudentAccessAvailability.js';
 import type { z } from 'zod';
 import type { ClassroomTranslate } from './ClassroomLabels.js';
@@ -14,7 +14,7 @@ import type { ClassroomTranslate } from './ClassroomLabels.js';
 /** Class management stays scoped to the selected, backend-authorized teacher class. */
 export function ClassSettings({
   classId,
-  supportsStudentQr = true,
+  organizationId,
   name,
   live,
   busy,
@@ -25,7 +25,7 @@ export function ClassSettings({
   t,
 }: {
   classId: string;
-  supportsStudentQr?: boolean;
+  organizationId?: string | undefined;
   name: string;
   live: boolean;
   busy: boolean;
@@ -38,16 +38,8 @@ export function ClassSettings({
   const [email, setEmail] = useState('');
   return (
     <Stack gap="xl">
-      {supportsStudentQr && canUseStudentAccess() && (
-        <StudentAccessSettings key={classId} classId={classId} name={name} disabled={busy} t={t} />
-      )}
-      {!supportsStudentQr && canUseStudentAccess() && (
-        <Text size="sm" c="dimmed">
-          {t(
-            'QR student sign-in currently supports personal classes. Add organization students to the team first, then enroll them by email.',
-            'Đăng nhập học sinh bằng QR hiện hỗ trợ lớp cá nhân. Thêm học sinh của tổ chức vào đội nhóm trước, rồi ghi danh bằng email.',
-          )}
-        </Text>
+      {organizationId && canUseStudentAccess() && (
+        <OrganizationStudentEnrollment key={classId} classId={classId} disabled={busy} t={t} />
       )}
       <section aria-label={t('Invite students', 'Mời học sinh')}>
         <Text component="h2" fw={600} mb="xs">
@@ -125,8 +117,8 @@ export function ClassSettings({
         <Stack gap="sm">
           <Text size="sm" c="dimmed">
             {t(
-              'Students enter this code to enroll. Codes expire after seven days.',
-              'Học sinh nhập mã để vào lớp. Mã hết hạn sau bảy ngày.',
+              'This invitation enrolls signed-in Google accounts in this class. It does not activate a company computer or sign in a QR student. Codes expire after seven days.',
+              'Mã mời ghi danh tài khoản đã đăng nhập Google vào lớp. Mã này không kích hoạt máy của tổ chức hay đăng nhập học sinh QR. Mã hết hạn sau bảy ngày.',
             )}
           </Text>
           <Button

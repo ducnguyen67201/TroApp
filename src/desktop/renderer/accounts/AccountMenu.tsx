@@ -18,6 +18,7 @@ import {
   IconCheck,
   IconLogout,
   IconPlus,
+  IconQrcode,
   IconX,
 } from '@tabler/icons-react';
 import { useEffect, useState, type ReactElement } from 'react';
@@ -40,13 +41,14 @@ export function AccountMenu({ controller, roleLabel, disabled }: AccountMenuProp
   const [adding, setAdding] = useState(false);
   const [starting, setStarting] = useState(false);
   const [expiredStudent, setExpiredStudent] = useState(false);
+  const [studentSignIn, setStudentSignIn] = useState(false);
   const { user, savedAccounts, isSigning, isSwitchingAccount } = controller;
   const shared =
     user?.learner?.mode === StudentDeviceMode.SHARED ||
     savedAccounts?.deviceMode === StudentDeviceMode.SHARED;
   const identityLabel = (identity: NonNullable<typeof user>): string =>
     identity.learner
-      ? `${locale === 'vi' ? 'Mã học sinh' : 'Student ID'} · ${identity.learner.externalId}`
+      ? `${locale === 'vi' ? 'Mã QR' : 'QR ID'} · ${identity.learner.externalId}`
       : (identity.email ?? '');
 
   useEffect(() => {
@@ -57,6 +59,7 @@ export function AccountMenu({ controller, roleLabel, disabled }: AccountMenuProp
 
   function openAddAccount(): void {
     setOpened(false);
+    setStudentSignIn(false);
     setAdding(true);
   }
 
@@ -266,35 +269,64 @@ export function AccountMenu({ controller, roleLabel, disabled }: AccountMenuProp
           {expiredStudent && (
             <Alert role="alert">
               {locale === 'vi'
-                ? 'Đăng nhập đã hết hạn. Tiếp tục bằng thẻ QR sẽ tạo hồ sơ mới và không mở lại bài làm cũ.'
-                : 'This saved login expired. Continuing with a QR creates a new profile and will not reopen previous work.'}
+                ? 'Đăng nhập đã hết hạn. Quét lại thẻ QR để vào tài khoản và bài làm đã lưu.'
+                : 'This saved login expired. Scan your QR card again to reopen your account and saved work.'}
             </Alert>
           )}
-          {window.tro.controlStudentAccess && (
-            <StudentAccessForm
-              controller={controller}
-              onSuccess={() => {
-                setAdding(false);
-              }}
-            />
-          )}
-          <Text size="sm" c="dimmed">
-            {messages.accountSignInDescription}
-          </Text>
-          {isSigning ? (
-            <Group gap="sm" role="status">
-              <Loader size="sm" />
-              <Text size="sm">{messages.accountWaitingGoogle}</Text>
-            </Group>
+          {studentSignIn || expiredStudent ? (
+            <>
+              <StudentAccessForm
+                mode={StudentDeviceMode.PERSONAL}
+                controller={controller}
+                onSuccess={() => {
+                  setAdding(false);
+                }}
+              />
+              {!expiredStudent && (
+                <Button
+                  variant="subtle"
+                  disabled={isSwitchingAccount}
+                  onClick={() => {
+                    setStudentSignIn(false);
+                  }}
+                >
+                  {messages.accountSignInOptions}
+                </Button>
+              )}
+            </>
           ) : (
-            <Button
-              leftSection={<IconBrandGoogle size={18} />}
-              variant="default"
-              loading={starting}
-              onClick={() => void startGoogleSignIn()}
-            >
-              {messages.accountContinueGoogle}
-            </Button>
+            <>
+              <Text size="sm" c="dimmed">
+                {messages.accountSignInDescription}
+              </Text>
+              {isSigning ? (
+                <Group gap="sm" role="status">
+                  <Loader size="sm" />
+                  <Text size="sm">{messages.accountWaitingGoogle}</Text>
+                </Group>
+              ) : (
+                <Button
+                  leftSection={<IconBrandGoogle size={18} />}
+                  variant="default"
+                  loading={starting}
+                  onClick={() => void startGoogleSignIn()}
+                >
+                  {messages.accountContinueGoogle}
+                </Button>
+              )}
+              {window.tro.controlStudentAccess && (
+                <Button
+                  leftSection={<IconQrcode size={18} />}
+                  variant="default"
+                  disabled={starting || isSigning || isSwitchingAccount}
+                  onClick={() => {
+                    setStudentSignIn(true);
+                  }}
+                >
+                  {messages.accountContinueQr}
+                </Button>
+              )}
+            </>
           )}
           <Button
             variant="subtle"

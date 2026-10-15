@@ -1,4 +1,4 @@
-import { StudentAccessCapability } from '#contracts/StudentAccess.js';
+import { CompanyComputerCapability, StudentAccessCapability } from '#contracts/StudentAccess.js';
 import {
   ClassroomAdminCapability,
   ClassroomOrganizationCapability,
@@ -77,6 +77,7 @@ export class ClassroomApiClient {
           [ClassroomAdminCapability.HEADER]: ClassroomAdminCapability.VERSION,
           [ClassroomOrganizationCapability.HEADER]: ClassroomOrganizationCapability.VERSION,
           [StudentAccessCapability.HEADER]: StudentAccessCapability.VERSION,
+          [CompanyComputerCapability.HEADER]: CompanyComputerCapability.VERSION,
         },
         body: JSON.stringify(ClassroomCommandSchema.parse(command)),
         signal: AbortSignal.timeout(10_000),

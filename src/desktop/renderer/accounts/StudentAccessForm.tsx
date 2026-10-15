@@ -1,14 +1,25 @@
 import { StudentAccessKind } from '#contracts/StudentAccess.js';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
-import { Alert, Button, Group, Loader, Modal, Stack, Text, TextInput } from '@mantine/core';
+import {
+  Alert,
+  Button,
+  Group,
+  Loader,
+  Modal,
+  Stack,
+  Text,
+  Textarea,
+  TextInput,
+} from '@mantine/core';
 import { IconQrcode } from '@tabler/icons-react';
 import {
   StudentAccessReplySchema,
   StudentExternalIdSchema,
+  StudentActivationCodeSchema,
   type StudentAccessReply,
   type StudentDeviceContextSchema,
 } from '#contracts/StudentAccess.js';
-import { StudentDeviceMode } from '#contracts/StudentIdentity.js';
+import { StudentDeviceMode, StudentQrLimits } from '#contracts/StudentIdentity.js';
 import type { z } from 'zod';
 import type { ComputerUseController } from '../UseComputerUse.js';
 import { useLocale } from '../localization/UseLocale.js';
@@ -17,9 +28,12 @@ import { StudentQrScanner } from './StudentQrScanner.js';
 export function StudentAccessForm({
   controller,
   onSuccess,
+  mode = StudentDeviceMode.SHARED,
 }: {
-  controller: Pick<ComputerUseController, 'enrollStudent'>;
+  controller: Pick<ComputerUseController, 'enrollStudent'> &
+    Partial<Pick<ComputerUseController, 'refreshAccounts' | 'savedAccounts'>>;
   onSuccess: () => void;
+  mode?: StudentDeviceMode;
 }): ReactElement {
   const { locale } = useLocale();
   const t = (english: string, vietnamese: string): string =>
@@ -35,6 +49,12 @@ export function StudentAccessForm({
   const activationId = useRef(crypto.randomUUID());
   const enrollmentId = useRef(crypto.randomUUID());
   const submitting = useRef(false);
+  const activeAccount = controller.savedAccounts?.accounts.find(
+    (account) => account.id === controller.savedAccounts?.activeAccountId,
+  );
+  const hasActiveQrAccount = Boolean(
+    controller.savedAccounts?.activeAccountId && (!activeAccount || activeAccount.user.learner),
+  );
 
   useEffect(() => {
     let disposed = false;
@@ -78,13 +98,12 @@ export function StudentAccessForm({
         result = await window.tro.controlStudentAccess({
           kind: StudentAccessKind.ACTIVATE,
           code,
+          mode,
           requestId: activationId.current,
         });
       } else {
         if (!StudentExternalIdSchema.safeParse(externalId).success || !controller.enrollStudent) {
-          setError(
-            t('Enter the student ID printed on your card.', 'Nhập đúng mã học sinh in trên thẻ.'),
-          );
+          setError(t('Scan your QR or enter its text.', 'Quét QR hoặc nhập nội dung của mã QR.'));
           return;
         }
         result = await controller.enrollStudent({
@@ -96,6 +115,7 @@ export function StudentAccessForm({
       }
       if (result.kind === 'ready') {
         setContext(result.context);
+        await controller.refreshAccounts?.();
       } else if (result.kind === 'signed-in') {
         onSuccess();
       } else if (result.kind === 'failed') {
@@ -103,6 +123,35 @@ export function StudentAccessForm({
       }
     } catch {
       setError(t('Could not sign in. Please retry.', 'Chưa đăng nhập được. Em thử lại nhé.'));
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function deactivateComputer(): Promise<void> {
+    if (submitting.current || !window.tro.controlStudentAccess) {
+      return;
+    }
+    submitting.current = true;
+    setBusy(true);
+    try {
+      const reply = await window.tro.controlStudentAccess({ kind: StudentAccessKind.DEACTIVATE });
+      if (reply.kind === 'done') {
+        setContext(null);
+        setError(null);
+        setCode('');
+        await controller.refreshAccounts?.();
+      } else if (reply.kind === 'failed') {
+        setError(reply.message);
+      }
+    } catch {
+      setError(
+        t(
+          'Could not remove computer authorization. Please retry.',
+          'Chưa gỡ được quyền máy tính. Vui lòng thử lại.',
+        ),
+      );
     } finally {
       submitting.current = false;
       setBusy(false);
@@ -123,22 +172,29 @@ export function StudentAccessForm({
       {error && <Alert role="alert">{error}</Alert>}
       {context && (
         <Text size="sm" fw={600}>
-          {context.schoolName} · {context.className}
+          {context.schoolName}
+          {context.className ? ` · ${context.className}` : ''}
         </Text>
       )}
       {scanning ? (
         <StudentQrScanner
           onRead={(value) => {
             setScanning(false);
-            if (StudentExternalIdSchema.safeParse(value).success) {
+            const decoded = StudentExternalIdSchema.safeParse(value);
+            if (decoded.success) {
               setExternalId(value);
               enrollmentId.current = crypto.randomUUID();
               setError(null);
             } else {
+              console.warn('student.qr.rejected', {
+                stage: 'decoded-text-validation',
+                reason: decoded.error.issues[0]?.code ?? 'invalid',
+                characters: value.length,
+              });
               setError(
                 t(
-                  'This QR is not a supported student ID. Enter the ID printed on the card.',
-                  'QR chưa đúng định dạng mã học sinh. Em nhập mã in trên thẻ nhé.',
+                  `Use a QR containing non-empty text up to ${String(StudentQrLimits.TEXT_CHARACTERS)} characters, without null characters.`,
+                  `Dùng QR có nội dung văn bản không rỗng, tối đa ${String(StudentQrLimits.TEXT_CHARACTERS)} ký tự và không chứa ký tự null.`,
                 ),
               );
             }
@@ -159,16 +215,31 @@ export function StudentAccessForm({
               <>
                 <Text size="sm" c="dimmed">
                   {t(
-                    'Enter the class code from your teacher once to set up this device.',
-                    'Nhập mã lớp từ thầy cô một lần để thiết lập máy này.',
+                    mode === StudentDeviceMode.PERSONAL
+                      ? 'Enable QR login once using your organization code. Your saved Google accounts stay available on this personal computer.'
+                      : 'Authorize this company computer once using the code from your organization administrator. Students can then sign in with their school QR.',
+                    mode === StudentDeviceMode.PERSONAL
+                      ? 'Dùng mã tổ chức để bật đăng nhập QR một lần. Các tài khoản Google đã lưu vẫn dùng được trên máy cá nhân này.'
+                      : 'Dùng mã từ quản trị viên tổ chức để kích hoạt máy này một lần. Sau đó học sinh đăng nhập bằng QR của trường.',
                   )}
                 </Text>
                 <TextInput
-                  label={t('Class setup code', 'Mã thiết lập lớp')}
+                  label={t('Organization activation code', 'Mã kích hoạt tổ chức')}
+                  description={t(
+                    'Get the reusable TRO- code from Settings → Team → Company computers. This computer will be named automatically.',
+                    'Lấy mã TRO- dùng chung trong Cài đặt → Đội nhóm → Máy tính của tổ chức. Máy này sẽ được đặt tên tự động.',
+                  )}
+                  error={
+                    code && !StudentActivationCodeSchema.safeParse(code).success
+                      ? t(
+                          'Enter the full TRO- code followed by 16 letters or digits 2–7.',
+                          'Nhập đủ mã TRO- kèm 16 chữ cái hoặc chữ số 2–7.',
+                        )
+                      : undefined
+                  }
                   value={code}
                   required
-                  minLength={16}
-                  maxLength={16}
+                  maxLength={21}
                   autoComplete="off"
                   disabled={busy}
                   onChange={(event) => {
@@ -189,11 +260,16 @@ export function StudentAccessForm({
                 >
                   {t('Scan your student card', 'Quét thẻ học sinh')}
                 </Button>
-                <TextInput
-                  label={t('Student ID', 'Mã học sinh')}
+                <Textarea
+                  label={t('Student ID or QR text', 'Mã học sinh hoặc nội dung QR')}
+                  description={t(
+                    'Random text and URLs are supported. Tro uses the exact text to find your account; it does not open the link.',
+                    'Có thể dùng văn bản ngẫu nhiên hoặc đường dẫn. Tro dùng đúng nội dung để tìm tài khoản và không mở đường dẫn.',
+                  )}
+                  rows={2}
                   value={externalId}
                   required
-                  maxLength={128}
+                  maxLength={StudentQrLimits.TEXT_CHARACTERS}
                   autoComplete="off"
                   disabled={busy}
                   onChange={(event) => {
@@ -203,8 +279,11 @@ export function StudentAccessForm({
                 />
                 <TextInput
                   label={t('What should Tro call you?', 'Tro gọi em là gì?')}
+                  description={t(
+                    'Only needed for your first sign-in. Scan the same card to return to your account.',
+                    'Chỉ cần khi đăng nhập lần đầu. Quét lại thẻ để vào tài khoản đã có.',
+                  )}
                   value={name}
-                  required
                   maxLength={80}
                   autoComplete="off"
                   disabled={busy}
@@ -220,8 +299,8 @@ export function StudentAccessForm({
                         'Tro ghi nhớ đăng nhập trên máy cá nhân này.',
                       )
                     : t(
-                        'Shared classroom device. Your lesson closes when you finish or leave.',
-                        'Máy dùng chung. Phiên học sẽ đóng khi em kết thúc hoặc rời máy.',
+                        'Company computer. Choose Change student when finished. Your account and work stay saved; this computer forgets your login.',
+                        'Máy của tổ chức. Chọn Đổi học sinh khi học xong. Tài khoản và bài làm vẫn được lưu; máy không giữ đăng nhập của em.',
                       )}
                 </Text>
               </>
@@ -232,23 +311,27 @@ export function StudentAccessForm({
               disabled={
                 !window.tro.controlStudentAccess ||
                 (context
-                  ? !name.trim() || !StudentExternalIdSchema.safeParse(externalId).success
-                  : code.length !== 16)
+                  ? !StudentExternalIdSchema.safeParse(externalId).success
+                  : !StudentActivationCodeSchema.safeParse(code).success)
               }
             >
-              {context ? t('Start learning', 'Bắt đầu học') : t('Continue', 'Tiếp tục')}
+              {context
+                ? t('Start learning', 'Bắt đầu học')
+                : t('Activate computer', 'Kích hoạt máy tính')}
             </Button>
-            {context && (
+            {(context?.organizationId ||
+              controller.savedAccounts?.deviceMode === StudentDeviceMode.SHARED) && (
               <Button
                 variant="subtle"
                 size="xs"
-                disabled={busy}
+                disabled={busy || hasActiveQrAccount}
                 onClick={() => {
-                  setContext(null);
-                  setError(null);
+                  void deactivateComputer();
                 }}
               >
-                {t('Use another class code', 'Dùng mã lớp khác')}
+                {context?.mode === StudentDeviceMode.PERSONAL
+                  ? t('Remove QR authorization', 'Gỡ quyền đăng nhập QR')
+                  : t('Remove company authorization', 'Gỡ quyền máy của tổ chức')}
               </Button>
             )}
           </Stack>
@@ -275,7 +358,9 @@ export function StudentSignInButton({
           setOpened(true);
         }}
       >
-        {locale === 'vi' ? 'Học sinh · Dùng thẻ QR' : 'Student · Use QR card'}
+        {locale === 'vi'
+          ? 'Máy tính của tổ chức · Học sinh dùng QR'
+          : 'Company computer · Student QR'}
       </Button>
       <Modal
         opened={opened}
@@ -286,7 +371,7 @@ export function StudentSignInButton({
         }}
         closeOnClickOutside={!controller.isSwitchingAccount}
         closeOnEscape={!controller.isSwitchingAccount}
-        title={locale === 'vi' ? 'Vào học với Tro' : 'Learn with Tro'}
+        title={locale === 'vi' ? 'Máy tính của tổ chức' : 'Company computer'}
         centered
         keepMounted
       >

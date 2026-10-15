@@ -10,12 +10,38 @@ export const StudentDeviceLimits = {
   SESSION_CHECK_MS: 15_000,
 } as const;
 
-/** A school ID is an unverified claim, never a private account recovery credential. */
-export const StudentIdentitySchema = z.strictObject({
+export const StudentQrLimits = { TEXT_CHARACTERS: 512 } as const;
+
+/** QR text is an opaque account key: preserve URLs, whitespace, case and leading zeros. */
+export const StudentQrTextSchema = z
+  .string()
+  .min(1)
+  .max(StudentQrLimits.TEXT_CHARACTERS)
+  .refine(
+    (value) => value.trim().length > 0 && !value.includes('\0'),
+    'The QR must contain non-empty text without null characters.',
+  );
+
+/** Organization QR login requires an authorized device; legacy grants retain class scope. */
+const StudentIdentityFields = z.strictObject({
   schoolId: z.uuid(),
-  schoolName: z.string().min(1).max(100),
-  classId: z.uuid(),
-  externalId: z.string().min(1).max(128),
+  schoolName: z.string().min(1).max(120),
+  classId: z.uuid().nullable(),
+  organizationId: z.uuid().optional(),
+  externalId: StudentQrTextSchema,
   mode: z.enum(StudentDeviceMode),
   provisional: z.literal(true),
+});
+
+function hasConsistentStudentScope(identity: z.infer<typeof StudentIdentityFields>): boolean {
+  if (identity.organizationId !== undefined) {
+    return identity.classId === null && identity.schoolId === identity.organizationId;
+  }
+  return identity.classId !== null;
+}
+
+export const StudentIdentitySchema = StudentIdentityFields.superRefine((identity, context) => {
+  if (!hasConsistentStudentScope(identity)) {
+    context.addIssue({ code: 'custom', message: 'Invalid learner access scope.' });
+  }
 });

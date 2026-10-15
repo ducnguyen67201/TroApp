@@ -66,26 +66,75 @@ containing real data. `pnpm db:migrate` authors a new reviewed migration;
 `pnpm db:deploy` applies existing ones. Integration tests use their own disposable
 container, not the development database.
 
-## Student QR access
+## Company computers and student QR login
 
-After applying the committed migrations through the normal development setup,
-an authenticated teacher opens a class's settings and creates a **Student QR
-access** setup code. Choose personal devices for remembered logins, or one shared
-computer for temporary learner sessions. Activate shared computers in a clean app
-profile without saved personal accounts; staff keep their login on their own
-device. The signed-out student screen offers **Student · Use QR card**. Enter the
-setup code once, then scan a plain student-ID QR or enter the ID manually and add a
-display name. No student email is required.
+Apply committed migrations through the normal local setup (`pnpm dev`), then restart
+the desktop/API with the new build. Existing accounts and work are preserved.
 
-On personal devices, use the sidebar account icon to add/select saved students or
-sign out the current account. On shared computers, start the teacher's live class
-before onboarding; **Change student** ends the current learner session. Teachers
-can paste two tab-separated roster columns (ID and name), preview matches and
-apply metadata later. QR IDs do not recover private accounts; duplicate claims
-remain separate. This initial flow supports typed lessons. See
-[Architecture](docs/Architecture.md#email-free-student-access) for access boundaries,
-session policy ownership and limitations. Setup codes and credentials must not be
-posted in issues or logs.
+1. On the organization owner's personal computer, open **Settings → Team → Company
+   computers** (**Cài đặt → Đội nhóm → Máy tính của tổ chức**). A platform admin can
+   also manage the selected organization. Choose **Create organization activation
+   code** (**Tạo mã kích hoạt tổ chức**); no computer name is required.
+2. On the company computer, sign out all saved personal accounts. On the welcome
+   screen choose **Company computer · Student QR**, then enter the complete `TRO-`
+   activation code and choose **Activate computer**. Share the same organization code
+   with everyone setting up company computers: it can activate multiple installations
+   until it expires or is revoked. Each computer gets an automatic name such as
+   **Computer 1** and its own authorization record. Class invitation codes cannot
+   activate computers. Already activated computers retain their independent
+   authorization until their own expiry or revocation.
+3. Students scan a QR containing their unique text, random value or URL, or enter
+   that exact text manually. A name is needed only on first sign-in. Later sign-ins reopen the same organization
+   student account and saved work on any authorized company computer. No email,
+   Google account or running class is required for QR login.
+4. An assigned teacher opens **Class settings → Add a QR student**, enters the
+   student's exact QR text (or school ID) after their first login, and chooses
+   **Enroll QR student**.
+   Computer activation and organization membership do not enroll students in all
+   classes. Students see only classes they have been explicitly enrolled in.
+5. Students choose **Change student** when finished. The computer forgets their
+   login and retains company authorization. Student accounts and work stay on the
+   backend. Idle expiry/app exit also end temporary access; restart requires scanning
+   again. Personal computers continue using Google and remembered personal accounts.
+
+On a personal computer, **Add account → Sign in with QR** (**Thêm tài khoản →
+Đăng nhập bằng QR**) is an alternative to Google. Enter the same organization
+activation code once to enable QR login on that installation, then scan a student's
+card. Google accounts stay saved, QR accounts are remembered in the encrypted
+account switcher, and either can be selected later. This personal flow does not
+convert the installation into a company computer. Company setup from the welcome
+screen continues to use temporary QR-only sessions.
+
+The owner can refresh **Company computers** to see authorized installations (both
+personal and company), unique QR student accounts, students signed in today (UTC),
+and sign-in counts. Twenty new sign-ins by one student count as one student and twenty sign-ins; retrying a failed
+submission does not create another login event. These counts describe QR accounts
+and installation grants, not continuous presence, verified real people or paid seats.
+The same panel shows activation counts per active code. **Stop new activations**
+revokes a code without signing students out of already authorized computers;
+**Revoke computer** disables an individual installation. Removing a student from
+the team blocks their QR account; removing class enrollment blocks that class only.
+
+To return a signed-out company computer to personal mode, open the company-computer
+login and choose **Remove company authorization**. This requires the backend to
+acknowledge revocation before local storage is removed; retry if offline.
+
+QR text is an opaque account key: URLs, random values and multiline text are
+accepted without opening links, executing code or interpreting embedded roles.
+Case, leading zeros, whitespace and line breaks are preserved. Each student needs
+a distinct QR; anyone using the same QR on an authorized computer opens the same
+organization learner account. This is not verified provider login or Google-account
+recovery. Empty/whitespace-only text, null characters and text above the bound owned
+by [StudentIdentity](src/contracts/StudentIdentity.ts) are rejected. The development
+warning `student.qr.rejected` reports only validation stage, reason and character
+count; it never logs QR contents or camera images. Current QR flows support typed
+lessons. Existing legacy
+personal-class grants and saved learner accounts remain readable, with their original
+class/live-session restrictions. Old class setup codes and roster-import commands
+are retired; new computer activation requires an organization-issued `TRO-` code.
+See [Architecture](docs/Architecture.md#email-free-student-access) for boundaries,
+compatibility and technical policy ownership. Never post activation codes, QR IDs or
+credentials in issues or ordinary logs.
 
 ## Lesson video development
 
@@ -553,9 +602,10 @@ class and select **Save teachers**. Only active Teacher members are eligible. Ea
 class supports multiple teachers. Adding a teacher keeps the others; unchecking a
 teacher removes their class access. Keep at least one assigned teacher.
 End any live session before changing the assignment. Teachers see only their assigned
-classes, and students see only enrolled classes. QR student sign-in currently supports
-personal classes; organization students must first join the team and enroll by email. Organization ownership alone exposes
-class names and assignment controls, without classroom content or progress. Removal
+classes, and students see only enrolled classes. Organization QR students first sign in
+on an organization-authorized computer, then an assigned teacher enrolls their exact
+QR text or school ID in Class settings. Google students retain the email enrollment
+path. Organization ownership alone exposes class names and assignment controls, without classroom content or progress. Removal
 revokes organization resource access on subsequent backend requests while preserving
 historical work and personal pet entitlements.
 

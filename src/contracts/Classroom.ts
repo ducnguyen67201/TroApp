@@ -7,11 +7,15 @@ import { MaterialLessonContextSchema, MaterialPageSchema } from './ClassroomMate
 import { z } from 'zod';
 import { PracticeCheckpointSchema } from './PracticeCheck.js';
 import { AccountRoleSchema } from './AccountRole.js';
+import { StudentExternalIdSchema } from './StudentAccess.js';
+
 import {
   ClassroomPeoplePageSchema,
   ClassroomPersonIdSchema,
   ClassroomPersonSchema,
 } from './ClassroomViewAs.js';
+
+export const ClassroomEnrollmentKind = { QR_STUDENT: 'enroll-qr-student' } as const;
 
 export const ClassroomPhase = {
   EXPLANATION: 'explanation',
@@ -278,6 +282,7 @@ export const ClassroomHomeSchema = z.strictObject({
         meetings: z.array(ClassMeetingSchema).max(100),
         canTeach: z.boolean().optional(),
         supportsStudentQr: z.boolean().optional(),
+        organizationId: z.uuid().optional(),
       }),
     )
     .max(100),
@@ -329,6 +334,11 @@ export const ClassroomCommandSchema = z.discriminatedUnion('kind', [
     courseRevisionId: z.uuid().optional(),
   }),
   z.strictObject({ kind: z.literal('enroll'), classId: z.uuid(), email: z.email() }),
+  z.strictObject({
+    kind: z.literal(ClassroomEnrollmentKind.QR_STUDENT),
+    classId: z.uuid(),
+    externalId: StudentExternalIdSchema,
+  }),
   z.strictObject({
     kind: z.literal('revoke'),
     classId: z.uuid(),

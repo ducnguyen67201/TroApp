@@ -12,6 +12,7 @@ import {
   type StudentAccessStore,
 } from '../application/StudentAccessStore.js';
 import { InvitationAttempts } from '../../classroom/application/InvitationAttempts.js';
+import { StudentDeviceMode } from '#contracts/StudentIdentity.js';
 
 /** Allowlisted learner routes preserve session capabilities instead of treating a learner as a general Google user. */
 export function registerStudentAccessRoutes(
@@ -129,9 +130,10 @@ export function registerStudentAccessRoutes(
     }
     const parsed = StudentAccessCommandSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({ kind: 'failed', message: 'Check the class code, student ID and name.' });
+      return reply.code(400).send({
+        kind: 'failed',
+        message: 'Check the computer activation code, student ID and name.',
+      });
     }
     const command = parsed.data;
     const rawDevice = request.headers['x-tro-student-device'];
@@ -146,15 +148,16 @@ export function registerStudentAccessRoutes(
       const teacherId = StudentStaffAccessKinds.includes(command.kind)
         ? await readGoogleUserId(request.headers)
         : null;
-      if (command.kind === StudentAccessKind.CREATE_ADMISSION && teacherId) {
+      if (command.kind === StudentAccessKind.CREATE_COMPUTER_CODE && teacherId) {
         const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-        const code = [...randomBytes(16)].map((value) => alphabet[value % 32]).join('');
+        const generated = [...randomBytes(16)].map((value) => alphabet[value % 32]).join('');
+        const code = `TRO-${generated}`;
         const now = new Date();
-        await store.createAdmission(teacherId, command, digest(code), now);
+        await store.createComputerCode(teacherId, command, digest(code), now);
         return {
           kind: 'admission',
           code,
-          mode: command.mode,
+          mode: StudentDeviceMode.SHARED,
           expiresAt: new Date(now.getTime() + StudentAccessPolicy.ACTIVATION_MS).toISOString(),
         };
       }

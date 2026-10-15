@@ -363,6 +363,10 @@ export class MemoryClassroomStore implements ClassroomStore {
   readStudentByEmail(email: string) {
     return Promise.resolve(email.split('@')[0] ?? null);
   }
+
+  readOrganizationStudentByExternalId(): Promise<string | null> {
+    return Promise.resolve(null);
+  }
   enrollStudent(classId: string, studentId: string, active: boolean) {
     if (active) {
       this.enrollments.add(`${classId}:${studentId}`);

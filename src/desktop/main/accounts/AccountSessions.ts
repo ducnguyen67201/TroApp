@@ -538,12 +538,27 @@ export class AccountSessions {
     this.sharedMode = shared;
   }
 
-  canAddStudent(): boolean {
+  canStartStudentSignIn(): boolean {
+    this.load();
+    return !this.pending && !this.sharedAccount;
+  }
+
+  canAuthorizeCompanyComputer(): boolean {
     this.load();
     return (
       !this.pending &&
       !this.sharedAccount &&
-      (this.sharedMode || (this.state?.accounts.length ?? 0) < DesktopAccountLimits.MAX_ACCOUNTS)
+      (this.state?.accounts.length ?? 0) === 0 &&
+      (this.state !== null || !this.readLoginCookie())
+    );
+  }
+
+  private canSaveStudent(userId: string): boolean {
+    return (
+      this.canStartStudentSignIn() &&
+      (this.sharedMode ||
+        Boolean(this.state?.accounts.some((account) => account.user.id === userId)) ||
+        (this.state?.accounts.length ?? 0) < DesktopAccountLimits.MAX_ACCOUNTS)
     );
   }
 
@@ -553,7 +568,7 @@ export class AccountSessions {
     beforeSelection?: () => Promise<void>,
   ): Promise<AuthResult> {
     if (
-      !this.canAddStudent() ||
+      !this.canSaveStudent(user.id) ||
       !user.learner ||
       (user.learner.mode === StudentDeviceMode.SHARED) !== this.sharedMode
     ) {
@@ -568,11 +583,12 @@ export class AccountSessions {
       return { kind: 'failed', message: 'The account changed. Try again.' };
     }
     await beforeSelection?.();
-    if (generation !== this.generation || !this.canAddStudent()) {
+    if (generation !== this.generation || !this.canSaveStudent(user.id)) {
       return { kind: 'failed', message: 'The account changed. Try again.' };
     }
+    const previous = this.state?.accounts.find((account) => account.user.id === result.user.id);
     const account = {
-      id: randomUUID(),
+      id: previous?.id ?? randomUUID(),
       cookie,
       user: result.user,
       role: result.role,
@@ -584,7 +600,10 @@ export class AccountSessions {
       this.save({
         version: 2,
         activeAccountId: account.id,
-        accounts: [...(this.state?.accounts ?? []), account],
+        accounts: [
+          ...(this.state?.accounts ?? []).filter((saved) => saved.user.id !== result.user.id),
+          account,
+        ],
       });
     }
     this.generation += 1;

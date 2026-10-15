@@ -17,8 +17,10 @@ export const english = {
   accountExpired: 'Sign in again',
   accountSignInHeading: 'Add an account',
   accountSignInDescription:
-    'Sign in with another Google account. Your current account stays signed in on this device.',
+    'Choose how to sign in. Your current account stays saved on this device.',
   accountContinueGoogle: 'Continue with Google',
+  accountContinueQr: 'Sign in with QR',
+  accountSignInOptions: 'Back to sign-in options',
   accountWaitingGoogle: 'Finish signing in in your browser.',
   accountCancelSignIn: 'Cancel sign-in',
   accountCancel: 'Cancel',

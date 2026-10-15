@@ -1309,7 +1309,7 @@ async function startDesktop(): Promise<void> {
     if (command.kind === StudentAccessKind.CAMERA_START) {
       const device = await auth.controlStudentAccess({ kind: StudentAccessKind.STATUS });
       if (device.kind !== 'ready' || accountGate.isChanging() || auth.isAddingAccount()) {
-        return { kind: 'failed', message: 'Enter a valid class code before scanning.' };
+        return { kind: 'failed', message: 'Authorize this computer before scanning.' };
       }
       cameraAllowedUntil = Date.now() + StudentDeviceLimits.CAMERA_MS;
       return { kind: 'done' };
@@ -1332,7 +1332,10 @@ async function startDesktop(): Promise<void> {
         { kind: 'failed', message: 'Finish active work before changing accounts.' },
       );
     }
-    if (command.kind === StudentAccessKind.ACTIVATE) {
+    if (
+      command.kind === StudentAccessKind.ACTIVATE ||
+      command.kind === StudentAccessKind.DEACTIVATE
+    ) {
       return accountGate.changeContext(() => auth.controlStudentAccess(command), {
         kind: 'failed',
         message: 'Finish active work before configuring this device.',

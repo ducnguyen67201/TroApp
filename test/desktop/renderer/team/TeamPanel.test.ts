@@ -4,6 +4,7 @@ import { MantineProvider } from '@mantine/core';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { DesktopBridge } from '#contracts/DesktopBridge.js';
+import { StudentAccessKind } from '#contracts/StudentAccess.js';
 import { AccountRole } from '#contracts/AccountRole.js';
 import {
   OrganizationAction,
@@ -85,6 +86,48 @@ async function waitForTeamReady(): Promise<void> {
     );
   });
 }
+
+it.each([false, true])(
+  'shows computer activation controls only for an owner (owner=%s)',
+  async (isOwner) => {
+    const controlStudentAccess = vi
+      .fn<NonNullable<DesktopBridge['controlStudentAccess']>>()
+      .mockResolvedValue({
+        kind: StudentAccessKind.ORGANIZATION_ACCESS,
+        organizationId,
+        day: '2026-10-14',
+        authorizedComputers: 0,
+        registeredStudents: 0,
+        studentsToday: 0,
+        signInsToday: 0,
+        totalSignIns: 0,
+        computers: [],
+        activationCodes: [],
+      });
+    Object.defineProperty(window, 'tro', {
+      configurable: true,
+      value: { ...createBridge(isOwner), controlStudentAccess },
+    });
+    renderTeam();
+    await screen.findByText(isOwner ? 'Your role: Teacher' : 'Your role: Student');
+    if (isOwner) {
+      expect(
+        await screen.findByRole('button', { name: 'Create organization activation code' }),
+      ).toBeTruthy();
+      await waitFor(() => {
+        expect(controlStudentAccess).toHaveBeenCalledWith({
+          kind: StudentAccessKind.ORGANIZATION_ACCESS,
+          organizationId,
+        });
+      });
+    } else {
+      expect(
+        screen.queryByRole('button', { name: 'Create organization activation code' }),
+      ).toBeNull();
+      expect(controlStudentAccess).not.toHaveBeenCalled();
+    }
+  },
+);
 
 beforeEach(() => {
   window.localStorage.setItem(localeStorageKey, DesktopLocale.ENGLISH);
