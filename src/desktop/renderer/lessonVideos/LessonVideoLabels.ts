@@ -12,6 +12,11 @@ import {
 
 type Screen = LessonVideo['screens'][number];
 
+/** Active work belongs to the API and continues independently of open dialogs. */
+export function isLessonGenerating(lesson: LessonVideo): boolean {
+  return lesson.status === LessonVideoStatus.RUNNING || lesson.status === LessonVideoStatus.QUEUED;
+}
+
 export function describeLesson(lesson: LessonVideo, vi: boolean): string {
   if (lesson.status === LessonVideoStatus.READY) {
     const notes = [vi ? 'Video sẵn sàng' : 'Video ready'];
