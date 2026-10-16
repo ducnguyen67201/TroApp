@@ -815,3 +815,66 @@ it('retires uncertain task cleanup without granting idle cursor ownership', asyn
   expect(cursor.resumeFollowing).not.toHaveBeenCalled();
   controller.dispose();
 });
+
+it.each([false, true])(
+  'restores following after Escape and fences account teardown: %s',
+  async (disposeDuringStop) => {
+    const cursor = {
+      suspendFollowing: vi
+        .fn<AgentCursorPresentation['suspendFollowing']>()
+        .mockResolvedValue(undefined),
+      resumeFollowing: vi
+        .fn<AgentCursorPresentation['resumeFollowing']>()
+        .mockResolvedValue(undefined),
+    };
+    const { auth, worker, controller } = createController(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      cursor,
+    );
+    auth.fetchModelCredential.mockResolvedValue({
+      token: 'test',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    });
+    worker.isRunning.mockReturnValue(true);
+    let finishTask: (result: AgentResult) => void = () => {};
+    let finishRetirement: (result: AgentResult) => void = () => {};
+    worker.sendMessage.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishTask = resolve;
+      }),
+    );
+    worker.stop.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishRetirement = resolve;
+      }),
+    );
+    const task = controller.sendMessage('teacher', 'First task', DesktopLocale.ENGLISH);
+    await vi.waitFor(() => {
+      expect(worker.sendMessage).toHaveBeenCalledOnce();
+    });
+    const stopping = controller.stopSession('teacher');
+    finishTask({ kind: 'failed', message: 'Not connected' });
+    await task;
+    expect(cursor.resumeFollowing).not.toHaveBeenCalled();
+    const next = controller.sendMessage('teacher', 'Second task', DesktopLocale.ENGLISH);
+    await Promise.resolve();
+    expect(worker.sendMessage).toHaveBeenCalledOnce();
+    if (disposeDuringStop) {
+      controller.dispose();
+    }
+    finishRetirement({ kind: 'stopped' });
+    await stopping;
+    if (disposeDuringStop) {
+      expect(await next).toMatchObject({ kind: 'failed' });
+      expect(cursor.resumeFollowing).not.toHaveBeenCalled();
+    } else {
+      expect(await next).toMatchObject({ kind: 'completed' });
+      expect(worker.sendMessage).toHaveBeenCalledTimes(2);
+      expect(cursor.resumeFollowing).toHaveBeenCalledTimes(2);
+    }
+    controller.dispose();
+  },
+);

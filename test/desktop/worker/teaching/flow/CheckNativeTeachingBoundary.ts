@@ -149,6 +149,42 @@ export async function checkNativeTeachingBoundary(): Promise<void> {
     console.info(
       'PASS cursor handoff: presentation to task and back retains the HUD connection and message.',
     );
+    /* Escape disconnects the task before hidden-mode cleanup. The surviving
+       presentation must regain ownership, including after a second task. */
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const acquired = await callNativeTool(server, CursorCompanionTool.SET_MODE, {
+        mode: 'follow',
+        label: 'Tro',
+      });
+      assert.ok(
+        !acquired.isError && CursorCompanionStateSchema.parse(acquired.structuredContent).following,
+      );
+      await server.close();
+      const restored = await callNativeTool(peer, CursorCompanionTool.SET_MODE, {
+        mode: 'follow',
+        label: 'Tro',
+      });
+      assert.ok(
+        !restored.isError && CursorCompanionStateSchema.parse(restored.structuredContent).following,
+      );
+      const retained = await callNativeTool(peer, CompanionHudTool.READ_MESSAGE, { group });
+      assert.deepEqual(
+        CompanionHudMessageSchema.parse(retained.structuredContent).message,
+        message,
+      );
+      const released = await callNativeTool(peer, CursorCompanionTool.SET_MODE, { mode: 'hidden' });
+      assert.ok(
+        !released.isError &&
+          !CursorCompanionStateSchema.parse(released.structuredContent).following,
+      );
+      server = new MCPServerStdio({ name: 'Replacement task connection', ...connection });
+      await server.connect();
+      const rebound = await callNativeTool(server, CompanionHudTool.BIND_CURSOR, { group });
+      assert.ok(CompanionHudAckSchema.parse(rebound.structuredContent).applied);
+    }
+    console.info(
+      'PASS cursor cancellation: disconnected task ownership returns to presentation across two tasks.',
+    );
     const capabilities = await callNativeTool(server, CursorCompanionTool.READ_CAPABILITIES, {});
     assert.ok(!capabilities.isError, 'Native capabilities must be admitted.');
     assert.equal(

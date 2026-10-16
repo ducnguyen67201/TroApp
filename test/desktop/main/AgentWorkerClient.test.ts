@@ -227,3 +227,65 @@ it('waits for the retiring process to exit and ignores its late startup before r
   expect(currentChild.kill).not.toHaveBeenCalled();
   worker.dispose();
 });
+
+it.each(['stopped', 'failed', 'timeout'] as const)(
+  'confirms exit after %s cleanup before returning cursor ownership',
+  async (cleanup) => {
+    vi.useFakeTimers();
+    const child = new Child();
+    child.kill.mockImplementation(() => {});
+    doubles.fork.mockReturnValue(child);
+    const driver = { start: vi.fn<DesktopDriverPort['start']>().mockResolvedValue(connection) };
+    const worker = new AgentWorkerClient('/worker', false, driver);
+    const preparing = worker.prepare();
+    await vi.advanceTimersByTimeAsync(0);
+    child.emit('spawn');
+    await vi.advanceTimersByTimeAsync(0);
+    const prepare = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
+    child.emit('message', {
+      requestId: prepare.requestId,
+      result: { kind: 'started', sessionId: prepare.command.sessionId },
+    });
+    await preparing;
+    let settled = false;
+    const stopping = worker.stop(sessionId).then((result) => {
+      settled = true;
+      return result;
+    });
+    const stop = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
+    if (cleanup === 'timeout') {
+      await vi.advanceTimersByTimeAsync(2000);
+    } else {
+      child.emit('message', {
+        requestId: stop.requestId,
+        result:
+          cleanup === 'stopped'
+            ? { kind: 'stopped' }
+            : { kind: 'failed', message: 'Not connected' },
+      });
+      await vi.advanceTimersByTimeAsync(0);
+    }
+    expect(child.kill).toHaveBeenCalledOnce();
+    expect(settled).toBe(false);
+    child.emit('exit');
+    expect(await stopping).toEqual({ kind: 'stopped' });
+  },
+);
+
+it('does not confirm cancellation when the retiring child fails to exit', async () => {
+  vi.useFakeTimers();
+  const child = new Child();
+  child.kill.mockImplementation(() => {});
+  doubles.fork.mockReturnValue(child);
+  const driver = { start: vi.fn<DesktopDriverPort['start']>().mockResolvedValue(connection) };
+  const worker = new AgentWorkerClient('/worker', false, driver);
+  const preparing = expect(worker.prepare()).rejects.toThrow('Could not prepare');
+  await vi.advanceTimersByTimeAsync(0);
+  worker.dispose();
+  child.emit('spawn');
+  await preparing;
+  const stopping = worker.stop(sessionId);
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(await stopping).toMatchObject({ kind: 'failed' });
+  child.emit('exit');
+});

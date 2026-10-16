@@ -346,13 +346,34 @@ export class AgentWorkerClient implements AgentChatWorker {
   }
 
   async stop(sessionId: string): Promise<AgentResult> {
-    if (this.worker === null) {
-      return { kind: 'stopped' };
+    const startedAt = performance.now();
+    if (this.worker !== null) {
+      const result = await this.send({ kind: 'stop', sessionId });
+      console.info('agent.worker.stop.cleanup', { sessionId, result: result.kind });
+      this.dispose();
     }
 
-    const result = await this.send({ kind: 'stop', sessionId });
-    this.dispose();
-    return result;
+    /* Escape closes MCP before cooperative cleanup can finish. A failed cleanup
+       reply is recoverable once the old process has actually exited; a kill
+       request alone is not confirmation that it can no longer issue commands. */
+    let timer: NodeJS.Timeout | undefined;
+    const exited = await Promise.race([
+      this.stopping.then(() => true),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => {
+          resolve(false);
+        }, stopTimeoutMs);
+      }),
+    ]);
+    clearTimeout(timer);
+    console.info('agent.worker.stop.retired', {
+      sessionId,
+      exited,
+      durationMs: Math.round(performance.now() - startedAt),
+    });
+    return exited
+      ? { kind: 'stopped' }
+      : { kind: 'failed', message: 'The local agent is still stopping. Try again.' };
   }
 
   dispose(): void {

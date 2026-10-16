@@ -128,6 +128,7 @@ export class AgentChatController {
   private turnInProgress = false;
   private pendingSessionId: string | null = null;
   private taskGeneration = 0;
+  private stoppingTask: Promise<void> | null = null;
   private authChangeInProgress = false;
   private classroomTask = false;
 
@@ -230,6 +231,13 @@ export class AgentChatController {
     locale: DesktopLocale,
     mode: AgentTaskMode = AgentTaskMode.EXECUTE,
   ): Promise<AgentResult> {
+    if (this.stoppingTask) {
+      const generation = this.taskGeneration;
+      await this.stoppingTask;
+      if (generation !== this.taskGeneration) {
+        return { kind: 'failed', message: 'The agent session ended.' };
+      }
+    }
     if (this.turnInProgress) {
       if (this.waitingLessonId && sessionId === this.pendingSessionId) {
         return this.answerLesson(sessionId, this.waitingLessonId, message, locale);
@@ -414,17 +422,36 @@ export class AgentChatController {
   }
 
   async stopSession(sessionId: string): Promise<AgentResult> {
+    if (this.stoppingTask) {
+      await this.stoppingTask;
+      return { kind: 'stopped' };
+    }
     if (this.activeSessionId === sessionId || this.pendingSessionId === sessionId) {
       this.voiceover?.clearTask();
     }
     if (this.activeSessionId === sessionId || this.pendingSessionId === sessionId) {
       this.cancelShortcut?.disable();
-      this.taskGeneration += 1;
-      const stopped = await this.stopWorker();
-      if (stopped) {
-        await this.cursor?.resumeFollowing().catch(() => {
-          console.warn('companion.following.failed', { stage: 'cancel-resume' });
-        });
+      const generation = ++this.taskGeneration;
+      const stopping = (async () => {
+        const stopped = await this.stopWorker();
+        if (stopped && generation === this.taskGeneration) {
+          await this.cursor?.resumeFollowing().then(
+            () => {
+              console.info('companion.following.restored', { stage: 'cancel-resume' });
+            },
+            () => {
+              console.warn('companion.following.failed', { stage: 'cancel-resume' });
+            },
+          );
+        }
+      })();
+      this.stoppingTask = stopping;
+      try {
+        await stopping;
+      } finally {
+        if (this.stoppingTask === stopping) {
+          this.stoppingTask = null;
+        }
       }
     }
     return { kind: 'stopped' };

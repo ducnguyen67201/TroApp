@@ -538,8 +538,16 @@ Before task dispatch, main waits for presentation to suspend renewals and acknow
 native hidden mode. The pinned native implementation retires the cursor owner and
 its renewal generation without closing the HUD connection. Task cleanup serializes
 hidden mode after its own renewals, then acknowledges credential/context cleanup.
-Only then does main restore following. An unconfirmed cleanup keeps following
-suspended rather than racing ownership; the next successful task can restore it.
+Only then does main restore following. Escape can close the task transport before
+its hidden-mode cleanup runs. Main retires that worker and waits for confirmed
+process exit even when cooperative cleanup fails, then asks presentation to
+reacquire following with a native acknowledgement. New submissions wait for this
+cancellation handoff; account/window invalidation prevents a late restoration.
+An unconfirmed process exit keeps following suspended rather than racing ownership.
+`agent.worker.stop.cleanup` records the cooperative result,
+`agent.worker.stop.retired` records exit confirmation and elapsed milliseconds,
+and `companion.following.restored` or `companion.following.failed` records the
+presentation acknowledgement. These events contain no task text or credentials.
 A reconnect during an active task preserves presentation suspension. The production
 bundle check rejects task orchestration reachable from idle presentation.
 The presentation transport still uses the Agents SDK MCP client; this change does
