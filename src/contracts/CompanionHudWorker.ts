@@ -11,10 +11,12 @@ export const CompanionHudWorkerCommandSchema = z.discriminatedUnion('kind', [
     snapshot: CompanionHudSnapshotSchema,
   }),
   z.strictObject({ kind: z.literal('snapshot'), snapshot: CompanionHudSnapshotSchema }),
+  z.strictObject({ kind: z.literal('following'), requestId: z.uuid(), enabled: z.boolean() }),
 ]);
 
 export const CompanionHudWorkerReplySchema = z.union([
   z.strictObject({ ready: z.boolean() }),
+  z.strictObject({ kind: z.literal('following'), requestId: z.uuid(), applied: z.boolean() }),
   z.strictObject({ kind: z.literal('message'), message: TeachingMessageSchema.nullable() }),
 ]);
 

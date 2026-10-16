@@ -4,7 +4,7 @@ import type { ServerEnv } from '../Env.js';
 import type { createAuthDatabase } from '../persistence/AuthDatabase.js';
 import { createModelCredentials } from './ModelCredentials.js';
 import { ModelGatewayConfig } from './ModelGatewayConfig.js';
-import { ModelRequestSchema, limitModelOutputTokens } from './ModelRequest.js';
+import { ModelRequestSchema, prepareProviderModelRequest } from './ModelRequest.js';
 import { forwardModelResponse } from './ForwardModelResponse.js';
 import { ModelGatewayEvent, ModelGatewayFailure } from './ModelGatewayDiagnostics.js';
 import { ModelRequestTraceHeader, ModelRequestTraceSchema } from '#contracts/ModelGatewayError.js';
@@ -182,7 +182,7 @@ export function registerModelGateway(
       );
       await forwardModelResponse(
         reply,
-        limitModelOutputTokens(parsed.data),
+        prepareProviderModelRequest(parsed.data),
         providerKey,
         request.id,
         startedAt,

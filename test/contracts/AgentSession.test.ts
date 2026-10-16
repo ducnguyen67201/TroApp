@@ -166,13 +166,13 @@ it('rejects an unrecognized mode and defaults old clients to execution', () => {
   });
 });
 
-it('admits only local follow startup without credentials or arbitrary actions', () => {
+it('separates public following from private preparation without credentials or actions', () => {
   expect(AgentCommandSchema.parse({ kind: 'follow' })).toEqual({ kind: 'follow' });
   expect(
     AgentWorkerRequestSchema.safeParse({
       requestId: sessionId,
       command: {
-        kind: 'follow',
+        kind: 'prepare',
         sessionId,
         debugEnabled: true,
         desktopDriver: { command: '/tro/cua-driver', args: ['mcp', '--embedded'], env: {} },
@@ -184,7 +184,7 @@ it('admits only local follow startup without credentials or arbitrary actions', 
     AgentWorkerRequestSchema.safeParse({
       requestId: sessionId,
       command: {
-        kind: 'follow',
+        kind: 'prepare',
         sessionId,
         debugEnabled: true,
         gatewayToken: 'unexpected-token',
@@ -195,7 +195,7 @@ it('admits only local follow startup without credentials or arbitrary actions', 
 });
 
 it('requires the host-owned endpoint for companion startup and hides it from renderer commands', () => {
-  const command = { kind: 'follow', sessionId, debugEnabled: true };
+  const command = { kind: 'prepare', sessionId, debugEnabled: true };
   expect(AgentWorkerRequestSchema.safeParse({ requestId: sessionId, command }).success).toBe(false);
   expect(
     AgentCommandSchema.safeParse({
@@ -207,7 +207,7 @@ it('requires the host-owned endpoint for companion startup and hides it from ren
 
 it('keeps the HUD group private while both workers receive the embedded endpoint', () => {
   const command = {
-    kind: 'follow',
+    kind: 'prepare',
     sessionId,
     debugEnabled: false,
     hudGroup: sessionId,

@@ -6,6 +6,8 @@ import { ModelConfig } from '#contracts/config/ModelConfig.js';
  */
 export const ModelGatewayConfig = {
   model: ModelConfig.textModel,
+  /** Installed v1 desktops can update independently from the backend. */
+  legacyModel: 'gpt-5.4',
   maximumOutputTokens: 4096,
   bodyLimitBytes: 8 * 1024 * 1024,
   requestTimeoutMs: 120_000,

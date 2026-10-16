@@ -17,7 +17,8 @@ export interface AgentChatAuth {
 export interface AgentChatWorker {
   updateTeachingLocale?: (sessionId: string, locale: DesktopLocale) => Promise<AgentResult>;
   isRunning(): boolean;
-  startCompanion(sessionId: string): Promise<AgentResult>;
+  prepare(): Promise<void>;
+  finish(sessionId: string): Promise<void>;
   start(sessionId: string, gatewayToken: string, gatewayBaseUrl: string): Promise<AgentResult>;
   sendMessage(
     sessionId: string,
@@ -50,4 +51,10 @@ export interface AgentChatPermissions {
 export interface AgentCancelShortcut {
   enable(cancel: () => void): boolean;
   disable(): void;
+}
+
+/** Presentation owns following independently from the task worker. */
+export interface AgentCursorPresentation {
+  suspendFollowing(): Promise<void>;
+  resumeFollowing(): Promise<void>;
 }

@@ -1,4 +1,5 @@
-import { Agent, run, MaxTurnsExceededError, type AgentInputItem } from '@openai/agents';
+import { readTaskModelRunner } from '../agent/TaskModelClient.js';
+import { Agent, MaxTurnsExceededError, type AgentInputItem } from '@openai/agents';
 import { ModelConfig } from '#contracts/config/ModelConfig.js';
 import type { Logger } from 'pino';
 import {
@@ -27,7 +28,7 @@ export type RunTaskVerifier = (
 
 const runTaskVerifier: RunTaskVerifier = async (agent, input, task, maxTurns, log) => {
   let attemptModelTurns = 0;
-  const result = await run(agent, input, {
+  const result = await readTaskModelRunner().run(agent, input, {
     context: task,
     signal: task.abort.signal,
     maxTurns,

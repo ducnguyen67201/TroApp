@@ -126,6 +126,7 @@ import { executeAgentCommand } from './ExecuteAgentCommand.js';
 import { AuthCommandSchema, type AuthResult } from '#contracts/AuthSession.js';
 import {
   PermissionCommandSchema,
+  DesktopPermissionState,
   type DesktopPermissionStatus,
   type PermissionActionResult,
 } from '#contracts/DesktopPermissions.js';
@@ -653,6 +654,8 @@ async function startDesktop(): Promise<void> {
     new OrganizationApiClient(environment.API_BASE_URL, () => auth.readCookie()),
     () => auth.readCookie(),
     () => {
+      chat?.dispose();
+      voice?.cancelVoiceCapture();
       classroomController.dispose();
       insightController.dispose();
       reportExports.dispose();
@@ -1013,11 +1016,11 @@ async function startDesktop(): Promise<void> {
     (usage) => {
       productAnalytics.capture(usage);
     },
+    hudClient,
   );
 
-  const companionChat = chat;
   const companion = new DesktopCompanion(
-    { startFollowing: () => companionChat.startCursorCompanion() },
+    { startFollowing: () => hudClient.startCursorFollowing() },
     {
       canShow: async () =>
         (process.platform === 'darwin' || process.platform === 'win32') &&
@@ -1047,6 +1050,7 @@ async function startDesktop(): Promise<void> {
   voice = new VoiceInputController(
     {
       readSession: () => auth.readSession(),
+      beginAgentPreparation: (userId) => voiceChat.beginAgentPreparation(userId),
       releaseUnusedCredential: (captureId) => auth.releaseUnusedTranscription(captureId),
       fetchCredential: (captureId, locale) => auth.fetchTranscriptionCredential(captureId, locale),
       connect: (token, emit) => {
@@ -1504,8 +1508,15 @@ async function startDesktop(): Promise<void> {
         return { kind: 'failed', message: 'The permission request is invalid.' };
       }
       switch (parsed.data.kind) {
-        case 'status':
-          return permissions.readStatus();
+        case 'status': {
+          const status = await permissions.readStatus();
+          if (status.kind !== DesktopPermissionState.READY) {
+            chat?.dispose();
+            voice?.cancelVoiceCapture();
+            companion.dispose();
+          }
+          return status;
+        }
         case 'request':
           return permissions.requestPermissions();
         case 'open-settings':

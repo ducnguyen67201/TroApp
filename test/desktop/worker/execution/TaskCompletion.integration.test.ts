@@ -1,7 +1,10 @@
 import {
+  TaskModelClient,
+  runWithTaskModel,
+} from '../../../../src/desktop/worker/agent/TaskModelClient.js';
+import {
   MCPServerStdio,
-  OpenAIProvider,
-  setDefaultModelProvider,
+  Runner,
   setTracingDisabled,
   Usage,
   type Model,
@@ -18,23 +21,8 @@ import { DesktopLocale } from '#contracts/DesktopLocale.js';
 import { ComputerUseTaskRunner } from '../../../../src/desktop/worker/agent/ComputerUseTaskRunner.js';
 import { LoggedCuaServer } from '../../../../src/desktop/worker/cua/LoggedCuaServer.js';
 
-let fixtureModel: Model | null = null;
-
-/* The SDK's default Runner caches its first provider. Keep the provider stable
-   while selecting each test's model, so later fixtures cannot reuse old outputs. */
-const fixtureProvider = {
-  getModel: (): Model => {
-    if (!fixtureModel) {
-      throw new Error('No synthetic model is active.');
-    }
-    return fixtureModel;
-  },
-};
-
 afterEach(() => {
   vi.restoreAllMocks();
-  fixtureModel = null;
-  setDefaultModelProvider(new OpenAIProvider());
 });
 
 function callTool(name: string, args: Record<string, unknown>, callId: string): AgentOutputItem {
@@ -170,8 +158,13 @@ describe('SDK actor to read-only verifier to public completion contract', () => 
           throw new Error('Streaming is not enabled in this fixture.');
         },
       };
-      fixtureModel = model;
-      setDefaultModelProvider(fixtureProvider);
+      const scope = new TaskModelClient('fixture', 'http://127.0.0.1:1', vi.fn<typeof fetch>());
+      vi.spyOn(scope, 'readRunner').mockReturnValue(
+        new Runner({
+          modelProvider: { getModel: () => model },
+          tracingDisabled: true,
+        }),
+      );
       const output = new PassThrough();
       const lines: string[] = [];
       output.on('data', (chunk: Buffer) => lines.push(chunk.toString('utf8')));
@@ -181,11 +174,15 @@ describe('SDK actor to read-only verifier to public completion contract', () => 
         log,
       );
       const runner = new ComputerUseTaskRunner(server, log);
-      const result = await runner.runTask(
-        'Mở YouTube trên màn hình ngoài',
-        DesktopLocale.VIETNAMESE,
-        new AbortController().signal,
-      );
+      const result = await runWithTaskModel(scope, () =>
+        runner.runTask(
+          'Mở YouTube trên màn hình ngoài',
+          DesktopLocale.VIETNAMESE,
+          new AbortController().signal,
+        ),
+      ).finally(() => {
+        scope.dispose();
+      });
       const reply = AgentWorkerResponseSchema.parse({
         requestId: '11111111-1111-4111-8111-111111111111',
         result,

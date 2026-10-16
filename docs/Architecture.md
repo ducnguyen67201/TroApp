@@ -507,10 +507,51 @@ provide saved conversation history or change the cursor-following HUD.
 
 Typed instructions and completed voice transcripts enter `AgentChatController`.
 Main checks account, permissions and exclusivity, obtains a scoped model credential,
-and sends one task to the utility worker. With the native companion, the local
-following worker stays connected while the signed-in window is open. The fallback
-worker starts on demand and retains a bounded warm lifetime after a task. Every
-settled follow-up starts a fresh task; an active teaching lesson retains its own goal.
+and sends one task to the utility worker. Idle cursor following belongs to the
+presentation worker; opening an authorized window does not start the task worker.
+Authorized voice capture starts content-free preparation alongside transcription
+setup. Typed submission prepares on demand. Preparation loads the worker and
+connects/discovers desktop tools without model credentials, capture or input.
+
+[AgentWorkerLifecycle](../src/desktop/main/agent/AgentWorkerLifecycle.ts) holds
+leases for capture, admission and the entire task, including teaching waits.
+[AgentWorkerPolicy](../src/desktop/main/agent/AgentWorkerPolicy.ts) owns task idle,
+speculative idle, startup and shutdown deadlines. Pointer movement and HUD events
+do not extend task-worker retention. A new request cancels idle shutdown; if the
+previous process is already retiring, preparation waits for its exit. Startup has
+one shared promise and a deadline including native-host connection and spawn.
+Account/organization changes, observed permission revocation and window teardown
+invalidate pending preparation. Main retains ownership of the shared native host.
+
+Each task binds a fresh [TaskModelClient](../src/desktop/worker/agent/TaskModelClient.ts)
+through async context into the execution, verification, teaching and translation
+runners. It has no SDK global credential. Renewal updates only that task's token;
+finish clears the binding and disposes the token/abort scope. Delayed callbacks
+cannot send requests through a disposed scope. Evidence, lesson state, classroom
+callbacks and progress listeners are cleared before reuse. A cleanup failure
+retires the process instead of returning it to readiness. Successive task/session
+IDs reuse a prepared PID; an active teaching answer remains in its existing task.
+Private worker commands and replies use canonical contract validation, unique
+request IDs and child/generation fencing; renderer commands remain unchanged.
+
+Before task dispatch, main waits for presentation to suspend renewals and acknowledge
+native hidden mode. The pinned native implementation retires the cursor owner and
+its renewal generation without closing the HUD connection. Task cleanup serializes
+hidden mode after its own renewals, then acknowledges credential/context cleanup.
+Only then does main restore following. Escape can close the task transport before
+its hidden-mode cleanup runs. Main retires that worker and waits for confirmed
+process exit even when cooperative cleanup fails, then asks presentation to
+reacquire following with a native acknowledgement. New submissions wait for this
+cancellation handoff; account/window invalidation prevents a late restoration.
+An unconfirmed process exit keeps following suspended rather than racing ownership.
+`agent.worker.stop.cleanup` records the cooperative result,
+`agent.worker.stop.retired` records exit confirmation and elapsed milliseconds,
+and `companion.following.restored` or `companion.following.failed` records the
+presentation acknowledgement. These events contain no task text or credentials.
+A reconnect during an active task preserves presentation suspension. The production
+bundle check rejects task orchestration reachable from idle presentation.
+The presentation transport still uses the Agents SDK MCP client; this change does
+not eliminate Electron, SDK transport, GPU, native host or pet memory.
 
 ```mermaid
 sequenceDiagram
@@ -520,7 +561,9 @@ sequenceDiagram
   participant API as Tro API
   participant Model as OpenAI
   participant Cua as Native Cua
-  UI->>Main: Submit validated instruction
+  UI->>Main: Authorized capture or typed submission
+  Main->>Worker: Prepare locally (no model credential)
+  Worker-->>Main: Ready
   Main->>API: Request scoped model credential
   API-->>Main: Short-lived credential
   Main->>Worker: Start task with private Cua connection
@@ -531,6 +574,8 @@ sequenceDiagram
   Worker->>Cua: Admitted tools
   Cua-->>Worker: Validated observations or receipts
   Worker-->>Main: Typed progress and final outcome
+  Main->>Worker: Finish task and clear model scope
+  Worker-->>Main: Cleanup acknowledged; keep process warm
   Main-->>UI: Validated event
 ```
 
@@ -543,6 +588,14 @@ It contains no credentials; feature-specific Mini and speech models remain with
 their owning backend configuration. `ModelGatewayConfig` owns the output ceiling,
 body limit, credential lifetime, timeout and retry policy; backend `Env.ts` owns
 validated secrets.
+
+The v1 gateway also accepts the legacy model identifier configured in
+`ModelGatewayConfig` so installed desktops can update independently from the API.
+`ModelRequest` rewrites that alias to the current provider model and translates
+the old SDK's `none` reasoning effort to `low`. Other reasoning settings, input,
+tools and response formats are preserved; output remains capped by gateway policy.
+Admission diagnostics retain the client model, while dispatch records the provider
+model. Deploy this compatible backend before desktop bundles selecting the new model.
 
 Assistant requests have no input-token counting preflight and no daily model request
 cap. A rejected fetch before headers may retry once, only for the configured socket
@@ -747,7 +800,7 @@ execution and from classroom assessment.
 
 `DesktopCompanion` composes cursor following and HUD presentation in main.
 `CompanionHudController` reduces voice/task events; `CompanionHudClient` owns a
-separate persistent presentation worker. Both task and HUD workers use main's
+separate persistent presentation worker that also owns idle cursor following. Both task and HUD workers use main's
 shared native daemon. Private group registration and bounded leases bind only the
 associated cursors; host HUD tools are excluded from model discovery and dispatch.
 

@@ -35,6 +35,14 @@ export type AgentCommand = z.infer<typeof AgentCommandSchema>;
 /** Main supplies a scoped model credential only over its private worker port. */
 export const AgentWorkerCommandSchema = z.discriminatedUnion('kind', [
   z.strictObject({
+    kind: z.literal('prepare'),
+    sessionId: z.uuid(),
+    debugEnabled: z.boolean(),
+    desktopDriver: DesktopDriverConnectionSchema,
+    hudGroup: z.uuid().optional(),
+  }),
+  z.strictObject({ kind: z.literal('finish'), sessionId: z.uuid() }),
+  z.strictObject({
     kind: z.literal('activity'),
     sessionId: z.uuid(),
     taskRequestId: z.uuid(),
@@ -47,13 +55,6 @@ export const AgentWorkerCommandSchema = z.discriminatedUnion('kind', [
     gatewayToken: z.string().min(1),
     gatewayBaseUrl: z.url(),
     debugEnabled: z.boolean(),
-  }),
-  z.strictObject({
-    kind: z.literal('follow'),
-    sessionId: z.uuid(),
-    debugEnabled: z.boolean(),
-    desktopDriver: DesktopDriverConnectionSchema,
-    hudGroup: z.uuid().optional(),
   }),
   z.strictObject({
     kind: z.literal('start'),

@@ -384,6 +384,61 @@ describe('model gateway', () => {
   });
 
   it.each([
+    { model: 'gpt-5.4', effort: undefined, expectedEffort: undefined },
+    { model: 'gpt-5.4', effort: 'none', expectedEffort: 'low' },
+    { model: 'gpt-5.4', effort: 'high', expectedEffort: 'high' },
+    { model: 'gpt-6.1-sol', effort: undefined, expectedEffort: undefined },
+    { model: 'gpt-6.1-sol', effort: 'low', expectedEffort: 'low' },
+    { model: 'gpt-6.1-sol', effort: 'none', expectedEffort: 'none' },
+  ])(
+    'forwards $model with $effort reasoning using the current provider model',
+    async ({ model, effort, expectedEffort }) => {
+      const fixture = await createLoggingFixture();
+      const provider = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+      const fields = {
+        input: [{ role: 'user', content: 'Synthetic input' }],
+        tools: [{ type: 'function', name: 'read', parameters: { type: 'object' } }],
+        text: { format: { type: 'json_object' } },
+        instructions: 'Synthetic instruction',
+        store: false,
+        stream: false,
+      };
+      try {
+        const reply = await fixture.sendRequest({
+          ...fields,
+          model,
+          max_output_tokens: 10000,
+          ...(effort === undefined ? {} : { reasoning: { effort, summary: 'auto' } }),
+        });
+        expect(reply.statusCode).toBe(200);
+        expect(provider).toHaveBeenCalledOnce();
+        const body = provider.mock.calls[0]?.[1]?.body;
+        if (typeof body !== 'string') {
+          throw new Error('Missing forwarded request body.');
+        }
+        const forwarded: unknown = JSON.parse(body);
+        expect(forwarded).toEqual({
+          ...fields,
+          model: 'gpt-6.1-sol',
+          max_output_tokens: 4096,
+          ...(expectedEffort === undefined
+            ? {}
+            : { reasoning: { effort: expectedEffort, summary: 'auto' } }),
+        });
+        expect(
+          fixture.readEvents().find((event) => event.event === ModelGatewayEvent.ADMITTED),
+        ).toMatchObject({ model });
+        expect(
+          fixture.readEvents().find((event) => event.event === ModelGatewayEvent.DISPATCH),
+        ).toMatchObject({ model: 'gpt-6.1-sol' });
+      } finally {
+        provider.mockRestore();
+        await fixture.api.close();
+      }
+    },
+  );
+
+  it.each([
     { requested: undefined, expected: 4096 },
     { requested: 1024, expected: 1024 },
     { requested: 10000, expected: 4096 },
@@ -681,24 +736,27 @@ describe('model gateway', () => {
     }
   });
 
-  it('explains credential rejections without dispatching upstream', async () => {
-    const fixture = await createLoggingFixture();
-    const provider = vi.spyOn(globalThis, 'fetch');
-    try {
-      const denied = await fixture.api.inject({
-        method: 'POST',
-        url: '/api/v1/model/responses',
-        payload: { model: 'gpt-6.1-sol', input: 'private prompt' },
-      });
-      expect(denied.statusCode).toBe(401);
-      expect(provider).not.toHaveBeenCalled();
-      expect(fixture.readLogs()).toContain('"reason":"credential_required"');
-      expect(fixture.readLogs()).not.toContain('private');
-    } finally {
-      provider.mockRestore();
-      await fixture.api.close();
-    }
-  });
+  it.each(['gpt-5.4', 'gpt-6.1-sol'])(
+    'rejects unauthenticated %s requests without dispatching upstream',
+    async (model) => {
+      const fixture = await createLoggingFixture();
+      const provider = vi.spyOn(globalThis, 'fetch');
+      try {
+        const denied = await fixture.api.inject({
+          method: 'POST',
+          url: '/api/v1/model/responses',
+          payload: { model, input: 'private prompt' },
+        });
+        expect(denied.statusCode).toBe(401);
+        expect(provider).not.toHaveBeenCalled();
+        expect(fixture.readLogs()).toContain('"reason":"credential_required"');
+        expect(fixture.readLogs()).not.toContain('private');
+      } finally {
+        provider.mockRestore();
+        await fixture.api.close();
+      }
+    },
+  );
 
   it('preserves a successful response stream and logs completion without its contents', async () => {
     const fixture = await createLoggingFixture();

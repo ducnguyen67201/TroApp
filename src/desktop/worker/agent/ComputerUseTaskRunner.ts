@@ -82,7 +82,7 @@ export class ComputerUseTaskRunner {
           .callHostTool(CompanionHudTool.BIND_CURSOR, { group: hudGroup })
           .catch(() => {});
       }
-      await runner.companion?.startFollowing();
+
       return runner;
     } catch (error) {
       await desktopServer.close();
@@ -128,6 +128,7 @@ export class ComputerUseTaskRunner {
     });
     try {
       signal.throwIfAborted();
+      await this.companion?.startFollowing();
       if (this.companion) {
         if (mode === AgentTaskMode.EXECUTE) {
           await this.companion.pauseFollowing();
@@ -179,11 +180,13 @@ export class ComputerUseTaskRunner {
       if (mode === AgentTaskMode.EXECUTE) {
         await this.companion?.cancelSequence().catch(() => {});
       }
-      if (!signal.aborted) {
-        await this.companion?.startFollowing().catch(() => {});
+      try {
+        await this.companion?.releaseFollowing();
+      } finally {
+        this.desktopServer.taskEvidence.reset();
+        this.teachingRunner = null;
+        this.active = false;
       }
-      this.teachingRunner = null;
-      this.active = false;
     }
   }
 

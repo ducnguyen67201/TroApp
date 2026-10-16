@@ -27,6 +27,7 @@ let window: BrowserWindow | null = null;
 let chat: AgentChatController | null = null;
 const progress: AgentProgress[] = [];
 const hudSnapshots: CompanionHudSnapshot[] = [];
+let cursorFollowing = true;
 const hud = new CompanionHudController(
   {
     showSnapshot: (snapshot) => {
@@ -317,6 +318,7 @@ async function pressEscapeAndCheckCleanup(): Promise<void> {
   const count = fixture.requests;
   fixture.changeScreen('youtube');
   await delay(600);
+  assert.ok(cursorFollowing, 'Escape must restore idle following after the task transport closes.');
   assert.equal(fixture.requests, count, 'A stopped lesson must not resume on later changes.');
 }
 
@@ -484,14 +486,33 @@ async function runContract(): Promise<void> {
       window?.webContents.send('tro:agent-progress', event);
     },
   );
-  chat = new AgentChatController(auth, worker, `${fixture.url}/v1`, {
-    readStatus: () =>
-      Promise.resolve({
-        kind: 'ready',
-        accessibility: 'granted',
-        screenRecording: 'granted',
-      }),
-  });
+  chat = new AgentChatController(
+    auth,
+    worker,
+    `${fixture.url}/v1`,
+    {
+      readStatus: () =>
+        Promise.resolve({
+          kind: 'ready',
+          accessibility: 'granted',
+          screenRecording: 'granted',
+        }),
+    },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {
+      suspendFollowing: () => {
+        cursorFollowing = false;
+        return Promise.resolve();
+      },
+      resumeFollowing: () => {
+        cursorFollowing = true;
+        return Promise.resolve();
+      },
+    },
+  );
   const documentUrl = pathToFileURL(join(root, 'renderer', 'index.html')).href;
   window = new BrowserWindow({
     show: false,

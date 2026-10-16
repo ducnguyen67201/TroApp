@@ -20,7 +20,11 @@ function createHarness() {
     sendCommand: vi.fn<TranscriptionConnection['sendCommand']>(),
     close: vi.fn<() => void>(),
   };
+  const releaseWarmup = vi.fn<() => void>();
   const dependencies = {
+    beginAgentPreparation: vi
+      .fn<NonNullable<VoiceDependencies['beginAgentPreparation']>>()
+      .mockReturnValue({ release: releaseWarmup }),
     releaseUnusedCredential: vi
       .fn<VoiceDependencies['releaseUnusedCredential']>()
       .mockResolvedValue(),
@@ -75,7 +79,7 @@ function createHarness() {
     return prepared.captureId;
   }
 
-  return { events, dependencies, controller, connection, emit, startCapture };
+  return { events, dependencies, controller, connection, emit, startCapture, releaseWarmup };
 }
 
 afterEach(() => {
@@ -446,4 +450,22 @@ it('still suppresses original lesson replies after account invalidation during a
   expect(harness.controller.readStatus().state).toBe(VoiceState.DISABLED);
   expect(harness.events.some((event) => event.kind === 'result')).toBe(false);
   expect(harness.controller.startVoiceCapture()).toEqual({ kind: 'failed' });
+});
+
+it('warms during transcription setup and releases canceled preparation once', async () => {
+  const { controller, dependencies, events, releaseWarmup } = createHarness();
+  controller.enableVoiceInput(VoiceShortcut.CONTROL_ALT, true);
+  controller.startVoiceCapture();
+  const capture = events.find((event) => event.kind === 'prepare');
+  if (!capture) {
+    throw new Error('Missing capture');
+  }
+  const captureId = capture.captureId;
+  await controller.prepareVoiceCapture(captureId, DesktopLocale.ENGLISH);
+  expect(dependencies.beginAgentPreparation).toHaveBeenCalledOnce();
+  expect(dependencies.fetchCredential).toHaveBeenCalledOnce();
+  expect(dependencies.startAgentSession).not.toHaveBeenCalled();
+  controller.cancelVoiceCapture();
+  controller.cancelVoiceCapture();
+  expect(releaseWarmup).toHaveBeenCalledOnce();
 });
