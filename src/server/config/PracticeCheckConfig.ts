@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ModelConfig } from '#contracts/config/ModelConfig.js';
 
 const PracticeCheckConfigSchema = z.strictObject({
   model: z.string().min(1).max(100),
@@ -8,9 +9,9 @@ const PracticeCheckConfigSchema = z.strictObject({
   }),
 });
 
-/** Backend-owned practice model and admission limits; credentials remain in Env.ts. */
+/** Shared text model with backend-owned practice limits; credentials remain in Env.ts. */
 export const PracticeCheckConfig = {
-  model: 'gpt-5.4',
+  model: ModelConfig.textModel,
   policy: { dailyChecks: 30, minuteChecks: 5 },
 } as const satisfies z.input<typeof PracticeCheckConfigSchema>;
 

@@ -582,8 +582,20 @@ sequenceDiagram
 The gateway is split by responsibility: `RegisterModelGateway` owns routes,
 `ModelCredentials` scoped authentication, `ModelRequest` admission,
 `FetchModelResponse` bounded fetch recovery, and `ForwardModelResponse` streaming.
-`ModelGatewayConfig` owns the model, output ceiling, body limit, credential lifetime,
-timeout and retry policy; backend `Env.ts` owns validated secrets.
+[ModelConfig](../src/contracts/config/ModelConfig.ts) owns the shared text model used
+by desktop agents, gateway admission, practice checks and material preparation.
+It contains no credentials; feature-specific Mini and speech models remain with
+their owning backend configuration. `ModelGatewayConfig` owns the output ceiling,
+body limit, credential lifetime, timeout and retry policy; backend `Env.ts` owns
+validated secrets.
+
+The v1 gateway also accepts the legacy model identifier configured in
+`ModelGatewayConfig` so installed desktops can update independently from the API.
+`ModelRequest` rewrites that alias to the current provider model and translates
+the old SDK's `none` reasoning effort to `low`. Other reasoning settings, input,
+tools and response formats are preserved; output remains capped by gateway policy.
+Admission diagnostics retain the client model, while dispatch records the provider
+model. Deploy this compatible backend before desktop bundles selecting the new model.
 
 Assistant requests have no input-token counting preflight and no daily model request
 cap. A rejected fetch before headers may retry once, only for the configured socket

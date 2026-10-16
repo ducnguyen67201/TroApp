@@ -215,7 +215,7 @@ it('correlates count and generation logs without logging source content or crede
       ...context,
       generationStage: 'brief',
       materialId: input.materialId,
-      model: 'gpt-5.4',
+      model: 'gpt-6.1-sol',
       timeoutMs: 90000,
       maxRetries: 0,
       signalAborted: false,

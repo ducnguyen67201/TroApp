@@ -1,9 +1,13 @@
+import { ModelConfig } from '#contracts/config/ModelConfig.js';
+
 /** Backend-owned gateway policy. Secrets are supplied by validated ServerEnv.
- * Keep the model aligned with the desktop agent; changing it requires both consumers.
+ * The shared model configuration keeps gateway admission aligned with desktop agents.
  * Retry attempts remain bounded by the public diagnostics contract (at most two).
  */
 export const ModelGatewayConfig = {
-  model: 'gpt-5.4',
+  model: ModelConfig.textModel,
+  /** Installed v1 desktops can update independently from the backend. */
+  legacyModel: 'gpt-5.4',
   maximumOutputTokens: 4096,
   bodyLimitBytes: 8 * 1024 * 1024,
   requestTimeoutMs: 120_000,
