@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { createElement } from 'react';
 import { MantineProvider } from '@mantine/core';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   LessonCommand,
@@ -18,6 +18,8 @@ import {
   LessonVisualTreatment,
 } from '#contracts/LessonVisuals.js';
 import { LessonVideoStudio } from '../../../../src/desktop/renderer/lessonVideos/LessonVideoStudio.js';
+
+import { LessonGenerationProgress } from '../../../../src/desktop/renderer/lessonVideos/LessonGenerationProgress.js';
 
 vi.mock('@remotion/player', () => ({ Player: () => null }));
 vi.mock('../../../../src/desktop/renderer/lessonVideos/LessonVideoPlayer.js', () => ({
@@ -172,4 +174,88 @@ it('shows older scenes as standard animation without claiming a failed enhanceme
   expect(screen.getByRole('status').textContent).toBe('Video sẵn sàng');
   expect(screen.getByText('Cảnh 1: Hoạt ảnh tiêu chuẩn')).toBeTruthy();
   expect(screen.queryByRole('alert')).toBeNull();
+});
+
+it('shows saved stage counts without marking earlier steps complete merely because a later stage runs', () => {
+  const lesson = createLesson();
+  lesson.stage = LessonVideoStage.CLIP;
+  lesson.screens = lesson.screens.map((item, index) => ({
+    ...item,
+    audioId: index === 0 ? videoId : null,
+    clipId: index === 0 ? videoId : null,
+  }));
+  render(
+    createElement(MantineProvider, {
+      env: 'test',
+      children: createElement(LessonGenerationProgress, {
+        lesson,
+        vi: false,
+        busy: false,
+        execute: vi.fn<(command: LessonVideoCommand) => Promise<void>>().mockResolvedValue(),
+        close: () => {},
+        preview: () => {},
+      }),
+    }),
+  );
+  const narrationStep = screen.getByText('Prepare narration or captions').closest('li');
+  expect(narrationStep?.getAttribute('data-complete')).toBe('false');
+  if (!narrationStep) {
+    throw new Error('Missing narration step');
+  }
+  expect(within(narrationStep).getByText('1/3')).toBeTruthy();
+  expect(screen.getByText('Render scenes').closest('li')?.getAttribute('aria-current')).toBe(
+    'step',
+  );
+  expect(
+    screen.getByText('Combine the finished video').closest('li')?.getAttribute('data-complete'),
+  ).toBe('false');
+});
+
+it('closes progress independently of the explicit cancellation command', () => {
+  const lesson = createLesson();
+  const close = vi.fn<() => void>();
+  const execute = vi.fn<(command: LessonVideoCommand) => Promise<void>>().mockResolvedValue();
+  render(
+    createElement(MantineProvider, {
+      env: 'test',
+      children: createElement(LessonGenerationProgress, {
+        lesson,
+        vi: false,
+        busy: false,
+        execute,
+        close,
+        preview: () => {},
+      }),
+    }),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Back to library' }));
+  expect(close).toHaveBeenCalledOnce();
+  expect(execute).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel generation' }));
+  expect(execute).toHaveBeenCalledWith({
+    kind: LessonCommand.CANCEL,
+    id: lesson.id,
+    revision: lesson.revision,
+  });
+});
+
+it('keeps saved content accessible while video rendering is active', () => {
+  const preview = vi.fn<() => void>();
+  const execute = vi.fn<(command: LessonVideoCommand) => Promise<void>>().mockResolvedValue();
+  render(
+    createElement(MantineProvider, {
+      env: 'test',
+      children: createElement(LessonGenerationProgress, {
+        lesson: createLesson(),
+        vi: false,
+        busy: false,
+        execute,
+        close: () => {},
+        preview,
+      }),
+    }),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'View saved content' }));
+  expect(preview).toHaveBeenCalledOnce();
+  expect(execute).not.toHaveBeenCalled();
 });
