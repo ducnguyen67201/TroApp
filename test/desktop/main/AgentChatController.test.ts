@@ -6,6 +6,7 @@ import type {
   AgentChatWorker,
   AgentChatPermissions,
   AgentCancelShortcut,
+  AgentCursorPresentation,
 } from '../../../src/desktop/main/AgentChatPorts.js';
 import { DesktopPermissionState, PermissionGrant } from '#contracts/DesktopPermissions.js';
 import type { ModelCredential } from '#contracts/AuthSession.js';
@@ -40,6 +41,7 @@ function createController(
   classroom?: ClassroomTaskContext,
   voiceover?: VoiceoverController,
   recordUsage?: (event: AnalyticsEventInput) => void,
+  cursor?: AgentCursorPresentation,
 ) {
   const auth = {
     readSession: vi.fn<AgentChatAuth['readSession']>().mockResolvedValue({
@@ -54,9 +56,8 @@ function createController(
   };
   const worker = {
     isRunning: vi.fn<AgentChatWorker['isRunning']>().mockReturnValue(false),
-    startCompanion: vi
-      .fn<AgentChatWorker['startCompanion']>()
-      .mockResolvedValue({ kind: 'started', sessionId: 'companion' }),
+    prepare: vi.fn<AgentChatWorker['prepare']>().mockResolvedValue(undefined),
+    finish: vi.fn<AgentChatWorker['finish']>().mockResolvedValue(undefined),
     start: vi
       .fn<AgentChatWorker['start']>()
       .mockResolvedValue({ kind: 'started', sessionId: 'teacher' }),
@@ -88,6 +89,7 @@ function createController(
     voiceover,
     classroom,
     recordUsage,
+    cursor,
   );
   return { auth, worker, permissions, controller };
 }
@@ -198,85 +200,45 @@ it('disposes a starting worker and rejects its late ready reply after Stop', asy
   expect(worker.sendMessage).not.toHaveBeenCalled();
 });
 
-it('starts one local companion without a model credential or task', async () => {
+it('prepares locally during voice without fetching model credentials', async () => {
   const { auth, worker, controller } = createController();
-  const first = controller.startCursorCompanion();
-  const second = controller.startCursorCompanion();
-  expect(second).toBe(first);
-  expect(await first).toMatchObject({ kind: 'started' });
-  expect(worker.startCompanion).toHaveBeenCalledTimes(1);
+  const capture = controller.beginAgentPreparation('student');
+  await vi.waitFor(() => {
+    expect(worker.prepare).toHaveBeenCalledOnce();
+  });
   expect(auth.fetchModelCredential).not.toHaveBeenCalled();
   expect(worker.start).not.toHaveBeenCalled();
-  expect(worker.sendMessage).not.toHaveBeenCalled();
+  capture.release();
   controller.dispose();
 });
 
-it('keeps the companion off until sign-in and both desktop grants are verified', async () => {
-  const { auth, worker, permissions, controller } = createController();
-  auth.readSession.mockResolvedValueOnce({ kind: 'signed-out' });
-  expect(await controller.startCursorCompanion()).toMatchObject({ kind: 'failed' });
-  permissions.readStatus.mockResolvedValue({
-    kind: 'unknown',
-    accessibility: 'unknown',
-    screenRecording: 'unknown',
-  });
-  expect(await controller.startCursorCompanion()).toMatchObject({ kind: 'failed' });
-  expect(worker.startCompanion).not.toHaveBeenCalled();
-  expect(auth.fetchModelCredential).not.toHaveBeenCalled();
-  controller.dispose();
-});
-
-it('rejects late companion startup after sign-out without reconnecting', async () => {
+it('does not prepare for a canceled capture or a different account', async () => {
   const { worker, controller } = createController();
-  let finishStart:
-    ((result: Awaited<ReturnType<AgentChatWorker['startCompanion']>>) => void) | undefined;
-  worker.startCompanion.mockImplementation(
-    () =>
-      new Promise((resolve) => {
-        finishStart = resolve;
-      }),
-  );
-  const following = controller.startCursorCompanion();
-  await vi.waitFor(() => {
-    expect(worker.startCompanion).toHaveBeenCalledTimes(1);
-  });
-  await controller.signOut();
-  finishStart?.({ kind: 'started', sessionId: 'companion' });
-  expect(await following).toMatchObject({ kind: 'failed' });
-  expect(worker.startCompanion).toHaveBeenCalledTimes(1);
+  const canceled = controller.beginAgentPreparation('student');
+  canceled.release();
+  controller.beginAgentPreparation('other').release();
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(worker.prepare).not.toHaveBeenCalled();
   controller.dispose();
 });
 
-it('releases idle ownership before starting a credentialed task and restores it after Stop', async () => {
+it('rebinds separate task IDs without stopping the process and clears both tasks', async () => {
   const { auth, worker, controller } = createController();
-  worker.startCompanion.mockImplementation((sessionId) => {
-    worker.isRunning.mockReturnValue(true);
-    return Promise.resolve({ kind: 'started', sessionId });
-  });
-  worker.stop.mockImplementation(() => {
-    worker.isRunning.mockReturnValue(false);
-    return Promise.resolve({ kind: 'stopped' });
-  });
-  worker.start.mockImplementation((sessionId) => {
-    worker.isRunning.mockReturnValue(true);
-    return Promise.resolve({ kind: 'started', sessionId });
-  });
   auth.fetchModelCredential.mockResolvedValue({
     token: 'test-token',
     expiresAt: '2099-01-01T00:00:00.000Z',
   });
-  await controller.startCursorCompanion();
-  expect(
-    await controller.sendMessage('teacher', 'Show a circle', DesktopLocale.ENGLISH, 'teach'),
-  ).toMatchObject({ kind: 'completed' });
-  const stopOrder = worker.stop.mock.invocationCallOrder[0];
-  const taskStartOrder = worker.start.mock.invocationCallOrder[0];
-  expect(stopOrder).toBeDefined();
-  expect(taskStartOrder).toBeDefined();
-  expect(stopOrder).toBeLessThan(taskStartOrder ?? 0);
-  await controller.stopSession('teacher');
-  expect(worker.startCompanion).toHaveBeenCalledTimes(2);
-  expect(auth.fetchModelCredential).toHaveBeenCalledTimes(1);
+  for (const sessionId of ['first', 'second']) {
+    expect(
+      await controller.sendMessage(sessionId, 'Show a circle', DesktopLocale.ENGLISH),
+    ).toMatchObject({ kind: 'completed' });
+  }
+  expect(worker.start).toHaveBeenCalledTimes(2);
+  expect(worker.finish).toHaveBeenNthCalledWith(1, 'first');
+  expect(worker.finish).toHaveBeenNthCalledWith(2, 'second');
+  expect(worker.stop).not.toHaveBeenCalled();
+  expect(worker.dispose).not.toHaveBeenCalled();
   controller.dispose();
 });
 
@@ -698,6 +660,7 @@ it.each([
     const startNarration = vi.spyOn(voiceover, 'startTask');
     const isContextCurrent = vi
       .fn<ClassroomTaskContext['isContextCurrent']>()
+      .mockReturnValueOnce(true)
       .mockReturnValue(false);
     const { auth, worker, controller } = createController(
       undefined,
@@ -785,3 +748,133 @@ it('disposes the old worker before switching credentials without signing the old
   expect(auth.signOut).not.toHaveBeenCalled();
   expect(auth.signInWithGoogle).not.toHaveBeenCalled();
 });
+
+it('waits for native release before dispatch and for task cleanup before restoring following', async () => {
+  const order: string[] = [];
+  const cursor = {
+    suspendFollowing: vi
+      .fn<AgentCursorPresentation['suspendFollowing']>()
+      .mockImplementation(() => {
+        order.push('suspend');
+        return Promise.resolve();
+      }),
+    resumeFollowing: vi.fn<AgentCursorPresentation['resumeFollowing']>().mockImplementation(() => {
+      order.push('resume');
+      return Promise.resolve();
+    }),
+  };
+  const { auth, worker, controller } = createController(
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    cursor,
+  );
+  auth.fetchModelCredential.mockResolvedValue({
+    token: 'test',
+    expiresAt: '2099-01-01T00:00:00.000Z',
+  });
+  worker.sendMessage.mockImplementation(() => {
+    order.push('turn');
+    return Promise.resolve({ kind: 'completed', completion: { kind: 'response' }, answer: 'Done' });
+  });
+  worker.finish.mockImplementation(() => {
+    order.push('clean');
+    return Promise.resolve();
+  });
+  await controller.stopSession('unrelated');
+  expect(cursor.resumeFollowing).not.toHaveBeenCalled();
+  await controller.sendMessage('teacher', 'Help', DesktopLocale.ENGLISH);
+  expect(order).toEqual(['suspend', 'turn', 'clean', 'resume']);
+  controller.dispose();
+});
+
+it('retires uncertain task cleanup without granting idle cursor ownership', async () => {
+  const cursor = {
+    suspendFollowing: vi
+      .fn<AgentCursorPresentation['suspendFollowing']>()
+      .mockResolvedValue(undefined),
+    resumeFollowing: vi
+      .fn<AgentCursorPresentation['resumeFollowing']>()
+      .mockResolvedValue(undefined),
+  };
+  const { auth, worker, controller } = createController(
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    cursor,
+  );
+  auth.fetchModelCredential.mockResolvedValue({
+    token: 'test',
+    expiresAt: '2099-01-01T00:00:00.000Z',
+  });
+  worker.finish.mockRejectedValue(new Error('unconfirmed cleanup'));
+  await controller.sendMessage('teacher', 'Help', DesktopLocale.ENGLISH);
+  expect(worker.dispose).toHaveBeenCalledOnce();
+  expect(cursor.resumeFollowing).not.toHaveBeenCalled();
+  controller.dispose();
+});
+
+it.each([false, true])(
+  'restores following after Escape and fences account teardown: %s',
+  async (disposeDuringStop) => {
+    const cursor = {
+      suspendFollowing: vi
+        .fn<AgentCursorPresentation['suspendFollowing']>()
+        .mockResolvedValue(undefined),
+      resumeFollowing: vi
+        .fn<AgentCursorPresentation['resumeFollowing']>()
+        .mockResolvedValue(undefined),
+    };
+    const { auth, worker, controller } = createController(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      cursor,
+    );
+    auth.fetchModelCredential.mockResolvedValue({
+      token: 'test',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    });
+    worker.isRunning.mockReturnValue(true);
+    let finishTask: (result: AgentResult) => void = () => {};
+    let finishRetirement: (result: AgentResult) => void = () => {};
+    worker.sendMessage.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishTask = resolve;
+      }),
+    );
+    worker.stop.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishRetirement = resolve;
+      }),
+    );
+    const task = controller.sendMessage('teacher', 'First task', DesktopLocale.ENGLISH);
+    await vi.waitFor(() => {
+      expect(worker.sendMessage).toHaveBeenCalledOnce();
+    });
+    const stopping = controller.stopSession('teacher');
+    finishTask({ kind: 'failed', message: 'Not connected' });
+    await task;
+    expect(cursor.resumeFollowing).not.toHaveBeenCalled();
+    const next = controller.sendMessage('teacher', 'Second task', DesktopLocale.ENGLISH);
+    await Promise.resolve();
+    expect(worker.sendMessage).toHaveBeenCalledOnce();
+    if (disposeDuringStop) {
+      controller.dispose();
+    }
+    finishRetirement({ kind: 'stopped' });
+    await stopping;
+    if (disposeDuringStop) {
+      expect(await next).toMatchObject({ kind: 'failed' });
+      expect(cursor.resumeFollowing).not.toHaveBeenCalled();
+    } else {
+      expect(await next).toMatchObject({ kind: 'completed' });
+      expect(worker.sendMessage).toHaveBeenCalledTimes(2);
+      expect(cursor.resumeFollowing).toHaveBeenCalledTimes(2);
+    }
+    controller.dispose();
+  },
+);

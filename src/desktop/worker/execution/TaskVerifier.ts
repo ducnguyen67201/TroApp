@@ -1,4 +1,6 @@
-import { Agent, run, MaxTurnsExceededError, type AgentInputItem } from '@openai/agents';
+import { readTaskModelRunner } from '../agent/TaskModelClient.js';
+import { Agent, MaxTurnsExceededError, type AgentInputItem } from '@openai/agents';
+import { ModelConfig } from '#contracts/config/ModelConfig.js';
 import type { Logger } from 'pino';
 import {
   AgentLogRole,
@@ -26,7 +28,7 @@ export type RunTaskVerifier = (
 
 const runTaskVerifier: RunTaskVerifier = async (agent, input, task, maxTurns, log) => {
   let attemptModelTurns = 0;
-  const result = await run(agent, input, {
+  const result = await readTaskModelRunner().run(agent, input, {
     context: task,
     signal: task.abort.signal,
     maxTurns,
@@ -57,7 +59,7 @@ export function createTaskVerificationAgent(
   const language = locale === DesktopLocale.VIETNAMESE ? 'Vietnamese' : 'English';
   return new Agent<TaskContext, typeof TaskVerificationSchema>({
     name: 'Tro task verifier',
-    model: 'gpt-5.4',
+    model: ModelConfig.textModel,
     instructions:
       VerificationInstructions +
       '\nWrite summary and explanations in ' +

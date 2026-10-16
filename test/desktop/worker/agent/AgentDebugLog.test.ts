@@ -121,7 +121,7 @@ describe('local agent debug summaries', () => {
   });
   it('shows model exchange structure without text, screenshots, or tool arguments', () => {
     const request = describeModelRequest({
-      model: 'gpt-5.4',
+      model: 'gpt-6.1-sol',
       input: [
         {
           role: 'user',
@@ -142,7 +142,7 @@ describe('local agent debug summaries', () => {
     });
 
     expect(request).toEqual({
-      model: 'gpt-5.4',
+      model: 'gpt-6.1-sol',
       inputItems: 1,
       textChars: 26,
       imageParts: 1,
@@ -257,7 +257,7 @@ describe('local agent debug summaries', () => {
         () =>
           createLoggedModelFetch(log)('https://api.example.test/model', {
             method: 'POST',
-            body: JSON.stringify({ model: 'gpt-5.4', input: 'private question' }),
+            body: JSON.stringify({ model: 'gpt-6.1-sol', input: 'private question' }),
           }),
       );
       expect(response.status).toBe(200);
@@ -481,7 +481,7 @@ describe('local agent debug summaries', () => {
     try {
       let failure: unknown;
       try {
-        await client.responses.create({ model: 'gpt-5.4', input: 'Synthetic input' });
+        await client.responses.create({ model: 'gpt-6.1-sol', input: 'Synthetic input' });
       } catch (error) {
         failure = error;
       }
@@ -548,7 +548,7 @@ it('pairs actual model messages and function output in readable development exch
       method: 'POST',
       headers: { authorization: 'Bearer synthetic-secret' },
       body: JSON.stringify({
-        model: 'gpt-5.4',
+        model: 'gpt-6.1-sol',
         input: [
           {
             role: 'user',
@@ -610,7 +610,7 @@ it('preserves gateway diagnostics through the real SDK and JSON logs without raw
   try {
     let failure: unknown;
     try {
-      await client.responses.create({ model: 'gpt-5.4', input: 'Synthetic input' });
+      await client.responses.create({ model: 'gpt-6.1-sol', input: 'Synthetic input' });
     } catch (error) {
       failure = error;
     }
@@ -661,7 +661,7 @@ describe('model request trace correlation', () => {
         await guardedFetch(new URL('https://api.example.test/private-resource'), {
           method: 'POST',
           headers: suppliedHeaders,
-          body: JSON.stringify({ model: 'gpt-5.4', input: 'private prompt' }),
+          body: JSON.stringify({ model: 'gpt-6.1-sol', input: 'private prompt' }),
         });
       }
       expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -773,7 +773,7 @@ describe('model request trace correlation', () => {
         createLoggedModelFetch(capture.log)('https://api.example.test/private-resource', {
           method: 'POST',
           headers: { authorization: 'Bearer private-token' },
-          body: JSON.stringify({ model: 'gpt-5.4', input: 'private prompt' }),
+          body: JSON.stringify({ model: 'gpt-6.1-sol', input: 'private prompt' }),
         }),
       ).rejects.toBe(originalError);
       expect(fetchMock).toHaveBeenCalledOnce();

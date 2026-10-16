@@ -6,8 +6,7 @@ import {
   type CompanionHudTransition,
 } from './CompanionHudController.js';
 
-/** Cursor operations delegate to the authenticated chat controller. Its worker
- * is shared with tasks, so disposing presentation must not dispose that worker. */
+/** Cursor following belongs to presentation; it never starts the task worker. */
 export interface DesktopCompanionCursor {
   startFollowing(): Promise<AgentResult>;
 }
@@ -44,9 +43,24 @@ export class DesktopCompanion {
    * Cursor startup retains its own authorization checks and error reporting. */
   async startFollowing(): Promise<AgentResult> {
     const generation = this.presentationGeneration;
-    await this.startPresentation();
+    const allowed = await this.access.canShow();
     if (generation !== this.presentationGeneration) {
       return { kind: 'stopped' };
+    }
+    if (!allowed) {
+      return { kind: 'failed', message: 'Finish sign-in and desktop permission setup.' };
+    }
+    try {
+      await this.presentation.start();
+    } catch {
+      /* Cursor startup reports its own transport failure. */
+    }
+    const stillAllowed = await this.access.canShow();
+    if (generation !== this.presentationGeneration) {
+      return { kind: 'stopped' };
+    }
+    if (!stillAllowed) {
+      return { kind: 'failed', message: 'Finish sign-in and desktop permission setup.' };
     }
     return this.cursor.startFollowing();
   }

@@ -1,4 +1,5 @@
 import { Agent, tool } from '@openai/agents';
+import { ModelConfig } from '#contracts/config/ModelConfig.js';
 import {
   createClassroomTeachingTools,
   type ClassroomTeachingSession,
@@ -42,7 +43,7 @@ export function createComputerUseAgent(
 ): Agent<TaskContext, typeof CompletionProposalSchema> {
   return new Agent<TaskContext, typeof CompletionProposalSchema>({
     name: 'Tro computer-use assistant',
-    model: 'gpt-5.4',
+    model: ModelConfig.textModel,
     instructions: createComputerUseInstructions(locale),
     mcpServers: [desktopServer],
     mcpConfig: { convertSchemasToStrict: false },
@@ -83,7 +84,7 @@ export function createTeachingAgent(
   );
   return new Agent({
     name: 'Tro teaching assistant',
-    model: 'gpt-5.4',
+    model: ModelConfig.textModel,
     instructions: `${createComputerUseInstructions(locale, AgentTaskMode.TEACH)}\n${classroom ? ClassroomMaterialInstructions : ''}`,
     mcpServers: [desktopServer],
     mcpConfig: { convertSchemasToStrict: false },

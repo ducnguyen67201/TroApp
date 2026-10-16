@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { ModelConfig } from '#contracts/config/ModelConfig.js';
 import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
@@ -30,12 +31,12 @@ import { buildMaterialCompositionFormat } from './MaterialCompositionFormat.js';
 
 const providerTimeoutMs = 90_000;
 const providerMaxRetries = 0;
-const providerModel = 'gpt-5.4';
+const providerModel = ModelConfig.textModel;
 
 /** Generation remains backend-only. Count and generate use identical text, schema and PDF inputs. */
 export class OpenAiMaterialPreparation implements MaterialGeneration {
   readonly available: boolean;
-  readonly version = 'gpt-5.4:document-brief-v2.3';
+  readonly version = `${providerModel}:document-brief-v2.3`;
   private readonly client: OpenAI | null;
   constructor(
     apiKey: string | undefined,
