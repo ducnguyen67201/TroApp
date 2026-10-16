@@ -493,7 +493,7 @@ export class TeachingFlowFixture {
         object: 'response',
         created_at: Math.floor(Date.now() / 1000),
         status: 'completed',
-        model: 'gpt-5.4',
+        model: 'gpt-6.1-sol',
         output: [
           {
             id: `msg_${randomUUID()}`,
@@ -709,7 +709,7 @@ export class TeachingFlowFixture {
       object: 'response',
       created_at: Math.floor(Date.now() / 1000),
       status: 'completed',
-      model: 'gpt-5.4',
+      model: 'gpt-6.1-sol',
       output,
       error: null,
       incomplete_details: null,

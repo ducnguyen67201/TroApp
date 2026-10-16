@@ -63,7 +63,7 @@ async function createLoggingFixture() {
         url: '/api/v1/model/responses',
         headers: { authorization: 'Bearer ' + token, ...headers },
         payload: {
-          model: 'gpt-5.4',
+          model: 'gpt-6.1-sol',
           input: 'private prompt and screenshot',
           stream: false,
           ...fields,
@@ -137,7 +137,7 @@ describe('model gateway', () => {
       }
       expect(events.find((entry) => entry.event === ModelGatewayEvent.DISPATCH)).toMatchObject({
         requestBytes: Buffer.byteLength(forwardedBody),
-        model: 'gpt-5.4',
+        model: 'gpt-6.1-sol',
         stream: true,
       });
       expect(
@@ -368,7 +368,7 @@ describe('model gateway', () => {
       expect(provider.mock.calls[0]?.[0]).toBe('https://api.openai.com/v1/responses');
       expect(provider.mock.calls[0]?.[1]?.body).toBe(
         JSON.stringify({
-          model: 'gpt-5.4',
+          model: 'gpt-6.1-sol',
           input,
           stream: false,
           tools,
@@ -688,7 +688,7 @@ describe('model gateway', () => {
       const denied = await fixture.api.inject({
         method: 'POST',
         url: '/api/v1/model/responses',
-        payload: { model: 'gpt-5.4', input: 'private prompt' },
+        payload: { model: 'gpt-6.1-sol', input: 'private prompt' },
       });
       expect(denied.statusCode).toBe(401);
       expect(provider).not.toHaveBeenCalled();
@@ -799,7 +799,7 @@ describe('model gateway', () => {
             method: 'POST' as const,
             url: '/api/v1/model/responses',
             headers: { authorization: `Bearer ${token}` },
-            payload: { model: 'gpt-5.4', input: 'Hello', stream: false },
+            payload: { model: 'gpt-6.1-sol', input: 'Hello', stream: false },
           };
           const missingCredential = await api.inject({ ...request, headers: {} });
           expect(missingCredential.statusCode).toBe(401);

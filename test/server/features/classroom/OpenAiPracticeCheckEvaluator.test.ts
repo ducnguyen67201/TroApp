@@ -27,7 +27,7 @@ it('uses structured read-only Responses without tools or automatic retries', asy
     ),
   );
   vi.stubGlobal('fetch', request);
-  const evaluator = new OpenAiPracticeCheckEvaluator('test-key', 'gpt-5.4');
+  const evaluator = new OpenAiPracticeCheckEvaluator('test-key', 'gpt-6.1-sol');
   expect(
     await evaluator.evaluate(
       rubric,
@@ -56,7 +56,7 @@ it('uses structured read-only Responses without tools or automatic retries', asy
 it('unavailable or incomplete evaluation is a provider failure', async () => {
   const rubric = createPracticeCheckpoint();
   await expect(
-    new OpenAiPracticeCheckEvaluator(undefined, 'gpt-5.4').evaluate(
+    new OpenAiPracticeCheckEvaluator(undefined, 'gpt-6.1-sol').evaluate(
       rubric,
       [],
       'en',
@@ -72,7 +72,7 @@ it('unavailable or incomplete evaluation is a provider failure', async () => {
     ),
   );
   await expect(
-    new OpenAiPracticeCheckEvaluator('test-key', 'gpt-5.4').evaluate(
+    new OpenAiPracticeCheckEvaluator('test-key', 'gpt-6.1-sol').evaluate(
       rubric,
       [],
       'en',

@@ -537,8 +537,12 @@ sequenceDiagram
 The gateway is split by responsibility: `RegisterModelGateway` owns routes,
 `ModelCredentials` scoped authentication, `ModelRequest` admission,
 `FetchModelResponse` bounded fetch recovery, and `ForwardModelResponse` streaming.
-`ModelGatewayConfig` owns the model, output ceiling, body limit, credential lifetime,
-timeout and retry policy; backend `Env.ts` owns validated secrets.
+[ModelConfig](../src/contracts/config/ModelConfig.ts) owns the shared text model used
+by desktop agents, gateway admission, practice checks and material preparation.
+It contains no credentials; feature-specific Mini and speech models remain with
+their owning backend configuration. `ModelGatewayConfig` owns the output ceiling,
+body limit, credential lifetime, timeout and retry policy; backend `Env.ts` owns
+validated secrets.
 
 Assistant requests have no input-token counting preflight and no daily model request
 cap. A rejected fetch before headers may retry once, only for the configured socket

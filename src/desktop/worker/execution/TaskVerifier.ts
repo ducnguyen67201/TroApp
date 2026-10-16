@@ -1,4 +1,5 @@
 import { Agent, run, MaxTurnsExceededError, type AgentInputItem } from '@openai/agents';
+import { ModelConfig } from '#contracts/config/ModelConfig.js';
 import type { Logger } from 'pino';
 import {
   AgentLogRole,
@@ -57,7 +58,7 @@ export function createTaskVerificationAgent(
   const language = locale === DesktopLocale.VIETNAMESE ? 'Vietnamese' : 'English';
   return new Agent<TaskContext, typeof TaskVerificationSchema>({
     name: 'Tro task verifier',
-    model: 'gpt-5.4',
+    model: ModelConfig.textModel,
     instructions:
       VerificationInstructions +
       '\nWrite summary and explanations in ' +
