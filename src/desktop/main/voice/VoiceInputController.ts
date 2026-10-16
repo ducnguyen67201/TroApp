@@ -20,6 +20,7 @@ import type { TranscriptionConnection } from './TranscriptionClient.js';
 import { AgentTaskMode } from '#contracts/CursorCompanion.js';
 
 export interface VoiceDependencies {
+  beginAgentPreparation?(userId: string): { release(): void };
   readSession(): Promise<AuthResult>;
   releaseUnusedCredential(captureId: string): Promise<void>;
   fetchCredential(captureId: string, locale: DesktopLocale): Promise<TranscriptionCredential>;
@@ -37,6 +38,7 @@ export interface VoiceDependencies {
 }
 
 interface ActiveCapture {
+  agentWarmup: { release(): void } | null;
   id: string;
   userId: string | null;
   locale: DesktopLocale | null;
@@ -111,6 +113,7 @@ export class VoiceInputController {
     }
     const id = randomUUID();
     this.capture = {
+      agentWarmup: null,
       id,
       userId: null,
       locale: null,
@@ -155,6 +158,7 @@ export class VoiceInputController {
         return { kind: 'failed' };
       }
       capture.userId = session.user.id;
+      capture.agentWarmup = this.dependencies.beginAgentPreparation?.(session.user.id) ?? null;
       const credential = await this.dependencies.fetchCredential(captureId, locale);
       if (this.capture !== capture) {
         await this.dependencies.releaseUnusedCredential(captureId);
@@ -291,6 +295,8 @@ export class VoiceInputController {
     this.clearDeadline();
     capture?.connection?.close();
     if (capture) {
+      capture.agentWarmup?.release();
+      capture.agentWarmup = null;
       this.dependencies.emit({ kind: 'cancel', captureId: capture.id });
       void this.dependencies.releaseUnusedCredential(capture.id).catch(() => {});
     }
@@ -316,6 +322,8 @@ export class VoiceInputController {
     const locale = capture.locale;
     const generation = this.generation;
     if (!text || !locale || text.length > 8000 || this.dependencies.isAgentBusy()) {
+      capture.agentWarmup?.release();
+      capture.agentWarmup = null;
       this.setState(VoiceState.IDLE);
       if (text) {
         this.dependencies.emit({ kind: 'failed' });
@@ -367,6 +375,8 @@ export class VoiceInputController {
         this.dependencies.emit({ kind: 'failed' });
       }
     } finally {
+      capture.agentWarmup?.release();
+      capture.agentWarmup = null;
       this.running -= 1;
       if (this.status.state !== VoiceState.DISABLED) {
         this.setState(

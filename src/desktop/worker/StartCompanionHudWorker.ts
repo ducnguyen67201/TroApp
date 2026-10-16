@@ -1,3 +1,4 @@
+import { IdleCursorFollowing } from './companion/IdleCursorFollowing.js';
 import { MCPServerStdio } from '@openai/agents';
 import type { TeachingMessage } from '#contracts/TeachingStep.js';
 import { CompanionHudAckSchema, CompanionHudTool } from '#contracts/CompanionHud.js';
@@ -11,8 +12,10 @@ const parentPort = process.parentPort;
 let server: MCPServerStdio | null = null;
 let publisher: CompanionHudPublisher | null = null;
 let connecting = false;
+let cursor: IdleCursorFollowing | null = null;
 
 function stopPresentation(): void {
+  cursor?.dispose();
   publisher?.dispose();
   parentPort.postMessage({ ready: false });
   void server?.close().catch(() => {});
@@ -24,6 +27,20 @@ parentPort.on('message', (event) => {
     return;
   }
   const command = parsed.data;
+  if (command.kind === 'following') {
+    void (async () => {
+      try {
+        if (!cursor) {
+          throw new Error('Cursor transport is unavailable.');
+        }
+        await cursor.setEnabled(command.enabled);
+        parentPort.postMessage({ kind: 'following', requestId: command.requestId, applied: true });
+      } catch {
+        parentPort.postMessage({ kind: 'following', requestId: command.requestId, applied: false });
+      }
+    })();
+    return;
+  }
   if (command.kind === 'snapshot') {
     try {
       publisher?.updateSnapshot(command.snapshot);
@@ -73,6 +90,11 @@ parentPort.on('message', (event) => {
       publisher = publication;
       publication.updateSnapshot(command.snapshot);
       await publication.flush();
+      const binding = await connection.callToolResult(CompanionHudTool.BIND_CURSOR, { group });
+      if (binding.isError) {
+        throw new Error('Cursor binding unavailable.');
+      }
+      cursor = new IdleCursorFollowing(connection, stopPresentation);
       parentPort.postMessage({ ready: true });
       let reading = false;
       let previousMessage = '';

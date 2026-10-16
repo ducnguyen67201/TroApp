@@ -10,7 +10,8 @@ import type { AgentChatWorker } from '../../../src/desktop/main/AgentChatPorts.j
 function createPorts() {
   const worker = {
     isRunning: () => false,
-    startCompanion: vi.fn<AgentChatWorker['startCompanion']>(),
+    prepare: vi.fn<AgentChatWorker['prepare']>().mockResolvedValue(undefined),
+    finish: vi.fn<AgentChatWorker['finish']>().mockResolvedValue(undefined),
     start: vi
       .fn<AgentChatWorker['start']>()
       .mockImplementation((sessionId) => Promise.resolve({ kind: 'started', sessionId })),

@@ -63,6 +63,7 @@ describe('desktop companion composition', () => {
     companion.hud.updateMeter({ captureId, sequence: 0, level: 0.7 });
     const following = companion.startFollowing();
     await Promise.resolve();
+    await Promise.resolve();
     expect(presentation.start).toHaveBeenCalledTimes(1);
     expect(cursor.startFollowing).not.toHaveBeenCalled();
     expect(latest()?.phase).toBe(CompanionHudPhase.LISTENING);
@@ -72,14 +73,15 @@ describe('desktop companion composition', () => {
     expect(latest()?.level).toBe(0.7);
   });
 
-  it('skips native presentation when access is unavailable and preserves cursor authorization errors', async () => {
+  it('skips native presentation and following when access is unavailable', async () => {
     const { companion, cursor, access, presentation } = createHarness();
     access.canShow.mockResolvedValue(false);
     cursor.startFollowing.mockResolvedValue({ kind: 'failed', message: 'Sign in to use Tro.' });
     expect(await companion.startFollowing()).toEqual({
       kind: 'failed',
-      message: 'Sign in to use Tro.',
+      message: 'Finish sign-in and desktop permission setup.',
     });
+    expect(cursor.startFollowing).not.toHaveBeenCalled();
     expect(presentation.start).not.toHaveBeenCalled();
   });
 
@@ -145,4 +147,12 @@ describe('desktop companion composition', () => {
     expect(await companion.startFollowing()).toEqual({ kind: 'started', sessionId });
     expect(cursor.startFollowing).toHaveBeenCalledTimes(1);
   });
+});
+
+it('does not acquire idle following if access changes while presentation starts', async () => {
+  const { companion, access, cursor } = createHarness();
+  access.canShow.mockResolvedValueOnce(true).mockResolvedValue(false);
+  expect(await companion.startFollowing()).toMatchObject({ kind: 'failed' });
+  expect(cursor.startFollowing).not.toHaveBeenCalled();
+  companion.dispose();
 });

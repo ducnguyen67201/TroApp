@@ -1,3 +1,4 @@
+import { CompanionHudWorkerCommandSchema } from '#contracts/CompanionHudWorker.js';
 import { EventEmitter } from 'node:events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CompanionHudPhase } from '#contracts/CompanionHud.js';
@@ -104,4 +105,41 @@ describe('persistent HUD presentation connection', () => {
     expect(children).toHaveLength(4);
     client.dispose();
   });
+});
+
+it('acknowledges suspension and prevents focus or reconnect from reclaiming an active task cursor', async () => {
+  vi.useFakeTimers();
+  const children: Child[] = [];
+  const enabled: boolean[] = [];
+  doubles.fork.mockImplementation(() => {
+    const child = new Child();
+    children.push(child);
+    child.postMessage.mockImplementation((raw) => {
+      const command = CompanionHudWorkerCommandSchema.parse(raw);
+      if (command.kind === 'following') {
+        enabled.push(command.enabled);
+        child.emit('message', { kind: 'following', requestId: command.requestId, applied: true });
+      }
+    });
+    return child;
+  });
+  const client = new CompanionHudClient('/worker', driver);
+  const starting = client.startCursorFollowing();
+  await vi.advanceTimersByTimeAsync(0);
+  children[0]?.emit('spawn');
+  children[0]?.emit('message', { ready: true });
+  await starting;
+  await client.suspendFollowing();
+  expect(enabled.at(-1)).toBe(false);
+  const count = enabled.length;
+  await client.startCursorFollowing();
+  children[0]?.emit('exit');
+  await vi.advanceTimersByTimeAsync(5000);
+  children[1]?.emit('spawn');
+  children[1]?.emit('message', { ready: true });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(enabled).toHaveLength(count);
+  await client.resumeFollowing();
+  expect(enabled.at(-1)).toBe(true);
+  client.dispose();
 });

@@ -16,15 +16,39 @@ if (typeof electronExecutable !== 'string') {
 
 const temporaryRoot = await mkdtemp(join(tmpdir(), 'tro-worker-smoke-'));
 
-/* Generated smoke-only Electron entry. No window, credentials, driver or model
-   request: a stop command exercises module loading and the real utility port. */
+/* The scripted MCP peer exercises preparation and task rebinding without desktop
+   access or model requests. Durations are fixture measurements, not native readiness. */
+const fixtureSource = `
+const { createInterface } = require('node:readline');
+createInterface({ input: process.stdin }).on('line', line => {
+  const request = JSON.parse(line);
+  if (request.id === undefined) return;
+  let result = {};
+  if (request.method === 'initialize') result = {
+    protocolVersion: request.params.protocolVersion,
+    capabilities: { tools: {} }, serverInfo: { name: 'Tro readiness fixture', version: '1' }
+  };
+  if (request.method === 'tools/list') result = { tools: [{
+    name: 'get_desktop_info', description: 'Fixture only', inputSchema: { type: 'object', properties: {} }
+  }] };
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result }) + '\\n');
+});
+`;
+
 const probeSource = `
 const { app, utilityProcess } = require('electron');
-const requestId = '11111111-1111-4111-8111-111111111111';
-const sessionId = '22222222-2222-4222-8222-222222222222';
+const { randomUUID } = require('node:crypto');
 let child;
 let finished = false;
-const timeout = setTimeout(() => finish(1, 'Worker startup timed out.'), 10000);
+let requestId;
+let sessionId = randomUUID();
+let stage = 'prepare';
+let tasks = 0;
+let startedAt;
+let readyMs;
+let boundAt;
+const bindingMs = [];
+const timeout = setTimeout(() => finish(1, 'Worker lifecycle timed out.'), 10000);
 function finish(code, message) {
   if (finished) return;
   finished = true;
@@ -33,18 +57,39 @@ function finish(code, message) {
   if (child) child.kill();
   app.exit(code);
 }
+const driver = { command: process.execPath, args: [process.argv[3]], env: { ELECTRON_RUN_AS_NODE: '1' } };
+function send(command) {
+  requestId = randomUUID();
+  child.postMessage({ requestId, command });
+}
+function begin() {
+  stage = 'start';
+  sessionId = randomUUID();
+  boundAt = performance.now();
+  send({ kind: 'start', sessionId, debugEnabled: false, desktopDriver: driver,
+    gatewayToken: 'fixture-never-sent', gatewayBaseUrl: 'http://127.0.0.1:1' });
+}
 app.whenReady().then(() => {
+  startedAt = performance.now();
   child = utilityProcess.fork(process.argv[2], [], { stdio: 'pipe' });
-  child.stderr.on('data', (data) => process.stderr.write(data));
-  child.once('spawn', () => {
-    child.postMessage({ requestId, command: { kind: 'stop', sessionId } });
-  });
-  child.on('message', (message) => {
-    if (message.requestId === requestId && message.result?.kind === 'stopped') {
-      finish(0, 'Worker loaded and answered stop without starting an agent.');
-    } else {
-      finish(1, 'Unexpected worker response.');
+  child.stderr.on('data', data => process.stderr.write(data));
+  child.once('spawn', () => send({ kind: 'prepare', sessionId, debugEnabled: false, desktopDriver: driver }));
+  child.on('message', message => {
+    if (message.requestId !== requestId || !message.result) return finish(1, 'Unexpected worker response.');
+    if (stage === 'prepare' && message.result.kind === 'started') {
+      readyMs = performance.now() - startedAt;
+      return begin();
     }
+    if (stage === 'start' && message.result.kind === 'started') {
+      bindingMs.push(performance.now() - boundAt);
+      stage = 'finish';
+      return send({ kind: 'finish', sessionId });
+    }
+    if (stage === 'finish' && message.result.kind === 'stopped') {
+      if (++tasks < 2) return begin();
+      return finish(0, JSON.stringify({ fixture: 'scripted-mcp-no-model', readyMs, bindingMs, tasks, pid: child.pid }));
+    }
+    finish(1, 'Worker lifecycle command failed.');
   });
   child.once('exit', () => finish(1, 'Worker exited before responding.'));
 }).catch(() => finish(1, 'Could not start the Electron probe.'));
@@ -53,6 +98,8 @@ app.whenReady().then(() => {
 try {
   const probePath = join(temporaryRoot, 'WorkerProbe.cjs');
   await writeFile(probePath, probeSource);
+  const fixturePath = join(temporaryRoot, 'McpFixture.cjs');
+  await writeFile(fixturePath, fixtureSource);
   /* Use an ESM package boundary for the generated worker's .js chunks. */
   await writeFile(join(temporaryRoot, 'package.json'), '{"type":"module"}');
 
@@ -70,6 +117,38 @@ try {
     const outputDirectory = join(temporaryRoot, mode);
     await build({
       ...main,
+      plugins: [
+        ...(main.plugins ?? []),
+        {
+          name: 'check-idle-presentation-bundle',
+          generateBundle(_options, bundle) {
+            const visited = new Set<string>();
+            const inspect = (name: string): void => {
+              if (visited.has(name)) {
+                return;
+              }
+              visited.add(name);
+              const chunk = bundle[name];
+              if (!chunk || chunk.type !== 'chunk') {
+                return;
+              }
+              for (const moduleId of Object.keys(chunk.modules)) {
+                if (
+                  /src\/desktop\/worker\/(?:agent|execution|teaching|cua|observation)\//.test(
+                    moduleId.replaceAll('\\', '/'),
+                  )
+                ) {
+                  throw new Error('Idle presentation imports task orchestration: ' + moduleId);
+                }
+              }
+              for (const dependency of [...chunk.imports, ...chunk.dynamicImports]) {
+                inspect(dependency);
+              }
+            };
+            inspect('StartCompanionHudWorker.js');
+          },
+        },
+      ],
       envFile: false,
       build: { ...main.build, outDir: outputDirectory, watch: null },
     });
@@ -85,7 +164,7 @@ try {
     }
     const result = await executeFile(
       electronExecutable,
-      [probePath, join(outputDirectory, 'StartAgentWorker.js')],
+      [probePath, join(outputDirectory, 'StartAgentWorker.js'), fixturePath],
       { env: environment, timeout: 15000 },
     );
     console.info(`${mode}: ${result.stdout.trim()}`);

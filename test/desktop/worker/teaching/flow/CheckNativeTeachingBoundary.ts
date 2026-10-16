@@ -1,3 +1,4 @@
+import { CompanionHudMessageSchema } from '../../../../../src/contracts/CompanionHudWorker.js';
 import assert from 'node:assert/strict';
 import { checkNativeHudRendering } from './CheckNativeHudRendering.js';
 import { randomUUID } from 'node:crypto';
@@ -123,6 +124,67 @@ export async function checkNativeTeachingBoundary(): Promise<void> {
     assert.ok(CompanionHudAckSchema.parse(presentation.structuredContent).applied);
     const binding = await callNativeTool(server, CompanionHudTool.BIND_CURSOR, { group });
     assert.ok(CompanionHudAckSchema.parse(binding.structuredContent).applied);
+    const presentationBinding = await callNativeTool(peer, CompanionHudTool.BIND_CURSOR, { group });
+    assert.ok(CompanionHudAckSchema.parse(presentationBinding.structuredContent).applied);
+    for (const owner of [peer, server, peer]) {
+      const acquired = await callNativeTool(owner, CursorCompanionTool.SET_MODE, {
+        mode: 'follow',
+        label: 'Tro',
+      });
+      assert.ok(
+        !acquired.isError && CursorCompanionStateSchema.parse(acquired.structuredContent).following,
+      );
+      const released = await callNativeTool(owner, CursorCompanionTool.SET_MODE, {
+        mode: 'hidden',
+      });
+      const releasedState = CursorCompanionStateSchema.parse(released.structuredContent);
+      assert.ok(!released.isError && !releasedState.following && !releasedState.active);
+    }
+    const retainedHud = await callNativeTool(peer, CompanionHudTool.READ_MESSAGE, { group });
+    assert.ok(!retainedHud.isError);
+    assert.deepEqual(
+      CompanionHudMessageSchema.parse(retainedHud.structuredContent).message,
+      message,
+    );
+    console.info(
+      'PASS cursor handoff: presentation to task and back retains the HUD connection and message.',
+    );
+    /* Escape disconnects the task before hidden-mode cleanup. The surviving
+       presentation must regain ownership, including after a second task. */
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const acquired = await callNativeTool(server, CursorCompanionTool.SET_MODE, {
+        mode: 'follow',
+        label: 'Tro',
+      });
+      assert.ok(
+        !acquired.isError && CursorCompanionStateSchema.parse(acquired.structuredContent).following,
+      );
+      await server.close();
+      const restored = await callNativeTool(peer, CursorCompanionTool.SET_MODE, {
+        mode: 'follow',
+        label: 'Tro',
+      });
+      assert.ok(
+        !restored.isError && CursorCompanionStateSchema.parse(restored.structuredContent).following,
+      );
+      const retained = await callNativeTool(peer, CompanionHudTool.READ_MESSAGE, { group });
+      assert.deepEqual(
+        CompanionHudMessageSchema.parse(retained.structuredContent).message,
+        message,
+      );
+      const released = await callNativeTool(peer, CursorCompanionTool.SET_MODE, { mode: 'hidden' });
+      assert.ok(
+        !released.isError &&
+          !CursorCompanionStateSchema.parse(released.structuredContent).following,
+      );
+      server = new MCPServerStdio({ name: 'Replacement task connection', ...connection });
+      await server.connect();
+      const rebound = await callNativeTool(server, CompanionHudTool.BIND_CURSOR, { group });
+      assert.ok(CompanionHudAckSchema.parse(rebound.structuredContent).applied);
+    }
+    console.info(
+      'PASS cursor cancellation: disconnected task ownership returns to presentation across two tasks.',
+    );
     const capabilities = await callNativeTool(server, CursorCompanionTool.READ_CAPABILITIES, {});
     assert.ok(!capabilities.isError, 'Native capabilities must be admitted.');
     assert.equal(

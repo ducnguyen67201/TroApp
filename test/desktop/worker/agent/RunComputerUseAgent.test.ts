@@ -1,3 +1,7 @@
+import {
+  TaskModelClient,
+  runWithTaskModel,
+} from '../../../../src/desktop/worker/agent/TaskModelClient.js';
 import { Agent, Usage, setTracingDisabled, type Model } from '@openai/agents';
 import { expect, it, vi } from 'vitest';
 import { runComputerUseAgent } from '../../../../src/desktop/worker/agent/RunComputerUseAgent.js';
@@ -37,12 +41,11 @@ it.each(Object.values(TeachingDisposition))(
       },
     };
     const agent = new Agent({ name: 'Teaching fixture', model, outputType: TeachingReplySchema });
-    const result = await runComputerUseAgent(
-      agent,
-      'Open YouTube',
-      new AbortController().signal,
-      1,
+    const scope = new TaskModelClient('fixture', 'http://127.0.0.1', vi.fn<typeof fetch>());
+    const result = await runWithTaskModel(scope, () =>
+      runComputerUseAgent(agent, 'Open YouTube', new AbortController().signal, 1),
     );
+    scope.dispose();
     expect(result.decision).toEqual(decision);
     expect(result.history).toHaveLength(2);
     expect(getResponse).toHaveBeenCalledOnce();

@@ -1,3 +1,4 @@
+import { measureWindowsDesktopMemory } from './WindowsDesktopMemory.js';
 import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -154,13 +155,14 @@ async function measureDesktopMemory(
 }
 
 async function checkDesktopMemory(): Promise<void> {
-  if (process.platform !== 'darwin') {
-    throw new Error('Desktop physical-footprint measurement currently requires macOS.');
+  if (process.platform !== 'darwin' && process.platform !== 'win32') {
+    throw new Error('Desktop memory measurement requires macOS or Windows.');
   }
   const options = parseDesktopMemoryOptions(process.argv.slice(2));
-  const root = (await inspectDesktopProcessTree(options.pid)).find(
-    (row) => row.pid === options.pid,
-  );
+  const root =
+    process.platform === 'win32'
+      ? await measureWindowsDesktopMemory(options.pid)
+      : (await inspectDesktopProcessTree(options.pid)).find((row) => row.pid === options.pid);
   if (!root) {
     throw new Error('The requested desktop process is unavailable.');
   }
@@ -174,23 +176,40 @@ async function checkDesktopMemory(): Promise<void> {
     if (waitMs > 0) {
       await delay(waitMs);
     }
-    const processes = await measureDesktopMemory(options.pid, root.startedAt);
-    const physicalFootprintBytes = processes.reduce(
-      (sum, row) => sum + row.physicalFootprintBytes,
-      0,
-    );
-    baselineBytes ??= physicalFootprintBytes;
-    console.info(
-      JSON.stringify({
-        sample: sample + 1,
-        elapsedSeconds: Math.round((performance.now() - startedAt) / 1000),
-        physicalFootprintBytes,
-        growthBytes: physicalFootprintBytes - baselineBytes,
-        budgetBytes: memoryBudgetBytes,
-        belowBudget: physicalFootprintBytes < memoryBudgetBytes,
-        processes,
-      }),
-    );
+    const timing = {
+      sample: sample + 1,
+      elapsedSeconds: Math.round((performance.now() - startedAt) / 1000),
+    };
+    if (process.platform === 'win32') {
+      const measurement = await measureWindowsDesktopMemory(options.pid, root.startedAt);
+      baselineBytes ??= measurement.privateCommittedBytes;
+      console.info(
+        JSON.stringify({
+          ...timing,
+          metric: 'windows-private-commit',
+          ...measurement,
+          growthBytes: measurement.privateCommittedBytes - baselineBytes,
+        }),
+      );
+    } else {
+      const processes = await measureDesktopMemory(options.pid, root.startedAt);
+      const physicalFootprintBytes = processes.reduce(
+        (sum, row) => sum + row.physicalFootprintBytes,
+        0,
+      );
+      baselineBytes ??= physicalFootprintBytes;
+      console.info(
+        JSON.stringify({
+          ...timing,
+          metric: 'macos-physical-footprint',
+          physicalFootprintBytes,
+          growthBytes: physicalFootprintBytes - baselineBytes,
+          budgetBytes: memoryBudgetBytes,
+          belowBudget: physicalFootprintBytes < memoryBudgetBytes,
+          processes,
+        }),
+      );
+    }
     const nowMs = performance.now();
     if (nowMs >= deadlineMs) {
       break;

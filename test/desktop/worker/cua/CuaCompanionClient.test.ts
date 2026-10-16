@@ -178,3 +178,22 @@ it('latches failed following renewal, interrupts the active segment, and never s
     await companion.close();
   }
 });
+
+it('clears a prior task renewal failure only after acknowledged native release', async () => {
+  vi.useFakeTimers();
+  const callHostTool = vi
+    .fn<CompanionTransport['callHostTool']>()
+    .mockResolvedValueOnce(modeResult(true))
+    .mockRejectedValueOnce(new Error('renewal failed'))
+    .mockResolvedValueOnce(modeResult(false))
+    .mockResolvedValueOnce(modeResult(true))
+    .mockResolvedValue(modeResult(false));
+  const companion = new CuaCompanionClient({ callHostTool });
+  await companion.startFollowing();
+  await vi.advanceTimersByTimeAsync(15_000);
+  await expect(companion.startFollowing()).rejects.toThrow();
+  await companion.releaseFollowing();
+  await companion.startFollowing();
+  expect(callHostTool).toHaveBeenCalledTimes(4);
+  await companion.close();
+});

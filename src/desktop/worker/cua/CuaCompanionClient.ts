@@ -136,15 +136,20 @@ export class CuaCompanionClient {
     CursorCompanionStateSchema.parse(result.structuredContent);
   }
 
-  async close(): Promise<void> {
-    this.closed = true;
+  async releaseFollowing(): Promise<void> {
     if (this.renewal) {
       clearInterval(this.renewal);
       this.renewal = null;
     }
-    /* Hiding cancels natively before transport shutdown. A disconnected worker
-       also loses its runtime lease and session cleanup removes native marks. */
+    // Serialized after any in-flight renewal; native hidden retires this owner.
     await this.setMode('hidden');
+    this.followingFailure = null;
+    this.receiveFollowingFailure = null;
+  }
+
+  async close(): Promise<void> {
+    this.closed = true;
+    await this.releaseFollowing();
   }
 
   private setMode(mode: 'follow' | 'hidden'): Promise<void> {
@@ -176,7 +181,10 @@ export class CuaCompanionClient {
           details,
         );
       }
-      if (state.data.following !== (mode === 'follow')) {
+      if (
+        state.data.following !== (mode === 'follow') ||
+        (mode === 'hidden' && state.data.active)
+      ) {
         throw new TeachingFailure(
           TeachingFailureCode.COMPANION_MODE_NOT_APPLIED,
           GuidanceReason.SESSION_LOST,
