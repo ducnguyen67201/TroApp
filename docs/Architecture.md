@@ -1606,6 +1606,19 @@ account-gated main-process API client. Only main attaches cookies; media is fetc
 by authorized artifact IDs with a byte ceiling and downloaded through a native
 save dialog. Navigating away does not cancel the API job.
 
+The desktop lesson-video page keeps the library mounted behind creation, progress
+and studio dialogs. Cards use saved screen text as a content preview; full media
+loads only when a lesson is opened. Empty libraries explain creation, and class
+filters apply to the saved list. Closing a progress dialog never sends Cancel;
+only the explicit action does. Cancelled/stopped lessons remain drafts with the
+existing server-authorized Continue/edit actions. The creation form retains its
+request ID after an uncertain transport result and rotates it after acknowledgement.
+`UseLessonVideo` refreshes the list while jobs are active, including behind an open
+dialog, without blocking creation controls. Saved stages and scene artifacts drive
+progress; the UI does not invent timed percentages. Navigation fences prevent late
+responses from reopening a dismissed lesson, and command fences prevent older
+polls from overwriting mutations. No renderer timer runs or cancels backend work.
+
 `LessonVideoService` authorizes teacher/class access, snapshots selected prepared
 material, counts the immutable structured request and admits it atomically with
 teacher/deployment daily reservations. `LessonVideoConfig.ts` owns reviewed model,

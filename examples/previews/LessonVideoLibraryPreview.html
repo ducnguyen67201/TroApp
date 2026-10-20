@@ -1,0 +1,1988 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tro · Video bài giảng — bản xem thử</title>
+    <style>
+      :root {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #29362e;
+        background: #eceee8;
+        font-synthesis: none;
+        --paper: #fffdf4;
+        --green: #304e3c;
+        --muted: #7a8074;
+        --line: #e2e5d9;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      button,
+      select,
+      input,
+      textarea {
+        -webkit-tap-highlight-color: transparent;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible,
+      textarea:focus-visible,
+      summary:focus-visible {
+        outline: 3px solid #b58241;
+        outline-offset: 4px;
+      }
+      button {
+        color: inherit;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .symbols {
+        width: 0;
+        height: 0;
+        position: absolute;
+        overflow: hidden;
+      }
+      svg {
+        width: 20px;
+        height: 20px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex-shrink: 0;
+      }
+      .preview-bar {
+        min-height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 10px 28px;
+        font-size: 12px;
+        color: #647160;
+      }
+      .preview-label {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+      }
+      .preview-label::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        background: #a97b44;
+        border-radius: 50%;
+      }
+      .state-switch {
+        display: flex;
+        padding: 3px;
+        background: #e2e6dc;
+        border-radius: 9px;
+        gap: 3px;
+      }
+      .state-switch button {
+        border: 0;
+        background: transparent;
+        border-radius: 6px;
+        padding: 7px 13px;
+        font-size: 12px;
+      }
+      .state-switch button[aria-pressed='true'] {
+        background: #fffdf5;
+        box-shadow: 0 1px 4px #24342812;
+        color: #2e4935;
+      }
+      .app {
+        margin: 0 18px 18px;
+        border-radius: 15px;
+        background: #232e37;
+        padding: 0 12px 12px 0;
+        display: grid;
+        grid-template: 38px 1fr / 90px minmax(0, 1fr);
+        min-height: calc(100dvh - 74px);
+        box-shadow: 0 12px 32px #26342b15;
+      }
+      .titlebar {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding-left: 20px;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #ff6258;
+      }
+      .dot:nth-child(2) {
+        background: #ffbd30;
+      }
+      .dot:nth-child(3) {
+        background: #32c948;
+      }
+      .sidebar {
+        padding: 15px 9px 6px;
+        color: #b7c0c6;
+        display: flex;
+        align-items: center;
+        flex-direction: column;
+        gap: 15px;
+      }
+      .brand {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        margin-bottom: 24px;
+      }
+      .nav-item {
+        width: 100%;
+        padding: 12px 3px;
+        display: grid;
+        justify-items: center;
+        gap: 8px;
+        text-align: center;
+        font-size: 10px;
+        line-height: 1.4;
+      }
+      .nav-item.active {
+        border-radius: 13px;
+        background: #38454e;
+        color: #fff9e8;
+      }
+      .nav-bottom {
+        margin-top: auto;
+        width: 100%;
+        padding-top: 45px;
+      }
+      .avatar {
+        background: #f3efdf;
+        color: #354436;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-weight: 600;
+        margin: 15px auto 7px;
+      }
+      .workspace {
+        min-width: 0;
+        background: var(--paper);
+        border-radius: 23px 23px 12px 12px;
+        overflow: hidden;
+      }
+      .orgbar {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        padding: 19px 28px;
+        font-size: 12px;
+        border-bottom: 1px solid #eeeee3;
+      }
+      .role {
+        color: #a35b2d;
+        background: #f7e8d6;
+        padding: 5px 9px;
+        border-radius: 5px;
+        text-transform: uppercase;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.7px;
+      }
+      .organization {
+        font-weight: 550;
+      }
+      .org-caption {
+        margin-left: auto;
+        color: #909487;
+        font-size: 11px;
+      }
+      main {
+        max-width: 1210px;
+        margin: auto;
+        padding: 45px 48px 36px;
+      }
+      .heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 29px;
+        font-weight: 650;
+        letter-spacing: -0.8px;
+      }
+      .heading-line {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .beta {
+        background: #eef0e4;
+        color: #7b856d;
+        font-size: 10px;
+        border: 1px solid #e2e7d5;
+        border-radius: 5px;
+        padding: 4px 7px;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .subtitle {
+        margin: 12px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.7;
+      }
+      .primary {
+        border: 1px solid var(--green);
+        background: var(--green);
+        color: #fffef7;
+        border-radius: 9px;
+        padding: 12px 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 550;
+        white-space: nowrap;
+        box-shadow: 0 2px 2px #304e3c10;
+      }
+      .primary:hover {
+        background: #223d2c;
+      }
+      .primary svg {
+        width: 17px;
+        height: 17px;
+      }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin: 37px 0 25px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line);
+      }
+      .library-label {
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .count {
+        background: #ecefe3;
+        color: #6d7b61;
+        padding: 3px 7px;
+        border-radius: 5px;
+        font-size: 10px;
+      }
+      .filters {
+        display: flex;
+        gap: 8px;
+      }
+      select {
+        padding: 8px 28px 8px 10px;
+        border: 1px solid #dde1d4;
+        border-radius: 7px;
+        background: #fffdf6;
+        color: #677360;
+        font-size: 12px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 22px;
+      }
+      .card {
+        min-width: 0;
+        background: #fffef9;
+        border: 1px solid #e0e4d5;
+        border-radius: 13px;
+        overflow: hidden;
+        transition:
+          transform 0.18s,
+          box-shadow 0.18s;
+      }
+      .card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 7px 20px #3345300c;
+      }
+      .open-video {
+        border: 0;
+        padding: 0;
+        background: transparent;
+        text-align: left;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+      .poster {
+        aspect-ratio: 16 / 10;
+        width: 100%;
+        position: relative;
+        padding: 23px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .poster::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(currentColor 0.65px, transparent 0.65px);
+        background-size: 15px 15px;
+        opacity: 0.11;
+      }
+      .poster > * {
+        position: relative;
+      }
+      .sage {
+        background: #e4ead8;
+        color: #3c563d;
+      }
+      .peach {
+        background: #f4e3ce;
+        color: #855b37;
+      }
+      .blue {
+        background: #dfe8e7;
+        color: #3f6467;
+      }
+      .poster-kicker {
+        text-transform: uppercase;
+        letter-spacing: 1.6px;
+        font-size: 8px;
+        font-weight: 650;
+      }
+      .poster-title {
+        margin-top: 10px;
+        font-size: clamp(18px, 1.8vw, 25px);
+        font-weight: 650;
+        letter-spacing: -0.7px;
+        line-height: 1.25;
+      }
+      .pills {
+        display: flex;
+        gap: 8px;
+        margin-top: 18px;
+        align-items: center;
+        font-family: ui-monospace, monospace;
+        font-size: 13px;
+      }
+      .code-pill {
+        padding: 8px 13px;
+        border: 1px solid #fff9;
+        border-radius: 7px;
+        background: #ffffff6e;
+        box-shadow: 0 3px 0 #00000004;
+      }
+      .code-pill.strong {
+        color: #fff;
+        background: #587453;
+        border-color: #587453;
+        transform: rotate(-5deg);
+      }
+      .code-pill.false {
+        transform: rotate(5deg);
+        color: #7e725e;
+      }
+      .play {
+        position: absolute;
+        right: 15px;
+        bottom: 16px;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: #fffdf4e8;
+        display: grid;
+        place-items: center;
+        box-shadow: 0 2px 10px #2e3b2010;
+      }
+      .play svg {
+        width: 15px;
+        height: 15px;
+        fill: currentColor;
+        stroke-width: 1;
+        margin-left: 2px;
+      }
+      .duration {
+        position: absolute;
+        right: 11px;
+        top: 11px;
+        background: #24352eab;
+        color: #fff;
+        border-radius: 4px;
+        font-size: 9px;
+        padding: 4px 6px;
+        font-variant-numeric: tabular-nums;
+      }
+      .card-body {
+        padding: 19px 19px 17px;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+      }
+      .card-status {
+        color: #6b7c60;
+        font-size: 10px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .card-status::before {
+        content: '';
+        width: 5px;
+        height: 5px;
+        background: #82936d;
+        border-radius: 50%;
+      }
+      .card h2 {
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.55;
+        margin: 10px 0 8px;
+        letter-spacing: -0.2px;
+      }
+      .card-meta {
+        font-size: 11px;
+        color: #8a8b7f;
+        margin: auto 0 0;
+        padding-top: 8px;
+      }
+      .card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border-top: 1px solid #eceee4;
+        padding-top: 14px;
+        margin-top: 17px;
+        color: #7b8473;
+        font-size: 10px;
+      }
+      .card-footer svg {
+        width: 15px;
+        height: 15px;
+      }
+      .class-name {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .library-note {
+        text-align: center;
+        font-size: 11px;
+        color: #96998d;
+        margin-top: 30px;
+      }
+      .empty {
+        min-height: 465px;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        border: 1px solid #e3e7d8;
+        border-radius: 16px;
+        background: radial-gradient(ellipse at 50% 40%, #eaf0df 0, #f8f9ee 42%, #fbfbf1 75%);
+        overflow: hidden;
+        padding: 36px 24px;
+      }
+      .empty::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(#a8b59a 0.7px, transparent 0.7px);
+        background-size: 22px 22px;
+        opacity: 0.22;
+        mask-image: linear-gradient(#000, transparent 85%);
+      }
+      .empty > * {
+        position: relative;
+      }
+      .empty-art {
+        width: 240px;
+        height: 135px;
+        margin-bottom: 22px;
+      }
+      .sheet {
+        position: absolute;
+        width: 105px;
+        height: 114px;
+        background: #fffef8;
+        border: 1px solid #d7dfcc;
+        border-radius: 9px;
+        left: 16px;
+        top: 5px;
+        transform: rotate(-12deg);
+        padding: 20px 14px;
+        box-shadow: 0 7px 15px #5c6b3810;
+      }
+      .sheet svg {
+        color: #8c9d7b;
+        margin-bottom: 9px;
+      }
+      .sheet i {
+        display: block;
+        height: 4px;
+        background: #e3e8da;
+        margin-bottom: 7px;
+        border-radius: 4px;
+      }
+      .sheet i:last-child {
+        width: 65%;
+      }
+      .mini-player {
+        position: absolute;
+        background: #dbe5ce;
+        border: 5px solid #fffef8;
+        width: 154px;
+        height: 105px;
+        right: 5px;
+        top: 29px;
+        border-radius: 12px;
+        transform: rotate(7deg);
+        box-shadow: 0 8px 25px #465b3920;
+        display: grid;
+        place-items: center;
+      }
+      .mini-player::after {
+        content: '';
+        position: absolute;
+        bottom: 9px;
+        left: 10px;
+        right: 10px;
+        height: 3px;
+        background: linear-gradient(to right, #758e64 40%, #c6d3b9 40%);
+        border-radius: 3px;
+      }
+      .mini-player svg {
+        border-radius: 50%;
+        padding: 12px;
+        box-sizing: content-box;
+        background: #fffdf4;
+        color: #617950;
+        fill: #617950;
+        width: 16px;
+        height: 16px;
+      }
+      .spark {
+        position: absolute;
+        top: 0;
+        right: 20px;
+        color: #a7894d;
+        font-size: 24px;
+      }
+      .empty h2 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 600;
+        letter-spacing: -0.5px;
+      }
+      .empty p {
+        max-width: 430px;
+        color: #7c8572;
+        font-size: 13px;
+        line-height: 1.8;
+        margin: 13px 0 23px;
+      }
+      .empty-footnote {
+        color: #8a927e;
+        font-size: 10px;
+        margin-top: 18px;
+      }
+      .steps {
+        display: flex;
+        justify-content: center;
+        gap: 32px;
+        margin-top: 24px;
+        color: #8b9380;
+        font-size: 11px;
+      }
+      .steps span {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .steps b {
+        border: 1px solid #dce2d2;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: grid;
+        place-items: center;
+        font-size: 9px;
+        font-weight: 500;
+      }
+      dialog {
+        padding: 0;
+        border: 1px solid #d8dece;
+        border-radius: 18px;
+        background: var(--paper);
+        color: #29362e;
+        width: min(580px, calc(100vw - 32px));
+        max-height: calc(100dvh - 40px);
+        box-shadow: 0 20px 90px #17281e35;
+      }
+      dialog::backdrop {
+        background: #202e2b66;
+        backdrop-filter: blur(4px);
+      }
+      .dialog-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 27px 28px 0;
+        gap: 16px;
+      }
+      .dialog-header h2 {
+        margin: 0;
+        font-size: 21px;
+        font-weight: 600;
+        letter-spacing: -0.5px;
+      }
+      .close {
+        border: 1px solid #e1e4d7;
+        background: transparent;
+        border-radius: 50%;
+        padding: 6px;
+        display: flex;
+      }
+      .close svg {
+        width: 16px;
+        height: 16px;
+      }
+      .dialog-body {
+        padding: 22px 28px 28px;
+      }
+      .field {
+        display: grid;
+        gap: 9px;
+        margin-bottom: 21px;
+        font-size: 12px;
+        font-weight: 550;
+      }
+      .field select,
+      textarea {
+        width: 100%;
+        border: 1px solid #d8dece;
+        border-radius: 8px;
+        padding: 12px;
+        background: #fffef9;
+        color: #354635;
+        font-size: 13px;
+        font-weight: 400;
+      }
+      textarea {
+        resize: vertical;
+        min-height: 110px;
+        line-height: 1.6;
+      }
+      textarea::placeholder {
+        color: #9c9e90;
+      }
+      .material {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        border: 1px solid #e1e5d7;
+        border-radius: 8px;
+        padding: 13px;
+        font-size: 12px;
+        margin: 10px 0 20px;
+      }
+      input {
+        accent-color: var(--green);
+      }
+      .hint {
+        color: #7e8773;
+        font-size: 11px;
+        line-height: 1.7;
+      }
+      details {
+        font-size: 12px;
+        margin: 17px 0;
+        color: #6b775f;
+      }
+      summary {
+        cursor: pointer;
+      }
+      .dialog-footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        margin-top: 24px;
+        padding-top: 21px;
+        border-top: 1px solid var(--line);
+      }
+      .video-dialog {
+        width: min(760px, calc(100vw - 32px));
+      }
+      .preview-frame {
+        aspect-ratio: 16 / 9;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        margin-bottom: 14px;
+        padding: 28px;
+      }
+      .preview-frame h3 {
+        font-size: clamp(24px, 4vw, 38px);
+        line-height: 1.3;
+        max-width: 550px;
+        letter-spacing: -1px;
+        margin: 10px 0 20px;
+      }
+      .preview-frame .pills {
+        justify-content: center;
+      }
+      .scene-controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 18px;
+      }
+      .scene-controls button {
+        border: 1px solid #d9dfcd;
+        background: #f2f4e9;
+        padding: 9px 13px;
+        border-radius: 7px;
+        font-size: 12px;
+      }
+      .scene-controls button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      .scene-controls span {
+        font-size: 11px;
+        color: #7d8771;
+      }
+      .card-progress {
+        margin-top: 14px;
+        height: 4px;
+      }
+      .card[data-state='running'] {
+        border-color: #bac9a7;
+      }
+      .card[data-state='running'] .card-status::before {
+        background: #b18b47;
+      }
+      .card[data-state='running'] .play svg,
+      .card[data-state='draft'] .play svg {
+        display: none;
+      }
+      .card[data-state='running'] .play::after {
+        content: '';
+        width: 15px;
+        height: 15px;
+        border: 2px solid #d1dcc5;
+        border-top-color: #668257;
+        border-radius: 50%;
+        animation: orbit 1.3s linear infinite;
+      }
+      .card[data-state='draft'] .play::after {
+        content: '↻';
+        font-size: 22px;
+      }
+      .card[data-state='draft'] .card-status::before {
+        background: #a69b83;
+      }
+      .card[data-state='draft'] .poster {
+        opacity: 0.7;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .card[data-state='running'] .play::after {
+          animation: none;
+        }
+      }
+      .generation-art {
+        position: relative;
+        display: grid;
+        place-items: center;
+        height: 145px;
+        background: radial-gradient(ellipse, #e4ebd7, #f6f8ed 70%);
+        border: 1px solid #e1e6d6;
+        border-radius: 12px;
+        margin-bottom: 22px;
+        overflow: hidden;
+      }
+      .generation-art svg {
+        width: 36px;
+        height: 36px;
+        color: #668257;
+      }
+      .generation-art::after {
+        content: '';
+        position: absolute;
+        width: 82px;
+        height: 82px;
+        border: 2px solid #d7e0ca;
+        border-top-color: #668257;
+        border-radius: 50%;
+        animation: orbit 2s linear infinite;
+      }
+      .generation-art.complete::after {
+        animation: none;
+        border-color: #8da47b;
+      }
+      @keyframes orbit {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .generation-context {
+        padding: 12px 14px;
+        background: #f1f3e8;
+        border-radius: 8px;
+        margin-bottom: 20px;
+      }
+      .generation-context p {
+        margin: 5px 0 0;
+        font-size: 12px;
+        line-height: 1.6;
+        overflow-wrap: anywhere;
+        max-height: 80px;
+        overflow: auto;
+      }
+      .generation-context span {
+        font-size: 10px;
+        color: #7e8773;
+      }
+      .generation-progress {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        margin-bottom: 10px;
+        gap: 12px;
+      }
+      progress {
+        display: block;
+        width: 100%;
+        height: 6px;
+        border: 0;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #e8ecdf;
+        accent-color: #668257;
+      }
+      progress::-webkit-progress-bar {
+        background: #e8ecdf;
+      }
+      progress::-webkit-progress-value {
+        background: #668257;
+        transition: width 0.4s;
+      }
+      .generation-steps {
+        list-style: none;
+        padding: 0;
+        margin: 23px 0 0;
+        display: grid;
+        gap: 17px;
+      }
+      .generation-steps li {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: #939b8b;
+        font-size: 12px;
+      }
+      .step-marker {
+        width: 26px;
+        height: 26px;
+        border: 1px solid #dce2d2;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        font-size: 10px;
+      }
+      .generation-steps li[data-state='active'] {
+        color: #304e3c;
+        font-weight: 600;
+      }
+      .generation-steps li[data-state='active'] .step-marker {
+        background: #e7eddc;
+        border-color: #9bb08b;
+      }
+      .generation-steps li[data-state='complete'] {
+        color: #627957;
+      }
+      .generation-steps li[data-state='complete'] .step-marker {
+        background: #668257;
+        border-color: #668257;
+        color: white;
+      }
+      .secondary {
+        padding: 11px 14px;
+        border: 1px solid #dce2d2;
+        background: transparent;
+        border-radius: 8px;
+        font-size: 12px;
+      }
+      .generation-actions {
+        display: flex;
+        gap: 9px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      #generation-dialog .dialog-footer {
+        flex-wrap: wrap;
+      }
+      .card h2,
+      .poster-title {
+        overflow-wrap: anywhere;
+      }
+      @media (min-width: 1450px) {
+        main {
+          padding-top: 58px;
+        }
+        .poster {
+          padding: 30px;
+        }
+      }
+      @media (max-width: 1050px) {
+        main {
+          padding: 35px 28px;
+        }
+        .grid {
+          gap: 15px;
+        }
+        .poster {
+          padding: 17px;
+        }
+        .poster-title {
+          font-size: 21px;
+        }
+        .code-pill {
+          padding: 6px 9px;
+        }
+        .org-caption {
+          display: none;
+        }
+      }
+      @media (max-width: 800px) {
+        .grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .heading-line {
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .heading {
+          align-items: flex-start;
+        }
+        h1 {
+          font-size: 25px;
+        }
+        .subtitle {
+          max-width: 310px;
+        }
+        .steps {
+          gap: 15px;
+        }
+      }
+      @media (max-width: 560px) {
+        .preview-bar {
+          padding: 10px 14px;
+          flex-wrap: wrap;
+        }
+        .app {
+          margin: 0 6px 6px;
+          grid-template-columns: 52px minmax(0, 1fr);
+          padding-right: 5px;
+        }
+        .sidebar {
+          padding: 14px 4px;
+        }
+        .brand {
+          width: 27px;
+          height: 27px;
+        }
+        .nav-item {
+          font-size: 8px;
+          padding: 12px 1px;
+        }
+        .nav-item svg {
+          width: 17px;
+          height: 17px;
+        }
+        .orgbar {
+          padding: 16px;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .role {
+          font-size: 8px;
+        }
+        .organization {
+          font-size: 11px;
+        }
+        main {
+          padding: 26px 16px;
+        }
+        .heading {
+          flex-wrap: wrap;
+        }
+        .heading .primary {
+          margin-left: auto;
+        }
+        .toolbar {
+          flex-wrap: wrap;
+          margin-top: 25px;
+        }
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .poster {
+          padding: 28px;
+        }
+        .poster-title {
+          font-size: 28px;
+        }
+        .empty {
+          min-height: 460px;
+          padding: 30px 15px;
+        }
+        .empty-art {
+          transform: scale(0.8);
+          margin-bottom: 8px;
+        }
+        .empty h2 {
+          font-size: 21px;
+        }
+        .steps {
+          flex-direction: column;
+          gap: 12px;
+          align-items: center;
+        }
+        .dialog-header {
+          padding: 22px 20px 0;
+        }
+        .dialog-body {
+          padding: 20px;
+        }
+        .dialog-footer {
+          flex-wrap: wrap;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .card {
+          transition: none;
+        }
+        .generation-art::after {
+          animation: none;
+        }
+        progress::-webkit-progress-value {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg class="symbols" aria-hidden="true">
+      <defs>
+        <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+        <symbol id="play" viewBox="0 0 24 24"><path d="m8 4 12 8-12 8z" /></symbol>
+        <symbol id="class" viewBox="0 0 24 24">
+          <path d="m2 8 10-5 10 5-10 5zM6 10v7q6 5 12 0v-7M22 8v8" />
+        </symbol>
+        <symbol id="chat" viewBox="0 0 24 24">
+          <path d="M20 11a8 8 0 0 1-11 7l-6 2 2-6A8 8 0 1 1 20 11Z" />
+        </symbol>
+        <symbol id="chart" viewBox="0 0 24 24">
+          <rect x="3" y="12" width="4" height="9" rx="1" />
+          <rect x="10" y="3" width="4" height="18" rx="1" />
+          <rect x="17" y="8" width="4" height="13" rx="1" />
+        </symbol>
+        <symbol id="pet" viewBox="0 0 24 24">
+          <path d="M7 14c-5 6 0 8 5 5 5 3 10 1 5-5-3-4-7-4-10 0Z" />
+          <ellipse cx="4" cy="9" rx="2" ry="3" />
+          <ellipse cx="9" cy="5" rx="2" ry="3" />
+          <ellipse cx="15" cy="5" rx="2" ry="3" />
+          <ellipse cx="20" cy="9" rx="2" ry="3" />
+        </symbol>
+        <symbol id="settings" viewBox="0 0 24 24">
+          <path d="m9 3-1 3-3 1-2 4 2 2v4l4 3 3-1 3 1 4-3v-4l2-2-2-4-3-1-1-3z" />
+          <circle cx="12" cy="12" r="3" />
+        </symbol>
+        <symbol id="close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6" /></symbol>
+        <symbol id="file" viewBox="0 0 24 24">
+          <path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6" />
+        </symbol>
+        <symbol id="arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5" /></symbol>
+      </defs>
+    </svg>
+    <div class="preview-bar">
+      <span class="preview-label">BẢN XEM THỬ <span> / Video bài giảng</span></span>
+      <div class="state-switch" aria-label="Trạng thái bản xem thử">
+        <button type="button" id="ready-state" aria-pressed="true">Đã có video</button>
+        <button type="button" id="empty-state" aria-pressed="false">Chưa có video</button>
+      </div>
+    </div>
+    <div class="app">
+      <div class="titlebar" aria-hidden="true">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      </div>
+      <aside class="sidebar" aria-label="Thanh điều hướng minh họa">
+        <img class="brand" src="onboarding/public/Brand/TroMark.png" alt="Tro" />
+        <div class="nav-item">
+          <svg aria-hidden="true"><use href="#chat" /></svg>Trò chuyện
+        </div>
+        <div class="nav-item">
+          <svg aria-hidden="true"><use href="#class" /></svg>Lớp học
+        </div>
+        <div class="nav-item">
+          <svg aria-hidden="true"><use href="#chart" /></svg>Tiến độ<br />học tập
+        </div>
+        <div class="nav-item active" aria-current="page">
+          <svg aria-hidden="true"><use href="#play" /></svg>Video<br />bài giảng
+        </div>
+        <div class="nav-item">
+          <svg aria-hidden="true"><use href="#pet" /></svg>Thế giới<br />thú cưng
+        </div>
+        <div class="nav-bottom">
+          <div class="nav-item">
+            <svg aria-hidden="true"><use href="#settings" /></svg>Cài đặt
+          </div>
+          <div class="avatar">D</div>
+          <div style="text-align: center; font-size: 9px">Giáo viên</div>
+        </div>
+      </aside>
+      <div class="workspace">
+        <div class="orgbar">
+          <span class="role">Quản trị viên</span
+          ><span class="organization"
+            >Codespace Education
+            <span aria-hidden="true" style="margin-left: 10px; color: #9aa08e">⌄</span></span
+          ><span class="org-caption">Không gian giảng dạy của bạn</span>
+        </div>
+        <main>
+          <header class="heading">
+            <div>
+              <div class="heading-line">
+                <h1>Video bài giảng</h1>
+                <span class="beta">Thử nghiệm</span>
+              </div>
+              <p class="subtitle">Biến kiến thức thành những bài giảng sinh động, dễ hiểu.</p>
+            </div>
+            <button type="button" class="primary" data-create>
+              <svg aria-hidden="true"><use href="#plus" /></svg>Tạo video
+            </button>
+          </header>
+          <div class="toolbar">
+            <div class="library-label">
+              Thư viện của bạn <span class="count" id="video-count">3 video</span>
+            </div>
+            <div class="filters" id="filters">
+              <select aria-label="Lọc theo lớp học" id="class-filter">
+                <option value="all">Tất cả lớp học</option>
+                <option value="python">Python cơ bản</option>
+                <option value="demo">Demo Class</option>
+              </select>
+            </div>
+          </div>
+          <section id="ready-view" aria-label="Các video bài giảng">
+            <div class="grid">
+              <article class="card" data-class="demo">
+                <button
+                  type="button"
+                  class="open-video"
+                  data-lesson="boolean"
+                  aria-label="Xem trước Boolean là gì? Cách dùng True và False trong Python"
+                >
+                  <div class="poster sage">
+                    <span class="poster-kicker">Python · Bài 04</span
+                    ><span class="poster-title">Đúng hay sai?<br />Để Boolean trả lời.</span>
+                    <div class="pills">
+                      <span class="code-pill strong">True</span><span style="opacity: 0.4">/</span
+                      ><span class="code-pill false">False</span>
+                    </div>
+                    <span class="duration">01:42</span
+                    ><span class="play"
+                      ><svg aria-hidden="true"><use href="#play" /></svg
+                    ></span>
+                  </div>
+                  <div class="card-body">
+                    <span class="card-status">Sẵn sàng</span>
+                    <h2>Boolean là gì? Cách dùng True và False trong Python</h2>
+                    <p class="card-meta">5 cảnh · Giọng đọc AI</p>
+                    <div class="card-footer">
+                      <span class="class-name"
+                        ><svg aria-hidden="true"><use href="#class" /></svg>Demo Class</span
+                      ><span>Hôm nay</span>
+                    </div>
+                  </div>
+                </button>
+              </article>
+              <article class="card" data-class="python">
+                <button
+                  type="button"
+                  class="open-video"
+                  data-lesson="condition"
+                  aria-label="Xem trước Câu lệnh if else: Khi chương trình biết lựa chọn"
+                >
+                  <div class="poster peach">
+                    <span class="poster-kicker">Python · Bài 05</span
+                    ><span class="poster-title">Nếu trời mưa,<br />thì mang ô.</span>
+                    <div class="pills">
+                      <span class="code-pill">if</span
+                      ><svg aria-hidden="true"><use href="#arrow" /></svg
+                      ><span class="code-pill">else</span>
+                    </div>
+                    <span class="duration">01:56</span
+                    ><span class="play"
+                      ><svg aria-hidden="true"><use href="#play" /></svg
+                    ></span>
+                  </div>
+                  <div class="card-body">
+                    <span class="card-status">Sẵn sàng</span>
+                    <h2>Câu lệnh if / else: Khi chương trình biết lựa chọn</h2>
+                    <p class="card-meta">6 cảnh · Giọng đọc AI</p>
+                    <div class="card-footer">
+                      <span class="class-name"
+                        ><svg aria-hidden="true"><use href="#class" /></svg>Python cơ bản</span
+                      ><span>Hôm qua</span>
+                    </div>
+                  </div>
+                </button>
+              </article>
+              <article class="card" data-class="python">
+                <button
+                  type="button"
+                  class="open-video"
+                  data-lesson="loop"
+                  aria-label="Xem trước Hiểu vòng lặp for qua những ví dụ quen thuộc"
+                >
+                  <div class="poster blue">
+                    <span class="poster-kicker">Python · Bài 06</span
+                    ><span class="poster-title">Một lần viết.<br />Nhiều lần thực hiện.</span>
+                    <div class="pills">
+                      <span class="code-pill">1</span><span>→</span><span class="code-pill">2</span
+                      ><span>→</span><span class="code-pill">3</span>
+                    </div>
+                    <span class="duration">01:28</span
+                    ><span class="play"
+                      ><svg aria-hidden="true"><use href="#play" /></svg
+                    ></span>
+                  </div>
+                  <div class="card-body">
+                    <span class="card-status">Sẵn sàng</span>
+                    <h2>Hiểu vòng lặp for qua những ví dụ quen thuộc</h2>
+                    <p class="card-meta">4 cảnh · Giọng đọc AI</p>
+                    <div class="card-footer">
+                      <span class="class-name"
+                        ><svg aria-hidden="true"><use href="#class" /></svg>Python cơ bản</span
+                      ><span>12 thg 10</span>
+                    </div>
+                  </div>
+                </button>
+              </article>
+            </div>
+            <p class="library-note">Mỗi ý tưởng nhỏ, một bài giảng đáng nhớ.</p>
+          </section>
+          <section id="empty-view" hidden aria-label="Chưa có video bài giảng">
+            <div class="empty">
+              <div class="empty-art" aria-hidden="true">
+                <div class="sheet">
+                  <svg><use href="#file" /></svg><i></i><i></i><i></i>
+                </div>
+                <div class="mini-player">
+                  <svg><use href="#play" /></svg>
+                </div>
+                <span class="spark">✧</span>
+              </div>
+              <h2>Bài giảng đầu tiên<br />bắt đầu từ một ý tưởng.</h2>
+              <p>
+                Một khái niệm khó, một ví dụ hay, hay tài liệu của lớp.<br />Tro giúp bạn kể lại
+                bằng một video ngắn, dễ hiểu.
+              </p>
+              <button type="button" class="primary" data-create>
+                <svg aria-hidden="true"><use href="#plus" /></svg>Tạo video đầu tiên</button
+              ><span class="empty-footnote">3–6 cảnh · Khoảng 1–2 phút · Giọng đọc AI</span>
+            </div>
+            <div class="steps">
+              <span><b>1</b>Chọn lớp & tài liệu</span><span><b>2</b>Mô tả ý tưởng</span
+              ><span><b>3</b>Xem bài giảng</span>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+    <dialog id="create-dialog" aria-labelledby="create-title">
+      <div class="dialog-header">
+        <div>
+          <h2 id="create-title">Bạn muốn giải thích điều gì?</h2>
+          <p class="subtitle">Từ ý tưởng của bạn đến bài giảng của cả lớp.</p>
+        </div>
+        <button class="close" type="button" data-close aria-label="Đóng">
+          <svg aria-hidden="true"><use href="#close" /></svg>
+        </button>
+      </div>
+      <form id="create-form" class="dialog-body">
+        <label class="field"
+          >Lớp học<select id="create-class">
+            <option>Demo Class</option>
+            <option>Python cơ bản</option>
+          </select></label
+        >
+        <label class="field"
+          >Ý tưởng bài giảng
+          <textarea
+            required
+            maxlength="2000"
+            id="lesson-idea"
+            placeholder="Ví dụ: Giải thích Boolean cho học sinh mới học Python, kèm ví dụ đúng / sai trong cuộc sống."
+          ></textarea>
+        </label>
+        <div style="font-size: 12px; font-weight: 550">Tài liệu của lớp</div>
+        <label class="material" id="material-option"
+          ><input type="checkbox" checked /><svg aria-hidden="true"><use href="#file" /></svg>Bài 4.
+          Toán tử logic và so sánh.pdf</label
+        >
+        <p class="hint" id="no-material" hidden>Lớp này chưa có tài liệu trong bản xem thử.</p>
+        <details>
+          <summary>Chi phí và giới hạn</summary>
+          <p class="hint">
+            Đây là bản xem thử giao diện. Không tạo video thực tế và không phát sinh chi phí. Trong
+            sản phẩm, hạn mức và chi phí sẽ hiển thị tại đây trước khi tạo.
+          </p>
+        </details>
+        <div class="dialog-footer">
+          <span class="hint">3–6 cảnh · 1–2 phút · Giọng đọc AI</span
+          ><button type="submit" class="primary">
+            Tạo video<svg aria-hidden="true"><use href="#arrow" /></svg>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="video-dialog" class="video-dialog" aria-labelledby="video-title">
+      <div class="dialog-header">
+        <div>
+          <h2 id="video-title">Xem trước bài giảng</h2>
+          <p class="subtitle">Minh họa giao diện · Nội dung mẫu</p>
+        </div>
+        <button class="close" type="button" data-close aria-label="Đóng bản xem trước">
+          <svg aria-hidden="true"><use href="#close" /></svg>
+        </button>
+      </div>
+      <div class="dialog-body">
+        <div class="preview-frame sage" id="preview-frame">
+          <div>
+            <div class="poster-kicker" id="scene-kicker">Python cơ bản</div>
+            <h3 id="scene-title"></h3>
+            <div class="pills" id="scene-example"></div>
+          </div>
+        </div>
+        <p class="hint" id="scene-description"></p>
+        <div class="scene-controls">
+          <button type="button" id="previous-scene">← Cảnh trước</button
+          ><span id="scene-count"></span><button type="button" id="next-scene">Cảnh tiếp →</button>
+        </div>
+      </div>
+    </dialog>
+    <dialog id="generation-dialog" aria-labelledby="generation-title">
+      <div class="dialog-header">
+        <div>
+          <h2 id="generation-title">Bài giảng đang thành hình</h2>
+          <p class="subtitle" id="generation-subtitle">
+            Tro đang kết nối ý tưởng, hình ảnh và lời kể.
+          </p>
+        </div>
+        <button
+          class="close"
+          type="button"
+          id="close-generation"
+          aria-label="Đóng và tiếp tục tạo trong nền"
+        >
+          <svg aria-hidden="true"><use href="#close" /></svg>
+        </button>
+      </div>
+      <div class="dialog-body">
+        <div class="generation-art" id="generation-art" aria-hidden="true">
+          <svg><use href="#play" /></svg>
+        </div>
+        <div class="generation-context">
+          <span id="generation-class">Demo Class</span>
+          <p id="generation-idea"></p>
+        </div>
+        <div class="generation-progress">
+          <span id="generation-status" role="status">Đang lên kịch bản…</span
+          ><span id="generation-percent">0%</span>
+        </div>
+        <progress
+          id="generation-progress"
+          max="100"
+          value="0"
+          aria-label="Tiến độ tạo video mẫu"
+        ></progress>
+        <ol class="generation-steps">
+          <li data-generation-step>
+            <span class="step-marker">1</span><span>Lên kịch bản bài giảng</span>
+          </li>
+          <li data-generation-step>
+            <span class="step-marker">2</span><span>Thiết kế các cảnh minh họa</span>
+          </li>
+          <li data-generation-step><span class="step-marker">3</span><span>Tạo giọng đọc</span></li>
+          <li data-generation-step>
+            <span class="step-marker">4</span><span>Ghép và hoàn thiện video</span>
+          </li>
+        </ol>
+        <div class="dialog-footer">
+          <span class="hint" id="generation-hint"
+            >Bạn có thể đóng cửa sổ này, video vẫn tiếp tục được tạo. · Mô phỏng 12 giây</span
+          >
+          <div class="generation-actions">
+            <button type="button" class="secondary" id="cancel-generation">Hủy bản chạy thử</button
+            ><button type="button" class="secondary" id="retry-generation" hidden>
+              Tạo lại bản mẫu
+            </button>
+            <button type="button" class="secondary" id="return-library">Về thư viện</button
+            ><button type="button" class="primary" id="preview-generated" hidden>
+              <svg aria-hidden="true"><use href="#play" /></svg>Xem bài giảng
+            </button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+    <script>
+      // Local interaction fixtures only; this prototype never contacts a provider.
+      /** @param {string} id @returns {HTMLElement} */
+      function getElement(id) {
+        const element = document.getElementById(id);
+        if (!(element instanceof HTMLElement)) {
+          throw new Error(`Missing element: ${id}`);
+        }
+        return element;
+      }
+
+      /** @param {string} id @returns {HTMLDialogElement} */
+      function getDialog(id) {
+        const element = getElement(id);
+        if (!(element instanceof HTMLDialogElement)) {
+          throw new Error(`Missing dialog: ${id}`);
+        }
+        return element;
+      }
+
+      let showExampleVideos = true;
+
+      /** @param {boolean} isReady */
+      function showLibraryState(isReady) {
+        getElement('ready-view').hidden = !isReady;
+        getElement('empty-view').hidden = isReady;
+        getElement('filters').hidden = !isReady;
+        getElement('ready-state').setAttribute('aria-pressed', String(isReady));
+        getElement('empty-state').setAttribute('aria-pressed', String(!isReady));
+        if (isReady) {
+          filterVideos();
+        } else {
+          getElement('video-count').textContent = '0 video';
+        }
+      }
+
+      function filterVideos() {
+        const filter = getElement('class-filter');
+        if (!(filter instanceof HTMLSelectElement)) {
+          return;
+        }
+        let visibleCount = 0;
+        document.querySelectorAll('.card').forEach((card) => {
+          if (!(card instanceof HTMLElement)) {
+            return;
+          }
+          card.hidden =
+            (!showExampleVideos && card.dataset.generated !== 'true') ||
+            (filter.value !== 'all' && card.dataset.class !== filter.value);
+          if (!card.hidden) {
+            visibleCount += 1;
+          }
+        });
+        getElement('video-count').textContent = `${visibleCount} video`;
+      }
+
+      /** @typedef {{ title: string, example: string, description: string }} Scene */
+      /** @type {Record<string, { title: string, theme: string, scenes: Scene[] }>} */
+      const lessons = {
+        boolean: {
+          title: 'Boolean là gì?',
+          theme: 'sage',
+          scenes: [
+            {
+              title: 'Một câu hỏi. Hai câu trả lời.',
+              example: 'True / False',
+              description: 'Boolean biểu diễn một trong hai giá trị: đúng (True) hoặc sai (False).',
+            },
+            {
+              title: 'Hôm nay có phải thứ Hai?',
+              example: 'is_monday = False',
+              description: 'Một câu hỏi có / không có thể được biểu diễn bằng một giá trị Boolean.',
+            },
+            {
+              title: 'So sánh cũng cho ra Boolean.',
+              example: '5 > 3 → True',
+              description: 'Python trả về True vì 5 lớn hơn 3. Hãy thử với 5 < 3.',
+            },
+          ],
+        },
+        condition: {
+          title: 'Câu lệnh if / else',
+          theme: 'peach',
+          scenes: [
+            {
+              title: 'Nếu trời mưa, thì mang ô.',
+              example: 'if is_raining:',
+              description: 'Câu lệnh if kiểm tra một điều kiện trước khi thực hiện hành động.',
+            },
+            {
+              title: 'Nếu không, đi dạo thôi.',
+              example: 'else:',
+              description: 'Nhánh else được thực hiện khi điều kiện của if là False.',
+            },
+            {
+              title: 'Chương trình biết lựa chọn.',
+              example: 'True → if · False → else',
+              description: 'Chỉ một trong hai nhánh được thực hiện ở mỗi lần kiểm tra.',
+            },
+          ],
+        },
+        loop: {
+          title: 'Hiểu vòng lặp for',
+          theme: 'blue',
+          scenes: [
+            {
+              title: 'Một lần viết. Nhiều lần thực hiện.',
+              example: 'for i in range(3):',
+              description: 'Vòng lặp giúp thực hiện cùng một hành động nhiều lần.',
+            },
+            {
+              title: 'Bắt đầu đếm từ số 0.',
+              example: '0 → 1 → 2',
+              description: 'range(3) tạo ra ba giá trị: 0, 1 và 2.',
+            },
+            {
+              title: 'Thử gửi ba lời chào.',
+              example: 'print("Xin chào!")',
+              description: 'Đặt lệnh print bên trong vòng lặp để in lời chào ba lần.',
+            },
+          ],
+        },
+      };
+      let activeLesson = 'boolean';
+      let sceneIndex = 0;
+
+      function renderScene() {
+        const lesson = lessons[activeLesson];
+        const scene = lesson?.scenes[sceneIndex];
+        if (!lesson || !scene) {
+          return;
+        }
+        getElement('video-title').textContent = lesson.title;
+        getElement('preview-frame').className = `preview-frame ${lesson.theme}`;
+        getElement('scene-title').textContent = scene.title;
+        getElement('scene-example').textContent = scene.example;
+        getElement('scene-description').textContent = scene.description;
+        getElement('scene-count').textContent =
+          `Cảnh mẫu ${sceneIndex + 1} / ${lesson.scenes.length}`;
+        const previousButton = getElement('previous-scene');
+        const nextButton = getElement('next-scene');
+        if (previousButton instanceof HTMLButtonElement) {
+          previousButton.disabled = sceneIndex === 0;
+        }
+        if (nextButton instanceof HTMLButtonElement) {
+          nextButton.disabled = sceneIndex === lesson.scenes.length - 1;
+        }
+      }
+
+      getElement('ready-state').addEventListener('click', () => {
+        showExampleVideos = true;
+        showLibraryState(true);
+      });
+      getElement('empty-state').addEventListener('click', () => {
+        showExampleVideos = false;
+        showLibraryState(false);
+      });
+      getElement('class-filter').addEventListener('change', filterVideos);
+      document.querySelectorAll('[data-create]').forEach((button) => {
+        button.addEventListener('click', () => getDialog('create-dialog').showModal());
+      });
+      document.querySelectorAll('[data-close]').forEach((button) => {
+        button.addEventListener('click', () => button.closest('dialog')?.close());
+      });
+      /** @param {string} lessonKey */
+      function openLessonPreview(lessonKey) {
+        if (!lessons[lessonKey]) {
+          return;
+        }
+        activeLesson = lessonKey;
+        sceneIndex = 0;
+        renderScene();
+        getDialog('video-dialog').showModal();
+      }
+
+      getElement('ready-view').addEventListener('click', (event) => {
+        if (!(event.target instanceof Element)) {
+          return;
+        }
+        const button = event.target.closest('[data-lesson]');
+        if (!(button instanceof HTMLElement) || !button.dataset.lesson) {
+          return;
+        }
+        const job = generationJobs.get(button.dataset.lesson);
+        if (job && job.state !== GenerationState.READY) {
+          openGeneration(job);
+        } else {
+          openLessonPreview(button.dataset.lesson);
+        }
+      });
+      getElement('previous-scene').addEventListener('click', () => {
+        sceneIndex = Math.max(0, sceneIndex - 1);
+        renderScene();
+      });
+      getElement('next-scene').addEventListener('click', () => {
+        const lesson = lessons[activeLesson];
+        if (!lesson) {
+          return;
+        }
+        sceneIndex = Math.min(lesson.scenes.length - 1, sceneIndex + 1);
+        renderScene();
+      });
+      getElement('create-class').addEventListener('change', (event) => {
+        if (!(event.target instanceof HTMLSelectElement)) {
+          return;
+        }
+        const hasMaterial = event.target.value === 'Demo Class';
+        getElement('material-option').hidden = !hasMaterial;
+        getElement('no-material').hidden = hasMaterial;
+      });
+      const GenerationState = { RUNNING: 'running', READY: 'ready', DRAFT: 'draft' };
+      const GenerationStage = {
+        SCRIPT: 'Đang soạn kịch bản…',
+        SCENES: 'Đang thiết kế cảnh minh họa…',
+        VOICE: 'Đang tạo giọng đọc…',
+        RENDER: 'Đang ghép và hoàn thiện video…',
+      };
+      const generationStages = Object.values(GenerationStage);
+      /** @typedef {{ key: string, idea: string, className: string, title: string, percent: number, state: string, timer: ReturnType<typeof setInterval> | undefined, card: HTMLElement }} GenerationJob */
+      /** @type {Map<string, GenerationJob>} */
+      const generationJobs = new Map();
+      let activeGenerationKey = '';
+      let generationNumber = 0;
+
+      /** @param {GenerationJob} job */
+      function renderGenerationProgress(job) {
+        const isComplete = job.state === GenerationState.READY;
+        const isDraft = job.state === GenerationState.DRAFT;
+        const stageIndex = Math.min(3, Math.floor(job.percent / 25));
+        const progress = getElement('generation-progress');
+        if (progress instanceof HTMLProgressElement) {
+          progress.value = job.percent;
+        }
+        getElement('generation-percent').textContent = `${job.percent}%`;
+        getElement('generation-status').textContent = isDraft
+          ? 'Đã dừng · Ý tưởng được giữ trong bản nháp'
+          : isComplete
+            ? 'Hoàn tất · Bài giảng mẫu đã sẵn sàng'
+            : (generationStages[stageIndex] ?? 'Đang chuẩn bị…');
+        getElement('generation-title').textContent = isDraft
+          ? 'Bản nháp của bạn'
+          : isComplete
+            ? 'Bài giảng đã sẵn sàng!'
+            : 'Bài giảng đang thành hình';
+        getElement('generation-subtitle').textContent = isDraft
+          ? 'Bạn có thể tạo lại bài giảng này bất cứ lúc nào.'
+          : isComplete
+            ? 'Xem thử bài giảng hoặc tìm lại trong thư viện của bạn.'
+            : 'Tro đang kết nối ý tưởng, hình ảnh và lời kể.';
+        getElement('generation-hint').textContent = isDraft
+          ? 'Bản chạy thử đã dừng. Chọn Tạo lại để bắt đầu lại.'
+          : isComplete
+            ? 'Bài giảng minh họa · Không tạo video thật'
+            : 'Bạn có thể đóng cửa sổ này, video vẫn tiếp tục được tạo. · Mô phỏng 12 giây';
+        getElement('generation-art').classList.toggle('complete', isComplete || isDraft);
+        getElement('cancel-generation').hidden = isComplete || isDraft;
+        getElement('retry-generation').hidden = !isDraft;
+        getElement('preview-generated').hidden = !isComplete;
+        getElement('generation-idea').textContent = job.idea;
+        getElement('generation-class').textContent = job.className;
+        getElement('close-generation').setAttribute(
+          'aria-label',
+          isComplete || isDraft ? 'Đóng' : 'Đóng và tiếp tục tạo trong nền',
+        );
+        document.querySelectorAll('[data-generation-step]').forEach((step, index) => {
+          if (!(step instanceof HTMLElement)) {
+            return;
+          }
+          const isStepComplete = isComplete || (!isDraft && index < stageIndex);
+          step.dataset.state = isStepComplete
+            ? 'complete'
+            : !isDraft && index === stageIndex
+              ? 'active'
+              : 'pending';
+          if (index === stageIndex && !isComplete && !isDraft) {
+            step.setAttribute('aria-current', 'step');
+          } else {
+            step.removeAttribute('aria-current');
+          }
+          const marker = step.querySelector('.step-marker');
+          if (marker) {
+            marker.textContent = isStepComplete ? '✓' : String(index + 1);
+          }
+        });
+      }
+
+      /** @param {GenerationJob} job */
+      function renderGenerationCard(job) {
+        const isComplete = job.state === GenerationState.READY;
+        const isDraft = job.state === GenerationState.DRAFT;
+        const stageIndex = Math.min(3, Math.floor(job.percent / 25));
+        const status = isDraft
+          ? 'Bản nháp · Đã dừng'
+          : isComplete
+            ? 'Sẵn sàng · Mô phỏng'
+            : job.percent < 25
+              ? 'Đang soạn kịch bản'
+              : 'Đang xử lý video';
+        job.card.dataset.state = job.state;
+        const button = job.card.querySelector('[data-lesson]');
+        if (button) {
+          button.setAttribute(
+            'aria-label',
+            `${isComplete ? 'Xem trước' : 'Xem tiến độ'} ${job.title}`,
+          );
+        }
+        const replacements = [
+          ['.card-status', status],
+          ['.duration', isDraft ? 'Bản nháp' : isComplete ? 'Bản mẫu' : `${job.percent}%`],
+          [
+            '.card-meta',
+            isDraft
+              ? 'Ý tưởng đã lưu · Nhấn để tạo lại'
+              : isComplete
+                ? '3 cảnh minh họa'
+                : (generationStages[stageIndex] ?? 'Đang chuẩn bị…'),
+          ],
+          [
+            '.card-footer > span:last-child',
+            isDraft ? 'Tạo lại →' : isComplete ? 'Vừa xong' : 'Xem tiến độ →',
+          ],
+        ];
+        replacements.forEach(([selector, text]) => {
+          if (!selector || text === undefined) {
+            return;
+          }
+          const element = job.card.querySelector(selector);
+          if (element) {
+            element.textContent = text;
+          }
+        });
+        const progress = job.card.querySelector('progress');
+        if (progress instanceof HTMLProgressElement) {
+          progress.value = job.percent;
+          progress.hidden = isComplete || isDraft;
+        }
+        if (activeGenerationKey === job.key) {
+          renderGenerationProgress(job);
+        }
+      }
+
+      /** @param {GenerationJob} job */
+      function startGeneration(job) {
+        clearInterval(job.timer);
+        job.percent = 0;
+        job.state = GenerationState.RUNNING;
+        renderGenerationCard(job);
+        job.timer = setInterval(() => {
+          job.percent = Math.min(100, job.percent + 5);
+          if (job.percent === 100) {
+            clearInterval(job.timer);
+            job.timer = undefined;
+            job.state = GenerationState.READY;
+          }
+          renderGenerationCard(job);
+        }, 600);
+      }
+
+      /** Closing this view never changes the job or its timer.
+       * @param {GenerationJob} job
+       */
+      function openGeneration(job) {
+        activeGenerationKey = job.key;
+        renderGenerationProgress(job);
+        getDialog('generation-dialog').showModal();
+      }
+
+      /** Creates a local sample immediately so it remains visible while processing.
+       * @param {string} idea
+       * @param {string} className
+       * @returns {GenerationJob}
+       */
+      function createGenerationJob(idea, className) {
+        const template = document.querySelector('.card:not([data-generated])');
+        const grid = document.querySelector('.grid');
+        if (!(template instanceof HTMLElement) || !(grid instanceof HTMLElement)) {
+          throw new Error('Missing library template');
+        }
+        const card = template.cloneNode(true);
+        if (!(card instanceof HTMLElement)) {
+          throw new Error('Invalid card template');
+        }
+        generationNumber += 1;
+        const key = `sample-${generationNumber}`;
+        const title = idea.length > 85 ? `${idea.slice(0, 85)}…` : idea;
+        /** @type {GenerationJob} */
+        const job = {
+          key,
+          idea,
+          className,
+          title,
+          percent: 0,
+          state: GenerationState.RUNNING,
+          timer: undefined,
+          card,
+        };
+        generationJobs.set(key, job);
+        lessons[key] = {
+          title,
+          theme: 'sage',
+          scenes: [
+            {
+              title: 'Bắt đầu từ một câu hỏi',
+              example: '01 · Khơi gợi',
+              description: `Ý tưởng của bạn: ${idea}`,
+            },
+            {
+              title: 'Giải thích qua một ví dụ',
+              example: '02 · Khám phá',
+              description:
+                'Ở bước này, bài giảng sẽ dùng hình ảnh và một ví dụ để giải thích khái niệm. Đây là nội dung minh họa, chưa được AI tạo.',
+            },
+            {
+              title: 'Cùng ôn lại điều vừa học',
+              example: '03 · Ghi nhớ',
+              description:
+                'Một câu hỏi ngắn giúp học sinh ôn tập. Bản mẫu này minh họa luồng giao diện, không có video hay giọng đọc thực tế.',
+            },
+          ],
+        };
+        card.hidden = false;
+        card.dataset.generated = 'true';
+        card.dataset.class = className === 'Demo Class' ? 'demo' : 'python';
+        const button = card.querySelector('[data-lesson]');
+        if (button instanceof HTMLElement) {
+          button.dataset.lesson = key;
+        }
+        const replacements = [
+          ['.poster-kicker', 'Bài giảng mới · Bản mẫu'],
+          ['.poster-title', title],
+          ['.pills', 'Ý tưởng → Bài giảng'],
+          ['h2', title],
+          ['.class-name', className],
+        ];
+        replacements.forEach(([selector, text]) => {
+          if (!selector || text === undefined) {
+            return;
+          }
+          const element = card.querySelector(selector);
+          if (element) {
+            element.textContent = text;
+          }
+        });
+        const posterTitle = card.querySelector('.poster-title');
+        if (posterTitle instanceof HTMLElement) {
+          posterTitle.style.fontSize = '20px';
+        }
+        const progress = document.createElement('progress');
+        progress.max = 100;
+        progress.value = 0;
+        progress.className = 'card-progress';
+        progress.setAttribute('aria-label', `Tiến độ: ${title}`);
+        card.querySelector('.card-meta')?.after(progress);
+        grid.prepend(card);
+        const filter = getElement('class-filter');
+        if (filter instanceof HTMLSelectElement) {
+          filter.value = 'all';
+        }
+        showLibraryState(true);
+        startGeneration(job);
+        return job;
+      }
+
+      function closeGeneration() {
+        getDialog('generation-dialog').close();
+      }
+
+      getElement('close-generation').addEventListener('click', closeGeneration);
+      getElement('return-library').addEventListener('click', closeGeneration);
+      getElement('cancel-generation').addEventListener('click', () => {
+        const job = generationJobs.get(activeGenerationKey);
+        if (!job) {
+          return;
+        }
+        clearInterval(job.timer);
+        job.timer = undefined;
+        job.state = GenerationState.DRAFT;
+        renderGenerationCard(job);
+        closeGeneration();
+      });
+      getElement('retry-generation').addEventListener('click', () => {
+        const job = generationJobs.get(activeGenerationKey);
+        if (job) {
+          startGeneration(job);
+        }
+      });
+      getElement('preview-generated').addEventListener('click', () => {
+        closeGeneration();
+        openLessonPreview(activeGenerationKey);
+      });
+      getElement('create-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const idea = getElement('lesson-idea');
+        const classSelect = getElement('create-class');
+        if (!(idea instanceof HTMLTextAreaElement) || !(classSelect instanceof HTMLSelectElement)) {
+          return;
+        }
+        if (!idea.value.trim()) {
+          idea.setCustomValidity('Hãy nhập ý tưởng bài giảng.');
+          idea.reportValidity();
+          return;
+        }
+        const job = createGenerationJob(idea.value.trim(), classSelect.value);
+        getDialog('create-dialog').close();
+        openGeneration(job);
+      });
+      getElement('lesson-idea').addEventListener('input', (event) => {
+        if (event.target instanceof HTMLTextAreaElement) {
+          event.target.setCustomValidity('');
+        }
+      });
+    </script>
+  </body>
+</html>

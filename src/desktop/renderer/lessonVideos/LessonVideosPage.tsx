@@ -1,207 +1,225 @@
-import { useRef, useState, type ReactElement } from 'react';
-import {
-  Alert,
-  Button,
-  Checkbox,
-  Group,
-  Loader,
-  Select,
-  Stack,
-  Text,
-  Textarea,
-  Title,
-} from '@mantine/core';
-import { LessonCommand, LessonVideoStatus } from '#contracts/LessonVideos.js';
+import { useState, type ReactElement } from 'react';
+import { Alert, Badge, Button, Group, Loader, Modal, Select, Text, Title } from '@mantine/core';
+import { IconPlus, IconRefresh } from '@tabler/icons-react';
+import { LessonCommand, type LessonVideo } from '#contracts/LessonVideos.js';
 import { useLessonVideo } from './UseLessonVideo.js';
-import { describeLesson, describeLessonFailure } from './LessonVideoLabels.js';
+import { describeLessonFailure, isLessonGenerating } from './LessonVideoLabels.js';
 import { LessonVideoStudio } from './LessonVideoStudio.js';
+import { LessonVideoCreateForm } from './LessonVideoCreateForm.js';
+import { LessonVideoCard } from './LessonVideoCard.js';
+import { LessonVideoEmptyState } from './LessonVideoEmptyState.js';
+import { LessonGenerationProgress } from './LessonGenerationProgress.js';
 import './LessonVideos.css';
 
+/** The library stays mounted behind dialogs; closing them never cancels a server job. */
 export function LessonVideosPage({ locale }: { locale: 'en' | 'vi' }): ReactElement {
   const view = useLessonVideo();
   const vi = locale === 'vi';
-  const [classId, setClassId] = useState<string | null>(null);
-  const [materialIds, setMaterialIds] = useState<string[]>([]);
-  const [prompt, setPrompt] = useState('');
-  const requestId = useRef(crypto.randomUUID());
-  const selectedClass = view.options?.classes.find((item) => item.id === classId);
+  const [creating, setCreating] = useState(false);
+  const [showStudio, setShowStudio] = useState(false);
+  const [classFilter, setClassFilter] = useState<string | null>(null);
+  const filteredLessons = view.lessons.filter(
+    (lesson) => !classFilter || lesson.classId === classFilter,
+  );
+
+  function openLesson(lesson: LessonVideo): void {
+    setShowStudio(!isLessonGenerating(lesson));
+    view.select(lesson);
+    void view.execute({ kind: LessonCommand.READ, id: lesson.id });
+  }
+
+  function closeLesson(): void {
+    view.select(null);
+  }
+
   return (
     <section className="lesson-workspace">
-      <Group justify="space-between">
-        <Title order={3}>{vi ? 'Video bài giảng' : 'Lesson videos'}</Title>
+      <header className="lesson-library-heading">
+        <div>
+          <Group gap="sm">
+            <Title order={2}>{vi ? 'Video bài giảng' : 'Lesson videos'}</Title>
+            <Badge variant="light" color="gray">
+              {vi ? 'Thử nghiệm' : 'Beta'}
+            </Badge>
+          </Group>
+          <Text className="lesson-library-subtitle">
+            {vi
+              ? 'Biến kiến thức thành những bài giảng sinh động, dễ hiểu.'
+              : 'Turn knowledge into vivid, easy-to-follow lessons.'}
+          </Text>
+        </div>
         <Button
-          variant="subtle"
-          disabled={view.busy}
+          className="lesson-primary"
+          leftSection={<IconPlus size={17} aria-hidden="true" />}
+          disabled={view.loading || view.busy}
           onClick={() => {
-            void view.execute(
-              view.selected
-                ? { kind: LessonCommand.READ, id: view.selected.id }
-                : { kind: LessonCommand.LIST },
-            );
+            setCreating(true);
           }}
         >
-          {vi ? 'Cập nhật' : 'Refresh'}
+          {vi ? 'Tạo video' : 'Create video'}
         </Button>
-      </Group>
-      {view.error && <Alert color="orange">{describeLessonFailure(view.error, vi)}</Alert>}
-      {view.selected ? (
-        <LessonVideoStudio
-          lesson={view.selected}
-          vi={vi}
-          busy={view.busy}
-          execute={view.execute}
-          back={() => {
-            view.select(null);
-          }}
-        />
-      ) : (
-        <>
-          <form
-            className="lesson-create"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (classId) {
-                const submittedRequestId = requestId.current;
-                void view.execute(
-                  {
-                    kind: LessonCommand.CREATE,
-                    requestId: submittedRequestId,
-                    classId,
-                    materialIds,
-                    prompt,
-                    locale,
-                  },
-                  () => {
-                    if (requestId.current === submittedRequestId) {
-                      requestId.current = crypto.randomUUID();
-                    }
-                  },
-                );
-              }
-            }}
-          >
-            <Title order={4}>
-              {vi ? 'Bạn muốn giải thích điều gì?' : 'What would you like to explain?'}
-            </Title>
+      </header>
+      {!creating && !view.selected && view.error && (
+        <Alert color="orange">{describeLessonFailure(view.error, vi)}</Alert>
+      )}
+      <div className="lesson-library-toolbar">
+        <Group gap="xs">
+          <Text fw={600} size="sm">
+            {vi ? 'Thư viện của bạn' : 'Your library'}
+          </Text>
+          <Badge variant="light" color="gray">
+            {filteredLessons.length} {vi ? 'video' : 'videos'}
+          </Badge>
+        </Group>
+        <Group gap="xs">
+          {view.lessons.length > 0 && (
             <Select
-              label={vi ? 'Lớp học' : 'Class'}
-              value={classId}
+              aria-label={vi ? 'Lọc theo lớp học' : 'Filter by class'}
+              placeholder={vi ? 'Tất cả lớp học' : 'All classes'}
+              clearable
+              value={classFilter}
+              onChange={setClassFilter}
               data={
                 view.options?.classes.map((item) => ({ value: item.id, label: item.name })) ?? []
               }
-              onChange={(value) => {
-                setClassId(value);
-                setMaterialIds([]);
-                requestId.current = crypto.randomUUID();
-              }}
             />
-            <Textarea
-              required
-              label={vi ? 'Yêu cầu của bạn' : 'Your instructions'}
-              placeholder={
-                vi
-                  ? 'Giải thích Boolean cho học sinh mới học, kèm ví dụ đúng và sai.'
-                  : 'Explain Boolean values to beginners using true and false examples.'
+          )}
+          <Button
+            variant="subtle"
+            size="compact-sm"
+            disabled={view.busy}
+            leftSection={<IconRefresh size={15} aria-hidden="true" />}
+            onClick={() => {
+              void view.execute({ kind: LessonCommand.LIST });
+            }}
+          >
+            {vi ? 'Cập nhật' : 'Refresh'}
+          </Button>
+        </Group>
+      </div>
+      {view.loading ? (
+        <div className="lesson-loading" role="status">
+          <Loader size="sm" />
+          <Text>{vi ? 'Đang tải thư viện…' : 'Loading your library…'}</Text>
+        </div>
+      ) : view.lessons.length === 0 ? (
+        <LessonVideoEmptyState
+          vi={vi}
+          disabled={view.busy}
+          create={() => {
+            setCreating(true);
+          }}
+        />
+      ) : filteredLessons.length === 0 ? (
+        <div className="lesson-empty">
+          <Text>
+            {vi ? 'Lớp này chưa có video bài giảng.' : 'This class has no lesson videos yet.'}
+          </Text>
+          <Button
+            variant="subtle"
+            onClick={() => {
+              setClassFilter(null);
+            }}
+          >
+            {vi ? 'Xem tất cả video' : 'Show all videos'}
+          </Button>
+        </div>
+      ) : (
+        <div
+          className="lesson-library"
+          aria-label={vi ? 'Các video bài giảng' : 'Lesson video library'}
+        >
+          {filteredLessons.map((lesson) => (
+            <LessonVideoCard
+              key={lesson.id}
+              lesson={lesson}
+              vi={vi}
+              className={
+                view.options?.classes.find((item) => item.id === lesson.classId)?.name ??
+                (vi ? 'Lớp học' : 'Class')
               }
-              maxLength={2000}
-              minRows={2}
-              value={prompt}
-              onChange={(event) => {
-                setPrompt(event.target.value);
-                requestId.current = crypto.randomUUID();
+              open={() => {
+                openLesson(lesson);
               }}
             />
-            <Stack gap="xs">
-              <Text size="sm">
-                {vi ? 'Tài liệu đã chuẩn bị của lớp' : 'Prepared class materials'}
-              </Text>
-              {selectedClass?.materials.map((material) => (
-                <Checkbox
-                  key={material.id}
-                  label={material.name}
-                  checked={materialIds.includes(material.id)}
-                  onChange={(event) => {
-                    const checked = event.currentTarget.checked;
-                    setMaterialIds((current) =>
-                      checked
-                        ? [...current, material.id]
-                        : current.filter((id) => id !== material.id),
-                    );
-                    requestId.current = crypto.randomUUID();
-                  }}
-                />
-              ))}
-              {selectedClass && !selectedClass.materials.length && (
-                <Text c="dimmed">
-                  {vi
-                    ? 'Hãy chuẩn bị tài liệu trong mục Lớp học trước.'
-                    : 'Prepare class materials in Classroom first.'}
-                </Text>
-              )}
-            </Stack>
-            <Group justify="space-between">
-              <Text size="xs" c="dimmed">
-                {vi
-                  ? '3–6 cảnh · khoảng 1–2 phút · giọng đọc AI'
-                  : '3–6 screens · about 1–2 minutes · AI narration'}
-              </Text>
-              <Button
-                type="submit"
-                loading={view.busy}
-                disabled={
-                  !view.options?.available || !classId || !materialIds.length || !prompt.trim()
-                }
-              >
-                {vi ? 'Tạo video' : 'Create video'}
-              </Button>
-            </Group>
-            {view.options && (
-              <details>
-                <summary>{vi ? 'Chi phí và giới hạn' : 'Cost and limits'}</summary>
-                <Text size="sm">
-                  {vi
-                    ? 'Giới hạn lượt đầu (nội dung và hoạt ảnh)'
-                    : 'First-pass limit (content and animation)'}
-                  : ${(view.options.estimatedMicroUsd / 1e6).toFixed(4)} ·{' '}
-                  {vi ? 'Dự phòng tối đa' : 'Maximum reservation'}: $
-                  {(view.options.maximumMicroUsd / 1e6).toFixed(3)} USD.{' '}
-                  {vi ? 'Giọng đọc và máy chủ tính riêng.' : 'Narration and hosting are separate.'}
-                </Text>
-              </details>
-            )}
-            {view.options && !view.options.available && (
-              <Alert color="orange">
-                {vi
-                  ? 'Dịch vụ tạo video chưa sẵn sàng. Kiểm tra API và Docker renderer.'
-                  : 'Video creation is unavailable. Check the API and Docker renderer.'}
-              </Alert>
-            )}
-          </form>
-          <div className="lesson-library">
-            {view.lessons.map((lesson) => (
-              <article key={lesson.id}>
-                <Text size="xs" c="dimmed">
-                  {describeLesson(lesson, vi)}
-                </Text>
-                <h3>{lesson.title}</h3>
-                <Group justify="space-between">
-                  <Button
-                    variant="subtle"
-                    onClick={() => {
-                      view.select(lesson);
-                      void view.execute({ kind: LessonCommand.READ, id: lesson.id });
-                    }}
-                  >
-                    {vi ? 'Mở bài giảng' : 'Open lesson'}
-                  </Button>
-                  {(lesson.status === LessonVideoStatus.RUNNING ||
-                    lesson.status === LessonVideoStatus.QUEUED) && <Loader size="sm" />}
-                </Group>
-              </article>
-            ))}
-          </div>
-        </>
+          ))}
+        </div>
       )}
+      <Modal
+        opened={creating}
+        onClose={() => {
+          if (!view.busy) {
+            setCreating(false);
+          }
+        }}
+        title={vi ? 'Bạn muốn giải thích điều gì?' : 'What would you like to explain?'}
+        centered
+        size="lg"
+        keepMounted
+        closeOnEscape={!view.busy}
+        closeOnClickOutside={!view.busy}
+        withCloseButton={!view.busy}
+        closeButtonProps={{ 'aria-label': vi ? 'Đóng' : 'Close' }}
+        classNames={{ content: 'lesson-dialog', title: 'lesson-dialog-title' }}
+      >
+        <LessonVideoCreateForm
+          options={view.options}
+          busy={view.busy}
+          error={view.error}
+          locale={locale}
+          execute={view.execute}
+          onCreated={() => {
+            setCreating(false);
+            setClassFilter(null);
+            setShowStudio(false);
+          }}
+        />
+      </Modal>
+      <Modal
+        opened={view.selected !== null}
+        onClose={closeLesson}
+        title={
+          showStudio
+            ? vi
+              ? 'Bài giảng của bạn'
+              : 'Your lesson'
+            : vi
+              ? 'Tạo video bài giảng'
+              : 'Lesson video generation'
+        }
+        centered
+        size={showStudio ? 'min(1200px, 95vw)' : 'lg'}
+        closeButtonProps={{ 'aria-label': vi ? 'Đóng bài giảng' : 'Close lesson' }}
+        classNames={{ content: 'lesson-dialog', title: 'lesson-dialog-title' }}
+      >
+        {view.error && (
+          <Alert color="orange" mb="sm">
+            {describeLessonFailure(view.error, vi)}
+          </Alert>
+        )}
+        {view.selected &&
+          (showStudio ? (
+            <LessonVideoStudio
+              key={view.selected.id}
+              lesson={view.selected}
+              vi={vi}
+              busy={view.busy}
+              execute={view.execute}
+              back={closeLesson}
+            />
+          ) : (
+            <LessonGenerationProgress
+              lesson={view.selected}
+              vi={vi}
+              busy={view.busy}
+              execute={view.execute}
+              close={closeLesson}
+              preview={() => {
+                setShowStudio(true);
+              }}
+            />
+          ))}
+      </Modal>
     </section>
   );
 }
