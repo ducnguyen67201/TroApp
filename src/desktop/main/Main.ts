@@ -1,3 +1,4 @@
+import { VoiceoverDiagnosticKind } from './voiceover/VoiceoverDiagnostics.js';
 import { StudentAccessKind } from '#contracts/StudentAccess.js';
 import { AdminOrganizationController } from './organizations/AdminOrganizationController.js';
 import {
@@ -553,6 +554,16 @@ async function startDesktop(): Promise<void> {
     reportEvent: (event) => {
       console.debug(`voiceover.${event.kind}`, event);
     },
+    reportDiagnostic: (event) => {
+      if (
+        event.kind === VoiceoverDiagnosticKind.FAILED ||
+        event.kind === VoiceoverDiagnosticKind.TIMEOUT
+      ) {
+        console.warn('voiceover.diagnostic', event);
+      } else {
+        console.debug('voiceover.diagnostic', event);
+      }
+    },
   });
   ipcMain.handle('tro:voiceover-ack', (event, raw: unknown) => {
     const parsed = VoiceoverAckSchema.safeParse(raw);
@@ -598,6 +609,7 @@ async function startDesktop(): Promise<void> {
       return voice?.startVoiceCapture() ?? { kind: 'failed' };
     } finally {
       isStartingMicrophone = false;
+      narration.resumeDeferredMessage();
     }
   }
 
@@ -1070,6 +1082,9 @@ async function startDesktop(): Promise<void> {
         sendVoiceEventToWindow(mainWindow, event);
         setImmediate(() => {
           refreshPetSuppression();
+          if (event.kind === 'status') {
+            narration.resumeDeferredMessage();
+          }
         });
       },
     },
@@ -1096,6 +1111,7 @@ async function startDesktop(): Promise<void> {
     },
     emit: (event) => {
       cancelMicrophoneTestStart(event.testId);
+      narration.resumeDeferredMessage();
       if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
         mainWindow.webContents.send('tro:microphone-test-event', event);
       }
@@ -1111,7 +1127,9 @@ async function startDesktop(): Promise<void> {
       }
       if (parsed.data.kind === 'stop') {
         cancelMicrophoneTestStart(parsed.data.testId);
-        return microphoneTests.stopTest(parsed.data.testId);
+        const reply = microphoneTests.stopTest(parsed.data.testId);
+        narration.resumeDeferredMessage();
+        return reply;
       }
       if (isStartingMicrophone || accountGate.isChanging() || auth.isAddingAccount()) {
         return { kind: 'failed' };
@@ -1142,6 +1160,7 @@ async function startDesktop(): Promise<void> {
         if (isCurrentStart()) {
           pendingMicrophoneTestStart = null;
           isStartingMicrophone = false;
+          narration.resumeDeferredMessage();
         }
       }
     },

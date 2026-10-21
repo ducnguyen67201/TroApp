@@ -862,6 +862,38 @@ call. Safe event logs and the case report are written to
 [Architecture.md](docs/Architecture.md#agent-requests-and-model-gateway) for what
 each failure stage establishes.
 
+For missing HUD voice, run the local narration reproduction:
+
+```sh
+pnpm test:voiceover
+```
+
+It exercises the real narration controller, loopback HTTP and backend voice route
+with synthetic speech, authentication, allowance and renderer acknowledgments. It
+uses no credentials or paid inference. Cases cover delayed first audio recovering
+successfully, independent provider and playback setup timeouts, intentional Stop,
+disappearing instructions, microphone deferral/resumption, renderer startup
+rejection and a stream that continues beyond the original five-second deadline. Safe
+event logs and results are saved under
+`.tro-development/voiceover-diagnostics/VoiceoverEvents.jsonl` and
+`VoiceoverReport.json`. Compare `voiceover.diagnostic` stage, reason, `elapsedMs`
+and `utteranceId` with the local HTTP/provider events. Playback setup has its own
+bounded deadline; the independent first-audio budget begins when speech is requested
+and ends after the first accepted PCM chunk. The budget is a safety ceiling, not a
+response-time target. `microphone_busy` means the current instruction was deferred
+before any speech request. Main resumes it on microphone readiness only while it is
+still visible and eligible. Stop, revocation, replacement, mute, locale and task
+changes prevent stale resumption. A local reproduction demonstrates a possible
+cause, not the cause of a particular production disconnect or proof of audible
+hardware playback.
+
+During desktop development, `voiceover.diagnostic` logs transitions once per stage
+and reports timeout, interruption, hidden/replaced messages and failed stages. These
+events exclude instruction text, PCM, credentials and raw error details. Correlate
+by `utteranceId`; `playing_audio` means the renderer accepted its first PCM chunk,
+not that the output device was audible. An HTTP disconnect alone cannot distinguish
+intentional cancellation from `first_audio_timeout` or `playback_start_timeout`.
+
 For current provider connectivity, run credentialless DNS/TLS/HTTP probes in the
 same environment as the API:
 
