@@ -3,22 +3,19 @@ import type { DesktopLocale } from '#contracts/DesktopLocale.js';
 import type { AgentProgress } from '#contracts/CompanionHud.js';
 import { TeachingMessageKind, type TeachingMessage } from '#contracts/TeachingStep.js';
 import {
+  VoiceoverStopReason,
+  VoiceoverDiagnosticKind,
+  VoiceoverDiagnosticReason,
+  VoiceoverDiagnosticStage,
+  type VoiceoverDiagnostic,
+} from './VoiceoverDiagnostics.js';
+import {
   VoiceoverLimits,
   VoiceoverState,
   type VoiceoverPlayback,
   type VoiceoverRequest,
   type VoiceoverStatus,
 } from '#contracts/Voiceover.js';
-
-const VoiceoverStopReason = {
-  INTERRUPTED: 'interrupted',
-  MESSAGE_REPLACED: 'message_replaced',
-  MESSAGE_HIDDEN: 'message_hidden',
-  COMPLETED: 'completed',
-  FAILED: 'failed',
-} as const;
-
-type VoiceoverStopReason = (typeof VoiceoverStopReason)[keyof typeof VoiceoverStopReason];
 
 const VoiceoverEventKind = {
   COMPLETION_RETAINED: 'completion_retained',
@@ -38,6 +35,9 @@ interface ActiveUtterance {
   id: string;
   abort: AbortController;
   message: TeachingMessage;
+  startedAt: number;
+  stage: VoiceoverDiagnosticStage;
+  timeoutReason: VoiceoverDiagnostic['reason'] | null;
 }
 
 export interface VoiceoverDependencies {
@@ -48,6 +48,7 @@ export interface VoiceoverDependencies {
   holdMessage(message: TeachingMessage | null): void;
   reportFailure(stage: string): void;
   reportEvent?(event: VoiceoverEvent): void;
+  reportDiagnostic?(event: VoiceoverDiagnostic): void;
 }
 
 /** Reads only the current accepted and natively visible message, once per sequence. */
@@ -56,6 +57,7 @@ export class VoiceoverController {
   private candidate: AgentProgress | null = null;
   private visible: TeachingMessage | null = null;
   private lastIdentity: string | null = null;
+  private deferredIdentity: string | null = null;
   private active: ActiveUtterance | null = null;
   private stopping: Promise<boolean> = Promise.resolve(true);
   private enabled = true;
@@ -153,13 +155,14 @@ export class VoiceoverController {
   setLocale(locale: DesktopLocale): void {
     if (locale !== this.locale) {
       this.locale = locale;
-      this.candidate = null;
       void this.stopSpeaking();
+      this.candidate = null;
     }
   }
 
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
+    this.deferredIdentity = null;
     if (this.candidate?.teachingMessage) {
       this.lastIdentity = this.readIdentity(this.candidate.teachingMessage);
     }
@@ -169,16 +172,27 @@ export class VoiceoverController {
   }
 
   clearTask(): void {
+    void this.stopSpeaking();
     this.sessionId = null;
     this.candidate = null;
     this.visible = null;
-    void this.stopSpeaking();
   }
 
   stopSpeaking(reason: VoiceoverStopReason = VoiceoverStopReason.INTERRUPTED): Promise<boolean> {
+    // A deliberate stop also retires an instruction deferred before dispatch.
+    const deferred = this.deferredIdentity;
+    if (
+      deferred &&
+      this.candidate?.teachingMessage &&
+      this.readIdentity(this.candidate.teachingMessage) === deferred
+    ) {
+      this.lastIdentity = deferred;
+    }
+    this.deferredIdentity = null;
     const active = this.active;
     this.active = null;
     if (active) {
+      this.reportDiagnostic(VoiceoverDiagnosticKind.STOPPED, active, reason);
       this.reportEvent(VoiceoverEventKind.STOPPED, active, reason);
     }
     active?.abort.abort();
@@ -198,6 +212,14 @@ export class VoiceoverController {
         });
     }
     return this.stopping;
+  }
+
+  /** Main calls this on microphone readiness transitions, never on an observer poll.
+   * Admission rechecks visibility, locale, mute and the current message identity. */
+  resumeDeferredMessage(): void {
+    if (this.deferredIdentity !== null) {
+      this.trySpeak();
+    }
   }
 
   private hasActiveUtterance(): boolean {
@@ -239,11 +261,31 @@ export class VoiceoverController {
     ) {
       return;
     }
-    this.lastIdentity = this.readIdentity(message);
+    const identity = this.readIdentity(message);
     if (!this.dependencies.canSpeak()) {
+      if (this.deferredIdentity !== identity) {
+        this.dependencies.reportDiagnostic?.({
+          kind: VoiceoverDiagnosticKind.DEFERRED,
+          stage: VoiceoverDiagnosticStage.ADMISSION,
+          utteranceId: null,
+          messageSequence: message.sequence,
+          elapsedMs: 0,
+          reason: VoiceoverDiagnosticReason.MICROPHONE_BUSY,
+        });
+      }
+      this.deferredIdentity = identity;
       return;
     }
-    const active = { id: randomUUID(), abort: new AbortController(), message };
+    this.deferredIdentity = null;
+    this.lastIdentity = identity;
+    const active: ActiveUtterance = {
+      id: randomUUID(),
+      abort: new AbortController(),
+      message,
+      startedAt: performance.now(),
+      stage: VoiceoverDiagnosticStage.WAITING_FOR_STOP,
+      timeoutReason: null,
+    };
     const stopping = this.stopSpeaking();
     this.active = active;
     this.dependencies.holdMessage(message);
@@ -253,6 +295,41 @@ export class VoiceoverController {
       active,
       stopping,
     );
+  }
+
+  private reportDiagnostic(
+    kind: VoiceoverDiagnostic['kind'],
+    active: ActiveUtterance,
+    reason?: VoiceoverDiagnostic['reason'],
+  ): void {
+    this.dependencies.reportDiagnostic?.({
+      kind,
+      stage: active.stage,
+      utteranceId: active.id,
+      messageSequence: active.message.sequence,
+      elapsedMs: Math.round(performance.now() - active.startedAt),
+      ...(reason ? { reason } : {}),
+    });
+  }
+
+  private reportStage(active: ActiveUtterance, stage: VoiceoverDiagnosticStage): void {
+    active.stage = stage;
+    this.reportDiagnostic(VoiceoverDiagnosticKind.STAGE, active);
+  }
+
+  private scheduleTimeout(
+    active: ActiveUtterance,
+    timeoutMs: number,
+    reason: NonNullable<VoiceoverDiagnostic['reason']>,
+  ): ReturnType<typeof setTimeout> {
+    return setTimeout(() => {
+      if (active.abort.signal.aborted) {
+        return;
+      }
+      active.timeoutReason = reason;
+      this.reportDiagnostic(VoiceoverDiagnosticKind.TIMEOUT, active, reason);
+      active.abort.abort();
+    }, timeoutMs);
   }
 
   private async sendPlayback(command: VoiceoverPlayback, signal: AbortSignal): Promise<boolean> {
@@ -276,21 +353,28 @@ export class VoiceoverController {
     active: ActiveUtterance,
     stopping: Promise<boolean>,
   ): Promise<void> {
-    const startup = setTimeout(() => {
-      active.abort.abort();
-    }, VoiceoverLimits.START_TIMEOUT_MS);
-    const deadline = setTimeout(() => {
-      active.abort.abort();
-    }, VoiceoverLimits.MAX_DURATION_MS);
+    const setup = this.scheduleTimeout(
+      active,
+      VoiceoverLimits.STOP_TIMEOUT_MS + VoiceoverLimits.START_TIMEOUT_MS,
+      VoiceoverDiagnosticReason.PLAYBACK_START_TIMEOUT,
+    );
+    let startup: ReturnType<typeof setTimeout> | undefined;
+    const deadline = this.scheduleTimeout(
+      active,
+      VoiceoverLimits.MAX_DURATION_MS,
+      VoiceoverDiagnosticReason.DURATION_TIMEOUT,
+    );
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     const cancelReader = (): void => {
       void reader?.cancel().catch(() => {});
     };
     try {
+      this.reportStage(active, VoiceoverDiagnosticStage.WAITING_FOR_STOP);
       if (!(await stopping)) {
         throw new Error('Playback did not stop.');
       }
       active.abort.signal.throwIfAborted();
+      this.reportStage(active, VoiceoverDiagnosticStage.STARTING_PLAYBACK);
       if (
         !(await this.sendPlayback(
           {
@@ -304,7 +388,15 @@ export class VoiceoverController {
         throw new Error('Playback unavailable.');
       }
       active.abort.signal.throwIfAborted();
+      clearTimeout(setup);
+      startup = this.scheduleTimeout(
+        active,
+        VoiceoverLimits.FIRST_AUDIO_TIMEOUT_MS,
+        VoiceoverDiagnosticReason.FIRST_AUDIO_TIMEOUT,
+      );
+      this.reportStage(active, VoiceoverDiagnosticStage.REQUESTING_SPEECH);
       const stream = await this.dependencies.fetchSpeech(request, active.abort.signal);
+      this.reportStage(active, VoiceoverDiagnosticStage.WAITING_FOR_AUDIO);
       reader = stream.getReader();
       active.abort.signal.addEventListener('abort', cancelReader, { once: true });
       active.abort.signal.throwIfAborted();
@@ -347,6 +439,7 @@ export class VoiceoverController {
           }
           if (sequence === 1) {
             clearTimeout(startup);
+            this.reportStage(active, VoiceoverDiagnosticStage.PLAYING_AUDIO);
             if (this.active === active) {
               this.dependencies.showStatus({ state: VoiceoverState.SPEAKING });
             }
@@ -357,6 +450,7 @@ export class VoiceoverController {
       if (!bytes || tail.length) {
         throw new Error('Invalid speech audio.');
       }
+      this.reportStage(active, VoiceoverDiagnosticStage.DRAINING_AUDIO);
       if (
         !(await this.sendPlayback(
           {
@@ -375,6 +469,11 @@ export class VoiceoverController {
       }
     } catch {
       if (this.active === active) {
+        this.reportDiagnostic(
+          VoiceoverDiagnosticKind.FAILED,
+          active,
+          active.timeoutReason ?? VoiceoverDiagnosticReason.OPERATION_FAILED,
+        );
         await this.stopSpeaking(VoiceoverStopReason.FAILED);
         this.dependencies.reportFailure('playback');
         if (!this.hasActiveUtterance()) {
@@ -382,6 +481,7 @@ export class VoiceoverController {
         }
       }
     } finally {
+      clearTimeout(setup);
       clearTimeout(startup);
       clearTimeout(deadline);
       active.abort.signal.removeEventListener('abort', cancelReader);

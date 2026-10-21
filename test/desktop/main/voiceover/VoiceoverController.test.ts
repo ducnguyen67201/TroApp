@@ -6,7 +6,12 @@ import {
 } from '../../../../src/desktop/main/voiceover/VoiceoverController.js';
 import { AgentProgressPhase, type AgentProgress } from '#contracts/CompanionHud.js';
 import { TeachingMessageKind } from '#contracts/TeachingStep.js';
-import { VoiceoverState } from '#contracts/Voiceover.js';
+import { VoiceoverLimits, VoiceoverState } from '#contracts/Voiceover.js';
+import {
+  VoiceoverDiagnosticKind,
+  VoiceoverDiagnosticReason,
+  VoiceoverDiagnosticStage,
+} from '../../../../src/desktop/main/voiceover/VoiceoverDiagnostics.js';
 
 function createHarness() {
   const dependencies = {
@@ -27,6 +32,7 @@ function createHarness() {
     showStatus: vi.fn<VoiceoverDependencies['showStatus']>(),
     reportFailure: vi.fn<VoiceoverDependencies['reportFailure']>(),
     reportEvent: vi.fn<NonNullable<VoiceoverDependencies['reportEvent']>>(),
+    reportDiagnostic: vi.fn<NonNullable<VoiceoverDependencies['reportDiagnostic']>>(),
   } satisfies VoiceoverDependencies;
   const progress = {
     kind: 'progress',
@@ -49,6 +55,303 @@ function createHarness() {
 }
 
 describe('HUD narration', () => {
+  it('keeps setup outside the first-audio budget and reports a stalled provider without text', async () => {
+    vi.useFakeTimers();
+    const { controller, dependencies, progress } = createHarness();
+    dependencies.sendPlayback.mockImplementation(async (command) => {
+      if (command.kind === 'start') {
+        await new Promise<void>((resolve) => setTimeout(resolve, 600));
+      }
+      return true;
+    });
+    dependencies.fetchSpeech.mockImplementation(
+      (_request, signal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener(
+            'abort',
+            () => {
+              reject(new Error('Synthetic abort.'));
+            },
+            {
+              once: true,
+            },
+          );
+        }),
+    );
+    try {
+      controller.receiveProgress(progress);
+      controller.receiveVisibleMessage(progress.teachingMessage);
+      await vi.advanceTimersByTimeAsync(600);
+      expect(dependencies.fetchSpeech).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(4400);
+      expect(dependencies.fetchSpeech.mock.calls[0]?.[1].aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(VoiceoverLimits.FIRST_AUDIO_TIMEOUT_MS - 4400 - 1);
+      expect(dependencies.fetchSpeech.mock.calls[0]?.[1].aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(dependencies.reportDiagnostic).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: VoiceoverDiagnosticKind.TIMEOUT,
+          stage: VoiceoverDiagnosticStage.REQUESTING_SPEECH,
+          reason: VoiceoverDiagnosticReason.FIRST_AUDIO_TIMEOUT,
+        }),
+      );
+      expect(dependencies.reportDiagnostic).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: VoiceoverDiagnosticKind.FAILED,
+          reason: VoiceoverDiagnosticReason.FIRST_AUDIO_TIMEOUT,
+        }),
+      );
+      expect(JSON.stringify(dependencies.reportDiagnostic.mock.calls)).not.toContain(
+        progress.teachingMessage.text,
+      );
+    } finally {
+      controller.clearTask();
+      vi.useRealTimers();
+    }
+  });
+
+  it('distinguishes deliberate interruption from a first-audio timeout', async () => {
+    const { controller, dependencies, progress } = createHarness();
+    dependencies.fetchSpeech.mockImplementation(
+      (_request, signal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener(
+            'abort',
+            () => {
+              reject(new Error('Synthetic abort.'));
+            },
+            {
+              once: true,
+            },
+          );
+        }),
+    );
+    try {
+      controller.receiveProgress(progress);
+      controller.receiveVisibleMessage(progress.teachingMessage);
+      await vi.waitFor(() => {
+        expect(dependencies.fetchSpeech).toHaveBeenCalledOnce();
+      });
+      await controller.stopSpeaking();
+      expect(dependencies.reportDiagnostic).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: VoiceoverDiagnosticKind.STOPPED,
+          reason: 'interrupted',
+          stage: VoiceoverDiagnosticStage.REQUESTING_SPEECH,
+        }),
+      );
+      expect(
+        dependencies.reportDiagnostic.mock.calls.some(
+          ([event]) => event.kind === VoiceoverDiagnosticKind.TIMEOUT,
+        ),
+      ).toBe(false);
+    } finally {
+      controller.clearTask();
+    }
+  });
+
+  it('defers microphone-busy instructions once and resumes the same visible message exactly once', async () => {
+    const { controller, dependencies, progress } = createHarness();
+    dependencies.canSpeak.mockReturnValue(false);
+    try {
+      controller.receiveProgress(progress);
+      controller.receiveVisibleMessage(progress.teachingMessage);
+      controller.receiveVisibleMessage(progress.teachingMessage);
+      controller.resumeDeferredMessage();
+      expect(dependencies.fetchSpeech).not.toHaveBeenCalled();
+      expect(dependencies.reportDiagnostic).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          kind: VoiceoverDiagnosticKind.DEFERRED,
+          stage: VoiceoverDiagnosticStage.ADMISSION,
+          reason: VoiceoverDiagnosticReason.MICROPHONE_BUSY,
+          utteranceId: null,
+        }),
+      );
+      dependencies.canSpeak.mockReturnValue(true);
+      controller.resumeDeferredMessage();
+      controller.resumeDeferredMessage();
+      await vi.waitFor(() => {
+        expect(dependencies.fetchSpeech).toHaveBeenCalledOnce();
+      });
+      controller.receiveVisibleMessage(progress.teachingMessage);
+      expect(dependencies.fetchSpeech).toHaveBeenCalledOnce();
+    } finally {
+      controller.clearTask();
+    }
+  });
+
+  it.each(['stop', 'hide', 'revoke', 'mute', 'locale', 'new task'] as const)(
+    'does not revive microphone-deferred guidance after %s',
+    async (action) => {
+      const { controller, dependencies, progress } = createHarness();
+      dependencies.canSpeak.mockReturnValue(false);
+      try {
+        controller.receiveProgress(progress);
+        controller.receiveVisibleMessage(progress.teachingMessage);
+        if (action === 'stop') {
+          await controller.stopSpeaking();
+        } else if (action === 'hide') {
+          controller.receiveVisibleMessage(null);
+        } else if (action === 'revoke') {
+          controller.receiveProgress({ ...progress, presentationRevoked: true });
+        } else if (action === 'mute') {
+          controller.setEnabled(false);
+          controller.setEnabled(true);
+        } else if (action === 'locale') {
+          controller.setLocale('en');
+          controller.setLocale('vi');
+        } else {
+          controller.startTask(randomUUID());
+        }
+        dependencies.canSpeak.mockReturnValue(true);
+        controller.resumeDeferredMessage();
+        controller.receiveVisibleMessage(progress.teachingMessage);
+        controller.receiveProgress(progress);
+        expect(dependencies.fetchSpeech).not.toHaveBeenCalled();
+      } finally {
+        controller.clearTask();
+      }
+    },
+  );
+
+  it('resumes only the latest visible instruction after microphone readiness', async () => {
+    const { controller, dependencies, progress } = createHarness();
+    dependencies.canSpeak.mockReturnValue(false);
+    const next = { ...progress, teachingMessage: { ...progress.teachingMessage, sequence: 2 } };
+    try {
+      controller.receiveProgress(progress);
+      controller.receiveVisibleMessage(progress.teachingMessage);
+      controller.receiveProgress(next);
+      controller.receiveVisibleMessage(next.teachingMessage);
+      dependencies.canSpeak.mockReturnValue(true);
+      controller.resumeDeferredMessage();
+      await vi.waitFor(() => {
+        expect(dependencies.fetchSpeech).toHaveBeenCalledOnce();
+      });
+      expect(dependencies.fetchSpeech.mock.calls[0]?.[0].message.sequence).toBe(2);
+    } finally {
+      controller.clearTask();
+    }
+  });
+
+  it('allows first audio later than five seconds after separate playback setup', async () => {
+    vi.useFakeTimers();
+    const { controller, dependencies, progress } = createHarness();
+    const audio = new ReadableStream<Uint8Array>({
+      start(stream) {
+        stream.enqueue(new Uint8Array([1, 2]));
+        stream.close();
+      },
+    });
+    dependencies.sendPlayback.mockImplementation(async (command) => {
+      if (command.kind === 'start') {
+        await new Promise<void>((resolve) => setTimeout(resolve, 600));
+      }
+      return true;
+    });
+    dependencies.fetchSpeech.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => {
+            resolve(audio);
+          }, 6500);
+        }),
+    );
+    try {
+      controller.receiveProgress(progress);
+      controller.receiveVisibleMessage(progress.teachingMessage);
+      await vi.advanceTimersByTimeAsync(7100);
+      expect(dependencies.sendPlayback).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'chunk' }),
+      );
+      expect(dependencies.reportEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'playback_finished' }),
+      );
+      expect(dependencies.reportFailure).not.toHaveBeenCalled();
+    } finally {
+      controller.clearTask();
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds playback setup separately before dispatching paid speech', async () => {
+    vi.useFakeTimers();
+    const { controller, dependencies, progress } = createHarness();
+    dependencies.sendPlayback.mockImplementation((command) =>
+      command.kind === 'start' ? new Promise(() => {}) : Promise.resolve(true),
+    );
+    try {
+      controller.receiveProgress(progress);
+      controller.receiveVisibleMessage(progress.teachingMessage);
+      await vi.advanceTimersByTimeAsync(
+        VoiceoverLimits.STOP_TIMEOUT_MS + VoiceoverLimits.START_TIMEOUT_MS,
+      );
+      expect(dependencies.fetchSpeech).not.toHaveBeenCalled();
+      expect(dependencies.reportDiagnostic).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: VoiceoverDiagnosticKind.TIMEOUT,
+          stage: VoiceoverDiagnosticStage.STARTING_PLAYBACK,
+          reason: VoiceoverDiagnosticReason.PLAYBACK_START_TIMEOUT,
+        }),
+      );
+    } finally {
+      controller.clearTask();
+      vi.useRealTimers();
+    }
+  });
+
+  it('retains the overall deadline after accepting first audio', async () => {
+    vi.useFakeTimers();
+    const { controller, dependencies, progress } = createHarness();
+    dependencies.fetchSpeech.mockResolvedValue(
+      new ReadableStream<Uint8Array>({
+        start(stream) {
+          stream.enqueue(new Uint8Array([1, 2]));
+        },
+      }),
+    );
+    try {
+      controller.receiveProgress(progress);
+      controller.receiveVisibleMessage(progress.teachingMessage);
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(VoiceoverLimits.MAX_DURATION_MS);
+      expect(dependencies.reportDiagnostic).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: VoiceoverDiagnosticKind.TIMEOUT,
+          stage: VoiceoverDiagnosticStage.PLAYING_AUDIO,
+          reason: VoiceoverDiagnosticReason.DURATION_TIMEOUT,
+        }),
+      );
+    } finally {
+      controller.clearTask();
+      vi.useRealTimers();
+    }
+  });
+
+  it('locates a renderer startup rejection before any speech request', async () => {
+    const { controller, dependencies, progress } = createHarness();
+    dependencies.sendPlayback.mockImplementation((command) =>
+      Promise.resolve(command.kind !== 'start'),
+    );
+    try {
+      controller.receiveProgress(progress);
+      controller.receiveVisibleMessage(progress.teachingMessage);
+      await vi.waitFor(() => {
+        expect(dependencies.reportFailure).toHaveBeenCalled();
+      });
+      expect(dependencies.fetchSpeech).not.toHaveBeenCalled();
+      expect(dependencies.reportDiagnostic).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: VoiceoverDiagnosticKind.FAILED,
+          stage: VoiceoverDiagnosticStage.STARTING_PLAYBACK,
+          reason: VoiceoverDiagnosticReason.OPERATION_FAILED,
+        }),
+      );
+    } finally {
+      controller.clearTask();
+    }
+  });
+
   it('retains completion narration through missing and older native frames until audio drains', async () => {
     const { controller, dependencies, progress } = createHarness();
     let finishAudio: ((accepted: boolean) => void) | undefined;

@@ -953,6 +953,23 @@ usable. Playback and speech are not completion evidence. English/Vietnamese loca
 is snapshotted for the operation. Live provider pronunciation and signed hardware
 acceptance remain separate checks.
 
+`VoiceoverController` emits bounded `voiceover.diagnostic` stage transitions for
+previous-playback stop, renderer startup, speech request, first audio and audio
+drain. Timeout events retain the active stage and distinguish playback setup, first
+audio and overall duration expiry; stop events retain explicit interruption, message
+replacement or visibility loss. Microphone admission deferral is recorded once per
+pending instruction before any speech request. Main signals readiness after voice
+status and microphone-test transitions; only the current eligible visible
+instruction can resume. A deferred instruction is not consumed until speech
+admission, while explicit Stop, visibility loss, replacement, revocation, mute,
+locale and task changes retire stale work. Correlation uses utterance ID and message
+sequence, with elapsed milliseconds from narration admission. Events contain no
+instruction text, audio or raw errors. Playback setup is bounded independently of
+the first-audio budget, which starts only after setup and ends after the first
+accepted PCM chunk. The overall deadline still bounds the whole utterance. Provider
+dispatch is not retried automatically, and cancellation remains immediate. The
+credential-free loopback reproduction and its limits are documented in README.
+
 ## Classroom and materials
 
 Classroom authorization lives in `ClassroomService` and its store port. Teachers

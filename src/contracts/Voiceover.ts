@@ -7,6 +7,8 @@ export const VoiceoverLimits = {
   CHUNK_BYTES: 12000,
   MAX_BYTES: 3 * 1024 * 1024,
   START_TIMEOUT_MS: 5000,
+  // Independent provider/first-playback safety budget, not a latency target.
+  FIRST_AUDIO_TIMEOUT_MS: 15000,
   STOP_TIMEOUT_MS: 1500,
   MAX_DURATION_MS: 60000,
   QUEUE_SECONDS: 2,

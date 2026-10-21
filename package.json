@@ -46,6 +46,7 @@
     "test": "vitest run",
     "test:worker": "tsx scripts/CheckWorkerBundle.ts",
     "test:model-gateway": "tsx scripts/CheckModelGatewayDiagnostics.ts",
+    "test:voiceover": "tsx scripts/CheckVoiceoverDiagnostics.ts",
     "check:model-connection": "tsx scripts/CheckModelConnection.ts",
     "inspect:cua:mcp": "tsx scripts/InspectCuaMcpSchema.ts",
     "test:integration": "tsx scripts/RunIntegration.ts",
