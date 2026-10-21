@@ -21,10 +21,13 @@ import type { TeachingLessonContext } from './TeachingLessonContext.js';
 import type { TeachingPresentationBudget } from './TeachingPresentationBudget.js';
 import { describeTeachingProposal } from './TeachingStepDiagnostics.js';
 import { logAgentExchange } from '../agent/AgentExchangeLog.js';
+import { TeachingObservationKind } from '#contracts/TeachingObservation.js';
+import { TeachingObservationRecorder } from './TeachingObserver.js';
 
 interface StagedTeachingPresentation {
   generation: number;
   message: TeachingMessage;
+  presentationId: string;
 }
 
 /** Commit a checkpoint only after its complete presentation has been acknowledged. */
@@ -44,6 +47,7 @@ export class TeachingPresenter {
     private readonly assertCanCommit: () => void = () => {},
     private readonly prepareMessage: (message: TeachingMessage) => void = () => {},
     private readonly revokeMessage: (message: TeachingMessage) => void = () => {},
+    private readonly observations = new TeachingObservationRecorder(),
   ) {}
 
   beginSegment(): void {
@@ -97,9 +101,27 @@ export class TeachingPresenter {
       presentationId,
       stepId: message.stepId,
     });
+    this.observations.record(this.lesson.id, {
+      kind: TeachingObservationKind.CUE_REQUESTED,
+      stepId: message.stepId,
+      presentationId,
+      proposal,
+      message,
+    });
+    if (proposal.previousStepAssessment !== null) {
+      this.observations.record(this.lesson.id, {
+        kind: TeachingObservationKind.ASSESSMENT,
+        stepId: proposal.checkpointId ?? this.lesson.readCurrentStep()?.receipt.stepId ?? null,
+        proposedStepId: message.stepId,
+        captureId: proposal.captureId,
+        goalRevisionId: proposal.goalRevisionId,
+        assessment: proposal.previousStepAssessment,
+        evidence: proposal.assessmentEvidence,
+      });
+    }
     // Input may arrive while native rendering is pending. Stage the matcher for
     // this action; history records approximate attempts, not proof of visibility.
-    const staged = { generation, message };
+    const staged = { generation, message, presentationId };
     this.clearStagedPresentation();
     this.stagedPresentation = staged;
     this.tracker.registerStep(message.stepId, actionTargets.interaction);
@@ -164,6 +186,7 @@ export class TeachingPresenter {
           proposal,
           refusal.success ? refusal.data.code : 'paired_presentation_missing',
           presentationId,
+          message.stepId,
         );
       }
       const coordinateTrace = GuidanceCoordinateTraceSchema.safeParse(parsed.data.coordinate_trace);
@@ -194,6 +217,12 @@ export class TeachingPresenter {
         textOnly,
         interrupted,
       });
+      this.observations.record(this.lesson.id, {
+        kind: TeachingObservationKind.CUE_ACKNOWLEDGED,
+        stepId: message.stepId,
+        presentationId,
+        receipt,
+      });
       this.lesson.commitPresentedStep(proposal, receipt, message);
       this.tracker.registerStep(message.stepId, actionTargets.interaction);
       this.receipt = receipt;
@@ -202,6 +231,12 @@ export class TeachingPresenter {
       if (!interrupted) {
         this.publish(message);
         published = true;
+        this.observations.record(this.lesson.id, {
+          kind: TeachingObservationKind.CUE_PUBLISHED,
+          stepId: message.stepId,
+          presentationId,
+          message,
+        });
       }
       this.log.debug(
         { ...describeTeachingProposal(proposal), ...receipt },
@@ -223,6 +258,12 @@ export class TeachingPresenter {
         }
         if (!published) {
           this.revokeMessage(message);
+          this.observations.record(this.lesson.id, {
+            kind: TeachingObservationKind.CUE_REVOKED,
+            stepId: message.stepId,
+            presentationId,
+            reason: committed ? 'presentation_interrupted' : 'presentation_not_published',
+          });
         }
       }
     }
@@ -240,8 +281,20 @@ export class TeachingPresenter {
     const staged = this.stagedPresentation;
     this.stagedPresentation = null;
     if (staged) {
+      this.observations.record(this.lesson.id, {
+        kind: TeachingObservationKind.CUE_SUPERSEDED,
+        stepId: staged.message.stepId,
+        presentationId: staged.presentationId,
+        reason: 'presentation_superseded',
+      });
       this.tracker.invalidateTarget();
       this.revokeMessage(staged.message);
+      this.observations.record(this.lesson.id, {
+        kind: TeachingObservationKind.CUE_REVOKED,
+        stepId: staged.message.stepId,
+        presentationId: staged.presentationId,
+        reason: 'presentation_superseded',
+      });
     }
   }
 
@@ -249,8 +302,16 @@ export class TeachingPresenter {
     proposal: PresentTeachingStep,
     reason: string,
     presentationId?: string,
+    stepId?: string,
   ): Record<string, unknown> {
     this.lesson.recordOperation({ operation: 'presentation_refused', reason, proposal });
+    this.observations.record(this.lesson.id, {
+      kind: TeachingObservationKind.CUE_REFUSED,
+      stepId: stepId ?? null,
+      presentationId: presentationId ?? null,
+      captureId: proposal.captureId || null,
+      reason,
+    });
     this.log.warn(
       {
         ...describeTeachingProposal(proposal),

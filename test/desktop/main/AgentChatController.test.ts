@@ -348,6 +348,7 @@ it.each(['needs_input', 'waiting'] as const)(
       teachingStep: 'Which database?',
     });
     expect(controller.isBusy()).toBe(false);
+    expect(controller.hasActiveTask()).toBe(true);
     expect(await controller.startTaskSession()).toEqual({ kind: 'started', sessionId: 'teacher' });
     expect(
       await controller.answerLesson('other', lessonId, 'Sales', DesktopLocale.ENGLISH),
@@ -364,6 +365,7 @@ it.each(['needs_input', 'waiting'] as const)(
     expect(worker.sendMessage).toHaveBeenCalledOnce();
     finish?.({ kind: 'teaching', result: { outcome: 'goal_reached', answer: 'ERD finished.' } });
     expect(await running).toMatchObject({ kind: 'teaching', result: { outcome: 'goal_reached' } });
+    expect(controller.hasActiveTask()).toBe(false);
     controller.dispose();
   },
 );

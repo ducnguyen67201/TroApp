@@ -1799,6 +1799,217 @@ repository source. Framework-free domain rules depend on explicit ports; public
 contracts use strict runtime schemas. `CheckBoundaries.ts` enforces filenames and
 import boundaries. See [AGENTS.md](../AGENTS.md) for coding rules.
 
+## Internal computer-use evaluation harness
+
+This internal checkout harness shares the production Sol task runner and native
+driver. [EvaluationScenario.ts](../test/evaluation/interactive/EvaluationScenario.ts)
+owns the versioned, validated manifest contract; registered adapters own setup
+and independent outcome checks. The optional
+[PreparedTaskContext](../src/desktop/worker/context/PrepareTaskContext.ts) port lets
+the harness inject authored history and accept checkpoint deltas in memory. The
+normal desktop startup supplies no context port or teaching observation sink;
+this harness does not install background collection or a persistence service.
+
+[ApplicationAdapter.ts](../test/evaluation/interactive/ApplicationAdapter.ts)
+owns the common prepare/observe/finalize/grade/close boundary over the existing
+VS Code and Scratch adapters. [RunEvaluationTrial.ts](../test/evaluation/interactive/RunEvaluationTrial.ts)
+verifies starting identities and intended failure before dispatch, and scopes
+final observations to the current trial. Main retires the agent before exporting
+the final application state. Stage diagnostics are bounded metadata; public
+content belongs to the existing explicit trial recorder.
+
+[GenerateEvaluationScenarios.ts](../test/evaluation/interactive/GenerateEvaluationScenarios.ts)
+creates deterministic constrained mutations of two reviewed mechanical exercise
+families: four Python defects and three Scratch defects. Generation and
+[ValidateEvaluationScenarios.ts](../test/evaluation/interactive/ValidateEvaluationScenarios.ts)
+make no model calls and execute no candidate Python. Calibration rejects duplicate
+identities/fixtures, unsupported or unregistered inputs, initially solved cases,
+rejected reference/alternative repairs and accepted wrong repairs. This calibrates
+the mechanical oracle, not the natural-language question or a child's learning.
+Reference repairs stay in controller modules and never enter worker inputs or the
+evaluated project. The Mac desktop driver still has desktop-wide access; manifest
+separation is not OS containment or adversarial answer isolation.
+
+[ReadEvaluationScenarios.ts](../test/evaluation/interactive/ReadEvaluationScenarios.ts)
+loads bounded regular UTF-8 JSON files with no symlink following. The CLI calibrates
+the selected manifest before creating a model worker, then freezes its data and
+digests in local artifacts. Generated collections are accepted by the validator;
+a live invocation selects a single case manifest. Existing controlled matrix
+commands remain available. Live runs use the existing model profile and scoped
+gateway credential. The internal development menu can select a scenario file via
+a native dialog; its header chooses the application, while the CLI owns complete
+manifest validation. No renderer IPC, database schema, public API, installed menu
+or independent provider-key path is added.
+
+[WaitForEvaluationWindow.ts](../test/evaluation/interactive/WaitForEvaluationWindow.ts)
+uses the main-owned native connection to read the exact launched VS Code process,
+window title/document and nonempty scoped content before paid dispatch. Readiness
+is bounded and cancellable and retains metadata only; it does not establish
+physical display scan-out. Preflight still has no native readiness claim. Execute
+mode runs without a learner actor; teaching requires a human operator. A simulated
+learner and automated collection of real understanding probes remain future work.
+
+[InteractiveStudyWorkspace.ts](../test/evaluation/interactive/InteractiveStudyWorkspace.ts)
+owns the six default resettable fixture pages plus the opt-in `DebugScore` block
+editor and their outcome predicates. The debugging case executes a bounded block
+program and independently checks general behaviour at multiple turn counts,
+current run revision and trusted edit/run events. It does not embed real Scratch.
+The fixture
+renderer is sandboxed without a preload, Node integration, network access or model
+credential. Main performs fixed-script DOM readback and validates the bounded
+state schema. App outcomes and relevant trusted UI-event evidence, rather than
+the agent's completion text, determine outcome success. Event counters and bounded
+first observations preserve semantic click/input/drag evidence during pointer
+noise. Event trust flags remain diagnostics rather than authentication of physical
+input. Main independently samples the OS cursor in Electron DIP; fixture target
+rectangles use viewport CSS pixels. Movement, outcome and cue installation are
+reported independently and do not establish visible overlay correctness.
+
+The live harness receives only a short-lived scoped Tro gateway credential on
+stdin and forwards it through private main/worker messages. It never writes that
+credential to its disposable profile, artifacts or ordinary logs; no shared
+provider key enters the renderer. Gateway authentication and existing admission
+policies remain authoritative. Live mode requires an operator-declared dedicated
+desktop or VM. This composition adds no OS containment: a fullscreen fixture and
+a declaration flag cannot constrain the desktop-wide native driver. Each trial
+resets its workspace and retires its worker before the next trial; interruptions
+and incomplete cleanup prevent a finished-run claim.
+On macOS the evaluation host uses a separate, stable ignored bundle and matching
+bundle identity so OS grants survive disposable run profiles. Its bootstrap takes
+only the local entry and run directory; credentials remain on stdin. Host bundle
+preparation refuses to replace a running evaluation host. Guest OS permissions
+belong to the guest when running in a VM.
+
+Context-on trials inject authored history through the task's in-memory context
+port. This is a context-use comparison, not an evaluation of capture coverage,
+journal selection, HTTP/Prisma storage or semantic embedding retrieval. The
+history-dependent case intentionally leaves its assignment unavailable with
+context off, so an appropriate clarification can coexist with an incomplete
+destination outcome. Execution measures agent task completion; optional teaching
+requires operator input and does not measure a student's independent understanding.
+
+[InteractiveEvaluationReport.ts](../test/evaluation/interactive/InteractiveEvaluationReport.ts)
+keeps trial status, independently observed outcome, cursor movement, dispatch-based
+timing and model/tool observations separate. Main's monotonic spans avoid
+subtracting clocks from different processes. Polling bounds the precision of first
+observed input and passing outcome. Native cue acknowledgments establish host
+installation only. Reported usage retains unknowns; backend retry accounting and
+prices are incomplete, so these reports are not reconciled provider or classroom
+cost estimates. Audio latency, independent cue pixels, physical scan-out and
+student learning remain outside this harness. README owns invocation, credential
+transport and platform prerequisites.
+
+Single-request mode selects one authored question and one trial through this same
+composition, without audio. The optional task-local
+[TeachingObservation.ts](../src/contracts/TeachingObservation.ts) contract and
+[TeachingObserver.ts](../src/desktop/worker/teaching/TeachingObserver.ts) recorder
+stream public presentation requests, acknowledgments, publications, refusals,
+supersession/revocation, prior-step assessments, decisions and input attempts before
+bounded runtime history eviction. Its default is no observation; sink/validation
+failures cannot change tutor behaviour. A terminal event reports preceding attempt
+and failure counts after teardown. An interrupted installation is distinct from a
+published instruction. Physical input metadata describes attempts, not acceptance
+or learner authorship.
+
+The evaluation worker wraps those observations with sequence IDs and worker-local
+time, adds allowlisted native tool metadata/progress and a bounded final public
+answer, then emits a terminal output count. Main validates the private protocol and
+records changed fixture state using its own clock. Scoped credentials are removed
+before public outputs leave the worker and again at artifact serialization.
+[RecordAgentRequest.ts](../test/evaluation/interactive/RecordAgentRequest.ts) owns
+append-only, owner-readable per-trial artifacts and bounded asynchronous writes.
+Overflow, truncation, invalid sequences, missing terminal markers and disk failures
+invalidate complete coverage; none silently becomes proof that an action was absent.
+These explicit benchmark artifacts include authored/suggested text, not observed
+keypress contents, native arguments/results, raw SDK history or screen pixels.
+Artifact retention is operator-controlled.
+
+[GradeAgentRequest.ts](../test/evaluation/interactive/GradeAgentRequest.ts) runs after
+the worker is retired and grades recorded evidence without a second model call.
+It keeps pipeline settlement, publication, application input calls, independent
+state outcomes, structured completion claims and trace coverage separate. Allowed
+window focus does not count as taking over a student's task. Timeouts/cancellations
+retain final usage accounting but cannot become successful full runs. Custom text
+overrides have no mapped requested-outcome predicate and remain unassessed on those
+checks. Step-level correctness needs independently authored milestone predicates;
+cue visibility, child usability and learning need their own independent evidence.
+The report and printed A–J checklist retain these unknowns rather than reporting
+them as passes. No extra inference or production spending policy is introduced.
+
+The normal development host exposes fixed native evaluation actions through
+[RegisterEvaluationMenu.ts](../src/desktop/main/evaluation/RegisterEvaluationMenu.ts).
+It admits only an idle, signed-in development app and suspends normal cursor
+following while the independent evaluation host runs. Installed hosts do not
+register this menu. Typed and voice task admission also reject new normal-app
+tasks during the evaluation so two native agents cannot share the desktop.
+[RunSignedInEvaluation.ts](../src/desktop/main/evaluation/RunSignedInEvaluation.ts)
+uses the existing AuthClient, checks the active identity before and after fetching
+a fresh scoped model credential, and sends only that credential to the fixed
+checkout evaluator command through stdin. The selected application is validated
+against fixed Scratch/VS Code choices, with no arbitrary command or path input.
+The gateway uses the same API origin
+as the signed-in app. Child environment validation forwards OS startup values
+and the fixed Electron Node-mode setting; backend credentials, cookies and Node
+injection settings are excluded. No new renderer IPC or credential export is
+introduced, and app code does not import test implementations. Account changes,
+window closure and app shutdown abort the child, with bounded retirement before
+shutdown completes. The evaluation host still owns its own native permission
+identity and requires a working Escape shortcut before dispatching any task.
+
+`EvaluationApplication` distinguishes controlled harness pages, the actual
+Scratch web editor and installed VS Code. [ScratchWorkspace.ts](../test/evaluation/interactive/ScratchWorkspace.ts)
+owns the real-site adapter in a disposable anonymous Electron profile with no
+preload or Node integration. It loads the official editor, imports an authored SB3
+through its file input and exports the resulting project through its download UI.
+It reads only public monitor/target geometry and bounded input metadata. No VM
+global, React-fiber inspection or private browser profile is used. Exported state
+becomes stale after editing; exports occur at setup and final verification rather
+than every observation poll. [ScratchProject.ts](../test/evaluation/interactive/ScratchProject.ts)
+owns bounded archive parsing and supported block-graph interpretation. Independent
+grading requires a supported general fix, the observed score and relevant trusted
+editor input, with a green-flag click after the latest block interaction; it does
+not infer success from a displayed number alone. Setup/download waits share the
+evaluation cancellation signal, and explicit cancellation skips final export.
+The current adapter requires English editor labels. Other
+repeat counts are interpreted from the exported supported program, distinct from
+the real three-turn editor run. Unsupported graphs invalidate outcome applicability
+instead of becoming a correctness claim. Raw project/code snapshots are explicit
+benchmark artifacts; legacy controlled-page fields are neutral compatibility data
+for this adapter, not claims about fake button actions. The default six-case
+controlled matrix remains a harness check. Installed Chrome remains outside the suite.
+CLI startup writes bounded stage/error-class diagnostics to `LaunchStatus.json`
+without exposing raw child errors or configuration.
+
+[PythonDebugCase.ts](../test/evaluation/interactive/PythonDebugCase.ts) owns the
+customer-derived number-guessing case, its bounded source parser/interpreter and
+named program milestones. The supplied video shows VS Code, an existing equal
+and smaller-number branch, and guidance for adding greater-number feedback. The
+initial request is not captured, so the Vietnamese question is explicitly an
+authored paraphrase. Only reconstructed code and non-identifying provenance enter
+the portable fixture; customer video frames and student names are excluded. The
+worker receives the question, authored history and locale, not the repair notes
+or grader criteria. Existing cases default to English; this case uses Vietnamese.
+
+[VisualStudioCodeWorkspace.ts](../test/evaluation/interactive/VisualStudioCodeWorkspace.ts)
+owns an installed macOS VS Code process in a separate profile with extensions
+disabled, a fixed executable and its own process group. It opens only an authored
+file, preserves existing editor profiles and retires its owned process on reset,
+cancellation and completion. Its disposable `/tmp/TroCode-<random>/` profile keeps
+macOS IPC paths below the socket limit; it is removed only after confirmed process
+retirement. `VSCodeLifecycle.json` records bounded PID, lifecycle, timing and safe
+failure-code evidence without source, arguments, environment values or raw errors.
+No renderer IPC or editor extension is added. The
+adapter observes bounded saved bytes; it does not inspect unsaved buffers or
+invent browser geometry/native input events. Per-trial `Scenario.json` preserves
+the canonical authored case without solution notes; the live trial's `Request.json`
+records its actual request, which may be overridden. Final `ProgramOutcome.json`/`.md` record saved
+source checks. Syntax outside the exercise subset remains unassessed. No candidate
+Python is executed. A saved-program outcome does not establish physical student
+input, native Python output or learner comprehension. Preflight records source
+preparation/application startup separately from observed rendering. The live run
+uses the existing Sol/native pipeline and public output recording without a
+separate model judge. Windows and Linux VS Code launches are unsupported.
+
 ## Verification and current limits
 
 Unit and disposable-PostgreSQL integration tests cover contracts, authorization,

@@ -21,6 +21,7 @@ import {
   type AgentProgressPhase as ProgressPhase,
 } from '#contracts/CompanionHud.js';
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
 import {
   CursorCompanionStateSchema,
   CursorCompanionTool,
@@ -456,6 +457,11 @@ export class LoggedCuaServer extends MCPServerStdio {
   }
 
   private receiveObservation: ((result: CallToolResult) => void) | null = null;
+  private receiveContextObservation: ((id: string, text: string) => void) | null = null;
+
+  setContextObservationListener(listener: ((id: string, text: string) => void) | null): void {
+    this.receiveContextObservation = listener;
+  }
 
   setObservationListener(listener: ((result: CallToolResult) => void) | null): void {
     this.receiveObservation = listener;
@@ -845,6 +851,23 @@ export class LoggedCuaServer extends MCPServerStdio {
           : options,
       );
       const result = native;
+      if (
+        !result.isError &&
+        [
+          'get_desktop_state',
+          'get_accessibility_tree',
+          'get_browser_state',
+          'get_window_state',
+        ].includes(toolName)
+      ) {
+        this.receiveContextObservation?.(
+          call.id,
+          result.content
+            .filter((item) => item.type === 'text')
+            .map((item) => item.text)
+            .join('\n'),
+        );
+      }
       this.taskEvidence.record(toolName, result);
       const recorded = this.taskEvidence.recordToolResult(call, args, result);
       task?.recordProgress(recorded.fingerprint, recorded.observations.length > 0);
@@ -1009,6 +1032,13 @@ export class LoggedCuaServer extends MCPServerStdio {
       if (toolName === 'get_desktop_state') {
         this.teachingCapture.recordDesktopCapture(native, args);
         this.receiveObservation?.(native);
+        this.receiveContextObservation?.(
+          randomUUID(),
+          native.content
+            .filter((item) => item.type === 'text')
+            .map((item) => item.text)
+            .join('\n'),
+        );
       }
       if (toolName === 'bring_to_front') {
         this.teachingCapture.reset();

@@ -221,6 +221,293 @@ MP4 media rather than executable code.
 Confirmed provider quality, real cost and hosted throughput still require a
 separately authorized paid benchmark; offline fixtures do not establish those.
 
+## Internal computer-use evaluations
+
+These are internal checkout tools for personal testing. The installed product has
+no evaluation menu, public evaluation API, or scenario-upload flow. Development
+menus reuse your signed-in Tro gateway session; provider keys remain on the backend.
+
+Python and Scratch share one scenario-driven application lifecycle. A manifest
+defines the request, locale, starting fixture, provenance and registered grader.
+The runner prepares the application, verifies the starting bug, invokes the real
+Tro worker, records public outputs and independently grades the final state.
+Live VS Code runs also verify the exact owned window/document through the native
+driver before model dispatch. Preflight without native permissions remains a
+process/source check. Cleanup failure prevents a completed-run claim.
+
+Generate the seven distinct supported mutations (four Python, three Scratch), then
+inspect their mechanical calibration:
+
+```sh
+pnpm eval:generate --seed 1 --count 7 --output .tro-development/evaluations/MyScenarios
+pnpm eval:validate --input .tro-development/evaluations/MyScenarios/Scenarios.json
+```
+
+Generation is deterministic and makes zero model calls. Seed changes order and
+case identity; it does not create new exercise families. Existing output folders
+are refused. Each package contains `Scenarios.json`, per-case `Scenario.json`, and
+`Validation.json`/`.md`. Calibration checks schema, registered fixtures, duplicate
+IDs/fixtures, initial failure, accepted repairs and rejected wrong repairs.
+Unsupported input stays unassessed; passing calibration is separate from teacher
+review of the question and from learner understanding. Generated data cannot
+supply executable setup scripts or graders.
+
+Preflight a generated Python case through the shared pipeline:
+
+```sh
+pnpm eval:request --application vscode --scenario-file .tro-development/evaluations/MyScenarios/PythonMissingElseSeed1/Scenario.json
+```
+
+For one automatic live run, sign in to `tro-dev`, then use **Development → Run
+scenario file automatically (internal)** and choose that case's `Scenario.json`.
+**Run automatic Python debugging evaluation (internal)** runs the default case.
+Both use Tro's real execute mode: Tro performs the repair. The existing teaching
+actions still require a human operator to follow the published steps. There is
+no simulated learner in this implementation. CLI live runs additionally accept
+`--execute --live --dedicated-desktop --credential-stdin`; the scoped credential
+must enter through stdin. One manifest selects one trial, preventing an implicit
+expansion into many paid runs.
+
+Each live report links the actual request, readable public outputs, A–J checklist,
+append-only event trace and stage metadata. `ScenarioValidation.md` describes the
+local calibration; `Pipeline-<trialId>.json` records preparation, baseline, native
+readiness where applicable, agent execution, final observation and cleanup timings.
+`Readiness-<trialId>.json` retains safe owned-window evidence. Desktop trials run
+sequentially; pure generation/validation need no GUI, database or model credential.
+
+The customer debugging case recreates the Python number-guessing exercise visible
+in the supplied classroom clip. The equal and smaller-number branches are present;
+the student needs help with missing greater-number feedback. The original question
+is not captured, so the Vietnamese request is an authored paraphrase.
+
+On macOS with VS Code installed in `/Applications`, prepare that case without
+making a model call:
+
+```sh
+pnpm eval:request --application vscode
+```
+
+This launches the real installed VS Code with a separate profile, disabled extensions
+and an authored `main.py`. The profile uses `/tmp/TroCode-<random>/` to keep macOS
+IPC socket paths short and is removed after its process group has retired.
+Existing editor profiles and projects are not loaded.
+Inside `VSCode-<trialId>/`, `Scenario.json` records the authored case, starting source
+and provenance; `ProgramOutcome.md` lists independent program checks. Each live
+trial records the actual request in `Trial-<trialId>/Request.json`, including any
+custom request override. Setup preflight
+checks process startup and the saved baseline, not window visibility or renderer readiness.
+`VSCodeLifecycle.json` records bounded process and cleanup diagnostics using safe
+codes, without environment values, source contents or raw errors.
+
+For the live text-only teaching trial, sign in to `tro-dev` and choose
+**Development → Run student Python debugging evaluation in VS Code**. The existing
+Sol computer-use runner receives the Vietnamese question and locale, inspects the
+editor and publishes native guidance. The operator edits and saves `main.py`.
+Alternatively, supply the scoped credential through stdin:
+
+```sh
+pnpm eval:request --application vscode --live --dedicated-desktop --credential-stdin
+```
+
+The grader parses and interprets a bounded Python subset without executing the
+submitted program. It checks branch alignment, greater-number feedback, preserved
+behavior and varied guesses. Unsupported syntax remains unassessed. A saved-source
+pass is distinct from Python execution, physical student input and student understanding.
+Public instructions, native tool metadata, saved source changes, timing and usage
+observations use the usual trial recording. Audio input/playback is outside this
+trial. Escape cancels; cleanup targets only the benchmark's VS Code process group.
+
+The actual Scratch web editor remains an additional application benchmark:
+
+```sh
+pnpm eval:request --application scratch
+```
+
+This setup preflight opens the official Scratch editor in an isolated anonymous
+evaluation window, imports an authored buggy `.sb3` through its file loader and
+checks the exported project. It makes no model request. It needs network access
+to Scratch. For the live teaching trial, sign in to the local `tro-dev` app and
+choose **Development → Run Scratch teaching evaluation on this Mac**, or supply
+the scoped credential through stdin:
+
+```sh
+pnpm eval:request --application scratch --live --dedicated-desktop --credential-stdin
+```
+
+The student-style request describes a score that stays at 1 after three turns.
+Tro must inspect the real Scratch block workspace and present native guidance.
+The operator performs the suggested block edits and runs the green flag. Final
+grading exports the actual project through Scratch's UI, checks its variable/block
+graph with a bounded interpreter at 0, 1, 3 and 5 turns, and requires the observed
+score and relevant trusted inputs from the editor. The extra turn-count checks
+interpret the exported supported blocks; they are not additional native Scratch
+runs. A green-flag click must follow the latest observed block edit; later block
+interaction conservatively requires another run. The adapter currently requires
+English editor labels. Unsupported program shapes remain unassessed. No private `window.vm` global,
+React internals, hidden correct project or model success claim supplies the grade.
+The profile is disposable and anonymous, so it does not load or autosave your
+existing Scratch project. This is the real web editor, displayed in the evaluation
+window; testing the installed Chrome browser is not yet implemented.
+
+Start with one text request, without audio:
+
+```sh
+pnpm eval:request
+```
+
+This preflights the `DebugScore` workspace and prints a Test A–J checklist with
+live checks marked unassessed. Its natural request describes a score that stays
+at 1 after three turns and asks for debugging help. The controlled block editor
+starts with a reset inside the loop; the request and injected history do not
+provide the fix. This fixture represents block-programming behaviour, not the
+real Scratch application.
+
+To run that request through the production Sol computer-use teaching runner,
+pipe the scoped credential described below into this consumer command **inside
+the dedicated test desktop or VM**:
+
+```sh
+pnpm eval:request --live --dedicated-desktop --credential-stdin
+```
+
+The local `tro-dev` app also has **Development → Run Scratch teaching evaluation
+on this Mac**. Sign in normally, finish any active task, and choose that action
+when this Mac is the test desktop. It obtains a fresh scoped credential through
+the existing signed-in main process and sends it directly to the fixed evaluator's
+stdin; no token needs to be copied. Its gateway matches the signed-in app's API.
+This menu is available only in the development host. Account changes, closing the
+app window or quitting stop its evaluation child. The normal idle cursor is
+suspended during the trial to leave the evaluation host's cues visible.
+
+The live fixture opens fullscreen on this Mac. Watch the blue Tro teaching cursor
+and drawing cues, then perform the suggested action with your own pointer. Escape
+stops the trial. The evaluation host needs its own macOS Accessibility and Screen
+Recording grants; it is the stable **Tro Evaluation** bundle described below.
+If setup stops with `desktop_permissions_missing`, grant those in System Settings
+and choose the menu action again. A successful native development-host check does
+not establish the evaluation host's grants. Each attempt saves its own report.
+
+One request may involve multiple normal model/tool turns. The operator follows
+the published guidance in teaching mode. `--execute` instead measures the agent
+performing the task. There is no audio input or additional model judge. `--single`
+underlies this alias and requires exactly one task, variant and repetition;
+`--task Click` can select a simpler scenario. `--request "Your question"` overrides
+the text, limited to 1,200 characters. A changed question has no automatically
+mapped outcome rubric: its app-outcome/completion-claim checklist checks remain
+unassessed, while the fixture's original predicate is retained as a separate
+diagnostic. Author a matching case/predicate before treating custom questions as
+a scored benchmark.
+
+The command prints `Test A [PASS/FAIL/UNASSESSED] ...` through Test J, with evidence
+references. Checks cover agent settlement, published guidance, student control,
+independent app outcome, completion claims and recording coverage. Per-step
+assessment correctness, visible cue pixels, child-readable instructions and
+student understanding remain unassessed without independent evidence. The
+debugging outcome checks actual program behaviour at 0, 1, 3 and 5 turns, a current
+three-turn run and relevant trusted edit/run events.
+
+Each live trial writes `Trial-<id>/Request.json`, append-only `Events.jsonl`,
+`Outputs.md`, `Checklist.json` and `Checklist.md` under its report directory. These
+are explicit benchmark artifacts: they retain public model instructions (including
+suggested text), cue lifecycle/decisions, safe input-attempt metadata, allowlisted
+native tool metadata and changed fixture-state observations. They exclude observed
+keypress contents, native arguments/results, screenshots and SDK histories. Tokens
+are redacted. Ordinary app logs do not receive this content. Recording uses bounded
+asynchronous appends; overflow, write errors, sequence gaps or truncation make
+coverage incomplete without interrupting tutoring. Retain these artifacts for
+replay/review; artifact retention is operator-controlled.
+
+Render and inspect the six controlled study workspaces without a native driver or
+model request:
+
+```sh
+pnpm eval:interactive
+```
+
+This default preflight uses a disposable Electron profile and validates each
+fixture's initial state and target geometry. It does not move the OS cursor,
+perform a native input action or measure Sol success. The full live plan is six
+tasks × context off/on × three repetitions, or 36 task runs. Every live trial
+starts from a fresh workspace; a task run may make several model requests.
+
+Live runs require a dedicated test machine or isolated desktop/VM, the native
+driver's normal OS permissions, and an authenticated Tro model gateway. The native
+driver controls the desktop beyond the fixture window. A fullscreen workspace and
+`--dedicated-desktop` are not containment; the flag records an operator declaration.
+Keep unrelated apps, accounts and private work outside that test desktop.
+
+For a low-cost local test environment on an Apple Silicon Mac, use the free
+[UTM download](https://docs.getutm.app/installation/macos/) and a macOS guest with
+Apple virtualization. Start with 4 CPU cores, 8 GB RAM and an 80 GB virtual disk;
+these are suggested allocations, not measured minimums. Install this checkout and
+the prerequisites from this README inside the guest, build its native companion,
+and run the preflight there. Keep the guest awake and logged into its graphical
+desktop during live trials. Host and guest permissions are separate; grant
+Accessibility and Screen Recording to the evaluation host inside the guest.
+The Mac evaluation host has a stable local identity under
+`.tro-development/InteractiveHost/.tro-development/tro-dev.app`, while run profiles
+are temporary. A first run can stop with `desktop_permissions_missing`; add that
+host in the guest's Privacy & Security settings and rerun with a fresh credential.
+Start with one click trial, then run each six-trial task batch before attempting
+all 36. UTM adds no hosting subscription; model usage still incurs its normal cost.
+
+[Railway sandboxes](https://docs.railway.com/sandboxes) are Linux VMs. The current
+native harness uses Tro's macOS/Windows driver, so a Railway-hosted Linux desktop
+would need a separately supported driver and adapter. The model gateway may stay
+on Railway: pass its reachable HTTPS model base URL through `--gateway`.
+The default loopback address points to the VM itself when running inside UTM.
+
+Supply a short-lived Tro gateway credential directly through stdin as JSON with
+`token` and `expiresAt` fields from the existing authenticated credential flow.
+This is a scoped Tro token, never an OpenAI provider key. The development menu
+supplies it locally, or a trusted credential-producing process can pipe it into
+the command below. The standalone CLI does not supply login. Do not put the token in command
+arguments, environment variables, chat, shell history or a credential file.
+
+```sh
+pnpm eval:interactive --live --dedicated-desktop --credential-stdin
+```
+
+The current gateway credential window is approximately 15 minutes. Select smaller
+batches when needed and obtain a fresh credential for the next batch; this harness
+does not renew credentials. For example, the consumer side of a credential pipe
+can run one context-enabled click trial:
+
+```sh
+pnpm eval:interactive --live --dedicated-desktop --credential-stdin --task Click --variant on --repetitions 1
+```
+
+`--task` accepts comma-separated `Click`, `Drag`, `Type`, `Scroll`, `Recovery` and
+`History` case IDs; `DebugScore` is an additional opt-in case. `--variant` selects `off`, `on` or `both`; `--repetitions`
+selects one through five repetitions. `--gateway` selects the authenticated model
+gateway base URL; the owning defaults and input rules are in
+[InteractiveEvaluationConfig.ts](test/evaluation/interactive/InteractiveEvaluationConfig.ts).
+`--output` chooses a fresh report directory. Add `--teach` to exercise production
+teaching instead of execution. In teaching mode, a real operator must carry out
+the presented steps; operator or scripted actions do not establish student learning.
+
+Reports are saved under `.tro-development/evaluations/Interactive-*/` by default.
+They retain independent app-state outcomes, relevant trusted fixture events, OS
+cursor movement in Electron device-independent pixels, model/tool observations,
+timeouts and main-process timing spans from task dispatch. First observed input
+may be wrong; first verified outcome is the first passing fixture predicate.
+Cursor movement is a separate diagnostic, not proof of target accuracy or learning.
+Cue acknowledgment establishes host installation, not independently visible pixels.
+
+The history-dependent case injects authored activity through an in-memory context
+port. It does not exercise background collection, the local journal, HTTP/Prisma
+context storage or embeddings. The context-off case asks for clarification when
+the earlier assignment is unavailable; that may be appropriate behaviour while
+remaining incomplete on the requested destination outcome.
+
+Observed token usage remains a subtotal: unknown usage and unobserved backend
+retries are not treated as free. The harness does not derive a full provider bill
+or class-cost projection. It also does not measure audio-to-action latency,
+independent cue pixels, physical display scan-out or student understanding. Use
+the separate teaching probes for recorded learner evidence. Native run setup,
+controlled fixtures and report ownership live under `test/evaluation/interactive`;
+the ordinary desktop renderer receives no benchmark credential or generic IPC.
+
 ## Configuration
 
 | Process                                     | Settings                                                                                                                                                                                                       |

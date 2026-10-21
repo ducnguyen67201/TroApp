@@ -185,6 +185,7 @@ export class CompanionHudClient implements CompanionPresentationPort {
       return Promise.reject(new Error('Cursor presentation is unavailable.'));
     }
     const requestId = randomUUID();
+    const startedAt = performance.now();
     return new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => {
         finish(false);
@@ -192,6 +193,12 @@ export class CompanionHudClient implements CompanionPresentationPort {
       const finish = (applied: boolean): void => {
         clearTimeout(timer);
         this.followingReplies.delete(requestId);
+        console.debug('companion.cursor.ownership', {
+          requestId,
+          enabled,
+          applied,
+          elapsedMs: Math.round(performance.now() - startedAt),
+        });
         if (applied) {
           resolve();
         } else {

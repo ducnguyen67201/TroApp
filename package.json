@@ -57,7 +57,11 @@
     "build:renderer": "docker build -f Dockerfile.renderer -t tro-lesson-renderer:local .",
     "dev:renderer": "tsx scripts/StartDevelopment.ts --renderer-only",
     "bundle:renderer": "tsx scripts/BuildLessonRenderer.ts",
-    "check:lesson-renderer": "tsx scripts/CheckLessonRenderer.ts"
+    "check:lesson-renderer": "tsx scripts/CheckLessonRenderer.ts",
+    "eval:interactive": "tsx scripts/RunInteractiveEvaluations.ts",
+    "eval:request": "tsx scripts/RunInteractiveEvaluations.ts --single",
+    "eval:generate": "tsx scripts/GenerateEvaluationScenarios.ts",
+    "eval:validate": "tsx scripts/ValidateEvaluationScenarios.ts"
   },
   "dependencies": {
     "@better-auth/electron": "1.7.6",

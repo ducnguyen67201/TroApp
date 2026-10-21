@@ -1,6 +1,8 @@
 import { StudentInteractionTracker } from '../observation/StudentInteractionTracker.js';
+import type { PreparedTaskContext } from '../context/PrepareTaskContext.js';
 import type { ClassroomTeachingSession } from './ClassroomTeachingTools.js';
 import type { StudentActivity } from '#contracts/StudentActivity.js';
+import { TeachingObservationKind } from '#contracts/TeachingObservation.js';
 import { logAgentExchange } from '../agent/AgentExchangeLog.js';
 import { AgentLogRole, withAgentLogContext } from '../agent/AgentDebugLog.js';
 import type { Logger } from 'pino';
@@ -19,9 +21,10 @@ import {
 } from '../observation/DesktopObservationClient.js';
 import type { LoggedCuaServer } from '../cua/LoggedCuaServer.js';
 import { runComputerUseAgent, type ComputerUseAnswer } from '../agent/RunComputerUseAgent.js';
-import { TeachingDisposition } from './TeachingReply.js';
+import { TeachingDisposition, type TeachingDecision } from './TeachingReply.js';
 import { TeachingLessonContext } from './TeachingLessonContext.js';
 import { TeachingPresenter } from './TeachingPresenter.js';
+import { TeachingObservationRecorder, type TeachingObserver } from './TeachingObserver.js';
 import { TeachingPresentationBudget } from './TeachingPresentationBudget.js';
 import {
   TeachingObservationLimits,
@@ -72,7 +75,9 @@ async function waitForLessonPoll(
 }
 
 export class TeachingTaskRunner {
-  private readonly interactionTracker = new StudentInteractionTracker();
+  private readonly interactionTracker: StudentInteractionTracker;
+  private readonly observations: TeachingObservationRecorder;
+
   recordStudentActivity(activity: StudentActivity): void {
     this.interactionTracker.recordActivity(activity);
   }
@@ -104,8 +109,19 @@ export class TeachingTaskRunner {
     private readonly runAgent: typeof runComputerUseAgent = runComputerUseAgent,
     observation?: DesktopObservationPort,
     private readonly translateMessage: typeof translateTeachingMessage = translateTeachingMessage,
+    private readonly activityContext?: PreparedTaskContext,
+    observeTeaching?: TeachingObserver,
   ) {
     this.observation = observation ?? new DesktopObservationClient(server);
+    this.observations = new TeachingObservationRecorder(observeTeaching);
+    this.interactionTracker = new StudentInteractionTracker((attempt) => {
+      if (this.lesson) {
+        this.observations.record(this.lesson.id, {
+          kind: TeachingObservationKind.STUDENT_ATTEMPT,
+          attempt,
+        });
+      }
+    });
   }
 
   submitAnswer(lessonId: string, answer: string): boolean {
@@ -170,6 +186,7 @@ export class TeachingTaskRunner {
           false,
           true,
         ),
+      this.observations,
     );
     this.server.setObservationListener((result) => {
       this.observation.recordCapture(result);
@@ -251,6 +268,7 @@ export class TeachingTaskRunner {
         });
         const baseline = this.observation.readBaseline();
         if (!baseline) {
+          this.recordDecision(lesson, decision, false, 'capture_baseline_missing');
           throw new TeachingFailure(
             TeachingFailureCode.CAPTURE_BASELINE_MISSING,
             GuidanceReason.TRANSPORT_FAILED,
@@ -276,6 +294,7 @@ export class TeachingTaskRunner {
           'agent.teaching.observed',
         );
         if (changedDuringRun) {
+          this.recordDecision(lesson, decision, false, 'observation_superseded');
           await this.waitForStableScreen(signal);
           trigger =
             'Real input or display geometry superseded the previous observation; assess fresh evidence without blaming the student';
@@ -286,6 +305,7 @@ export class TeachingTaskRunner {
           decision.captureId !== lesson.readCaptureId() ||
           decision.goalRevisionId !== (lesson.readGoal()?.id ?? null)
         ) {
+          this.recordDecision(lesson, decision, false, 'current_decision_required');
           lesson.recordOperation({
             operation: 'decision_refused',
             ...budget.reject('current_decision_required'),
@@ -295,6 +315,7 @@ export class TeachingTaskRunner {
         }
         if (decision.disposition === TeachingDisposition.COMPLETE) {
           if (!decision.message || !lesson.hasReachedGoal(decision)) {
+            this.recordDecision(lesson, decision, false, 'goal_evidence_required');
             lesson.recordOperation({
               operation: 'completion_refused',
               ...budget.reject('goal_evidence_required'),
@@ -302,6 +323,7 @@ export class TeachingTaskRunner {
             trigger = 'Original goal has insufficient current evidence; continue teaching';
             continue;
           }
+          this.recordDecision(lesson, decision, true);
           const currentMessage = lesson.readMessage();
           receiveStep?.(
             decision.message,
@@ -320,6 +342,7 @@ export class TeachingTaskRunner {
         }
         if (decision.disposition === TeachingDisposition.ASK) {
           if (!decision.message || !decision.reason) {
+            this.recordDecision(lesson, decision, false, 'scoped_question_required');
             lesson.recordOperation({
               operation: 'question_refused',
               ...budget.reject('scoped_question_required'),
@@ -329,6 +352,7 @@ export class TeachingTaskRunner {
           }
           budget.confirm();
           lesson.askQuestion(decision.message);
+          this.recordDecision(lesson, decision, true);
           receiveStep?.(
             decision.message,
             TeachingLessonPhase.NEEDS_INPUT,
@@ -339,6 +363,7 @@ export class TeachingTaskRunner {
         } else {
           const receipt = presenter.readReceipt();
           if (!receipt || receipt.presentationId !== decision.presentationId) {
+            this.recordDecision(lesson, decision, false, 'this_segment_presentation_required');
             lesson.recordOperation({
               operation: 'decision_refused',
               ...budget.reject('this_segment_presentation_required'),
@@ -351,6 +376,7 @@ export class TeachingTaskRunner {
             decision.disposition === TeachingDisposition.OBSERVE_AGAIN &&
             lesson.readGoal()?.purpose === 'tour'
           ) {
+            this.recordDecision(lesson, decision, true);
             trigger =
               'Requested tour: continue to the next grounded highlight after the acknowledged cue';
             continue;
@@ -359,6 +385,7 @@ export class TeachingTaskRunner {
             decision.disposition === TeachingDisposition.OBSERVE_AGAIN &&
             (lesson.readCurrentStep()?.proposal.action.kind !== 'wait' || !decision.reason)
           ) {
+            this.recordDecision(lesson, decision, false, 'loading_evidence_required');
             lesson.recordOperation({
               operation: 'decision_refused',
               ...budget.reject('loading_evidence_required'),
@@ -368,6 +395,7 @@ export class TeachingTaskRunner {
             continue;
           }
           policy.recordAssessment(decision.disposition !== TeachingDisposition.OBSERVE_AGAIN);
+          this.recordDecision(lesson, decision, true);
         }
         lesson.setWaitingForStudent(true);
         if (decision.disposition !== TeachingDisposition.ASK) {
@@ -409,14 +437,42 @@ export class TeachingTaskRunner {
               error instanceof GuidanceTaskError ? error.reason : GuidanceReason.TRANSPORT_FAILED,
           };
     } finally {
-      this.lesson = null;
-      this.receiveStep = undefined;
-      this.server.setObservationListener(null);
-      this.server.setPreviewAdmission(null);
-      this.companion.setFollowingFailureListener(null);
-      await this.observation.end().catch(() => {});
-      this.server.endTeachingTask();
+      try {
+        this.lesson = null;
+        this.receiveStep = undefined;
+        this.server.setObservationListener(null);
+        this.server.setPreviewAdmission(null);
+        this.companion.setFollowingFailureListener(null);
+        await this.observation.end().catch(() => {});
+        this.server.endTeachingTask();
+      } finally {
+        this.observations.finish(lesson.id);
+      }
     }
+  }
+
+  private recordDecision(
+    lesson: TeachingLessonContext,
+    decision: TeachingDecision | null,
+    admitted: boolean,
+    refusalReason?: string,
+  ): void {
+    if (!decision) {
+      return;
+    }
+    this.observations.record(lesson.id, {
+      kind: TeachingObservationKind.DECISION,
+      stepId: lesson.readCurrentStep()?.receipt.stepId ?? null,
+      presentationId: decision.presentationId,
+      captureId: decision.captureId,
+      goalRevisionId: decision.goalRevisionId,
+      disposition: decision.disposition,
+      admitted,
+      reason: refusalReason ?? decision.reason,
+      message: decision.message,
+      observationSummary: decision.observationSummary,
+      goalEvidence: decision.goalEvidence,
+    });
   }
 
   private async runSegment(
@@ -451,7 +507,11 @@ export class TeachingTaskRunner {
           GuidanceReason.TRANSPORT_FAILED,
         );
       }
+      await this.activityContext?.settle();
       const input = lesson.buildInput(trigger, this.interactionTracker.readEvidence());
+      if (this.activityContext) {
+        input.push({ role: 'user', content: this.activityContext.buildMemoryInput() });
+      }
       logAgentExchange(this.log, {
         operation: 'teaching.segment.input',
         context: { lessonId: lesson.id },
@@ -500,6 +560,7 @@ export class TeachingTaskRunner {
             },
           },
           this.classroom,
+          this.activityContext,
         ),
         input,
         AbortSignal.any([
@@ -509,6 +570,7 @@ export class TeachingTaskRunner {
           AbortSignal.timeout(TeachingObservationLimits.MODEL_STEP_MS),
         ]),
         TeachingObservationLimits.MAXIMUM_MODEL_TURNS,
+        this.activityContext,
       );
       signal.throwIfAborted();
       this.companion.assertFollowingAvailable();

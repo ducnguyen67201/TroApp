@@ -1,4 +1,6 @@
 import { readTaskModelRunner } from './TaskModelClient.js';
+import { readCheckpointOutput } from '../context/ReadCheckpointOutput.js';
+import type { PreparedTaskContext } from '../context/PrepareTaskContext.js';
 import { MaxTurnsExceededError, type AgentInputItem } from '@openai/agents';
 import type { Logger } from 'pino';
 import {
@@ -71,12 +73,18 @@ export class MainAgentRunner implements MainAgentPort {
     controls: TaskControls,
     private readonly runAgent: RunTaskAgent = runTaskAgent,
     private readonly log?: Logger,
+    private readonly activityContext?: PreparedTaskContext,
   ) {
-    this.agent = createComputerUseAgent(server, locale, controls);
+    this.agent = createComputerUseAgent(server, locale, controls, activityContext);
   }
 
   runFirstAttempt(): Promise<CompletionProposal | null> {
-    return this.runAttempt(this.task.instruction, this.task.config.initialModelTurns);
+    return this.runAttempt(
+      this.activityContext
+        ? `${this.task.instruction}\n${this.activityContext.buildMemoryInput()}`
+        : this.task.instruction,
+      this.task.config.initialModelTurns,
+    );
   }
 
   continueWithFeedback(feedback: string): Promise<CompletionProposal | null> {
@@ -121,7 +129,9 @@ export class MainAgentRunner implements MainAgentPort {
       const attempt = await this.runAgent(this.agent, input, this.task, maxTurns, this.log);
       this.task.assertActive();
       this.history = structuredClone(attempt.history);
-      const parsed = CompletionProposalSchema.safeParse(attempt.finalOutput);
+      const parsed = CompletionProposalSchema.safeParse(
+        readCheckpointOutput(attempt.finalOutput, this.activityContext),
+      );
       this.log?.debug(
         {
           ...describeTaskDiagnostics(this.task),

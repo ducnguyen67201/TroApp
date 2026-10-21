@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { TeachingGoalEvidenceSchema } from '#contracts/TeachingStep.js';
+import { CheckpointUpdateSchema } from '#contracts/StudyMemory.js';
 export const TeachingDisposition = {
   AWAIT_ACTIVITY: 'await_activity',
   OBSERVE_AGAIN: 'observe_again',
@@ -20,3 +21,7 @@ export const TeachingReplySchema = z.strictObject({
 });
 
 export type TeachingDecision = z.infer<typeof TeachingReplySchema>;
+
+export const EnrichedTeachingReplySchema = TeachingReplySchema.extend({
+  checkpointUpdate: CheckpointUpdateSchema.nullable().catch(null),
+});
