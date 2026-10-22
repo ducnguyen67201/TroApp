@@ -53,9 +53,12 @@ import {
   InteractiveReportOutcome,
   formatInteractiveEvaluationReport,
   summarizeInteractiveAgent,
+  summarizeInteractiveAccounting,
+  summarizeInteractiveResults,
   type InteractiveEvaluationReport,
   type InteractiveTrialResult,
 } from './InteractiveEvaluationReport.js';
+import { summarizeEvaluationUsage } from '../accounting/EvaluationUsage.js';
 import {
   WorkspaceStateSchema,
   createInteractiveCases,
@@ -180,6 +183,17 @@ function gradeCurrentWorkspace(
 }
 
 async function saveReport(report: InteractiveEvaluationReport, directory: string): Promise<void> {
+  report.accounting = summarizeInteractiveAccounting(report);
+  report.usageByVariant = summarizeInteractiveResults(report).map(({ variant, accounting }) => ({
+    variant,
+    accounting,
+  }));
+  for (const trial of report.trials) {
+    trial.accounting = summarizeEvaluationUsage(
+      trial.agent?.modelRequests ?? null,
+      report.config.pricing,
+    );
+  }
   const json = join(directory, 'Report.json');
   await writeFile(`${json}.tmp`, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
   await rename(`${json}.tmp`, json);
@@ -192,6 +206,7 @@ async function saveReport(report: InteractiveEvaluationReport, directory: string
         observations: [],
         traceComplete: false,
         observedOutcomeMatches: null,
+        ...(report.config.pricing ? { pricing: report.config.pricing } : {}),
       }))
     : null;
   const formattedChecklist = checklist ? formatAgentRequestChecklist(checklist) : null;
@@ -614,6 +629,7 @@ async function runTrial(
           observations: recorder.readTeachingObservations(),
           traceComplete: summary.traceComplete,
           observedOutcomeMatches,
+          ...(launch.config.pricing ? { pricing: launch.config.pricing } : {}),
           hasApplicableOutcome: canonicalRequest === plan.scenario.request,
           supportsObservedOutcome:
             !hasInterrupted() && (applicationAdapter?.supportsOutcome() ?? true),

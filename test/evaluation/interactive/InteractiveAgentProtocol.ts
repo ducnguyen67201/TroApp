@@ -28,14 +28,32 @@ function isAllowedGatewayUrl(value: string): boolean {
 
 export const InteractiveGatewayUrlSchema = z.url().refine(isAllowedGatewayUrl);
 
-export const InteractiveModelRequestSchema = z.strictObject({
-  id: z.uuid(),
-  status: z.number().int().min(100).max(599).nullable(),
-  durationMs: z.number().nonnegative(),
-  inputTokens: z.number().int().nonnegative().nullable(),
-  cachedInputTokens: z.number().int().nonnegative().nullable(),
-  outputTokens: z.number().int().nonnegative().nullable(),
-});
+/** Bounded provider model identity, not arbitrary response text. */
+export const InteractiveModelNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$/u);
+
+export const InteractiveModelRequestSchema = z
+  .strictObject({
+    id: z.uuid(),
+    status: z.number().int().min(100).max(599).nullable(),
+    durationMs: z.number().nonnegative(),
+    inputTokens: z.number().int().nonnegative().nullable(),
+    cachedInputTokens: z.number().int().nonnegative().nullable(),
+    outputTokens: z.number().int().nonnegative().nullable(),
+    model: InteractiveModelNameSchema.nullable().optional(),
+    cacheWriteInputTokens: z.number().int().nonnegative().nullable().optional(),
+    reasoningTokens: z.number().int().nonnegative().nullable().optional(),
+  })
+  .superRefine((request, context) => {
+    if (
+      request.inputTokens !== null &&
+      (request.cachedInputTokens ?? 0) + (request.cacheWriteInputTokens ?? 0) > request.inputTokens
+    ) {
+      context.addIssue({ code: 'custom', message: 'Input token subsets exceed the total.' });
+    }
+    if (request.outputTokens !== null && (request.reasoningTokens ?? 0) > request.outputTokens) {
+      context.addIssue({ code: 'custom', message: 'Reasoning tokens exceed the output total.' });
+    }
+  });
 
 /** Main alone supplies native transport metadata and a short-lived model credential.
  * Neither the credential nor this private protocol crosses the fixture renderer. */

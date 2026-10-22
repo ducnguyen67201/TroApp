@@ -16,12 +16,14 @@ import {
   InteractiveTrialStatus,
   formatInteractiveEvaluationReport,
   summarizeInteractiveAgent,
+  summarizeInteractiveAccounting,
   summarizeInteractivePairs,
   summarizeInteractiveResults,
   type InteractiveEvaluationReport,
   type InteractiveTrialResult,
 } from './InteractiveEvaluationReport.js';
 import { InteractiveTaskId } from './InteractiveStudyWorkspace.js';
+import { EvaluationPriceCardSchema } from '../accounting/EvaluationUsage.js';
 
 function createAgentResult(
   result: InteractiveAgentSettled['result'] = {
@@ -251,6 +253,86 @@ it('distinguishes observed token subtotals, unknown request usage and absent acc
   expect(markdown).toContain('Trials without accounting');
   expect(markdown).toContain('not complete provider-attempt accounting');
   expect(markdown).toContain('prices remain unknown');
+});
+
+it('prices observed calls per trial and run without treating missing worker accounting as free', () => {
+  const measured = createAgentResult();
+  measured.modelRequests = [
+    {
+      id: randomUUID(),
+      status: 200,
+      durationMs: 100,
+      model: 'synthetic-model',
+      inputTokens: 1000,
+      cachedInputTokens: 200,
+      cacheWriteInputTokens: 100,
+      outputTokens: 300,
+      reasoningTokens: 100,
+    },
+  ];
+  const report = createReport([createTrial({ agent: summarizeInteractiveAgent(measured) })]);
+  report.config.pricing = EvaluationPriceCardSchema.parse({
+    schemaVersion: 1,
+    currency: 'USD',
+    id: 'SyntheticRateCard',
+    source: 'Authored test prices, not a provider quote',
+    effectiveAt: '2026-10-21T00:00:00.000Z',
+    models: [
+      {
+        model: 'synthetic-model',
+        missingCacheWriteTokens: 'unknown',
+        tiers: [
+          {
+            maximumInputTokens: null,
+            inputUsdPerMillion: 2,
+            cachedInputUsdPerMillion: 0.1,
+            cacheWriteInputUsdPerMillion: 2.5,
+            outputUsdPerMillion: 10,
+          },
+        ],
+      },
+    ],
+  });
+  const usage = summarizeInteractiveAccounting(report);
+  expect(usage).toMatchObject({
+    gatewayCalls: 1,
+    inputTokensObserved: 1000,
+    outputTokensObserved: 300,
+    reasoningTokensObserved: 100,
+    estimatedCostUsd: 0.00467,
+    knownEstimatedCostUsd: 0.00467,
+    unpricedCalls: 0,
+  });
+  const markdown = formatInteractiveEvaluationReport(report);
+  expect(markdown).toContain('$0.004670');
+  expect(markdown).toContain('SyntheticRateCard');
+  expect(markdown).toContain('synthetic-model');
+  report.trials.push(createTrial({ agent: null, repetition: 2 }));
+  expect(summarizeInteractiveAccounting(report)).toMatchObject({
+    gatewayCalls: 1,
+    estimatedCostUsd: null,
+    knownEstimatedCostUsd: 0.00467,
+    trialsWithoutAccounting: 1,
+  });
+  expect(formatInteractiveEvaluationReport(report)).toContain(
+    'Missing trial accounting keeps the run estimate unknown',
+  );
+});
+
+it('distinguishes a provider-free preflight from a live run with missing accounting', () => {
+  expect(
+    summarizeInteractiveAccounting(createReport([], InteractiveRunMode.PREFLIGHT)),
+  ).toMatchObject({
+    gatewayCalls: 0,
+    inputTokensObserved: 0,
+    outputTokensObserved: 0,
+    estimatedCostUsd: 0,
+  });
+  expect(summarizeInteractiveAccounting(createReport([], InteractiveRunMode.LIVE))).toMatchObject({
+    gatewayCalls: null,
+    inputTokensObserved: null,
+    estimatedCostUsd: null,
+  });
 });
 
 it('leaves missing timing spans unmeasured and reports sample counts for observed spans', () => {

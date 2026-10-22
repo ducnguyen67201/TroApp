@@ -6,6 +6,7 @@ import { ModelProfile } from '../../../src/contracts/ModelProfile.js';
 import { InteractiveGatewayUrlSchema } from './InteractiveAgentProtocol.js';
 import { EvaluationApplication } from './EvaluationApplication.js';
 import { EvaluationScenarioSchema, type EvaluationScenario } from './EvaluationScenario.js';
+import { EvaluationPriceCardSchema } from '../accounting/EvaluationUsage.js';
 import {
   getDefaultEvaluationScenario,
   getEvaluationTaskId,
@@ -46,6 +47,7 @@ export const InteractiveEvaluationConfigSchema = z
     variants: z.array(z.enum(InteractiveVariant)).min(1).max(2),
     gatewayBaseUrl: InteractiveGatewayUrlSchema,
     dedicatedDesktopDeclared: z.boolean(),
+    pricing: EvaluationPriceCardSchema.optional(),
   })
   .superRefine((config, context) => {
     if (config.evaluationScenario && config.evaluationScenario.application !== config.application) {
@@ -109,6 +111,7 @@ export interface InteractiveEvaluationOptions {
   credentialStdin: boolean;
   output: string | undefined;
   scenarioFile?: string;
+  pricingFile?: string;
 }
 
 export function parseInteractiveEvaluationOptions(args: string[]): InteractiveEvaluationOptions {
@@ -122,6 +125,7 @@ export function parseInteractiveEvaluationOptions(args: string[]): InteractiveEv
       request: { type: 'string' },
       application: { type: 'string', default: EvaluationApplication.CONTROLLED },
       'scenario-file': { type: 'string' },
+      'pricing-file': { type: 'string' },
       'dedicated-desktop': { type: 'boolean', default: false },
       'credential-stdin': { type: 'boolean', default: false },
       repetitions: { type: 'string' },
@@ -184,6 +188,9 @@ export function parseInteractiveEvaluationOptions(args: string[]): InteractiveEv
     credentialStdin: values['credential-stdin'],
     output: values.output,
     ...(values['scenario-file'] ? { scenarioFile: values['scenario-file'] } : {}),
+    ...(values['pricing-file'] !== undefined
+      ? { pricingFile: z.string().trim().min(1).max(4096).parse(values['pricing-file']) }
+      : {}),
   };
 }
 

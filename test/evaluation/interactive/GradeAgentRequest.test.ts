@@ -270,7 +270,7 @@ it('prints separate recorded checks without converting unknown learning or visib
   expect(text).toContain('Test A [PASS]');
   expect(text).toContain('Test B [PASS]');
   expect(text).toContain('Test J [UNASSESSED]');
-  expect(text).toContain('Cost: unmeasured');
+  expect(text).toContain('Estimated observed-call cost: unknown');
   expect(text).not.toContain('PrivateModel');
   expect(text).not.toContain('PrivateTeaching');
   expect(JSON.stringify(checklist)).not.toContain('Private');
@@ -645,7 +645,7 @@ it('reports observed usage subtotals and unknown requests without assuming a fre
     outputTokens: null,
   });
   const checklist = gradeAgentRequest(createInput({ trial }));
-  expect(checklist.usage).toEqual({
+  expect(checklist.usage).toMatchObject({
     gatewayRequests: 2,
     requestsWithUnknownUsage: 1,
     inputTokensObserved: 200,

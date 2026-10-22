@@ -24,7 +24,13 @@ it('ignores created placeholders and reads only validated terminal streaming usa
   for (let offset = 0; offset < terminal.byteLength; offset += 7) {
     reader.accept(terminal.slice(offset, offset + 7));
   }
-  expect(reader.finish()).toEqual({ inputTokens: 120, cachedInputTokens: 40, outputTokens: 14 });
+  expect(reader.finish()).toEqual({
+    inputTokens: 120,
+    cachedInputTokens: 40,
+    cacheWriteInputTokens: null,
+    outputTokens: 14,
+    reasoningTokens: null,
+  });
 });
 
 it('reads normal JSON usage after chunked UTF-8 content without retaining content in its result', () => {
@@ -39,7 +45,13 @@ it('reads normal JSON usage after chunked UTF-8 content without retaining conten
     reader.accept(bytes.slice(offset, offset + 2));
   }
   expect(reader.readUsage()).toBeNull();
-  expect(reader.finish()).toEqual({ inputTokens: 75, cachedInputTokens: 0, outputTokens: 8 });
+  expect(reader.finish()).toEqual({
+    inputTokens: 75,
+    cachedInputTokens: null,
+    cacheWriteInputTokens: null,
+    outputTokens: 8,
+    reasoningTokens: null,
+  });
   expect(JSON.stringify(reader.readUsage())).not.toContain('Private response');
 });
 
@@ -51,7 +63,11 @@ it('skips an oversized streaming line and recovers for a later bounded terminal 
     ),
   );
   reader.accept(encoder.encode(`still oversized\n\n${createCompletedEvent()}`));
-  expect(reader.finish()).toEqual({ inputTokens: 120, cachedInputTokens: 40, outputTokens: 14 });
+  expect(reader.finish()).toMatchObject({
+    inputTokens: 120,
+    cachedInputTokens: 40,
+    outputTokens: 14,
+  });
 });
 
 it('does not partially parse oversized JSON as known usage', () => {
@@ -77,10 +93,122 @@ it.each([
   { input_tokens: -1, output_tokens: 1 },
   { input_tokens: 1.5, output_tokens: 1 },
   { output_tokens: 1 },
+  { input_tokens: 10, output_tokens: 1, output_tokens_details: { reasoning_tokens: 2 } },
+  { input_tokens: 10, output_tokens: 2, output_tokens_details: { reasoning_tokens: -1 } },
 ])('keeps invalid or missing accounting unknown: %j', (usage) => {
   const reader = new InteractiveModelUsageReader('application/json');
   reader.accept(encoder.encode(JSON.stringify({ usage })));
   expect(reader.finish()).toBeNull();
+});
+
+it.each(['application/json', 'text/event-stream'])(
+  'retains the reported model and explicit cache/reasoning subsets in %s without double counting',
+  (contentType) => {
+    const response = {
+      model: 'gpt-6.1-sol',
+      output: 'Private output remains inside the response.',
+      usage: {
+        input_tokens: 120,
+        input_tokens_details: { cached_tokens: 40, cache_write_tokens: 10 },
+        output_tokens: 30,
+        output_tokens_details: { reasoning_tokens: 20 },
+      },
+    };
+    const reader = new InteractiveModelUsageReader(contentType);
+    const text =
+      contentType === 'application/json'
+        ? JSON.stringify(response)
+        : `data: ${JSON.stringify({ type: 'response.completed', response })}\n\n`;
+    reader.accept(encoder.encode(text));
+    expect(reader.finish()).toEqual({
+      inputTokens: 120,
+      cachedInputTokens: 40,
+      cacheWriteInputTokens: 10,
+      outputTokens: 30,
+      reasoningTokens: 20,
+    });
+    expect(reader.readModel()).toBe('gpt-6.1-sol');
+    expect(JSON.stringify(reader.readUsage())).not.toContain('Private output');
+  },
+);
+
+it('keeps absent detail fields unknown and distinguishes explicit zero values', () => {
+  const reader = new InteractiveModelUsageReader('application/json');
+  reader.accept(
+    encoder.encode(
+      JSON.stringify({
+        model: 'gpt-6.1-sol',
+        usage: {
+          input_tokens: 10,
+          output_tokens: 2,
+          input_tokens_details: { cached_tokens: 0 },
+          output_tokens_details: {},
+        },
+      }),
+    ),
+  );
+  expect(reader.finish()).toEqual({
+    inputTokens: 10,
+    cachedInputTokens: 0,
+    cacheWriteInputTokens: null,
+    outputTokens: 2,
+    reasoningTokens: null,
+  });
+});
+
+it.each([undefined, '', 'private model text\nnot an identifier', 'x'.repeat(161), 42])(
+  'does not retain malformed model metadata: %j',
+  (model) => {
+    const reader = new InteractiveModelUsageReader('application/json');
+    reader.accept(
+      encoder.encode(JSON.stringify({ model, usage: { input_tokens: 10, output_tokens: 2 } })),
+    );
+    expect(reader.finish()).toMatchObject({ inputTokens: 10, outputTokens: 2 });
+    expect(reader.readModel()).toBeNull();
+  },
+);
+
+it('does not combine a later terminal model with earlier usage when its accounting is missing', () => {
+  const reader = new InteractiveModelUsageReader('text/event-stream');
+  reader.accept(encoder.encode(createCompletedEvent()));
+  expect(reader.readUsage()).not.toBeNull();
+  reader.accept(
+    encoder.encode(
+      `data: ${JSON.stringify({ type: 'response.failed', response: { model: 'gpt-6.1-sol' } })}\n\n`,
+    ),
+  );
+  expect(reader.finish()).toBeNull();
+  expect(reader.readModel()).toBe('gpt-6.1-sol');
+});
+
+it('exposes only bounded terminal model and usage metadata through observed requests', async () => {
+  const fetchModel = vi.fn<typeof fetch>().mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        model: 'gpt-6.1-sol',
+        output: 'Private output',
+        usage: {
+          input_tokens: 100,
+          output_tokens: 20,
+          input_tokens_details: { cached_tokens: 5, cache_write_tokens: 0 },
+          output_tokens_details: { reasoning_tokens: 15 },
+        },
+      }),
+      { headers: { 'content-type': 'application/json' } },
+    ),
+  );
+  const observer = observeInteractiveModelFetch(fetchModel);
+  const response = await observer.fetch('https://benchmark.example.test/responses');
+  await response.text();
+  expect(observer.readRequests()[0]).toMatchObject({
+    model: 'gpt-6.1-sol',
+    inputTokens: 100,
+    cachedInputTokens: 5,
+    cacheWriteInputTokens: 0,
+    outputTokens: 20,
+    reasoningTokens: 15,
+  });
+  expect(JSON.stringify(observer.readRequests())).not.toContain('Private output');
 });
 
 it('forwards exact stream bytes and preserves response status and headers while collecting token counts', async () => {

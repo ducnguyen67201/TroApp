@@ -6,6 +6,7 @@ import {
   InteractiveAgentRunSchema,
   InteractiveAgentResponseSchema,
   InteractiveGatewayUrlSchema,
+  InteractiveModelRequestSchema,
 } from './InteractiveAgentProtocol.js';
 
 it('validates the private run contract and defaults to production execution mode', () => {
@@ -30,6 +31,44 @@ it('validates the private run contract and defaults to production execution mode
   expect(
     InteractiveAgentRunSchema.parse({ ...parsed, taskMode: AgentTaskMode.TEACH }).taskMode,
   ).toBe(AgentTaskMode.TEACH);
+});
+
+it('accepts legacy request accounting and optional provider detail without inventing missing values', () => {
+  const request = {
+    id: randomUUID(),
+    status: 200,
+    durationMs: 120,
+    inputTokens: 100,
+    cachedInputTokens: 10,
+    outputTokens: 20,
+  };
+  expect(InteractiveModelRequestSchema.parse(request)).toEqual(request);
+  expect(
+    InteractiveModelRequestSchema.parse({
+      ...request,
+      model: 'gpt-6.1-sol',
+      cacheWriteInputTokens: 5,
+      reasoningTokens: 12,
+    }),
+  ).toMatchObject({ model: 'gpt-6.1-sol', cacheWriteInputTokens: 5, reasoningTokens: 12 });
+});
+
+it('rejects impossible subsets and arbitrary model text at the accounting boundary', () => {
+  const request = {
+    id: randomUUID(),
+    status: 200,
+    durationMs: 120,
+    inputTokens: 100,
+    cachedInputTokens: 10,
+    outputTokens: 20,
+  };
+  for (const detail of [
+    { cacheWriteInputTokens: 91 },
+    { reasoningTokens: 21 },
+    { model: 'private model text\n' },
+  ]) {
+    expect(InteractiveModelRequestSchema.safeParse({ ...request, ...detail }).success).toBe(false);
+  }
 });
 
 it.each([

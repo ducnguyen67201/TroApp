@@ -24,6 +24,7 @@ import { InteractiveReportOutcome } from '../test/evaluation/interactive/Interac
 import { redactEvaluationText } from '../test/evaluation/interactive/AgentRequestOutput.js';
 import { EvaluationApplication } from '../test/evaluation/interactive/EvaluationApplication.js';
 import { readEvaluationScenarioFile } from '../test/evaluation/interactive/ReadEvaluationScenarios.js';
+import { readEvaluationPriceCard } from '../test/evaluation/accounting/ReadEvaluationPriceCard.js';
 import { getDefaultEvaluationScenario } from '../test/evaluation/interactive/ScenarioCatalog.js';
 import {
   validateEvaluationScenarios,
@@ -249,13 +250,46 @@ export async function resolveInteractiveEvaluationScenario(
   return { ...options, config: validated };
 }
 
+/** Resolve a local rate snapshot before building or making a model call. An
+ * absent conventional file leaves cost unpriced; an invalid file fails visibly. */
+export async function resolveInteractiveEvaluationPricing(
+  options: InteractiveEvaluationOptions,
+  projectDirectory = process.cwd(),
+): Promise<InteractiveEvaluationOptions> {
+  if (!options.pricingFile && options.config.pricing) {
+    return options;
+  }
+  const path = options.pricingFile
+    ? resolve(projectDirectory, options.pricingFile)
+    : join(projectDirectory, '.tro-development', 'evaluations', 'Pricing.json');
+  try {
+    const pricing = await readEvaluationPriceCard(path);
+    return {
+      ...options,
+      config: InteractiveEvaluationConfigSchema.parse({ ...options.config, pricing }),
+    };
+  } catch (error: unknown) {
+    if (
+      !options.pricingFile &&
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'ENOENT'
+    ) {
+      return options;
+    }
+    throw error;
+  }
+}
+
 /** Preflight only renders fixtures. Live mode runs the production worker/native
  * path and requires the operator's dedicated desktop plus gateway credential. */
 export async function runInteractiveEvaluations(
   optionsInput: InteractiveEvaluationOptions,
   credential: ModelCredential | null,
 ): Promise<InteractiveEvaluationRunResult> {
-  const options = await resolveInteractiveEvaluationScenario(optionsInput);
+  const selected = await resolveInteractiveEvaluationScenario(optionsInput);
+  const options = await resolveInteractiveEvaluationPricing(selected);
   const live = options.config.runMode === InteractiveRunMode.LIVE;
   if (live !== (credential !== null)) {
     throw new Error('credential_mode_mismatch');

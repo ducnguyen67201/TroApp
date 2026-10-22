@@ -10,6 +10,11 @@ import { AgentTaskMode, type TeachingOutcome } from '../../../src/contracts/Curs
 import type { AgentRequestChecklist } from './GradeAgentRequest.js';
 import type { AgentRequestRecordingSummary } from './RecordAgentRequest.js';
 import { EvaluationApplication } from './EvaluationApplication.js';
+import {
+  formatEvaluationUsage,
+  summarizeEvaluationUsage,
+  type EvaluationUsageSummary,
+} from '../accounting/EvaluationUsage.js';
 
 export const InteractiveTrialStatus = {
   SETTLED: 'settled',
@@ -74,6 +79,7 @@ export interface InteractiveTrialResult {
   agent: InteractiveAgentSummary | null;
   requestEvaluation?: AgentRequestChecklist;
   recording?: AgentRequestRecordingSummary;
+  accounting?: EvaluationUsageSummary;
 }
 
 export interface InteractivePreflightResult {
@@ -101,6 +107,37 @@ export interface InteractiveEvaluationReport {
   studentLearningMeasured: false;
   contextSource: 'authored_fixture';
   providerAttemptAccountingComplete: false;
+  accounting?: InteractiveUsageSummary;
+  usageByVariant?: {
+    variant: InteractiveTrialPlan['variant'];
+    accounting: InteractiveUsageSummary;
+  }[];
+}
+
+export interface InteractiveUsageSummary extends EvaluationUsageSummary {
+  trialsWithoutAccounting: number;
+}
+
+/** Aggregate finalized trial observations. A missing worker result can hide paid
+ * calls; its absence must not turn an observed subtotal into a complete total. */
+export function summarizeInteractiveAccounting(
+  report: InteractiveEvaluationReport,
+  trials: readonly InteractiveTrialResult[] = report.trials,
+): InteractiveUsageSummary {
+  const trialsWithoutAccounting = trials.filter((trial) => trial.agent === null).length;
+  const hasUnknownAccounting =
+    trialsWithoutAccounting > 0 ||
+    (report.runMode === InteractiveRunMode.LIVE && trials.length === 0);
+  const requests = trials.flatMap((trial) => trial.agent?.modelRequests ?? []);
+  const accounting = summarizeEvaluationUsage(
+    hasUnknownAccounting && requests.length === 0 ? null : requests,
+    report.config.pricing,
+  );
+  return {
+    ...accounting,
+    estimatedCostUsd: hasUnknownAccounting ? null : accounting.estimatedCostUsd,
+    trialsWithoutAccounting,
+  };
 }
 
 interface LatencyDistribution {
@@ -166,6 +203,7 @@ export function summarizeInteractivePairs(report: InteractiveEvaluationReport) {
 export function summarizeInteractiveResults(report: InteractiveEvaluationReport) {
   return Object.values(InteractiveVariant).map((variant) => {
     const trials = report.trials.filter((trial) => trial.variant === variant);
+    const accounting = summarizeInteractiveAccounting(report, trials);
     return {
       variant,
       trials: trials.length,
@@ -174,37 +212,12 @@ export function summarizeInteractiveResults(report: InteractiveEvaluationReport)
       timeouts: trials.filter((trial) => trial.status === InteractiveTrialStatus.TIMED_OUT).length,
       failed: trials.filter((trial) => trial.status === InteractiveTrialStatus.FAILED).length,
       cursorMovementObserved: trials.filter((trial) => trial.cursorMoved).length,
-      gatewayRequests: trials.reduce(
-        (count, trial) => count + (trial.agent?.modelRequests.length ?? 0),
-        0,
-      ),
-      requestsWithUnknownUsage: trials.reduce(
-        (count, trial) =>
-          count +
-          (trial.agent?.modelRequests.filter(
-            (request) => request.inputTokens === null || request.outputTokens === null,
-          ).length ?? 0),
-        0,
-      ),
-      trialsWithoutAccounting: trials.filter((trial) => trial.agent === null).length,
-      inputTokensObserved: trials.reduce(
-        (total, trial) =>
-          total +
-          (trial.agent?.modelRequests.reduce(
-            (sum, request) => sum + (request.inputTokens ?? 0),
-            0,
-          ) ?? 0),
-        0,
-      ),
-      outputTokensObserved: trials.reduce(
-        (total, trial) =>
-          total +
-          (trial.agent?.modelRequests.reduce(
-            (sum, request) => sum + (request.outputTokens ?? 0),
-            0,
-          ) ?? 0),
-        0,
-      ),
+      gatewayRequests: accounting.gatewayCalls,
+      requestsWithUnknownUsage: accounting.requestsWithUnknownUsage,
+      trialsWithoutAccounting: accounting.trialsWithoutAccounting,
+      inputTokensObserved: accounting.inputTokensObserved,
+      outputTokensObserved: accounting.outputTokensObserved,
+      accounting,
       firstObservedInput: describeLatency(trials.map((trial) => trial.firstObservedInputMs)),
       firstVerifiedOutcome: describeLatency(trials.map((trial) => trial.firstVerifiedOutcomeMs)),
       cueAcknowledged: describeLatency(trials.map((trial) => trial.cueAcknowledgedMs)),
@@ -222,8 +235,17 @@ function formatLatency(distribution: LatencyDistribution): string {
     : 'unmeasured';
 }
 
+function formatUsageCount(value: number | null): string {
+  return value === null ? 'unknown' : String(value);
+}
+
+function formatUsageCost(value: number | null): string {
+  return value === null ? 'unknown' : `$${value.toFixed(6)}`;
+}
+
 export function formatInteractiveEvaluationReport(report: InteractiveEvaluationReport): string {
   const summaries = summarizeInteractiveResults(report);
+  const accounting = summarizeInteractiveAccounting(report);
   const pairs = summarizeInteractivePairs(report);
   const lines = [
     '# Tro interactive evaluation',
@@ -287,7 +309,27 @@ export function formatInteractiveEvaluationReport(report: InteractiveEvaluationR
         `| ${item.variant} | ${formatLatency(item.firstObservedInput)} | ${formatLatency(item.firstVerifiedOutcome)} | ${formatLatency(item.cueAcknowledged)} | ${String(item.inputTokensObserved)} / ${String(item.outputTokensObserved)} | ${String(item.requestsWithUnknownUsage)} | ${String(item.trialsWithoutAccounting)} |`,
     ),
     '',
-    'Gateway HTTP requests can include backend transport retries that are invisible to this observer. Observed token subtotals are not complete provider-attempt accounting or a class-cost estimate; prices remain unknown. Logged native CUA tool counts, per-request model timings and usage details are retained in JSON without screenshot pixels, typed key contents, credentials or raw model replies.',
+    'Gateway HTTP requests can include backend transport retries that are invisible to this observer. Observed token subtotals are not complete provider-attempt accounting or a class-cost estimate; prices remain unknown for calls without a matching rate card. Logged native CUA tool counts, per-request model timings and usage details are retained in JSON without screenshot pixels, typed key contents, credentials or raw model replies.',
+    '',
+    '## Observed model calls and estimated cost',
+    '',
+    `Trials without accounting: ${String(accounting.trialsWithoutAccounting)}. Missing trial accounting keeps the run estimate unknown; priced calls still contribute to the known subtotal.`,
+    '',
+    formatEvaluationUsage(accounting),
+    '',
+    '| Variant | Observed gateway calls | Input / output token subtotals | Estimated observed-call USD | Known priced USD subtotal | Unpriced observed calls | Trials without accounting |',
+    '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
+    ...summaries.map(
+      ({ variant, accounting: usage }) =>
+        `| ${variant} | ${formatUsageCount(usage.gatewayCalls)} | ${formatUsageCount(usage.inputTokensObserved)} / ${formatUsageCount(usage.outputTokensObserved)} | ${formatUsageCost(usage.estimatedCostUsd)} | ${formatUsageCost(usage.knownEstimatedCostUsd)} | ${formatUsageCount(usage.unpricedCalls)} | ${String(usage.trialsWithoutAccounting)} |`,
+    ),
+    '',
+    '| Scenario / trial | Observed calls | Input | Cached input | Output | Estimated USD | Unpriced calls |',
+    '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
+    ...report.trials.map((trial) => {
+      const usage = summarizeInteractiveAccounting(report, [trial]);
+      return `| ${escapeCell(trial.scenarioId)} / ${trial.trialId} | ${formatUsageCount(usage.gatewayCalls)} | ${formatUsageCount(usage.inputTokensObserved)} | ${formatUsageCount(usage.cachedInputTokensObserved)} | ${formatUsageCount(usage.outputTokensObserved)} | ${formatUsageCost(usage.estimatedCostUsd)} | ${formatUsageCount(usage.unpricedCalls)} |`;
+    }),
     '',
     '## Trial results',
     '',

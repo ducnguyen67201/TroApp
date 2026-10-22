@@ -83,9 +83,13 @@ describe('signed-in development evaluation', () => {
       ...fixture.options,
       application: SignedInEvaluationApplication.VSCODE,
       taskMode: AgentTaskMode.EXECUTE,
+      pricingFile: '/synthetic/Pricing.json',
     });
     await waitForLaunch(fixture);
     expect(fixture.launch.mock.calls[0]?.[1]).toContain('--execute');
+    expect(fixture.launch.mock.calls[0]?.[1]).toEqual(
+      expect.arrayContaining(['--pricing-file', '/synthetic/Pricing.json']),
+    );
     expect(fixture.child.endInput).toHaveBeenCalledWith(JSON.stringify(fixture.credential));
     fixture.child.emit('exit', 0);
     await expect(running).resolves.toMatchObject({ exitCode: 0 });

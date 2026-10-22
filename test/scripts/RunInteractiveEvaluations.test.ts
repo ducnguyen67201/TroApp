@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readInteractiveEvaluationChildEnv } from '../../scripts/Env.js';
@@ -7,12 +7,61 @@ import {
   readInteractiveCredential,
   describeInteractiveLaunchFailure,
   resolveInteractiveEvaluationScenario,
+  resolveInteractiveEvaluationPricing,
 } from '../../scripts/RunInteractiveEvaluations.js';
 import { InteractiveEvaluationLimits } from '../evaluation/interactive/InteractiveEvaluationConfig.js';
 import { parseInteractiveEvaluationOptions } from '../evaluation/interactive/InteractiveEvaluationConfig.js';
 import { getDefaultEvaluationScenario } from '../evaluation/interactive/ScenarioCatalog.js';
 
 const scenarioDirectories: string[] = [];
+
+it('accepts an explicit local rate file without accepting an empty path', () => {
+  expect(
+    parseInteractiveEvaluationOptions(['--pricing-file', '/synthetic/Pricing.json']),
+  ).toMatchObject({ pricingFile: '/synthetic/Pricing.json' });
+  expect(() => parseInteractiveEvaluationOptions(['--pricing-file', ''])).toThrow();
+});
+
+it('finds a conventional rate file for signed-in menu runs and rejects invalid explicit files', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'TroBenchmarkPricing-'));
+  scenarioDirectories.push(directory);
+  const options = parseInteractiveEvaluationOptions([]);
+  expect(await resolveInteractiveEvaluationPricing(options, directory)).toEqual(options);
+  const parent = join(directory, '.tro-development', 'evaluations');
+  await mkdir(parent, { recursive: true });
+  const path = join(parent, 'Pricing.json');
+  const pricing = {
+    schemaVersion: 1,
+    currency: 'USD',
+    id: 'SyntheticTestPrices',
+    source: 'Authored test data',
+    effectiveAt: '2026-10-21T00:00:00.000Z',
+    models: [
+      {
+        model: 'example-model',
+        missingCacheWriteTokens: 'unknown',
+        tiers: [
+          {
+            maximumInputTokens: 1000,
+            inputUsdPerMillion: 2,
+            cachedInputUsdPerMillion: 0.2,
+            cacheWriteInputUsdPerMillion: null,
+            outputUsdPerMillion: 8,
+          },
+        ],
+      },
+    ],
+  };
+  await writeFile(path, JSON.stringify(pricing));
+  expect((await resolveInteractiveEvaluationPricing(options, directory)).config.pricing).toEqual(
+    pricing,
+  );
+  await writeFile(path, '{invalid');
+  await expect(resolveInteractiveEvaluationPricing(options, directory)).rejects.toThrow();
+  await expect(
+    resolveInteractiveEvaluationPricing({ ...options, pricingFile: 'Missing.json' }, directory),
+  ).rejects.toThrow();
+});
 
 afterEach(async () => {
   for (const directory of scenarioDirectories.splice(0)) {

@@ -10,6 +10,12 @@ import {
   type InteractiveAgentSummary,
   type InteractiveTrialResult,
 } from './InteractiveEvaluationReport.js';
+import {
+  formatEvaluationUsage,
+  summarizeEvaluationUsage,
+  type EvaluationPriceCard,
+  type EvaluationUsageSummary,
+} from '../accounting/EvaluationUsage.js';
 
 export const ChecklistStatus = {
   PASS: 'pass',
@@ -54,6 +60,7 @@ export interface AgentRequestEvaluationInput {
   /** Null when a final, correctly identified app state was not independently read.
    * This state predicate excludes the separate trusted-interaction requirement. */
   observedOutcomeMatches: boolean | null;
+  pricing?: EvaluationPriceCard;
 }
 
 export interface AgentRequestUsage {
@@ -64,6 +71,7 @@ export interface AgentRequestUsage {
   outputTokensObserved: number | null;
   providerAttemptAccountingComplete: false;
   costMeasured: false;
+  accounting: EvaluationUsageSummary;
 }
 
 export interface AgentRequestChecklist {
@@ -408,25 +416,20 @@ function gradeCompletionClaim(
   );
 }
 
-function summarizeUsage(agent: InteractiveAgentSummary | null): AgentRequestUsage {
-  const requests = agent?.modelRequests;
+function summarizeUsage(
+  agent: InteractiveAgentSummary | null,
+  pricing?: EvaluationPriceCard,
+): AgentRequestUsage {
+  const accounting = summarizeEvaluationUsage(agent?.modelRequests ?? null, pricing);
   return {
-    gatewayRequests: requests?.length ?? null,
-    requestsWithUnknownUsage:
-      requests?.filter(
-        (request) =>
-          request.inputTokens === null ||
-          request.cachedInputTokens === null ||
-          request.outputTokens === null,
-      ).length ?? null,
-    inputTokensObserved:
-      requests?.reduce((sum, request) => sum + (request.inputTokens ?? 0), 0) ?? null,
-    cachedInputTokensObserved:
-      requests?.reduce((sum, request) => sum + (request.cachedInputTokens ?? 0), 0) ?? null,
-    outputTokensObserved:
-      requests?.reduce((sum, request) => sum + (request.outputTokens ?? 0), 0) ?? null,
+    gatewayRequests: accounting.gatewayCalls,
+    requestsWithUnknownUsage: accounting.requestsWithUnknownUsage,
+    inputTokensObserved: accounting.inputTokensObserved,
+    cachedInputTokensObserved: accounting.cachedInputTokensObserved,
+    outputTokensObserved: accounting.outputTokensObserved,
     providerAttemptAccountingComplete: false,
     costMeasured: false,
+    accounting,
   };
 }
 
@@ -517,7 +520,7 @@ export function gradeAgentRequest(input: AgentRequestEvaluationInput): AgentRequ
       teachingEventsAttempted: teachingTraceEnding?.attemptedEvents ?? null,
       teachingEventsFailed: teachingTraceEnding?.failedEvents ?? null,
     },
-    usage: summarizeUsage(agent),
+    usage: summarizeUsage(agent, input.pricing),
   };
 }
 
@@ -535,7 +538,7 @@ export function formatAgentRequestChecklist(checklist: AgentRequestChecklist): s
     '',
     `Observed gateway requests: ${formatMeasurement(checklist.usage.gatewayRequests)}. Requests with unknown usage: ${formatMeasurement(checklist.usage.requestsWithUnknownUsage)}.`,
     `Observed token subtotals — input: ${formatMeasurement(checklist.usage.inputTokensObserved)}, cached input: ${formatMeasurement(checklist.usage.cachedInputTokensObserved)}, output: ${formatMeasurement(checklist.usage.outputTokensObserved)}.`,
-    'Cost: unmeasured. Gateway observations do not provide complete provider-attempt accounting or verified prices.',
+    formatEvaluationUsage(checklist.usage.accounting),
   );
   return lines.join('\n');
 }

@@ -2064,6 +2064,24 @@ coverage instead of choosing an arbitrary assignment.
 
 ## Verification and current limits
 
+Internal model accounting uses
+[ObserveInteractiveModel.ts](../test/evaluation/interactive/ObserveInteractiveModel.ts)
+to observe already-returned terminal usage without retaining response contents.
+The private validated protocol carries bounded provider model IDs and nullable
+input/cache/write/output/reasoning counts. Missing details remain unknown;
+reasoning is a subset of output. One gateway observation does not expose hidden
+backend provider attempts.
+[EvaluationUsage.ts](../test/evaluation/accounting/EvaluationUsage.ts) owns exact
+model/tier rate-card matching, decimal token pricing, duplicate identity checks,
+per-call estimates and known/unknown subtotals. Rates are explicit local snapshots,
+not runtime defaults. The CLI resolves the conventional or selected price file
+before building, validates it, and carries the snapshot through the host config.
+Finalized worker results supply scenario/variant/run accounting and readable
+per-call rows; missing worker results keep complete estimates unknown. The local
+question-retrieval comparison separately records zero actual inference calls,
+tokens and cost alongside unbilled context-token estimates. These internal
+observers add no provider call, spending stop, billing mutation or renderer API.
+
 Unit and disposable-PostgreSQL integration tests cover contracts, authorization,
 state transitions, concurrency guards, cancellation, evidence and privacy. The
 teaching flow harness builds the actual renderer/preload/main/worker/SDK/MCP path

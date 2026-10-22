@@ -545,6 +545,69 @@ the separate teaching probes for recorded learner evidence. Native run setup,
 controlled fixtures and report ownership live under `test/evaluation/interactive`;
 the ordinary desktop renderer receives no benchmark credential or generic IPC.
 
+### Benchmark token and cost accounting
+
+`Report.json`, `Report.md` and a single-request `Checklist.md` retain observed
+gateway-call counts and per-call model, input, cached input, cache-write, output
+and reasoning tokens. Reports include per-scenario, variant and run totals,
+failed requests, missing worker accounting and unpriced calls. Cached/write tokens
+are subsets of input; reasoning is already included in output. Missing counts
+stay unknown instead of becoming zero. The local `eval:context` benchmark makes
+no provider calls: its actual inference tokens/cost are zero, while the separately
+reported context-token estimates are unbilled comparison proxies.
+
+For live cost estimates, create `.tro-development/evaluations/Pricing.json` once,
+or select another snapshot explicitly:
+
+```sh
+pnpm eval:request --application vscode --execute --live --dedicated-desktop --credential-stdin --pricing-file /absolute/path/Pricing.json
+```
+
+The conventional file also applies to signed-in menu runs. Without a file, tokens
+and calls are still recorded, and prices remain unknown. Price snapshots are
+validated locally before launching the host; provenance URLs are never fetched.
+The owning schema is [EvaluationUsage.ts](test/evaluation/accounting/EvaluationUsage.ts).
+The following values are **synthetic examples, not Sol/provider prices**; replace
+the model, rates, source and effective date with the applicable provider contract:
+
+```json
+{
+  "schemaVersion": 1,
+  "currency": "USD",
+  "id": "ExampleRateSnapshot",
+  "source": "Replace with verified provider contract or price source",
+  "effectiveAt": "2026-10-21T00:00:00.000Z",
+  "models": [
+    {
+      "model": "example-model",
+      "missingCacheWriteTokens": "unknown",
+      "tiers": [
+        {
+          "maximumInputTokens": 100000,
+          "inputUsdPerMillion": 2,
+          "cachedInputUsdPerMillion": 0.2,
+          "cacheWriteInputUsdPerMillion": null,
+          "outputUsdPerMillion": 8
+        }
+      ]
+    }
+  ]
+}
+```
+
+Models must exactly match the reported provider model. Add ascending input tiers
+when rates change with context size; a final `null` maximum covers larger inputs
+only when the supplied rates apply there. Omitted cache-write counts stay unknown
+unless the model's explicit `missingCacheWriteTokens: "zero"` policy declares that
+absence means zero. A nonzero write count requires a write rate. Each call's
+estimate rounds upward once to one micro-USD. The full rate snapshot is retained
+in the run config and its ID/source/date appear in the report.
+
+Estimates cover observed gateway responses. Hidden backend retries, missing
+terminal usage and missing worker results can add cost; a known priced subtotal
+is not a complete bill. This adds no spending stop, model switch or extra model
+request. No provider price is built in or assumed current.
+
 ## Configuration
 
 | Process                                     | Settings                                                                                                                                                                                                       |

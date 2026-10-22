@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { ModelRequestTraceHeader } from '../../../src/contracts/ModelGatewayError.js';
-import type { InteractiveModelRequest } from './InteractiveAgentProtocol.js';
+import {
+  InteractiveModelNameSchema,
+  type InteractiveModelRequest,
+} from './InteractiveAgentProtocol.js';
 
 export const InteractiveModelObservationLimits = {
   MAXIMUM_BUFFER_BYTES: 256 * 1024,
@@ -14,16 +17,20 @@ const UsageSchema = z.object({
   output_tokens: TokenCountSchema,
   input_tokens_details: z
     .object({
-      cached_tokens: TokenCountSchema.default(0),
+      cached_tokens: TokenCountSchema.optional(),
       cache_write_tokens: TokenCountSchema.optional(),
     })
     .optional(),
+  output_tokens_details: z.object({ reasoning_tokens: TokenCountSchema.optional() }).optional(),
 });
 
 export interface InteractiveUsageCounts {
   inputTokens: number;
-  cachedInputTokens: number;
+  cachedInputTokens: number | null;
+  cacheWriteInputTokens: number | null;
   outputTokens: number;
+  /** Reasoning tokens are already included in outputTokens, never added again. */
+  reasoningTokens: number | null;
 }
 
 /** Observes only terminal provider usage. Retained JSON/line buffers are bounded;
@@ -36,6 +43,7 @@ export class InteractiveModelUsageReader {
   private skippingLine = false;
   private oversizedJson = false;
   private usage: InteractiveUsageCounts | null = null;
+  private model: string | null = null;
 
   constructor(contentType: string) {
     this.streaming = contentType.toLowerCase().includes('text/event-stream');
@@ -58,6 +66,10 @@ export class InteractiveModelUsageReader {
 
   readUsage(): InteractiveUsageCounts | null {
     return this.usage ? { ...this.usage } : null;
+  }
+
+  readModel(): string | null {
+    return this.model;
   }
 
   private acceptText(text: string): void {
@@ -118,8 +130,11 @@ export class InteractiveModelUsageReader {
       const envelope = z
         .object({
           type: z.string().optional(),
+          model: z.unknown().optional(),
           usage: z.unknown().optional(),
-          response: z.object({ usage: z.unknown().optional() }).optional(),
+          response: z
+            .object({ model: z.unknown().optional(), usage: z.unknown().optional() })
+            .optional(),
         })
         .safeParse(raw);
       if (!envelope.success) {
@@ -133,19 +148,32 @@ export class InteractiveModelUsageReader {
       ) {
         return;
       }
+      /* Never combine a later terminal model with an earlier terminal's usage.
+       * Missing or malformed metadata remains unknown for this response. */
+      this.usage = null;
+      const model = InteractiveModelNameSchema.safeParse(
+        envelope.data.response?.model ?? envelope.data.model,
+      );
+      this.model = model.success ? model.data : null;
       const parsed = UsageSchema.safeParse(envelope.data.response?.usage ?? envelope.data.usage);
       if (!parsed.success) {
         return;
       }
-      const cached = parsed.data.input_tokens_details?.cached_tokens ?? 0;
-      const written = parsed.data.input_tokens_details?.cache_write_tokens ?? 0;
-      if (cached + written > parsed.data.input_tokens) {
+      const cached = parsed.data.input_tokens_details?.cached_tokens ?? null;
+      const written = parsed.data.input_tokens_details?.cache_write_tokens ?? null;
+      const reasoning = parsed.data.output_tokens_details?.reasoning_tokens ?? null;
+      if (
+        (cached ?? 0) + (written ?? 0) > parsed.data.input_tokens ||
+        (reasoning ?? 0) > parsed.data.output_tokens
+      ) {
         return;
       }
       this.usage = {
         inputTokens: parsed.data.input_tokens,
         cachedInputTokens: cached,
+        cacheWriteInputTokens: written,
         outputTokens: parsed.data.output_tokens,
+        reasoningTokens: reasoning,
       };
     } catch {
       // Missing or malformed terminal usage remains unknown, never a free request.
@@ -229,7 +257,10 @@ export function observeInteractiveModelFetch(
           durationMs: Math.max(0, (request.finishedAt ?? performance.now()) - request.startedAt),
           inputTokens: usage?.inputTokens ?? null,
           cachedInputTokens: usage?.cachedInputTokens ?? null,
+          cacheWriteInputTokens: usage?.cacheWriteInputTokens ?? null,
           outputTokens: usage?.outputTokens ?? null,
+          reasoningTokens: usage?.reasoningTokens ?? null,
+          model: request.reader?.readModel() ?? null,
         };
       }),
   };

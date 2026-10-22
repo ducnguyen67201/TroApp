@@ -58,6 +58,7 @@ export interface SignedInEvaluationOptions {
   application?: SignedInEvaluationApplication;
   taskMode?: AgentTaskMode;
   scenarioFile?: string;
+  pricingFile?: string;
   childEnvironment: NodeJS.ProcessEnv;
   signal?: AbortSignal;
   launch?: EvaluationProcessLauncher;
@@ -87,6 +88,7 @@ const LaunchSettingsSchema = z.strictObject({
   application: z.enum(SignedInEvaluationApplication).default(SignedInEvaluationApplication.SCRATCH),
   taskMode: AgentTaskModeSchema.default(AgentTaskMode.TEACH),
   scenarioFile: z.string().min(1).refine(isAbsolute).optional(),
+  pricingFile: z.string().min(1).refine(isAbsolute).optional(),
 });
 
 /** The fixed checkout CLI owns the evaluation host and its native teardown.
@@ -139,6 +141,7 @@ export async function runSignedInEvaluation(
     application: options.application,
     taskMode: options.taskMode,
     scenarioFile: options.scenarioFile,
+    pricingFile: options.pricingFile,
   });
   const environment = readEvaluationChildEnv(options.childEnvironment);
   const session = await options.auth.readSession();
@@ -175,6 +178,7 @@ export async function runSignedInEvaluation(
     settings.application,
     ...(settings.taskMode === AgentTaskMode.EXECUTE ? ['--execute'] : []),
     ...(settings.scenarioFile ? ['--scenario-file', settings.scenarioFile] : []),
+    ...(settings.pricingFile ? ['--pricing-file', settings.pricingFile] : []),
     '--live',
     '--dedicated-desktop',
     '--credential-stdin',

@@ -28,6 +28,22 @@ import {
 export const QuestionContextVariant = { LEGACY: 'legacy', QUESTION: 'question' } as const;
 type QuestionContextVariant = (typeof QuestionContextVariant)[keyof typeof QuestionContextVariant];
 
+const localContextUsage = {
+  basis: 'no_provider_invocations',
+  providerCalls: 0,
+  modelCalls: 0,
+  embeddingCalls: 0,
+  gatewayRequests: 0,
+  inputTokens: 0,
+  cachedInputTokens: 0,
+  cacheWriteInputTokens: 0,
+  outputTokens: 0,
+  reasoningTokens: 0,
+  inferenceCostUsd: 0,
+} as const;
+
+type QuestionContextActualUsage = typeof localContextUsage;
+
 interface QuestionContextAskResult {
   id: string;
   question: string;
@@ -37,6 +53,7 @@ interface QuestionContextAskResult {
   retrievalAndIngestionMs: number;
   modelInputCharacters: number;
   estimatedInputTokens: number;
+  actualUsage: QuestionContextActualUsage;
   ingestedTextCharacters: number;
   evidenceDelivery: {
     packetFacts: string[];
@@ -74,9 +91,45 @@ export interface QuestionContextEvaluationReport {
   modelCalls: 0;
   embeddingCalls: 0;
   tokenEstimator: string;
+  actualUsage: QuestionContextActualUsage;
+  variants: QuestionContextVariantSummary[];
   pairedCorpusDigestsMatch: boolean;
   results: QuestionContextCaseResult[];
   limitations: string[];
+}
+
+interface QuestionContextVariantSummary {
+  variant: QuestionContextVariant;
+  asks: number;
+  initialContextTokenEstimates: {
+    total: number;
+    averagePerAsk: number | null;
+    billed: false;
+  };
+  actualUsage: QuestionContextActualUsage;
+}
+
+/** The local harness never creates a provider client or makes a gateway request.
+ * Its known zero inference usage is separate from the estimated prepared text. */
+function summarizeQuestionContextVariants(
+  results: readonly QuestionContextCaseResult[],
+): QuestionContextVariantSummary[] {
+  return Object.values(QuestionContextVariant).map((variant) => {
+    const asks = results
+      .filter((result) => result.variant === variant)
+      .flatMap((result) => result.asks);
+    const total = asks.reduce((sum, ask) => sum + ask.estimatedInputTokens, 0);
+    return {
+      variant,
+      asks: asks.length,
+      initialContextTokenEstimates: {
+        total,
+        averagePerAsk: asks.length ? total / asks.length : null,
+        billed: false,
+      },
+      actualUsage: { ...localContextUsage },
+    };
+  });
 }
 
 /** This fixture implements the existing command contract without HTTP, Prisma,
@@ -363,6 +416,7 @@ async function runCase(
         retrievalAndIngestionMs,
         modelInputCharacters: input.length,
         estimatedInputTokens: encode(input),
+        actualUsage: { ...localContextUsage },
         ingestedTextCharacters: api.readIngestedCharacters() - ingestedBefore,
         evidenceDelivery: {
           packetFacts: ask.facts
@@ -418,6 +472,8 @@ export async function runQuestionContextEvaluation(
     modelCalls: 0,
     embeddingCalls: 0,
     tokenEstimator: 'o200k_base comparison proxy; no GPT-6.1 Sol usage or invoice is measured',
+    actualUsage: { ...localContextUsage },
+    variants: summarizeQuestionContextVariants(results),
     pairedCorpusDigestsMatch: results.every(
       (result) =>
         results.find((other) => other.id === result.id && other.variant !== result.variant)
@@ -427,6 +483,7 @@ export async function runQuestionContextEvaluation(
     limitations: [
       'Synthetic cases deliberately expose delivery boundaries; fact recall is not a population success rate or learner understanding.',
       'Actual encrypted journal, controller and task projection are used with a typed local protocol fixture; no HTTP, Prisma, native capture or model calls.',
+      'Known zero provider usage and inference cost apply only to this local harness. Prepared-context token estimates were not sent to a provider or billed; they are not live Sol usage, a request-cost forecast or CPU/storage costs.',
       'Legacy reference is the unchanged newest-64/compact compatibility path plus frozen 1,500-character source-prefix projection.',
       'Temporary AES-GCM key wrapping does not measure OS secure-storage cost. Timing is a single local run; cold/warm asks are separate rows. The three-hour workload uses one-minute capture-time guard bands at the session edges.',
     ],
@@ -434,11 +491,39 @@ export async function runQuestionContextEvaluation(
 }
 
 export function formatQuestionContextEvaluation(report: QuestionContextEvaluationReport): string {
+  const totals = report.variants.map((variant) => {
+    const estimates = variant.initialContextTokenEstimates;
+    return `| ${variant.variant} | ${String(variant.asks)} | ${String(estimates.total)} | ${estimates.averagePerAsk?.toFixed(2) ?? 'unmeasured'} | ${String(variant.actualUsage.modelCalls)} | $${variant.actualUsage.inferenceCostUsd.toFixed(6)} |`;
+  });
   const rows = report.results.flatMap((result) =>
     result.asks.map(
       (ask) =>
-        `| ${result.id}/${ask.id} | ${result.variant} | ${String(ask.modelFacts.length)}/${String(ask.requiredFacts.length)} | ${ask.localAdmissionMs.toFixed(2)} | ${String(ask.estimatedInputTokens)} |`,
+        `| ${result.id}/${ask.id} | ${result.variant} | ${String(ask.modelFacts.length)}/${String(ask.requiredFacts.length)} | ${ask.localAdmissionMs.toFixed(2)} | ${String(ask.estimatedInputTokens)} | ${String(ask.actualUsage.modelCalls)} | $${ask.actualUsage.inferenceCostUsd.toFixed(6)} |`,
     ),
   );
-  return `# Internal question-context evaluation\n\nPaired corpus identity: ${report.pairedCorpusDigestsMatch ? 'PASS' : 'FAIL'}. Model calls: 0; embedding calls: 0.\n\n| Case | Variant | Facts in initial model input | Local admission ms | Token proxy |\n| --- | --- | ---: | ---: | ---: |\n${rows.join('\n')}\n\n${report.limitations.map((limitation) => `- ${limitation}`).join('\n')}\n`;
+  const usage = report.actualUsage;
+  return [
+    '# Internal question-context evaluation',
+    '',
+    `Paired corpus identity: ${report.pairedCorpusDigestsMatch ? 'PASS' : 'FAIL'}. Model calls: ${String(usage.modelCalls)}; embedding calls: ${String(usage.embeddingCalls)}.`,
+    '',
+    `Actual gateway requests: ${String(usage.gatewayRequests)}; provider calls: ${String(usage.providerCalls)}. Actual input/cached input/cache-write/output/reasoning tokens: ${String(usage.inputTokens)} / ${String(usage.cachedInputTokens)} / ${String(usage.cacheWriteInputTokens)} / ${String(usage.outputTokens)} / ${String(usage.reasoningTokens)}. Actual inference cost: $${usage.inferenceCostUsd.toFixed(6)}.`,
+    '',
+    'This local harness invokes no provider. The token estimates below describe prepared initial context only: these tokens were not sent to a provider or billed. Unknown live-run usage must not be replaced with these known local zeros. CPU and storage costs are outside this report.',
+    '',
+    '## Variant totals',
+    '',
+    '| Variant | Asks | Estimated initial context tokens | Average estimated tokens / Ask | Actual model calls | Actual inference cost USD |',
+    '| --- | ---: | ---: | ---: | ---: | ---: |',
+    ...totals,
+    '',
+    '## Ask results',
+    '',
+    '| Case | Variant | Facts in initial model input | Local admission ms | Initial context token estimate (unbilled) | Actual model calls | Actual inference cost USD |',
+    '| --- | --- | ---: | ---: | ---: | ---: | ---: |',
+    ...rows,
+    '',
+    ...report.limitations.map((limitation) => `- ${limitation}`),
+    '',
+  ].join('\n');
 }
