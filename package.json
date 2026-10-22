@@ -61,7 +61,8 @@
     "eval:interactive": "tsx scripts/RunInteractiveEvaluations.ts",
     "eval:request": "tsx scripts/RunInteractiveEvaluations.ts --single",
     "eval:generate": "tsx scripts/GenerateEvaluationScenarios.ts",
-    "eval:validate": "tsx scripts/ValidateEvaluationScenarios.ts"
+    "eval:validate": "tsx scripts/ValidateEvaluationScenarios.ts",
+    "eval:context": "node --conditions=development --import tsx scripts/BenchmarkQuestionContext.ts"
   },
   "dependencies": {
     "@better-auth/electron": "1.7.6",

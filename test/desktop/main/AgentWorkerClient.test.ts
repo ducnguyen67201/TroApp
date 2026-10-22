@@ -5,6 +5,7 @@ import { AgentProgressPhase, type AgentProgress } from '#contracts/CompanionHud.
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
 import type { DesktopDriverPort } from '../../../src/desktop/main/DesktopDriverPort.js';
 import { AgentWorkerClient } from '../../../src/desktop/main/AgentWorkerClient.js';
+import { ContextFailure } from '#contracts/StudyContext.js';
 
 const doubles = vi.hoisted(() => ({ fork: vi.fn() }));
 vi.mock('electron', () => ({ utilityProcess: { fork: doubles.fork } }));
@@ -26,6 +27,341 @@ class Child extends EventEmitter {
 afterEach(() => {
   vi.clearAllMocks();
   vi.useRealTimers();
+});
+
+type ActivityContext = Parameters<AgentWorkerClient['setContextController']>[0];
+
+async function prepareObservedWorker(child: Child, pause: ActivityContext['pause']) {
+  doubles.fork.mockReturnValue(child);
+  const worker = new AgentWorkerClient('/worker', false, {
+    start: vi.fn<DesktopDriverPort['start']>().mockResolvedValue(connection),
+  });
+  const resume = vi.fn<ActivityContext['resume']>().mockResolvedValue();
+  const readScope = vi.fn<ActivityContext['readScope']>().mockReturnValue({
+    enabled: true,
+    available: true,
+    generation: 4,
+    sessionId,
+  });
+  const execute = vi.fn<ActivityContext['execute']>().mockResolvedValue({
+    kind: 'failed',
+    code: ContextFailure.UNAVAILABLE,
+  });
+  worker.setContextController({
+    readScope,
+    pause,
+    resume,
+    execute,
+  });
+  const preparing = worker.prepare();
+  await vi.advanceTimersByTimeAsync(0);
+  child.emit('spawn');
+  await vi.advanceTimersByTimeAsync(0);
+  const request = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
+  if (request.command.kind !== 'prepare') {
+    throw new Error('Expected a preparation command.');
+  }
+  child.emit('message', {
+    requestId: request.requestId,
+    result: { kind: 'started', sessionId: request.command.sessionId },
+  });
+  await preparing;
+  return { worker, resume, readScope, execute };
+}
+
+it('admits context only for its pending turn and rejects a switched account with the same generation', async () => {
+  vi.useFakeTimers();
+  const child = new Child();
+  const pause = vi.fn<ActivityContext['pause']>().mockResolvedValue();
+  const { worker, readScope, execute } = await prepareObservedWorker(child, pause);
+  const asking = worker.sendMessage(sessionId, 'What was my assignment?', DesktopLocale.ENGLISH);
+  await vi.advanceTimersByTimeAsync(0);
+  const turn = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
+  const request = {
+    kind: 'context-request',
+    requestId: group,
+    taskRequestId: turn.requestId,
+    command: { kind: 'resolve', generation: 4, query: 'assignment', cursor: null },
+  };
+  child.emit('message', request);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(execute).toHaveBeenCalledOnce();
+  expect(child.postMessage.mock.calls.at(-1)?.[0]).toMatchObject({
+    kind: 'context-response',
+    requestId: group,
+  });
+  readScope.mockReturnValue({
+    enabled: true,
+    available: true,
+    generation: 4,
+    sessionId: '33333333-3333-4333-8333-333333333333',
+  });
+  const messagesBeforeSwitchRequest = child.postMessage.mock.calls.length;
+  child.emit('message', request);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(execute).toHaveBeenCalledOnce();
+  expect(child.postMessage.mock.calls).toHaveLength(messagesBeforeSwitchRequest);
+  worker.dispose();
+  expect(await asking).toMatchObject({ kind: 'failed' });
+});
+
+it('does not forward a delayed context result after its admitted account changes', async () => {
+  vi.useFakeTimers();
+  const child = new Child();
+  const pause = vi.fn<ActivityContext['pause']>().mockResolvedValue();
+  const { worker, readScope, execute } = await prepareObservedWorker(child, pause);
+  let finishReply: (reply: Awaited<ReturnType<ActivityContext['execute']>>) => void = () => {};
+  execute.mockReturnValueOnce(
+    new Promise((resolve) => {
+      finishReply = resolve;
+    }),
+  );
+  const asking = worker.sendMessage(sessionId, 'What was my assignment?', DesktopLocale.ENGLISH);
+  await vi.advanceTimersByTimeAsync(0);
+  const turn = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
+  const messagesBeforeRequest = child.postMessage.mock.calls.length;
+  child.emit('message', {
+    kind: 'context-request',
+    requestId: group,
+    taskRequestId: turn.requestId,
+    command: { kind: 'resolve', generation: 4, query: 'assignment', cursor: null },
+  });
+  expect(execute).toHaveBeenCalledOnce();
+  readScope.mockReturnValue({
+    enabled: true,
+    available: true,
+    generation: 4,
+    sessionId: '33333333-3333-4333-8333-333333333333',
+  });
+  finishReply({
+    kind: 'source',
+    sourceId: group,
+    text: 'Synthetic private source.',
+    nextOffset: null,
+  });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(child.postMessage.mock.calls).toHaveLength(messagesBeforeRequest);
+  worker.dispose();
+  expect(await asking).toMatchObject({ kind: 'failed' });
+});
+
+it('does not authorize context requests through preparation or startup request identities', async () => {
+  vi.useFakeTimers();
+  const child = new Child();
+  doubles.fork.mockReturnValue(child);
+  const worker = new AgentWorkerClient('/worker', false, {
+    start: vi.fn<DesktopDriverPort['start']>().mockResolvedValue(connection),
+  });
+  const execute = vi.fn<ActivityContext['execute']>().mockResolvedValue({
+    kind: 'failed',
+    code: ContextFailure.UNAVAILABLE,
+  });
+  worker.setContextController({
+    readScope: () => ({ enabled: true, available: true, generation: 4, sessionId }),
+    pause: vi.fn<ActivityContext['pause']>().mockResolvedValue(),
+    resume: vi.fn<ActivityContext['resume']>().mockResolvedValue(),
+    execute,
+  });
+  const preparing = worker.prepare();
+  await vi.advanceTimersByTimeAsync(0);
+  child.emit('spawn');
+  await vi.advanceTimersByTimeAsync(0);
+  const preparation = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
+  child.emit('message', {
+    kind: 'context-request',
+    requestId: group,
+    taskRequestId: preparation.requestId,
+    command: { kind: 'resolve', generation: 4, query: 'assignment', cursor: null },
+  });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(execute).not.toHaveBeenCalled();
+  child.emit('message', {
+    requestId: preparation.requestId,
+    result: { kind: 'started', sessionId: preparation.command.sessionId },
+  });
+  await preparing;
+  const starting = worker.start(sessionId, 'synthetic-token', 'https://gateway.example.test');
+  await vi.advanceTimersByTimeAsync(0);
+  const startup = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
+  child.emit('message', {
+    kind: 'context-request',
+    requestId: group,
+    taskRequestId: startup.requestId,
+    command: { kind: 'resolve', generation: 4, query: 'assignment', cursor: null },
+  });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(execute).not.toHaveBeenCalled();
+  child.emit('message', { requestId: startup.requestId, result: { kind: 'started', sessionId } });
+  await starting;
+  worker.dispose();
+});
+
+it.each(['disposal', 'timeout'] as const)(
+  'resumes the same context account after %s confirms worker retirement without delaying the result',
+  async (failure) => {
+    vi.useFakeTimers();
+    const child = new Child();
+    child.kill.mockImplementation(() => {});
+    const pause = vi.fn<ActivityContext['pause']>().mockResolvedValue();
+    const { worker, resume } = await prepareObservedWorker(child, pause);
+    const asking = worker.sendMessage(sessionId, 'Why is the score wrong?', DesktopLocale.ENGLISH);
+    await vi.advanceTimersByTimeAsync(0);
+    if (failure === 'timeout') {
+      await vi.advanceTimersByTimeAsync(120_000);
+    } else {
+      worker.dispose();
+    }
+    expect(await asking).toMatchObject({ kind: 'failed' });
+    expect(child.kill).toHaveBeenCalledOnce();
+    expect(resume).not.toHaveBeenCalled();
+    child.emit('exit');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(resume).toHaveBeenCalledOnce();
+  },
+);
+
+it('does not let a retiring older Ask resume collection while a newer Ask owns its pause', async () => {
+  vi.useFakeTimers();
+  const child = new Child();
+  child.kill.mockImplementation(() => {});
+  let finishNewPause = (): void => {};
+  const newPause = new Promise<void>((resolve) => {
+    finishNewPause = resolve;
+  });
+  const pause = vi
+    .fn<ActivityContext['pause']>()
+    .mockResolvedValueOnce(undefined)
+    .mockReturnValueOnce(newPause);
+  const { worker, resume } = await prepareObservedWorker(child, pause);
+  const oldAsk = worker.sendMessage(sessionId, 'Why is the score wrong?', DesktopLocale.ENGLISH);
+  await vi.advanceTimersByTimeAsync(0);
+  worker.dispose();
+  expect(await oldAsk).toMatchObject({ kind: 'failed' });
+  const newAsk = worker.sendMessage(sessionId, 'What was my assignment?', DesktopLocale.ENGLISH);
+  expect(pause).toHaveBeenCalledTimes(2);
+  child.emit('exit');
+  await vi.advanceTimersByTimeAsync(0);
+  expect(resume).not.toHaveBeenCalled();
+  finishNewPause();
+  expect(await newAsk).toMatchObject({ kind: 'failed' });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(resume).toHaveBeenCalledOnce();
+});
+
+it('fences a superseded context admission before dispatch or collection resume', async () => {
+  vi.useFakeTimers();
+  const child = new Child();
+  let finishOldPause = (): void => {};
+  const oldPause = new Promise<void>((resolve) => {
+    finishOldPause = resolve;
+  });
+  const pause = vi
+    .fn<ActivityContext['pause']>()
+    .mockReturnValueOnce(oldPause)
+    .mockResolvedValueOnce(undefined);
+  const { worker, resume } = await prepareObservedWorker(child, pause);
+  const oldAsk = worker.sendMessage(sessionId, 'Why is the score wrong?', DesktopLocale.ENGLISH);
+  const newAsk = worker.sendMessage(sessionId, 'What was my assignment?', DesktopLocale.ENGLISH);
+  await vi.advanceTimersByTimeAsync(0);
+  const turn = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
+  expect(turn.command).toMatchObject({ kind: 'turn', message: 'What was my assignment?' });
+  child.emit('message', {
+    requestId: turn.requestId,
+    result: { kind: 'failed', message: 'Synthetic settlement.' },
+  });
+  expect(await newAsk).toMatchObject({ kind: 'failed' });
+  const dispatchedRequests = child.postMessage.mock.calls.length;
+  finishOldPause();
+  expect(await oldAsk).toMatchObject({ kind: 'failed' });
+  expect(child.postMessage.mock.calls).toHaveLength(dispatchedRequests);
+  expect(resume).toHaveBeenCalledOnce();
+  worker.dispose();
+});
+
+it('retrieves context using the actual question before dispatching the task', async () => {
+  const child = new Child();
+  let notifyFork = (): void => {};
+  const forked = new Promise<void>((resolve) => {
+    notifyFork = resolve;
+  });
+  doubles.fork.mockImplementation(() => {
+    notifyFork();
+    return child;
+  });
+  const driver = { start: vi.fn<DesktopDriverPort['start']>().mockResolvedValue(connection) };
+  const worker = new AgentWorkerClient('/worker', false, driver);
+  type ActivityContext = Parameters<AgentWorkerClient['setContextController']>[0];
+  const pause = vi.fn<ActivityContext['pause']>().mockResolvedValue();
+  const resume = vi.fn<ActivityContext['resume']>().mockResolvedValue();
+  worker.setContextController({
+    readScope: () => ({ enabled: true, available: true, generation: 4, sessionId }),
+    pause,
+    resume,
+    execute: vi
+      .fn<ActivityContext['execute']>()
+      .mockResolvedValue({ kind: 'failed', code: ContextFailure.UNAVAILABLE }),
+  });
+  const preparing = worker.prepare();
+  await forked;
+  child.emit('spawn');
+  await Promise.resolve();
+  const prepared = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
+  if (prepared.command.kind !== 'prepare') {
+    throw new Error('Expected a preparation command.');
+  }
+  child.emit('message', {
+    requestId: prepared.requestId,
+    result: { kind: 'started', sessionId: prepared.command.sessionId },
+  });
+  await preparing;
+  const asking = worker.sendMessage(
+    sessionId,
+    'Why does my Python loop never finish?',
+    DesktopLocale.ENGLISH,
+  );
+  await vi.waitFor(() => {
+    expect(
+      AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]).command.kind,
+    ).toBe('turn');
+  });
+  expect(pause).toHaveBeenCalledWith('Why does my Python loop never finish?');
+  const turn = AgentWorkerRequestSchema.parse(child.postMessage.mock.calls.at(-1)?.[0]);
+  expect(turn.command).toMatchObject({ activityContext: { generation: 4 } });
+  child.emit('message', {
+    requestId: turn.requestId,
+    result: { kind: 'failed', message: 'Synthetic settlement.' },
+  });
+  await asking;
+  expect(resume).toHaveBeenCalledOnce();
+  worker.dispose();
+});
+
+it('does not dispatch or resume an older Ask after its context identity changes', async () => {
+  type ActivityContext = Parameters<AgentWorkerClient['setContextController']>[0];
+  let finishPause = (): void => {};
+  const paused = new Promise<void>((resolve) => {
+    finishPause = resolve;
+  });
+  let contextSession = sessionId;
+  const pause = vi.fn<ActivityContext['pause']>().mockReturnValue(paused);
+  const resume = vi.fn<ActivityContext['resume']>().mockResolvedValue();
+  const worker = new AgentWorkerClient('/worker', false, {
+    start: vi.fn<DesktopDriverPort['start']>().mockResolvedValue(connection),
+  });
+  worker.setContextController({
+    readScope: () => ({ enabled: true, available: true, generation: 1, sessionId: contextSession }),
+    pause,
+    resume,
+    execute: vi
+      .fn<ActivityContext['execute']>()
+      .mockResolvedValue({ kind: 'failed', code: ContextFailure.UNAVAILABLE }),
+  });
+  const asking = worker.sendMessage(sessionId, 'Help me debug.', DesktopLocale.ENGLISH);
+  contextSession = '33333333-3333-4333-8333-333333333333';
+  finishPause();
+  expect(await asking).toMatchObject({ kind: 'failed' });
+  expect(resume).not.toHaveBeenCalled();
+  expect(doubles.fork).not.toHaveBeenCalled();
 });
 
 describe('agent connection to the shared desktop host', () => {

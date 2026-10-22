@@ -221,6 +221,43 @@ MP4 media rather than executable code.
 Confirmed provider quality, real cost and hosted throughput still require a
 separately authorized paid benchmark; offline fixtures do not establish those.
 
+## Question-aware session retrieval
+
+The internal benchmark supplies a journal and an injected context API port. The
+retrieval core and worker plumbing are available to a configured context controller;
+background capture startup and the hosted context endpoint remain separate from
+this benchmark branch.
+
+At Ask, the local journal reader considers acknowledged and unacknowledged evidence
+in the current session window. It caches one account/generation, checks journal
+metadata and yields between bounded read/index batches. Selection preserves
+assignment, error and unfinished-work candidates alongside relevant recent state.
+The deterministic ranker uses word/code-identifier matching and small English/Vietnamese
+related-word groups. It makes no model or embedding calls; arbitrary semantic
+paraphrases and native capture coverage are not established by these checks.
+
+Only bounded exact excerpts enter the server/model context. The owning limits and
+coverage fields are in [SelectQuestionContext.ts](src/desktop/context/SelectQuestionContext.ts).
+Offsets and original local IDs preserve provenance; the agent's source-range tools
+use the accepted server source IDs. Omitted passages, partial scans and truncated
+projections remain explicit. Retention limits apply independently of retrieval.
+
+Run the internal paired retrieval benchmark without a database or paid API:
+
+```sh
+pnpm eval:context --output .tro-development/evaluations/QuestionRetrieval
+```
+
+Add `--quick` to skip the three-hour workload. The report compares the preserved
+newest-batch/prefix reference with the question-aware controller and normal task
+projection. Both use the same authored histories and natural-language questions;
+marker delivery measures information retention, not answer quality or learning.
+It reports cold/warm admission times, local storage/ingestion sizes and `o200k_base`
+token estimates as a comparison proxy, not provider billing or a reconciled price.
+The injected context-protocol fixture avoids private accounts, PostgreSQL and
+provider credentials. Exact source versions and diagnostics belong to each local
+report; raw native recordings and student information are not benchmark inputs.
+
 ## Internal computer-use evaluations
 
 These are internal checkout tools for personal testing. The installed product has

@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { ContextWorkerResponseSchema } from '#contracts/DesktopContext.js';
+import { ContextToolClient } from './context/ContextToolClient.js';
 import { ClassroomToolResponseSchema } from '#contracts/Classroom.js';
 import { ClassroomToolClient } from './teaching/ClassroomToolClient.js';
 import { AgentProgressPhase, AgentProgressSchema } from '#contracts/CompanionHud.js';
@@ -25,6 +27,7 @@ let activeRun: ReturnType<ComputerUseTaskRunner['runTask']> | null = null;
 let activeRequestId: string | null = null;
 let dailyLimitReached = false;
 let classroomTools: ClassroomToolClient | null = null;
+let contextTools: ContextToolClient | null = null;
 
 function hasReachedDailyLimit(): boolean {
   return dailyLimitReached;
@@ -177,6 +180,17 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
         : null;
       classroomTools = toolClient;
       const activeRunner = runner;
+      const activityContext = command.activityContext;
+      const contextClient = activityContext?.enabled
+        ? new ContextToolClient(
+            (message) => {
+              parentPort.postMessage(message);
+            },
+            requestId,
+            abort.signal,
+          )
+        : null;
+      contextTools = contextClient;
       const run = runWithTaskModel(model, () =>
         activeRunner.runTask(
           command.message,
@@ -231,6 +245,9 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
           context && toolClient
             ? { context, callTool: (command) => toolClient.request(command) }
             : undefined,
+          activityContext && contextClient
+            ? { scope: activityContext, request: (command) => contextClient.request(command) }
+            : undefined,
         ),
       );
       activeRun = run;
@@ -252,6 +269,8 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
         };
       } finally {
         toolClient?.dispose();
+        contextClient?.dispose();
+        contextTools = null;
         classroomTools = null;
         activeRequestId = null;
         activeRun = null;
@@ -279,6 +298,11 @@ async function runCommand(command: AgentWorkerCommand, requestId: string): Promi
 }
 
 parentPort.on('message', (event) => {
+  const contextResponse = ContextWorkerResponseSchema.safeParse(event.data);
+  if (contextResponse.success) {
+    contextTools?.receive(contextResponse.data);
+    return;
+  }
   const classroomResponse = ClassroomToolResponseSchema.safeParse(event.data);
   if (classroomResponse.success) {
     classroomTools?.receive(classroomResponse.data);

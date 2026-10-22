@@ -2010,6 +2010,58 @@ preparation/application startup separately from observed rendering. The live run
 uses the existing Sol/native pipeline and public output recording without a
 separate model judge. Windows and Linux VS Code launches are unsupported.
 
+### Question-aware local retrieval
+
+`AgentWorkerClient` can receive an injected `DesktopContextController`; it passes
+the actual question into `pause(question)` before dispatch and resumes collection
+after the task settles. `StartAgentWorker` forwards validated context commands
+through correlated private messages. Default desktop startup in this branch does
+not construct a background collector or context API service.
+
+The local `ContextOutbox.readSession` path searches the current three-hour owner/
+generation window including acknowledged evidence. It uses bounded paged reads,
+yields between pages, caches a single active scope and invalidates/prunes using
+file metadata, appends, expiry, consolidation and forgetting. Physical input
+records do not enter the evidence cache. Limits and partial coverage are explicit;
+protected storage failure can use a bounded in-memory fallback. The journal keeps
+compressed AES-GCM frames under an OS-protected key supplied by the composition.
+Legacy frames, frozen upload receipts and raw recovery retention stay independent
+of question retrieval. There is no plaintext disk index or database access here.
+
+[SelectQuestionContext.ts](../src/desktop/context/SelectQuestionContext.ts) ranks
+all authorized session observations using lexical/code-identifier matches and
+small bilingual related-word groups. It reserves assignment, error, unfinished-
+work and recent candidates, then scores bounded exact windows in a shortlisted
+set of sources. Main uses yielding indexing/scoring; the worker uses the same
+selector on its small server packet. Derived excerpts retain original local IDs
+and UTF-16 offsets. Each logical Ask refreshes small event references while source
+text remains deduplicated by the receiving API. This prevents repeated questions
+from losing relevant evidence merely because its old reference left the recent
+activity packet. Exact retry payloads remain idempotent.
+
+`PreparedTaskContext` keeps accepted server source IDs/range offsets when selecting
+model excerpts, including facts beyond an old fixed prefix. It trims lower-priority
+activity metadata before selected source evidence under the existing packet bound.
+Local source IDs are provenance; only accepted server IDs belong to remote read
+and checkpoint tools. Sources remain untrusted and never grant action permission.
+`context.question.ingested` logs safe selection counts, partial/cache status and
+elapsed milliseconds without questions, source text, credentials or owner IDs.
+
+[QuestionContextEvaluation.ts](../test/evaluation/context/QuestionContextEvaluation.ts)
+compares a frozen newest-batch/prefix reference with the real question-aware
+controller, journal and task projection. Its injected typed protocol fixture
+supplies deduplicated sources and recent activity without a database or provider.
+Authored marker delivery, ingestion size, token estimates and cold/warm timing
+remain separate from real native capture, model quality and student learning.
+README owns the command. This retrieval adds no inference/embedding call, model
+switch or spending stop; it is not arbitrary semantic paraphrase retrieval.
+
+Observed evidence owns the reserved assignment/error slots. At most one saved
+user-message excerpt supplies continuity; repeated questions cannot fill the
+evidence budget. Overlap checks use actual excerpt lengths, including short
+records. Conflicting versions of one local event ID are excluded with partial
+coverage instead of choosing an arbitrary assignment.
+
 ## Verification and current limits
 
 Unit and disposable-PostgreSQL integration tests cover contracts, authorization,

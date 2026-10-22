@@ -130,3 +130,36 @@ it('bounds the entire memory projection while retaining full accepted source con
   expect(source.text).toHaveLength(32000);
   expect(packet.checkpoint.claims).toHaveLength(16);
 });
+
+it('projects question-relevant source ranges past the old prefix boundary and preserves exact source identity', async () => {
+  const packet = createPacket();
+  const source = packet.sources[0];
+  if (!source) {
+    throw new Error('Missing source fixture.');
+  }
+  source.text = `${'Unrelated screen panel. '.repeat(150)}\nTypeError: unsupported operand when adding text to the score. REQUIRED_SCORE_TYPE_ERROR`;
+  const originalText = source.text;
+  const request = vi
+    .fn<TaskContextPort['request']>()
+    .mockImplementation((command) =>
+      Promise.resolve(
+        command.kind === 'resolve' ? { kind: 'packet', packet } : { kind: 'accepted', revision: 1 },
+      ),
+    );
+  const context = new PreparedTaskContext(
+    {
+      scope: { enabled: true, available: true, generation: 1, sessionId: packet.sessionId },
+      request,
+    },
+    new AbortController().signal,
+  );
+  await context.prepareForQuestion('Why does adding to my score produce a TypeError?');
+  const input = context.buildMemoryInput();
+  expect(input).toContain('REQUIRED_SCORE_TYPE_ERROR');
+  expect(input).toContain(source.id);
+  expect(input).toContain('"offset":');
+  expect(input).toContain('"originalCharacters":');
+  expect(input.length).toBeLessThan(ContextLimits.PACKET_CHARACTERS + 500);
+  expect(source.text).toBe(originalText);
+  expect(request.mock.calls.map(([command]) => command.kind)).toEqual(['events', 'resolve']);
+});
