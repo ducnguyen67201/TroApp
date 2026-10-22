@@ -4,15 +4,8 @@ import {
   type TeachingInteraction,
 } from '#contracts/StudentActivity.js';
 import type { DesktopObservationRegion } from '#contracts/DesktopObservation.js';
-interface StudentAttempt {
-  sequence: number;
-  stepId: string | null;
-  kind: 'click' | 'drag' | 'key' | 'scroll' | 'unpaired_release';
-  pressPoint: StudentActivity['point'];
-  releasePoint: StudentActivity['point'];
-  sourceNear: boolean | null;
-  destinationNear: boolean | null;
-}
+import { StudentAttemptKind, type StudentAttempt } from '#contracts/TeachingObservation.js';
+
 /** A bounded event history, independent of native input_revision. Metadata is not app success. */
 export class StudentInteractionTracker {
   private stepId: string | null = null;
@@ -22,6 +15,9 @@ export class StudentInteractionTracker {
   private sequence = 0;
   private readonly attempts: StudentAttempt[] = [];
   private attemptCount = 0;
+
+  constructor(private readonly observeAttempt?: (attempt: StudentAttempt) => void) {}
+
   registerStep(stepId: string, expected: TeachingInteraction | null): void {
     if (this.stepId !== stepId) {
       this.attemptCount = 0;
@@ -29,9 +25,11 @@ export class StudentInteractionTracker {
     this.stepId = stepId;
     this.expected = expected;
   }
+
   invalidateTarget(): void {
     this.expected = null;
   }
+
   recordActivity(activity: StudentActivity): void {
     this.sequence += 1;
     if (activity.kind === StudentActivityKind.PRESS) {
@@ -49,16 +47,16 @@ export class StudentInteractionTracker {
     const paired = isRelease && press !== null && press.button === activity.button;
     const kind =
       activity.kind === StudentActivityKind.KEY
-        ? 'key'
+        ? StudentAttemptKind.KEY
         : activity.kind === StudentActivityKind.SCROLL
-          ? 'scroll'
+          ? StudentAttemptKind.SCROLL
           : !paired
-            ? 'unpaired_release'
+            ? StudentAttemptKind.UNPAIRED_RELEASE
             : this.dragged
-              ? 'drag'
-              : 'click';
+              ? StudentAttemptKind.DRAG
+              : StudentAttemptKind.CLICK;
     this.attemptCount += 1;
-    this.attempts.push({
+    const attempt: StudentAttempt = {
       sequence: this.sequence,
       stepId: this.stepId,
       kind,
@@ -72,7 +70,13 @@ export class StudentInteractionTracker {
           : paired && expected?.kind === 'click'
             ? containsPoint(expected.target, activity.point)
             : null,
-    });
+    };
+    this.attempts.push(attempt);
+    try {
+      this.observeAttempt?.(attempt);
+    } catch {
+      // Optional observation cannot interrupt native student input bookkeeping.
+    }
     if (this.attempts.length > 12) {
       this.attempts.shift();
     }
@@ -81,6 +85,7 @@ export class StudentInteractionTracker {
       this.dragged = false;
     }
   }
+
   readEvidence() {
     return {
       activitySequence: this.sequence,

@@ -27,12 +27,28 @@ vi.mock('../../../../src/desktop/renderer/accounts/StudentQrScanner.js', () => (
     ),
 }));
 
+function canWaitForBrowserTasks(value: unknown): value is { waitUntilComplete(): unknown } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'waitUntilComplete' in value &&
+    typeof value.waitUntilComplete === 'function'
+  );
+}
+
 beforeEach(() => {
   localStorage.setItem('tro.desktop.locale', 'en');
   scannedQr.value = '';
 });
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  const browserTasks = 'happyDOM' in window ? window.happyDOM : null;
+  if (!canWaitForBrowserTasks(browserTasks)) {
+    throw new Error('Student access form tests require the Happy DOM environment.');
+  }
+  /* Mantine's loading transition can finish on a queued animation frame after
+   * unmount. Keep the browser globals alive until that owned work settles. */
+  await browserTasks.waitUntilComplete();
   localStorage.clear();
 });
 

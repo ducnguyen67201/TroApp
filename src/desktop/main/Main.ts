@@ -131,7 +131,12 @@ import {
   type DesktopPermissionStatus,
   type PermissionActionResult,
 } from '#contracts/DesktopPermissions.js';
-import { readDesktopEnv } from './Env.js';
+import { readDesktopEnv, readEvaluationChildEnv } from './Env.js';
+import { runSignedInEvaluation } from './evaluation/RunSignedInEvaluation.js';
+import {
+  registerEvaluationMenu,
+  type EvaluationMenu,
+} from './evaluation/RegisterEvaluationMenu.js';
 import { AgentWorkerClient } from './AgentWorkerClient.js';
 import { AgentChatController } from './AgentChatController.js';
 import { GlobalTaskCancelShortcut } from './GlobalTaskCancelShortcut.js';
@@ -173,6 +178,7 @@ let networkServiceFailureVersion = 0;
 let updates: AppUpdateController | undefined;
 let updateCheckTimer: ReturnType<typeof setInterval> | undefined;
 let startupStage: DesktopStartupStage = DesktopStartupStage.CONFIGURATION;
+let evaluationMenu: EvaluationMenu | undefined;
 
 app.on('child-process-gone', (_event, details) => {
   if (isQuitting) {
@@ -1072,7 +1078,10 @@ async function startDesktop(): Promise<void> {
         }
         return openTranscriptionConnection(environment.API_BASE_URL, token, cookie, emit);
       },
-      isAgentBusy: () => voiceChat.isBusy() || Boolean(microphoneTests?.isActive()),
+      isAgentBusy: () =>
+        voiceChat.isBusy() ||
+        Boolean(microphoneTests?.isActive()) ||
+        Boolean(evaluationMenu?.isRunning()),
       areTriggerKeysReleased: () => voiceKeysReleased,
       startAgentSession: () => voiceChat.startTaskSession(),
       sendAgentMessage: (sessionId, message, locale, mode) =>
@@ -1313,6 +1322,7 @@ async function startDesktop(): Promise<void> {
   });
 
   function clearAccountContext(): void {
+    void evaluationMenu?.stop();
     cameraAllowedUntil = 0;
     petAccessGeneration += 1;
     worldController.dispose();
@@ -1330,6 +1340,7 @@ async function startDesktop(): Promise<void> {
     canCancelSignIn = false,
   ): Promise<AuthResult> {
     return accountGate.changeAccount(async () => {
+      await evaluationMenu?.stop();
       clearAccountContext();
       if (!chat) {
         return { kind: 'failed', message: 'The sign-in request is invalid.' };
@@ -1548,6 +1559,12 @@ async function startDesktop(): Promise<void> {
     if (!isTrustedSender(event) || !chat) {
       return { kind: 'failed', message: 'This window cannot control an agent session.' };
     }
+    if (evaluationMenu?.isRunning()) {
+      return {
+        kind: 'failed',
+        message: 'Finish the development evaluation before starting another task.',
+      };
+    }
 
     if (accountGate.isChanging() || auth.isAddingAccount()) {
       return { kind: 'failed', message: 'An account change is already in progress.' };
@@ -1701,6 +1718,7 @@ async function startDesktop(): Promise<void> {
       },
     );
     window.on('closed', () => {
+      void evaluationMenu?.stop();
       cameraAllowedUntil = 0;
       if (auth.isSharedStudent()) {
         void auth.signOut();
@@ -1743,6 +1761,38 @@ async function startDesktop(): Promise<void> {
   }
 
   await openWindow();
+  if (
+    environment.APP_ENV === AppEnvironment.DEV &&
+    app.getName() === DesktopDevelopmentApp.NAME &&
+    !app.isPackaged
+  ) {
+    evaluationMenu = registerEvaluationMenu({
+      canStart: () =>
+        !chat?.hasActiveTask() &&
+        !accountGate.isChanging() &&
+        !auth.isAddingAccount() &&
+        !voice?.isCapturing(),
+      canNotify: () => !isQuitting && mainWindow !== undefined && !mainWindow.isDestroyed(),
+      suspendFollowing: async () => {
+        narration.clearTask();
+        await hudClient.suspendFollowing();
+      },
+      resumeFollowing: () => hudClient.resumeFollowing(),
+      run: (application, taskMode, signal, scenarioFile, compareObservationEncoding) =>
+        runSignedInEvaluation({
+          auth,
+          projectDirectory: join(mainDirectory, '../..'),
+          executablePath: process.execPath,
+          childEnvironment: readEvaluationChildEnv(process.env),
+          gatewayBaseUrl: `${environment.API_BASE_URL}/api/v1/model`,
+          application,
+          taskMode,
+          ...(scenarioFile ? { scenarioFile } : {}),
+          ...(compareObservationEncoding ? { compareObservationEncoding } : {}),
+          signal,
+        }),
+    });
+  }
   if (canUseUpdates) {
     void updateController.checkForUpdates();
     updateCheckTimer = setInterval(
@@ -1786,7 +1836,11 @@ app.on('before-quit', (event) => {
   classroomInsights?.dispose();
   parentReportExports?.dispose();
   chat?.dispose();
-  void Promise.allSettled([desktopDriver.stop(), analytics?.shutdown()]).finally(() => {
+  void Promise.allSettled([
+    desktopDriver.stop(),
+    analytics?.shutdown(),
+    evaluationMenu?.stop(),
+  ]).finally(() => {
     if (updates?.readStatus().status.state === AppUpdateState.RESTARTING) {
       updates.installAfterShutdown();
     } else {

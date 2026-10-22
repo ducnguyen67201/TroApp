@@ -109,6 +109,7 @@ describe('persistent HUD presentation connection', () => {
 
 it('acknowledges suspension and prevents focus or reconnect from reclaiming an active task cursor', async () => {
   vi.useFakeTimers();
+  const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
   const children: Child[] = [];
   const enabled: boolean[] = [];
   doubles.fork.mockImplementation(() => {
@@ -141,5 +142,16 @@ it('acknowledges suspension and prevents focus or reconnect from reclaiming an a
   expect(enabled).toHaveLength(count);
   await client.resumeFollowing();
   expect(enabled.at(-1)).toBe(true);
+  expect(debug).toHaveBeenCalledWith(
+    'companion.cursor.ownership',
+    expect.objectContaining({ enabled: false, applied: true }),
+  );
+  expect(debug).toHaveBeenCalledWith(
+    'companion.cursor.ownership',
+    expect.objectContaining({ enabled: true, applied: true }),
+  );
+  expect(JSON.stringify(debug.mock.calls)).not.toContain(connection.command);
+  expect(JSON.stringify(debug.mock.calls)).not.toContain('CUA_DRIVER_EMBEDDED');
   client.dispose();
+  debug.mockRestore();
 });

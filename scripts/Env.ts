@@ -288,6 +288,39 @@ export function readDesktopChildEnv(environment: NodeJS.ProcessEnv): NodeJS.Proc
   };
 }
 
+/** Evaluation hosts inherit OS paths only, including Windows runtime paths.
+ * Provider keys, account state and arbitrary environment settings stay outside. */
+export function readInteractiveEvaluationChildEnv(
+  environment: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  const settings = createEnv({
+    server: {
+      PATH: z.string().min(1),
+      HOME: z.string().optional(),
+      TMPDIR: z.string().optional(),
+      SystemRoot: z.string().optional(),
+      TEMP: z.string().optional(),
+      TMP: z.string().optional(),
+      DISPLAY: z.string().optional(),
+      LANG: z.string().optional(),
+    },
+    runtimeEnv: environment,
+    onValidationError: () => {
+      throw new Error('Evaluation host environment is invalid.');
+    },
+  });
+  return {
+    PATH: settings.PATH,
+    ...(settings.HOME ? { HOME: settings.HOME } : {}),
+    ...(settings.TMPDIR ? { TMPDIR: settings.TMPDIR } : {}),
+    ...(settings.SystemRoot ? { SystemRoot: settings.SystemRoot } : {}),
+    ...(settings.TEMP ? { TEMP: settings.TEMP } : {}),
+    ...(settings.TMP ? { TMP: settings.TMP } : {}),
+    ...(settings.DISPLAY ? { DISPLAY: settings.DISPLAY } : {}),
+    ...(settings.LANG ? { LANG: settings.LANG } : {}),
+  };
+}
+
 export const MacNotarizationMethod = {
   API_KEY: 'api-key',
   KEYCHAIN_PROFILE: 'keychain-profile',

@@ -1,4 +1,5 @@
 import type { StudentActivity } from '#contracts/StudentActivity.js';
+import { PreparedTaskContext, type TaskContextPort } from '../context/PrepareTaskContext.js';
 import type { ClassroomTeachingSession } from '../teaching/ClassroomTeachingTools.js';
 import { logAgentExchange } from './AgentExchangeLog.js';
 import { CompanionHudTool, type AgentProgressPhase } from '#contracts/CompanionHud.js';
@@ -11,6 +12,7 @@ import { AgentTaskMode, GuidanceReason, TeachingOutcome } from '#contracts/Curso
 import { CuaCompanionClient } from '../cua/CuaCompanionClient.js';
 import { runComputerUseAgent } from './RunComputerUseAgent.js';
 import { TeachingTaskRunner, type ReceiveTeachingStep } from '../teaching/TeachingTaskRunner.js';
+import type { TeachingObserver } from '../teaching/TeachingObserver.js';
 
 import { describeTaskDiagnostics } from './AgentDebugLog.js';
 import { TaskContext } from '../execution/TaskContext.js';
@@ -98,6 +100,8 @@ export class ComputerUseTaskRunner {
     receiveProgress?: (phase: AgentProgressPhase) => void,
     receiveTeachingStep?: ReceiveTeachingStep,
     classroom?: ClassroomTeachingSession,
+    activityContext?: TaskContextPort,
+    observeTeaching?: TeachingObserver,
   ): Promise<AgentResult> {
     if (this.active) {
       throw new Error('Wait for the current task to finish.');
@@ -112,6 +116,9 @@ export class ComputerUseTaskRunner {
       };
     }
     this.active = true;
+    const preparedContext = activityContext
+      ? new PreparedTaskContext(activityContext, signal)
+      : undefined;
     this.desktopServer.setTaskMode(mode);
     this.desktopServer.setProgressListener(receiveProgress ?? null);
     const cancelGuidance = (): void => {
@@ -128,6 +135,14 @@ export class ComputerUseTaskRunner {
     });
     try {
       signal.throwIfAborted();
+      await preparedContext?.prepareForQuestion(message);
+      this.desktopServer.setContextObservationListener(
+        preparedContext
+          ? (id, text) => {
+              preparedContext.recordObservation(id, text);
+            }
+          : null,
+      );
       await this.companion?.startFollowing();
       if (this.companion) {
         if (mode === AgentTaskMode.EXECUTE) {
@@ -136,7 +151,9 @@ export class ComputerUseTaskRunner {
       }
       signal.throwIfAborted();
       if (mode === AgentTaskMode.EXECUTE) {
-        return await this.runExecutionTask(message, locale, signal);
+        const result = await this.runExecutionTask(message, locale, signal, preparedContext);
+        preparedContext?.recordResult(result);
+        return result;
       }
       if (!this.companion) {
         throw new Error('Teaching companion is unavailable.');
@@ -146,6 +163,10 @@ export class ComputerUseTaskRunner {
         this.companion,
         this.log,
         this.runAgent,
+        undefined,
+        undefined,
+        preparedContext,
+        observeTeaching,
       );
       const result = await this.teachingRunner.run(
         message,
@@ -163,7 +184,9 @@ export class ComputerUseTaskRunner {
         },
         'agent.teaching.settled',
       );
-      return { kind: 'teaching', result };
+      const answer: AgentResult = { kind: 'teaching', result };
+      preparedContext?.recordResult(answer);
+      return answer;
     } catch (error) {
       this.log.debug(
         {
@@ -174,6 +197,8 @@ export class ComputerUseTaskRunner {
       );
       throw error;
     } finally {
+      this.desktopServer.setContextObservationListener(null);
+      await preparedContext?.settle();
       await this.desktopServer.settleCalls();
       this.desktopServer.setProgressListener(null);
       signal.removeEventListener('abort', cancelGuidance);
@@ -194,6 +219,7 @@ export class ComputerUseTaskRunner {
     message: string,
     locale: DesktopLocale,
     signal: AbortSignal,
+    preparedContext?: PreparedTaskContext,
   ): Promise<AgentResult> {
     const startedAt = performance.now();
     const task = new TaskContext(
@@ -223,6 +249,7 @@ export class ComputerUseTaskRunner {
       harness,
       this.runExecutionAgent,
       taskLog,
+      preparedContext,
     );
     try {
       const result = await harness.run(main);

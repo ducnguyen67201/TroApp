@@ -59,6 +59,9 @@ importers:
       '@tabler/icons-react':
         specifier: 3.48.0
         version: 3.48.0(react@19.3.0)
+      '@toon-format/toon':
+        specifier: 4.4.0
+        version: 4.4.0
       '@trycua/cua-driver':
         specifier: 0.30.4
         version: 0.30.4
@@ -2073,6 +2076,9 @@ packages:
         optional: true
       '@types/react-dom':
         optional: true
+
+  '@toon-format/toon@4.4.0':
+    resolution: {integrity: sha512-A6UcsVoWbNdhdLNhJbe6JpRlocmf/DZGG57fur3bd8oQtsjBaKWo2hHbOU2zTuy+byUmLIOyP1xJeitopCZzpQ==}
 
   '@trycua/cua-driver-darwin-arm64@0.30.4':
     resolution: {integrity: sha512-ceIRKOYtsL5mRTivFjctvDEjCuZSddzv6wsaN8fO3/U6bLLOEEXVEBxwmbF5hJLu0Eb33lybVeqZpc0hr9tdtg==}
@@ -7060,6 +7066,8 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.3.0
       '@types/react-dom': 19.3.0(@types/react@19.3.0)
+
+  '@toon-format/toon@4.4.0': {}
 
   '@trycua/cua-driver-darwin-arm64@0.30.4':
     optional: true

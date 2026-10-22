@@ -5,6 +5,7 @@ import { DesktopLocaleSchema } from './DesktopLocale.js';
 import { AgentTaskMode, AgentTaskModeSchema, TeachingResultSchema } from './CursorCompanion.js';
 import { DesktopDriverConnectionSchema } from './DesktopDriver.js';
 import { AgentCompletionSchema, TaskOutcomeLimits } from './TaskOutcome.js';
+import { ContextPreferenceSchema } from './StudyContext.js';
 
 export const AgentFailureCode = { DAILY_LIMIT: 'daily_limit' } as const;
 
@@ -72,6 +73,7 @@ export const AgentWorkerCommandSchema = z.discriminatedUnion('kind', [
     locale: DesktopLocaleSchema,
     mode: AgentTaskModeSchema.default(AgentTaskMode.EXECUTE),
     classroomContext: TeachingContextSchema.optional(),
+    activityContext: ContextPreferenceSchema.optional(),
   }),
   z.strictObject({
     kind: z.literal('answer'),

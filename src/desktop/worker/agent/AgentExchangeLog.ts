@@ -1,4 +1,5 @@
 import type { Logger } from 'pino';
+import { ActivityContextMarker } from '#contracts/StudyContext.js';
 
 const ExchangeLimits = { DEPTH: 12, ITEMS: 16, TEXT_CHARS: 6000, NODES: 400 } as const;
 const contentTraceLoggers = new WeakSet<Logger>();
@@ -27,6 +28,9 @@ export function describeDebugExchange(value: unknown): DebugValue {
       return current;
     }
     if (typeof current === 'string') {
+      if (current.includes(ActivityContextMarker)) {
+        return '[activity context omitted]';
+      }
       // Tool outputs and arguments often encode JSON inside a string.
       if (current.trimStart().startsWith('[') || current.trimStart().startsWith('{')) {
         try {
@@ -63,6 +67,11 @@ export function describeDebugExchange(value: unknown): DebugValue {
     if (typeof current === 'object') {
       const entries = Object.entries(current);
       if (
+        entries.some(([key, item]) => key === 'kind' && (item === 'packet' || item === 'source'))
+      ) {
+        return '[activity context omitted]';
+      }
+      if (
         (entries.some(([key]) => key === 'participation') &&
           entries.some(([key]) => key === 'meeting')) ||
         entries.some(
@@ -83,7 +92,7 @@ export function describeDebugExchange(value: unknown): DebugValue {
       const result: { [key: string]: DebugValue } = {};
       for (const [key, item] of entries.slice(0, 40)) {
         const isPrivate =
-          /token|secret|password|authorization|cookie|headers|api.?key|image|audio|base64|encrypted|session|endpoint|gateway.?url|classroom|workspace.?url|material.?context|extracted.?text|prepared.?note|teacher.?note|teacher.?instructions|^url$/i.test(
+          /checkpoint|activity.?context|token|secret|password|authorization|cookie|headers|api.?key|image|audio|base64|encrypted|session|endpoint|gateway.?url|classroom|workspace.?url|material.?context|extracted.?text|prepared.?note|teacher.?note|teacher.?instructions|^url$/i.test(
             key,
           );
         result[key] = isPrivate ? '[omitted]' : visit(item, depth + 1);

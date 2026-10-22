@@ -1,5 +1,9 @@
 import { Agent, tool } from '@openai/agents';
-import { ModelConfig } from '#contracts/config/ModelConfig.js';
+import { ModelProfile } from '#contracts/ModelProfile.js';
+import { CheckpointUpdateSchema } from '#contracts/StudyMemory.js';
+import { createStudyContextTools } from '../context/StudyContextTools.js';
+import { readCheckpointOutput } from '../context/ReadCheckpointOutput.js';
+import type { PreparedTaskContext } from '../context/PrepareTaskContext.js';
 import {
   createClassroomTeachingTools,
   type ClassroomTeachingSession,
@@ -14,13 +18,16 @@ import {
 import { LoggedCuaServer } from '../cua/LoggedCuaServer.js';
 import type { TaskContext } from '../execution/TaskContext.js';
 import { DefineTaskGoalSchema } from '../execution/TaskGoal.js';
-import { CompletionProposalSchema } from '../execution/TaskCompletionProposal.js';
+import {
+  CompletionProposalSchema,
+  EnrichedCompletionProposalSchema,
+} from '../execution/TaskCompletionProposal.js';
 import type { TaskControls } from '../execution/TaskExecutionPorts.js';
 import {
   TeachingProposalRecovery,
   type TeachingProposalRejection,
 } from '../teaching/TeachingProposalRecovery.js';
-import { TeachingReplySchema } from '../teaching/TeachingReply.js';
+import { TeachingReplySchema, EnrichedTeachingReplySchema } from '../teaching/TeachingReply.js';
 import {
   DefineTeachingGoalSchema,
   ReviseTeachingGoalSchema,
@@ -40,16 +47,21 @@ export function createComputerUseAgent(
   desktopServer: LoggedCuaServer,
   locale: DesktopLocale,
   controls: TaskControls,
-): Agent<TaskContext, typeof CompletionProposalSchema> {
-  return new Agent<TaskContext, typeof CompletionProposalSchema>({
+  context?: PreparedTaskContext,
+): Agent<TaskContext, typeof CompletionProposalSchema | typeof EnrichedCompletionProposalSchema> {
+  return new Agent<
+    TaskContext,
+    typeof CompletionProposalSchema | typeof EnrichedCompletionProposalSchema
+  >({
     name: 'Tro computer-use assistant',
-    model: ModelConfig.textModel,
-    instructions: createComputerUseInstructions(locale),
+    model: ModelProfile.MAIN,
+    instructions: createComputerUseInstructions(locale) + (context?.readInstructions() ?? ''),
     mcpServers: [desktopServer],
     mcpConfig: { convertSchemasToStrict: false },
     modelSettings: { parallelToolCalls: false },
-    outputType: CompletionProposalSchema,
+    outputType: context ? EnrichedCompletionProposalSchema : CompletionProposalSchema,
     tools: [
+      ...(context ? createStudyContextTools(context) : []),
       tool({
         name: 'define_task_goal',
         description:
@@ -78,19 +90,21 @@ export function createTeachingAgent(
   locale: DesktopLocale,
   controls: TeachingAgentControls,
   classroom?: ClassroomTeachingSession,
-): Agent<unknown, typeof TeachingReplySchema> {
+  context?: PreparedTaskContext,
+): Agent<unknown, typeof TeachingReplySchema | typeof EnrichedTeachingReplySchema> {
   const recovery = new TeachingProposalRecovery((rejection) =>
     controls.reportInvalidProposal?.(rejection),
   );
   return new Agent({
     name: 'Tro teaching assistant',
-    model: ModelConfig.textModel,
-    instructions: `${createComputerUseInstructions(locale, AgentTaskMode.TEACH)}\n${classroom ? ClassroomMaterialInstructions : ''}`,
+    model: ModelProfile.MAIN,
+    instructions: `${createComputerUseInstructions(locale, AgentTaskMode.TEACH)}\n${classroom ? ClassroomMaterialInstructions : ''}${context?.readInstructions() ?? ''}`,
     mcpServers: [desktopServer],
     mcpConfig: { convertSchemasToStrict: false },
     modelSettings: { parallelToolCalls: false },
-    outputType: TeachingReplySchema,
+    outputType: context ? EnrichedTeachingReplySchema : TeachingReplySchema,
     tools: [
+      ...(context ? createStudyContextTools(context) : []),
       ...(classroom ? createClassroomTeachingTools(classroom) : []),
       tool({
         name: 'define_teaching_goal',
@@ -115,21 +129,28 @@ export function createTeachingAgent(
         /* Spreading strips Zod's non-enumerable Standard Schema validator so
          * the SDK parses JSON and Tro owns the canonical validation below. */
         parameters: {
-          ...z.toJSONSchema(PresentTeachingStepSchema, {
-            unrepresentable: 'any',
-            override: ({ jsonSchema }) => {
-              /* Unique kind literals make these branches exclusive. OpenAI strict
-               * tools support anyOf, while Zod emits oneOf for discriminated unions. */
-              if (jsonSchema.oneOf) {
-                jsonSchema.anyOf = jsonSchema.oneOf;
-                delete jsonSchema.oneOf;
-              }
+          ...z.toJSONSchema(
+            context
+              ? PresentTeachingStepSchema.safeExtend({
+                  checkpointUpdate: CheckpointUpdateSchema.nullable(),
+                })
+              : PresentTeachingStepSchema,
+            {
+              unrepresentable: 'any',
+              override: ({ jsonSchema }) => {
+                /* Unique kind literals make these branches exclusive. OpenAI strict
+                 * tools support anyOf, while Zod emits oneOf for discriminated unions. */
+                if (jsonSchema.oneOf) {
+                  jsonSchema.anyOf = jsonSchema.oneOf;
+                  delete jsonSchema.oneOf;
+                }
+              },
             },
-          }),
+          ),
         },
         errorFunction: (_context, error) => recovery.rejectInput(error),
         execute: (input) => {
-          const parsed = PresentTeachingStepSchema.safeParse(input);
+          const parsed = PresentTeachingStepSchema.safeParse(readCheckpointOutput(input, context));
           if (!parsed.success) {
             return recovery.rejectFields(
               parsed.error.issues.slice(0, 8).map((issue) => ({

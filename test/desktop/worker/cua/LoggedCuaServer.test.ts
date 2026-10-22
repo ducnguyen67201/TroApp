@@ -1,6 +1,12 @@
 import { MCPServerStdio, mcpToFunctionTool, type CallToolResult } from '@openai/agents';
 import pino from 'pino';
 import { PassThrough } from 'node:stream';
+import { decode } from '@toon-format/toon';
+import { z } from 'zod';
+import {
+  ModelObservationEncoding,
+  ToonObservationPrefix,
+} from '../../../../src/desktop/worker/agent/FormatModelObservation.js';
 import {
   AgentLogRole,
   withAgentLogContext,
@@ -9,7 +15,168 @@ import { describe, expect, it, vi } from 'vitest';
 import { TaskContext } from '../../../../src/desktop/worker/execution/TaskContext.js';
 import { LoggedCuaServer } from '../../../../src/desktop/worker/cua/LoggedCuaServer.js';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
+import { ModelObservationProjection } from '../../../../src/desktop/worker/agent/ModelObservationProjection.js';
 import { enableAgentExchangeLog } from '../../../../src/desktop/worker/agent/AgentExchangeLog.js';
+
+it('reproduces the original unconditional JSON append only for the internal legacy control', async () => {
+  const metadata = { pid: 7, window_id: 12, label: 'Synthetic window' };
+  const json = JSON.stringify(metadata);
+  const native: CallToolResult = {
+    content: [{ type: 'text', text: json }],
+    structuredContent: metadata,
+  };
+  const before = structuredClone(native);
+  const driver = vi.spyOn(MCPServerStdio.prototype, 'callToolResult').mockResolvedValue(native);
+  const server = new LoggedCuaServer(
+    { name: 'Legacy JSON benchmark control', command: 'unused' },
+    pino({ level: 'silent' }),
+    { observationProjection: ModelObservationProjection.LEGACY_JSON },
+  );
+  try {
+    const result = await server.callToolResult('get_window_state', { pid: 7, window_id: 12 });
+    expect(native).toEqual(before);
+    expect(result.structuredContent).toBe(metadata);
+    expect(result.content.slice(0, 2)).toEqual([
+      { type: 'text', text: json },
+      { type: 'text', text: json },
+    ]);
+    const references = result.content.slice(2);
+    expect(references).toHaveLength(1);
+    const reference = references[0];
+    if (reference?.type !== 'text' || typeof reference.text !== 'string') {
+      throw new Error('Expected the original observation reference.');
+    }
+    expect(reference.text).toContain('Tro observation references:');
+  } finally {
+    driver.mockRestore();
+  }
+});
+
+it('projects repeated native metadata once as TOON while retaining original host evidence and images', async () => {
+  const metadata = {
+    pid: 7,
+    window_id: 12,
+    nodes: Array.from({ length: 150 }, (_, index) => ({
+      nodeIdentifier: `node-${String(index)}`,
+      role: 'button',
+      label: 'PRIVATE_SYNTHETIC_LABEL',
+      enabled: true,
+    })),
+  };
+  const json = JSON.stringify(metadata);
+  const image = { type: 'image' as const, data: 'U1lOVEhFVElDX0lNQUdF', mimeType: 'image/png' };
+  const native: CallToolResult = {
+    content: [image, { type: 'text', text: json }],
+    structuredContent: metadata,
+  };
+  const before = structuredClone(native);
+  const driver = vi.spyOn(MCPServerStdio.prototype, 'callToolResult').mockResolvedValue(native);
+  const output = new PassThrough();
+  const lines: string[] = [];
+  output.on('data', (chunk: Buffer) => lines.push(chunk.toString('utf8')));
+  const server = new LoggedCuaServer(
+    { name: 'TOON projection fixture', command: 'unused' },
+    pino({ level: 'debug' }, output),
+  );
+  const task = new TaskContext(server.taskEvidence, new AbortController().signal);
+  server.bindTask(task);
+  task.defineGoal({
+    summary: 'Inspect the synthetic window',
+    criteria: [{ description: 'Read the window content' }],
+  });
+  server.taskEvidence.setReadOnlyTools(['get_window_state']);
+  try {
+    const result = await server.callToolResult('get_window_state', { pid: 7, window_id: 12 });
+    expect(native).toEqual(before);
+    expect(result.structuredContent).toBe(metadata);
+    expect(result.content[0]).toBe(image);
+    const projections = result.content.filter(
+      (part) =>
+        part.type === 'text' &&
+        typeof part.text === 'string' &&
+        part.text.startsWith(ToonObservationPrefix),
+    );
+    expect(projections).toHaveLength(1);
+    const projection = projections[0];
+    if (projection?.type !== 'text' || typeof projection.text !== 'string') {
+      throw new Error('Expected a model text projection.');
+    }
+    expect(decode(projection.text.slice(ToonObservationPrefix.length))).toEqual(metadata);
+    expect(result.content.some((part) => part.type === 'text' && part.text === json)).toBe(false);
+    const snapshot = server.taskEvidence.readSnapshot();
+    expect(snapshot.observations).toHaveLength(1);
+    const observation = snapshot.observations[0];
+    if (!observation) {
+      throw new Error('Expected original native evidence.');
+    }
+    const evidence = server.taskEvidence.readContent(observation);
+    expect(evidence.some((part) => part.type === 'text' && part.text === json)).toBe(true);
+    expect(evidence.some((part) => part.type === 'image' && part.data === image.data)).toBe(true);
+    expect(
+      evidence.some((part) => part.type === 'text' && part.text.startsWith(ToonObservationPrefix)),
+    ).toBe(false);
+    const schema = z.object({
+      msg: z.literal('cua.model_projection'),
+      toolName: z.literal('get_window_state'),
+      callId: z.string().min(1),
+      format: z.enum(ModelObservationEncoding),
+      jsonCharacters: z.number(),
+      outputCharacters: z.number(),
+      jsonTokens: z.number(),
+      outputTokens: z.number(),
+      elapsedMs: z.number().nonnegative(),
+      duplicateCopyAvoided: z.boolean(),
+    });
+    const diagnostics = lines
+      .flatMap((line) => line.trim().split('\n'))
+      .flatMap((line) => {
+        const raw: unknown = JSON.parse(line);
+        const parsed = schema.safeParse(raw);
+        return parsed.success ? [parsed.data] : [];
+      });
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]).toMatchObject({
+      format: ModelObservationEncoding.TOON,
+      duplicateCopyAvoided: true,
+      jsonCharacters: json.length,
+    });
+    expect(lines.join('')).not.toContain('PRIVATE_SYNTHETIC_LABEL');
+    expect(lines.join('')).not.toContain(image.data);
+  } finally {
+    driver.mockRestore();
+    task.dispose();
+  }
+});
+
+it('avoids adding an exact JSON duplicate without collapsing similar native text', async () => {
+  const metadata = { pid: 7, window_id: 12 };
+  const json = JSON.stringify(metadata);
+  const native: CallToolResult = {
+    content: [
+      { type: 'text', text: json },
+      { type: 'text', text: json + '\n' },
+    ],
+    structuredContent: metadata,
+  };
+  const driver = vi.spyOn(MCPServerStdio.prototype, 'callToolResult').mockResolvedValue(native);
+  const server = new LoggedCuaServer(
+    { name: 'Exact JSON fixture', command: 'unused' },
+    pino({ level: 'silent' }),
+  );
+  try {
+    const result = await server.callToolResult('get_window_state', { pid: 7, window_id: 12 });
+    expect(
+      result.content.filter((part) => part.type === 'text' && part.text === json),
+    ).toHaveLength(1);
+    expect(result.content.some((part) => part.type === 'text' && part.text === json + '\n')).toBe(
+      true,
+    );
+    expect(native.content).toHaveLength(2);
+    expect(result.structuredContent).toBe(metadata);
+  } finally {
+    driver.mockRestore();
+  }
+});
 
 it('logs the comparison input and failing cue region without screenshots or pixel colors', async () => {
   const output = new PassThrough();
@@ -148,8 +315,17 @@ describe('Cua tool schemas presented to the Agents SDK', () => {
       expect(logs).toContain('"reasonCode":"window_id_not_found"');
       expect(logs).toContain('"deliveryMode":"background"');
       expect(logs).toContain('"windowId":12');
-      expect(logs.match(/"dispatchId":"dispatch-2"/g)).toHaveLength(2);
-      expect(logs.match(/"callId":"call-1"/g)).toHaveLength(2);
+      const toolCallLogs = logs
+        .split('\n')
+        .filter((line) => /"msg":"cua\.(request|response)"/u.test(line))
+        .join('\n');
+      expect(toolCallLogs.match(/"dispatchId":"dispatch-2"/g)).toHaveLength(2);
+      expect(toolCallLogs.match(/"callId":"call-1"/g)).toHaveLength(2);
+      const projectionLogs = logs
+        .split('\n')
+        .filter((line) => line.includes('"msg":"cua.model_projection"'));
+      expect(projectionLogs).toHaveLength(1);
+      expect(projectionLogs[0]).toContain('"callId":"call-1"');
       expect(logs).toContain('"taskId":"' + task.id + '"');
       expect(logs).not.toContain('private');
     } finally {

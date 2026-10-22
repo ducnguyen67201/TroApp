@@ -4,6 +4,11 @@ import {
   CompanionHudBindingSchema,
 } from '#contracts/CompanionHud.js';
 import { logAgentExchange } from '../agent/AgentExchangeLog.js';
+import {
+  formatModelObservation,
+  ModelObservationEncoding,
+} from '../agent/FormatModelObservation.js';
+import { ModelObservationProjection } from '../agent/ModelObservationProjection.js';
 import { MCPServerStdio, type CallToolResult, type MCPCallToolOptions } from '@openai/agents';
 import type { Logger } from 'pino';
 import { CuaTaskEvidence } from './CuaTaskEvidence.js';
@@ -21,6 +26,7 @@ import {
   type AgentProgressPhase as ProgressPhase,
 } from '#contracts/CompanionHud.js';
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
 import {
   CursorCompanionStateSchema,
   CursorCompanionTool,
@@ -369,13 +375,65 @@ export function describeCuaResult(value: unknown): {
  * capture geometry in structuredContent, so include it alongside the image.
  * The SDK's structured-only option would discard screenshot content.
  */
-function includeCuaMetadata(result: CallToolResult): CallToolResult {
+function includeCuaMetadata(
+  result: CallToolResult,
+  log: Logger,
+  context: { toolName: string; callId: string | null },
+  projection: ModelObservationProjection,
+): CallToolResult {
   if (result.structuredContent === undefined) {
     return result;
   }
+  const startedAt = performance.now();
+  const json = JSON.stringify(result.structuredContent);
+  if (projection === ModelObservationProjection.LEGACY_JSON) {
+    log.debug(
+      {
+        ...context,
+        projection,
+        format: ModelObservationEncoding.JSON,
+        jsonCharacters: json.length,
+        outputCharacters: json.length,
+        jsonTokens: null,
+        outputTokens: null,
+        elapsedMs: Math.round(performance.now() - startedAt),
+        duplicateCopyAvoided: false,
+      },
+      'cua.model_projection',
+    );
+    /* Preserve the pre-TOON behavior exactly, including its unconditional append.
+     * The internal paired benchmark must not silently improve its control. */
+    return { ...result, content: [...result.content, { type: 'text', text: json }] };
+  }
+  const formatted = formatModelObservation(json);
+  const duplicateIndex = result.content.findIndex(
+    (item) => item.type === 'text' && item.text === json,
+  );
+  const content =
+    duplicateIndex < 0
+      ? [...result.content, { type: 'text' as const, text: formatted.text }]
+      : result.content.map((item, index) =>
+          index === duplicateIndex && item.type === 'text'
+            ? { ...item, text: formatted.text }
+            : item,
+        );
+  log.debug(
+    {
+      ...context,
+      projection,
+      format: formatted.format,
+      jsonCharacters: formatted.jsonCharacters,
+      outputCharacters: formatted.outputCharacters,
+      jsonTokens: formatted.jsonTokens,
+      outputTokens: formatted.outputTokens,
+      elapsedMs: Math.round(performance.now() - startedAt),
+      duplicateCopyAvoided: duplicateIndex >= 0,
+    },
+    'cua.model_projection',
+  );
   return {
     ...result,
-    content: [...result.content, { type: 'text', text: JSON.stringify(result.structuredContent) }],
+    content,
   };
 }
 
@@ -456,6 +514,11 @@ export class LoggedCuaServer extends MCPServerStdio {
   }
 
   private receiveObservation: ((result: CallToolResult) => void) | null = null;
+  private receiveContextObservation: ((id: string, text: string) => void) | null = null;
+
+  setContextObservationListener(listener: ((id: string, text: string) => void) | null): void {
+    this.receiveContextObservation = listener;
+  }
 
   setObservationListener(listener: ((result: CallToolResult) => void) | null): void {
     this.receiveObservation = listener;
@@ -626,6 +689,7 @@ export class LoggedCuaServer extends MCPServerStdio {
   constructor(
     options: ConstructorParameters<typeof MCPServerStdio>[0],
     private readonly log: Logger,
+    private readonly modelOptions: { observationProjection?: ModelObservationProjection } = {},
   ) {
     super(options);
   }
@@ -845,6 +909,23 @@ export class LoggedCuaServer extends MCPServerStdio {
           : options,
       );
       const result = native;
+      if (
+        !result.isError &&
+        [
+          'get_desktop_state',
+          'get_accessibility_tree',
+          'get_browser_state',
+          'get_window_state',
+        ].includes(toolName)
+      ) {
+        this.receiveContextObservation?.(
+          call.id,
+          result.content
+            .filter((item) => item.type === 'text')
+            .map((item) => item.text)
+            .join('\n'),
+        );
+      }
       this.taskEvidence.record(toolName, result);
       const recorded = this.taskEvidence.recordToolResult(call, args, result);
       task?.recordProgress(recorded.fingerprint, recorded.observations.length > 0);
@@ -860,9 +941,19 @@ export class LoggedCuaServer extends MCPServerStdio {
         'cua.response',
       );
       if (recorded.observations.length === 0) {
-        return includeCuaMetadata(result);
+        return includeCuaMetadata(
+          result,
+          this.log,
+          { toolName, callId: call.id },
+          this.modelOptions.observationProjection ?? ModelObservationProjection.ADAPTIVE_TOON,
+        );
       }
-      const modelResult = includeCuaMetadata(result);
+      const modelResult = includeCuaMetadata(
+        result,
+        this.log,
+        { toolName, callId: call.id },
+        this.modelOptions.observationProjection ?? ModelObservationProjection.ADAPTIVE_TOON,
+      );
       return {
         ...modelResult,
         content: [
@@ -944,7 +1035,12 @@ export class LoggedCuaServer extends MCPServerStdio {
         this.taskEvidence.failGuidance(GuidanceReason.INVALID_REQUEST);
         this.onTeachingTerminal?.();
       }
-      return includeCuaMetadata(result);
+      return includeCuaMetadata(
+        result,
+        this.log,
+        { toolName, callId: null },
+        this.modelOptions.observationProjection ?? ModelObservationProjection.ADAPTIVE_TOON,
+      );
     }
     if (toolName === CursorCompanionTool.PRESENT_GUIDANCE) {
       const parsed = CursorGuidanceRequestHeaderSchema.safeParse(args);
@@ -1009,6 +1105,13 @@ export class LoggedCuaServer extends MCPServerStdio {
       if (toolName === 'get_desktop_state') {
         this.teachingCapture.recordDesktopCapture(native, args);
         this.receiveObservation?.(native);
+        this.receiveContextObservation?.(
+          randomUUID(),
+          native.content
+            .filter((item) => item.type === 'text')
+            .map((item) => item.text)
+            .join('\n'),
+        );
       }
       if (toolName === 'bring_to_front') {
         this.teachingCapture.reset();
@@ -1076,7 +1179,12 @@ export class LoggedCuaServer extends MCPServerStdio {
         output: result,
         ...(result.isError ? { error: describeCuaResult(result) } : {}),
       });
-      return includeCuaMetadata(result);
+      return includeCuaMetadata(
+        result,
+        this.log,
+        { toolName, callId: null },
+        this.modelOptions.observationProjection ?? ModelObservationProjection.ADAPTIVE_TOON,
+      );
     } catch (error) {
       logAgentExchange(this.log, {
         operation: 'native.tool',

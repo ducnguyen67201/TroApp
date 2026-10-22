@@ -158,6 +158,11 @@ export class AgentChatController {
     return this.turnInProgress && this.waitingLessonId === null;
   }
 
+  /** Waiting for a learner still owns the desktop and blocks internal evaluation. */
+  hasActiveTask(): boolean {
+    return this.turnInProgress;
+  }
+
   async readAuthSession(): Promise<AuthResult> {
     return this.auth.readSession();
   }

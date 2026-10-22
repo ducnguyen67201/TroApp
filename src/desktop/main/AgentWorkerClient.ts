@@ -1,4 +1,9 @@
 import { AgentWorkerPolicy } from './agent/AgentWorkerPolicy.js';
+import {
+  ContextWorkerRequestSchema,
+  ContextWorkerResponseSchema,
+} from '#contracts/DesktopContext.js';
+import type { DesktopContextController } from './context/DesktopContextController.js';
 import type { StudentInputPort } from './input/GlobalStudentInput.js';
 import {
   ClassroomToolRequestSchema,
@@ -25,6 +30,18 @@ import type { DesktopDriverConnection } from '#contracts/DesktopDriver.js';
 interface PendingRequest {
   resolve(result: AgentResult): void;
   timeout: NodeJS.Timeout | null;
+  context: TaskContextBinding | null;
+}
+
+type TaskActivityContext = Pick<
+  DesktopContextController,
+  'readScope' | 'pause' | 'resume' | 'execute'
+>;
+
+interface TaskContextBinding {
+  controller: TaskActivityContext;
+  sessionId: string;
+  generation: number;
 }
 
 const turnTimeoutMs = 120_000;
@@ -33,6 +50,13 @@ const stopTimeoutMs = AgentWorkerPolicy.SHUTDOWN_TIMEOUT_MS;
 
 /** Owns the one local computer-use process for the active chat session. */
 export class AgentWorkerClient implements AgentChatWorker {
+  private activityContext: TaskActivityContext | null = null;
+  private contextTurnSequence = 0;
+
+  setContextController(controller: TaskActivityContext): void {
+    this.activityContext = controller;
+  }
+
   private worker: UtilityProcess | null = null;
   private generation = 0;
   private preparing: Promise<void> | null = null;
@@ -65,6 +89,19 @@ export class AgentWorkerClient implements AgentChatWorker {
 
   isRunning(): boolean {
     return this.worker !== null;
+  }
+
+  /** A worker turn may use only the context identity admitted with that turn. */
+  private hasCurrentTaskContext(binding: TaskContextBinding): boolean {
+    if (this.activityContext !== binding.controller) {
+      return false;
+    }
+    const scope = binding.controller.readScope();
+    return (
+      scope?.enabled === true &&
+      scope.sessionId === binding.sessionId &&
+      scope.generation === binding.generation
+    );
   }
 
   prepare(): Promise<void> {
@@ -216,6 +253,33 @@ export class AgentWorkerClient implements AgentChatWorker {
       if (this.worker !== child) {
         return;
       }
+      const contextRequest = ContextWorkerRequestSchema.safeParse(message);
+      if (contextRequest.success) {
+        const input = contextRequest.data;
+        const context = this.pending.get(input.taskRequestId)?.context;
+        if (!context || !this.hasCurrentTaskContext(context)) {
+          return;
+        }
+        void context.controller
+          .execute(input.command)
+          .then((reply) => {
+            if (
+              this.worker === child &&
+              this.pending.get(input.taskRequestId)?.context === context &&
+              this.hasCurrentTaskContext(context)
+            ) {
+              child.postMessage(
+                ContextWorkerResponseSchema.parse({
+                  kind: 'context-response',
+                  requestId: input.requestId,
+                  reply,
+                }),
+              );
+            }
+          })
+          .catch(() => {});
+        return;
+      }
       const classroomRequest = ClassroomToolRequestSchema.safeParse(message);
       if (classroomRequest.success) {
         const input = classroomRequest.data;
@@ -308,14 +372,63 @@ export class AgentWorkerClient implements AgentChatWorker {
     classroomContext?: TeachingContext,
   ): Promise<AgentResult> {
     this.classroomContext = classroomContext ?? null;
-    return this.send({
-      kind: 'turn',
-      sessionId,
-      message,
-      locale,
-      mode,
-      ...(classroomContext ? { classroomContext } : {}),
-    });
+    const generation = this.generation;
+    const contextTurnSequence = ++this.contextTurnSequence;
+    const contextController = this.activityContext;
+    const admittedScope = contextController?.readScope();
+    const sendTurn = (): Promise<AgentResult> => {
+      const scope = this.activityContext?.readScope();
+      if (
+        generation !== this.generation ||
+        contextTurnSequence !== this.contextTurnSequence ||
+        (admittedScope && contextController !== this.activityContext) ||
+        (admittedScope &&
+          (scope?.sessionId !== admittedScope.sessionId ||
+            scope.generation !== admittedScope.generation))
+      ) {
+        return Promise.resolve({
+          kind: 'failed',
+          message: 'The active task or context account changed.',
+        });
+      }
+      return this.send({
+        kind: 'turn',
+        sessionId,
+        message,
+        locale,
+        mode,
+        ...(classroomContext ? { classroomContext } : {}),
+        ...(scope ? { activityContext: scope } : {}),
+      });
+    };
+    if (!admittedScope || !contextController) {
+      return sendTurn();
+    }
+    return contextController
+      .pause(message)
+      .then(sendTurn)
+      .finally(() => {
+        /* A failed worker may change its generation while the context account
+         * stays active. Resume after that worker retires, without delaying the
+         * result, and never let an older Ask resume a newer Ask's collector. */
+        const retirement = this.stopping;
+        void retirement
+          .then(() => {
+            const scope = this.activityContext?.readScope();
+            if (
+              contextTurnSequence === this.contextTurnSequence &&
+              contextController === this.activityContext &&
+              scope?.sessionId === admittedScope.sessionId &&
+              scope.generation === admittedScope.generation
+            ) {
+              return contextController.resume();
+            }
+            return undefined;
+          })
+          .catch(() => {
+            console.warn('context.collector.failed', { stage: 'resume-after-task' });
+          });
+      });
   }
 
   answerLesson(
@@ -430,6 +543,14 @@ export class AgentWorkerClient implements AgentChatWorker {
           resolve(result);
         },
         timeout,
+        context:
+          command.kind === 'turn' && command.activityContext && this.activityContext
+            ? {
+                controller: this.activityContext,
+                sessionId: command.activityContext.sessionId,
+                generation: command.activityContext.generation,
+              }
+            : null,
       });
       if (command.kind === 'turn' && command.mode === AgentTaskMode.TEACH) {
         void this.studentInput

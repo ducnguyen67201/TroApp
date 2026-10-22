@@ -102,3 +102,43 @@ export function readDesktopEnv({
     POSTHOG_HOST: validated.POSTHOG_HOST,
   };
 }
+
+function readEvaluationOperatingSystemEnv(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const settings = createEnv({
+    server: {
+      PATH: z.string().min(1),
+      HOME: z.string().optional(),
+      TMPDIR: z.string().optional(),
+      SystemRoot: z.string().optional(),
+      TEMP: z.string().optional(),
+      TMP: z.string().optional(),
+      DISPLAY: z.string().optional(),
+      LANG: z.string().optional(),
+    },
+    runtimeEnv: environment,
+    onValidationError: () => {
+      throw new Error('Evaluation child environment is invalid.');
+    },
+  });
+  return {
+    PATH: settings.PATH,
+    ...(settings.HOME ? { HOME: settings.HOME } : {}),
+    ...(settings.TMPDIR ? { TMPDIR: settings.TMPDIR } : {}),
+    ...(settings.SystemRoot ? { SystemRoot: settings.SystemRoot } : {}),
+    ...(settings.TEMP ? { TEMP: settings.TEMP } : {}),
+    ...(settings.TMP ? { TMP: settings.TMP } : {}),
+    ...(settings.DISPLAY ? { DISPLAY: settings.DISPLAY } : {}),
+    ...(settings.LANG ? { LANG: settings.LANG } : {}),
+  };
+}
+
+/** GUI evaluation applications receive validated OS startup settings only.
+ * Node injection flags and backend credentials never enter the editor process. */
+export function readEvaluationApplicationEnv(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return readEvaluationOperatingSystemEnv(environment);
+}
+
+/** The fixed evaluator CLI uses Electron's Node mode with the same OS allowlist. */
+export function readEvaluationChildEnv(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return { ...readEvaluationOperatingSystemEnv(environment), ELECTRON_RUN_AS_NODE: '1' };
+}
