@@ -62,7 +62,8 @@
     "eval:request": "tsx scripts/RunInteractiveEvaluations.ts --single",
     "eval:generate": "tsx scripts/GenerateEvaluationScenarios.ts",
     "eval:validate": "tsx scripts/ValidateEvaluationScenarios.ts",
-    "eval:context": "node --conditions=development --import tsx scripts/BenchmarkQuestionContext.ts"
+    "eval:context": "node --conditions=development --import tsx scripts/BenchmarkQuestionContext.ts",
+    "eval:encoding": "node --conditions=development --import tsx scripts/BenchmarkObservationEncoding.ts"
   },
   "dependencies": {
     "@better-auth/electron": "1.7.6",
@@ -78,6 +79,7 @@
     "@remotion/renderer": "4.0.534",
     "@t3-oss/env-core": "^0.13.10",
     "@tabler/icons-react": "3.48.0",
+    "@toon-format/toon": "4.4.0",
     "@trycua/cua-driver": "0.30.4",
     "better-auth": "^1.7.6",
     "dotenv": "^17.2.3",

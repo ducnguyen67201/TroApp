@@ -4,6 +4,7 @@ import {
   CompanionHudBindingSchema,
 } from '#contracts/CompanionHud.js';
 import { logAgentExchange } from '../agent/AgentExchangeLog.js';
+import { formatModelObservation } from '../agent/FormatModelObservation.js';
 import { MCPServerStdio, type CallToolResult, type MCPCallToolOptions } from '@openai/agents';
 import type { Logger } from 'pino';
 import { CuaTaskEvidence } from './CuaTaskEvidence.js';
@@ -370,13 +371,44 @@ export function describeCuaResult(value: unknown): {
  * capture geometry in structuredContent, so include it alongside the image.
  * The SDK's structured-only option would discard screenshot content.
  */
-function includeCuaMetadata(result: CallToolResult): CallToolResult {
+function includeCuaMetadata(
+  result: CallToolResult,
+  log: Logger,
+  context: { toolName: string; callId: string | null },
+): CallToolResult {
   if (result.structuredContent === undefined) {
     return result;
   }
+  const startedAt = performance.now();
+  const json = JSON.stringify(result.structuredContent);
+  const formatted = formatModelObservation(json);
+  const duplicateIndex = result.content.findIndex(
+    (item) => item.type === 'text' && item.text === json,
+  );
+  const content =
+    duplicateIndex < 0
+      ? [...result.content, { type: 'text' as const, text: formatted.text }]
+      : result.content.map((item, index) =>
+          index === duplicateIndex && item.type === 'text'
+            ? { ...item, text: formatted.text }
+            : item,
+        );
+  log.debug(
+    {
+      ...context,
+      format: formatted.format,
+      jsonCharacters: formatted.jsonCharacters,
+      outputCharacters: formatted.outputCharacters,
+      jsonTokens: formatted.jsonTokens,
+      outputTokens: formatted.outputTokens,
+      elapsedMs: Math.round(performance.now() - startedAt),
+      duplicateCopyAvoided: duplicateIndex >= 0,
+    },
+    'cua.model_projection',
+  );
   return {
     ...result,
-    content: [...result.content, { type: 'text', text: JSON.stringify(result.structuredContent) }],
+    content,
   };
 }
 
@@ -883,9 +915,9 @@ export class LoggedCuaServer extends MCPServerStdio {
         'cua.response',
       );
       if (recorded.observations.length === 0) {
-        return includeCuaMetadata(result);
+        return includeCuaMetadata(result, this.log, { toolName, callId: call.id });
       }
-      const modelResult = includeCuaMetadata(result);
+      const modelResult = includeCuaMetadata(result, this.log, { toolName, callId: call.id });
       return {
         ...modelResult,
         content: [
@@ -967,7 +999,7 @@ export class LoggedCuaServer extends MCPServerStdio {
         this.taskEvidence.failGuidance(GuidanceReason.INVALID_REQUEST);
         this.onTeachingTerminal?.();
       }
-      return includeCuaMetadata(result);
+      return includeCuaMetadata(result, this.log, { toolName, callId: null });
     }
     if (toolName === CursorCompanionTool.PRESENT_GUIDANCE) {
       const parsed = CursorGuidanceRequestHeaderSchema.safeParse(args);
@@ -1106,7 +1138,7 @@ export class LoggedCuaServer extends MCPServerStdio {
         output: result,
         ...(result.isError ? { error: describeCuaResult(result) } : {}),
       });
-      return includeCuaMetadata(result);
+      return includeCuaMetadata(result, this.log, { toolName, callId: null });
     } catch (error) {
       logAgentExchange(this.log, {
         operation: 'native.tool',

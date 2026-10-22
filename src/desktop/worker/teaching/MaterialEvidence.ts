@@ -1,9 +1,6 @@
-import { Tiktoken } from 'js-tiktoken/lite';
-import o200kRanks from 'js-tiktoken/ranks/o200k_base';
 import type { AgentInputItem } from '@openai/agents';
 import type { TeachingContext } from '#contracts/Classroom.js';
-
-let encoding: Tiktoken | null = null;
+import { countModelTextTokens } from '../agent/CountModelTextTokens.js';
 
 /** Download metadata stays in the desktop; only selected evidence enters the model packet. */
 export function projectClassroomForAgent(context: TeachingContext | undefined) {
@@ -31,7 +28,6 @@ export function countMaterialHistoryTokens(
   context: TeachingContext | undefined,
   exchanges: readonly AgentInputItem[][],
 ): number {
-  encoding ??= new Tiktoken(o200kRanks);
   const material = projectClassroomForAgent(context)?.materialContext ?? null;
   const results = exchanges
     .flat()
@@ -45,5 +41,5 @@ export function countMaterialHistoryTokens(
           'read_class_material_note',
         ].includes(item.name),
     );
-  return encoding.encode(JSON.stringify({ material, results }), [], []).length;
+  return countModelTextTokens(JSON.stringify({ material, results }));
 }

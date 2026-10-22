@@ -694,6 +694,26 @@ cannot bypass verification through a prose-only response. Public outcomes distin
 succeeded, partial, blocked and unverified; these checks validate evidence wiring,
 not the correctness of every model judgment.
 
+### Model observation encoding
+
+`LoggedCuaServer` records native results in host evidence before formatting the
+model-facing `structuredContent` text projection.
+[FormatModelObservation.ts](../src/desktop/worker/agent/FormatModelObservation.ts)
+uses the official TOON encoder only when a bounded character prefilter and a
+token-proxy comparison establish a material reduction, including a self-contained
+format guide. Other payloads retain their complete JSON text. Identical existing
+JSON content avoids an additional duplicate copy; distinct text is preserved.
+Encoding failures return the original JSON and never change agent permissions.
+
+The native object, screenshot parts, targeting/verification evidence, tool and API
+JSON schemas, output schemas and SDK call/result pairing are unchanged. Study
+context remains JSON. Token counting shares the worker's lazy tokenizer rather
+than creating another tokenizer for classroom history. `cua.model_projection`
+reports bounded format, lengths, proxy counts and elapsed time without source
+contents. The internal `eval:encoding` comparison invokes this same formatter
+and exact decode checks without native or provider calls; it does not establish
+model comprehension or full-request savings.
+
 ## Teaching
 
 Show me keeps the student's original goal and lets the student control the real

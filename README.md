@@ -608,6 +608,35 @@ terminal usage and missing worker results can add cost; a known priced subtotal
 is not a complete bill. This adds no spending stop, model switch or extra model
 request. No provider price is built in or assumed current.
 
+### Observation input encoding
+
+Native structured observations use selective [TOON](https://github.com/toon-format/toon)
+in the model-facing text projection. A character prefilter avoids tokenizing
+payloads unlikely to benefit; the remaining candidates must beat compact JSON
+by the owning minimum savings after including the format guide. Small or oversized
+payloads, failed conversions and candidates without enough gain keep their full JSON.
+No field is truncated to obtain a saving.
+
+Native `structuredContent`, host evidence, screenshots, tool/API schemas, model
+output schemas and tool call/result pairs keep their existing contracts. Saved
+study-context packets remain JSON because their measured encoding gain was small.
+The selector uses an `o200k_base` token proxy, not provider billing. It adds no
+model call or summary request.
+
+Run the provider-free format comparison on authored observation shapes:
+
+```sh
+pnpm eval:encoding --output .tro-development/evaluations/ObservationEncoding
+```
+
+The readable report compares minified JSON with the actual adaptive formatter,
+checks exact decode roundtrips, and records local formatting time. Cases include
+uniform window/node lists, nested trees and long text. These fixtures do not
+establish native-payload frequency, live Sol comprehension or dollar savings.
+`cua.model_projection` records content-free format/size/token-proxy diagnostics
+for native projections; no source text or pixels enter this event. The owning
+policy is [FormatModelObservation.ts](src/desktop/worker/agent/FormatModelObservation.ts).
+
 ## Configuration
 
 | Process                                     | Settings                                                                                                                                                                                                       |
