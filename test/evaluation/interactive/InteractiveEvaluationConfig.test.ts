@@ -11,6 +11,65 @@ import { InteractiveTaskId } from './InteractiveStudyWorkspace.js';
 import { EvaluationApplication } from './EvaluationApplication.js';
 import { DesktopLocale } from '../../../src/contracts/DesktopLocale.js';
 import { getDefaultEvaluationScenario } from './ScenarioCatalog.js';
+import { ModelObservationProjection } from '../../../src/desktop/worker/agent/ModelObservationProjection.js';
+
+it('allows an explicit native-only VS Code preflight without a model credential or live agent', () => {
+  const parsed = parseInteractiveEvaluationOptions([
+    '--application',
+    'vscode',
+    '--native-readiness-only',
+    '--dedicated-desktop',
+  ]);
+  expect(parsed.credentialStdin).toBe(false);
+  expect(parsed.config).toMatchObject({
+    runMode: InteractiveRunMode.PREFLIGHT,
+    nativeReadinessOnly: true,
+    application: EvaluationApplication.VSCODE,
+  });
+  expect(() =>
+    parseInteractiveEvaluationOptions(['--native-readiness-only', '--dedicated-desktop']),
+  ).toThrow();
+  expect(() =>
+    parseInteractiveEvaluationOptions(['--application', 'vscode', '--native-readiness-only']),
+  ).toThrow();
+  expect(() =>
+    parseInteractiveEvaluationOptions([
+      '--application',
+      'vscode',
+      '--native-readiness-only',
+      '--dedicated-desktop',
+      '--live',
+      '--credential-stdin',
+    ]),
+  ).toThrow();
+  expect(() =>
+    parseInteractiveEvaluationOptions([
+      '--application',
+      'vscode',
+      '--native-readiness-only',
+      '--dedicated-desktop',
+      '--credential-stdin',
+    ]),
+  ).toThrow();
+});
+
+it('changes only the explicit observation-projection axis without changing scenario identity', () => {
+  const adaptive = parseInteractiveEvaluationOptions(['--application', 'vscode', '--execute']);
+  const legacy = parseInteractiveEvaluationOptions([
+    '--application',
+    'vscode',
+    '--execute',
+    '--observation-projection',
+    ModelObservationProjection.LEGACY_JSON,
+  ]);
+  expect(adaptive.config.observationProjection).toBe(ModelObservationProjection.ADAPTIVE_TOON);
+  expect(createInteractiveTrialPlan(adaptive.config)).toEqual(
+    createInteractiveTrialPlan(legacy.config),
+  );
+  expect(() =>
+    parseInteractiveEvaluationOptions(['--observation-projection', 'unknown']),
+  ).toThrow();
+});
 
 describe('interactive evaluation matrix', () => {
   it('uses manifest identity and request without changing the application task selector', () => {

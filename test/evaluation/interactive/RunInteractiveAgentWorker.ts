@@ -4,6 +4,10 @@ import { setTracingDisabled } from '@openai/agents';
 import { z } from 'zod';
 import type { AgentResult } from '../../../src/contracts/AgentSession.js';
 import {
+  readModelGatewayDiagnostics,
+  type ModelGatewayDiagnostics,
+} from '../../../src/contracts/ModelGatewayError.js';
+import {
   CompanionHudPhase,
   CompanionHudTool,
   CompanionHudAckSchema,
@@ -40,6 +44,8 @@ import {
   InteractiveAgentRequestSchema,
   InteractiveAgentResponseSchema,
   InteractiveAgentSettledSchema,
+  InteractiveObservationProjectionSchema,
+  type InteractiveObservationProjection,
   type InteractiveAgentRun,
   type InteractiveAgentSettled,
   type InteractiveAgentResponse,
@@ -166,6 +172,8 @@ export async function runInteractiveAgentTrial(
   let mutationCalls = 0;
   let studentInputCalls = 0;
   let outputCount = 0;
+  const observationProjections: InteractiveObservationProjection[] = [];
+  let observationProjectionOverflow = false;
   const recordOutput = (output: AgentRequestOutput): void => {
     outputCount += 1;
     emit({
@@ -190,6 +198,20 @@ export async function runInteractiveAgentTrial(
       write(line: string): void {
         try {
           const raw: unknown = JSON.parse(line);
+          const projection = z.object({ msg: z.literal('cua.model_projection') }).safeParse(raw);
+          if (projection.success) {
+            const measurement = z
+              .object(InteractiveObservationProjectionSchema.shape)
+              .safeParse(raw);
+            if (measurement.success) {
+              if (observationProjections.length < 1000) {
+                observationProjections.push(measurement.data);
+              } else {
+                observationProjectionOverflow = true;
+              }
+            }
+            return;
+          }
           const parsed = logEventSchema.safeParse(raw);
           if (!parsed.success) {
             return;
@@ -232,6 +254,7 @@ export async function runInteractiveAgentTrial(
       cacheToolsList: true,
     },
     log,
+    { observationProjection: command.observationProjection },
   );
   const model = new TaskModelClient(
     command.credential.token,
@@ -241,6 +264,7 @@ export async function runInteractiveAgentTrial(
   const context = command.contextEnabled ? createAuthoredContext(command.historyText) : null;
   let runner: ComputerUseTaskRunner | null = null;
   let result: AgentResult | null = null;
+  let gatewayFailure: ModelGatewayDiagnostics | null = null;
   let failed: boolean;
   const onAbort = (): void => {
     void desktop.close().catch(() => {});
@@ -325,8 +349,9 @@ export async function runInteractiveAgentTrial(
       );
     });
     failed = result.kind === 'failed' || signal.aborted;
-  } catch {
+  } catch (error) {
     failed = true;
+    gatewayFailure = readModelGatewayDiagnostics(error);
   } finally {
     signal.removeEventListener('abort', onAbort);
     model.dispose();
@@ -365,6 +390,9 @@ export async function runInteractiveAgentTrial(
     mutationCalls,
     studentInputCalls,
     outputCount,
+    observationProjections,
+    observationProjectionOverflow,
+    gatewayFailure,
   });
 }
 
@@ -405,7 +433,7 @@ parentPort.on('message', (event) => {
   };
   void runInteractiveAgentTrial(command, abort.signal, emit)
     .then(emit)
-    .catch(() => {
+    .catch((error: unknown) => {
       // Uncertain cleanup must be retired by the parent; no raw error escapes.
       parentPort.postMessage(
         InteractiveAgentSettledSchema.parse({
@@ -418,6 +446,7 @@ parentPort.on('message', (event) => {
           modelRequests: [],
           toolCalls: 0,
           mutationCalls: 0,
+          gatewayFailure: readModelGatewayDiagnostics(error),
         }),
       );
     })

@@ -6,6 +6,7 @@ import {
   waitForEvaluationWindow,
   type EvaluationWindowConnection,
   type EvaluationWindowPorts,
+  type EvaluationWindowDiagnostic,
 } from './WaitForEvaluationWindow.js';
 
 const connection = { command: '/synthetic/driver', args: ['mcp'], env: { PRIVATE: 'synthetic' } };
@@ -61,6 +62,57 @@ function createFixture() {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+});
+
+it('records one bounded terminal failure with its operation and safe RPC code, without native content', async () => {
+  const fixture = createFixture();
+  fixture.server.callTool.mockRejectedValue(
+    Object.assign(new Error('private native contents must not be recorded'), {
+      name: 'McpError',
+      code: -32603,
+    }),
+  );
+  const record = vi
+    .fn<(event: EvaluationWindowDiagnostic) => Promise<void>>()
+    .mockResolvedValue(undefined);
+  await expect(
+    waitForEvaluationWindow(connection, target, undefined, fixture.ports, record),
+  ).rejects.toThrow(EvaluationWindowFailure.PROBE_FAILED);
+  expect(record).toHaveBeenCalledOnce();
+  expect(record.mock.calls[0]?.[0]).toMatchObject({
+    operation: 'close',
+    failedOperation: 'list_windows',
+    failureCode: EvaluationWindowFailure.PROBE_FAILED,
+    errorType: 'McpError',
+    errorCode: -32603,
+    attemptedLists: 1,
+    completedLists: 0,
+    attemptedStates: 0,
+    candidateWindowObserved: false,
+    contentObserved: false,
+    cleanupConfirmed: true,
+  });
+  const text = JSON.stringify(record.mock.calls);
+  expect(text).not.toContain('private');
+  expect(text).not.toContain('main.py');
+  expect(text).not.toContain('/synthetic');
+});
+
+it('drops arbitrary string error codes instead of recording untrusted error text', async () => {
+  const fixture = createFixture();
+  fixture.server.connect.mockRejectedValue(
+    Object.assign(new Error('private connection failure'), {
+      code: 'PRIVATE_ARBITRARY_ERROR_CODE',
+    }),
+  );
+  const record = vi
+    .fn<(event: EvaluationWindowDiagnostic) => Promise<void>>()
+    .mockResolvedValue(undefined);
+  await expect(
+    waitForEvaluationWindow(connection, target, undefined, fixture.ports, record),
+  ).rejects.toThrow(EvaluationWindowFailure.PROBE_FAILED);
+  expect(record.mock.calls[0]?.[0]).toMatchObject({ failedOperation: 'connect', errorCode: null });
+  expect(JSON.stringify(record.mock.calls)).not.toContain('PRIVATE_ARBITRARY_ERROR_CODE');
 });
 
 it('observes only the exact owned process, title and document before returning metadata', async () => {

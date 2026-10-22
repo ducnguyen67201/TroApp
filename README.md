@@ -637,6 +637,49 @@ establish native-payload frequency, live Sol comprehension or dollar savings.
 for native projections; no source text or pixels enter this event. The owning
 policy is [FormatModelObservation.ts](src/desktop/worker/agent/FormatModelObservation.ts).
 
+To compare the real agent before and after this projection change, sign in to the
+local development app and select **Development → Compare Python debugging before
+and after TOON (internal)**. It runs the reviewed `PythonMissingBreakSeed1` exercise
+twice in execution mode, once with the original JSON append and once with the
+current adaptive projection. Each trial starts with a fresh fixture, worker and
+model history; the model, request, authored study history and independent grader
+stay the same. No audio or model judge is added. The app sends one short-lived
+gateway credential directly to the fixed comparison command's stdin.
+
+The equivalent consumer command for a trusted credential pipe is:
+
+```sh
+pnpm eval:encoding:live --live --dedicated-desktop --credential-stdin
+```
+
+Use the live desktop and pricing setup described above. The comparison report
+retains the scenario/start-state identity, per-run reported tokens and cache
+subsets, gateway calls, cost estimates or unpriced reasons, task/first-input/first
+verified-outcome timing, independent repair result and content-free projection
+counts. Its two child directories retain the normal request/output/checklist
+artifacts. A single pair is a smoke comparison: model choices and provider cache
+state can affect both the call count and timing. Exact field preservation does
+not establish equivalent model comprehension. The original JSON control also
+preserves the old unconditional metadata append, so the comparison covers that
+duplicate avoidance as well as encoding.
+The report explicitly states whether TOON was exercised. An adaptive run that
+keeps JSON for every observation cannot establish TOON comprehension or an
+encoding-related token, cost or timing improvement.
+
+Check the same owned VS Code window/native connection without a credential or
+model request before a live pair:
+
+```sh
+pnpm eval:request --application vscode --execute --native-readiness-only --dedicated-desktop --scenario-file /absolute/path/Scenario.json
+```
+
+This preflight stops before the agent worker is dispatched. Terminal
+`ReadinessDiagnostic-*.json` files retain only probe stage, bounded error class,
+counts and timing. Failed live trials also retain validated `gatewayFailure`
+diagnostics when the gateway supplies them; raw provider messages, request bodies
+and credentials are excluded. Setup failures leave partial diagnostics and do
+not establish a model-performance result.
+
 ## Configuration
 
 | Process                                     | Settings                                                                                                                                                                                                       |

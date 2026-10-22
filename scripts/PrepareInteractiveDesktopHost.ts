@@ -22,6 +22,36 @@ import { prepareCuaSdk } from './PrepareCuaSdk.js';
 import { prepareDesktopDevelopmentHost } from './PrepareDesktopDevelopmentHost.js';
 
 const runFile = promisify(execFile);
+
+export interface ArchiveFileSystemRuntime {
+  versions: { electron?: string | undefined };
+  noAsar?: boolean | undefined;
+}
+
+/** This serialized startup CLI copies signed bundles as physical directories.
+ * Electron otherwise treats embedded .asar files as virtual directories during
+ * recursive cp/rm. Keep physical mode through awaited staging cleanup, then
+ * restore the exact prior setting; ordinary Node processes remain untouched. */
+export async function runWithPhysicalArchiveFiles<T>(
+  operation: () => Promise<T>,
+  runtime: ArchiveFileSystemRuntime = process,
+): Promise<T> {
+  if (!runtime.versions.electron) {
+    return operation();
+  }
+  const hadSetting = Object.hasOwn(runtime, 'noAsar');
+  const previous = runtime.noAsar;
+  runtime.noAsar = true;
+  try {
+    return await operation();
+  } finally {
+    if (hadSetting) {
+      runtime.noAsar = previous;
+    } else {
+      Reflect.deleteProperty(runtime, 'noAsar');
+    }
+  }
+}
 const bootstrap = `import { app } from 'electron';
 import { isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -59,6 +89,10 @@ export function createInteractiveDesktopHostLayout(projectDirectory: string): {
  * development bundle. Only nonsecret entry/root arguments vary between runs;
  * credentials and disposable profiles never become signed bundle contents. */
 export async function prepareInteractiveDesktopHost(): Promise<string> {
+  return runWithPhysicalArchiveFiles(prepareInteractiveDesktopHostFiles);
+}
+
+async function prepareInteractiveDesktopHostFiles(): Promise<string> {
   const projectRoot = await realpath(process.cwd());
   const sourceExecutable = await prepareDesktopDevelopmentHost(projectRoot);
   if (process.platform !== 'darwin') {

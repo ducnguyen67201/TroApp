@@ -59,6 +59,7 @@ export interface SignedInEvaluationOptions {
   taskMode?: AgentTaskMode;
   scenarioFile?: string;
   pricingFile?: string;
+  compareObservationEncoding?: boolean;
   childEnvironment: NodeJS.ProcessEnv;
   signal?: AbortSignal;
   launch?: EvaluationProcessLauncher;
@@ -81,15 +82,26 @@ function isAllowedGateway(value: string): boolean {
   );
 }
 
-const LaunchSettingsSchema = z.strictObject({
-  projectDirectory: z.string().min(1).refine(isAbsolute),
-  executablePath: z.string().min(1).refine(isAbsolute),
-  gatewayBaseUrl: z.url().refine(isAllowedGateway),
-  application: z.enum(SignedInEvaluationApplication).default(SignedInEvaluationApplication.SCRATCH),
-  taskMode: AgentTaskModeSchema.default(AgentTaskMode.TEACH),
-  scenarioFile: z.string().min(1).refine(isAbsolute).optional(),
-  pricingFile: z.string().min(1).refine(isAbsolute).optional(),
-});
+const LaunchSettingsSchema = z
+  .strictObject({
+    projectDirectory: z.string().min(1).refine(isAbsolute),
+    executablePath: z.string().min(1).refine(isAbsolute),
+    gatewayBaseUrl: z.url().refine(isAllowedGateway),
+    application: z
+      .enum(SignedInEvaluationApplication)
+      .default(SignedInEvaluationApplication.SCRATCH),
+    taskMode: AgentTaskModeSchema.default(AgentTaskMode.TEACH),
+    scenarioFile: z.string().min(1).refine(isAbsolute).optional(),
+    pricingFile: z.string().min(1).refine(isAbsolute).optional(),
+    compareObservationEncoding: z.boolean().default(false),
+  })
+  .refine(
+    (settings) =>
+      !settings.compareObservationEncoding ||
+      (settings.application === SignedInEvaluationApplication.VSCODE &&
+        settings.taskMode === AgentTaskMode.EXECUTE),
+    { message: 'Observation encoding comparison requires automatic Python debugging.' },
+  );
 
 /** The fixed checkout CLI owns the evaluation host and its native teardown.
  * No child output is forwarded into app logs or parsed as trusted instructions. */
@@ -142,6 +154,7 @@ export async function runSignedInEvaluation(
     taskMode: options.taskMode,
     scenarioFile: options.scenarioFile,
     pricingFile: options.pricingFile,
+    compareObservationEncoding: options.compareObservationEncoding,
   });
   const environment = readEvaluationChildEnv(options.childEnvironment);
   const session = await options.auth.readSession();
@@ -168,11 +181,17 @@ export async function runSignedInEvaluation(
     settings.projectDirectory,
     '.tro-development',
     'evaluations',
-    `Interactive-signedin-${new Date().toISOString().replaceAll(':', '-')}-${randomUUID()}`,
+    `${settings.compareObservationEncoding ? 'ObservationComparison' : 'Interactive'}-signedin-${new Date().toISOString().replaceAll(':', '-')}-${randomUUID()}`,
   );
   const arguments_ = [
     join(settings.projectDirectory, 'node_modules', 'tsx', 'dist', 'cli.mjs'),
-    join(settings.projectDirectory, 'scripts', 'RunInteractiveEvaluations.ts'),
+    join(
+      settings.projectDirectory,
+      'scripts',
+      settings.compareObservationEncoding
+        ? 'CompareObservationEncoding.ts'
+        : 'RunInteractiveEvaluations.ts',
+    ),
     '--single',
     '--application',
     settings.application,

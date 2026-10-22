@@ -17,6 +17,7 @@ interface EvaluationMenuOptions {
     taskMode: AgentTaskMode,
     signal: AbortSignal,
     scenarioFile?: string,
+    compareObservationEncoding?: boolean,
   ): Promise<SignedInEvaluationResult>;
 }
 
@@ -34,16 +35,25 @@ export function registerEvaluationMenu(options: EvaluationMenuOptions): Evaluati
     {
       application: SignedInEvaluationApplication.VSCODE,
       taskMode: AgentTaskMode.EXECUTE,
+      compareObservationEncoding: true,
+      label: 'Compare Python debugging before and after TOON (internal)',
+    },
+    {
+      application: SignedInEvaluationApplication.VSCODE,
+      taskMode: AgentTaskMode.EXECUTE,
+      compareObservationEncoding: false,
       label: 'Run automatic Python debugging evaluation (internal)',
     },
     {
       application: SignedInEvaluationApplication.VSCODE,
       taskMode: AgentTaskMode.TEACH,
+      compareObservationEncoding: false,
       label: 'Run student Python debugging evaluation in VS Code',
     },
     {
       application: SignedInEvaluationApplication.SCRATCH,
       taskMode: AgentTaskMode.TEACH,
+      compareObservationEncoding: false,
       label: 'Run Scratch teaching evaluation on this Mac',
     },
   ];
@@ -52,6 +62,7 @@ export function registerEvaluationMenu(options: EvaluationMenuOptions): Evaluati
     application: SignedInEvaluationApplication,
     taskMode: AgentTaskMode,
     scenarioFile?: string,
+    compareObservationEncoding = false,
   ): void => {
     if (controller || !options.canStart()) {
       void dialog.showMessageBox({
@@ -67,7 +78,13 @@ export function registerEvaluationMenu(options: EvaluationMenuOptions): Evaluati
     execution = (async () => {
       await options.suspendFollowing();
       current.signal.throwIfAborted();
-      return options.run(application, taskMode, current.signal, scenarioFile);
+      return options.run(
+        application,
+        taskMode,
+        current.signal,
+        scenarioFile,
+        compareObservationEncoding,
+      );
     })();
     void execution
       .then(async (result) => {
@@ -77,7 +94,10 @@ export function registerEvaluationMenu(options: EvaluationMenuOptions): Evaluati
         const response = await dialog.showMessageBox({
           message:
             result.exitCode === 0 ? 'Evaluation finished' : 'Evaluation stopped before completion',
-          detail: `The recorded outputs and checklist are in:\n${result.outputDirectory}`,
+          detail:
+            result.exitCode === 0
+              ? `The recorded outputs and checklist are in:\n${result.outputDirectory}`
+              : `The run stopped before a complete result was saved. Partial artifacts and setup diagnostics are in:\n${result.outputDirectory}`,
           buttons: ['Show report folder', 'Close'],
         });
         if (response.response === 0 && options.canNotify()) {
@@ -111,7 +131,12 @@ export function registerEvaluationMenu(options: EvaluationMenuOptions): Evaluati
       new MenuItem({
         label: scenario.label,
         click: () => {
-          startEvaluation(scenario.application, scenario.taskMode);
+          startEvaluation(
+            scenario.application,
+            scenario.taskMode,
+            undefined,
+            scenario.compareObservationEncoding,
+          );
         },
       }),
   );

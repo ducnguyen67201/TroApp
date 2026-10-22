@@ -30,6 +30,7 @@ import {
 } from './RunEvaluationTrial.js';
 import { waitForEvaluationWindow, EvaluationWindowFailure } from './WaitForEvaluationWindow.js';
 import { ModelCredentialSchema } from '../../../src/contracts/AuthSession.js';
+import type { DesktopDriverConnection } from '../../../src/contracts/DesktopDriver.js';
 import { ModelProfile } from '../../../src/contracts/ModelProfile.js';
 import { EmbeddedDesktopDriver } from '../../../src/desktop/main/EmbeddedDesktopDriver.js';
 import { DesktopPermissions } from '../../../src/desktop/main/DesktopPermissions.js';
@@ -287,6 +288,49 @@ async function retireWorker(
   }
 }
 
+async function prepareNativeEvaluationWindow(trialId: string): Promise<DesktopDriverConnection> {
+  return runEvaluationStage(
+    EvaluationPipelineStage.NATIVE_READY,
+    async () => {
+      if ((await new DesktopPermissions().readStatus()).kind !== DesktopPermissionState.READY) {
+        throw new Error('desktop_permissions_missing');
+      }
+      if (hasInterrupted()) {
+        throw new Error('evaluation_cancelled');
+      }
+      const nativeConnection = await driver.start(cancelEvaluation);
+      const nativeTarget = applicationAdapter?.getNativeTarget();
+      if (applicationAdapter?.application === EvaluationApplication.VSCODE && !nativeTarget) {
+        throw new Error('evaluation_owned_window_missing');
+      }
+      if (nativeTarget) {
+        const readiness = await waitForEvaluationWindow(
+          nativeConnection,
+          nativeTarget,
+          workspaceCancellation.signal,
+          undefined,
+          (diagnostic) =>
+            writeFile(
+              join(artifactDirectory, `ReadinessDiagnostic-${trialId}.json`),
+              JSON.stringify(diagnostic, null, 2) + '\n',
+              { mode: 0o600 },
+            ),
+        );
+        await writeFile(
+          join(artifactDirectory, `Readiness-${trialId}.json`),
+          JSON.stringify(readiness, null, 2) + '\n',
+          { mode: 0o600 },
+        );
+      }
+      if (hasInterrupted()) {
+        throw new Error('evaluation_cancelled');
+      }
+      return nativeConnection;
+    },
+    createPipelineRecorder(trialId),
+  );
+}
+
 async function runTrial(
   plan: InteractiveTrialPlan,
   launch: z.infer<typeof LaunchSchema>,
@@ -307,39 +351,7 @@ async function runTrial(
     window?.show();
     window?.focus();
   }
-  const connection = await runEvaluationStage(
-    EvaluationPipelineStage.NATIVE_READY,
-    async () => {
-      if ((await new DesktopPermissions().readStatus()).kind !== DesktopPermissionState.READY) {
-        throw new Error('desktop_permissions_missing');
-      }
-      if (hasInterrupted()) {
-        throw new Error('evaluation_cancelled');
-      }
-      const nativeConnection = await driver.start(cancelEvaluation);
-      const nativeTarget = applicationAdapter?.getNativeTarget();
-      if (applicationAdapter?.application === EvaluationApplication.VSCODE && !nativeTarget) {
-        throw new Error('evaluation_owned_window_missing');
-      }
-      if (nativeTarget) {
-        const readiness = await waitForEvaluationWindow(
-          nativeConnection,
-          nativeTarget,
-          workspaceCancellation.signal,
-        );
-        await writeFile(
-          join(artifactDirectory, `Readiness-${trialId}.json`),
-          JSON.stringify(readiness, null, 2) + '\n',
-          { mode: 0o600 },
-        );
-      }
-      if (hasInterrupted()) {
-        throw new Error('evaluation_cancelled');
-      }
-      return nativeConnection;
-    },
-    createPipelineRecorder(trialId),
-  );
+  const connection = await prepareNativeEvaluationWindow(trialId);
   const worker = utilityProcess.fork(launch.workerEntry, [], {
     serviceName: 'Tro interactive evaluation',
   });
@@ -460,6 +472,7 @@ async function runTrial(
         request: plan.scenario.request,
         historyText: plan.scenario.historyText,
         contextEnabled: plan.variant === InteractiveVariant.ON,
+        observationProjection: launch.config.observationProjection,
         taskMode: launch.config.taskMode,
         locale: plan.scenario.locale,
       }),
@@ -710,7 +723,7 @@ async function runBenchmark(): Promise<void> {
   }
   window.on('close', cancelEvaluation);
   let canCancelWithEscape = true;
-  if (launch.config.runMode === InteractiveRunMode.LIVE) {
+  if (launch.config.runMode === InteractiveRunMode.LIVE || launch.config.nativeReadinessOnly) {
     if (applicationAdapter?.application !== EvaluationApplication.VSCODE) {
       window.setFullScreen(true);
     }
@@ -753,6 +766,9 @@ async function runBenchmark(): Promise<void> {
           : visibleTarget;
       if (!hasValidBaseline || grade.outcomeMatches) {
         throw new Error('invalid_fixture_initial_state');
+      }
+      if (launch.config.nativeReadinessOnly) {
+        await prepareNativeEvaluationWindow(trialId);
       }
       report.preflight.push({
         scenarioId: trial.caseId,

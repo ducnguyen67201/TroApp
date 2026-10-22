@@ -1759,7 +1759,7 @@ async function startDesktop(): Promise<void> {
         await hudClient.suspendFollowing();
       },
       resumeFollowing: () => hudClient.resumeFollowing(),
-      run: (application, taskMode, signal, scenarioFile) =>
+      run: (application, taskMode, signal, scenarioFile, compareObservationEncoding) =>
         runSignedInEvaluation({
           auth,
           projectDirectory: join(mainDirectory, '../..'),
@@ -1769,6 +1769,7 @@ async function startDesktop(): Promise<void> {
           application,
           taskMode,
           ...(scenarioFile ? { scenarioFile } : {}),
+          ...(compareObservationEncoding ? { compareObservationEncoding } : {}),
           signal,
         }),
     });

@@ -4,7 +4,11 @@ import {
   CompanionHudBindingSchema,
 } from '#contracts/CompanionHud.js';
 import { logAgentExchange } from '../agent/AgentExchangeLog.js';
-import { formatModelObservation } from '../agent/FormatModelObservation.js';
+import {
+  formatModelObservation,
+  ModelObservationEncoding,
+} from '../agent/FormatModelObservation.js';
+import { ModelObservationProjection } from '../agent/ModelObservationProjection.js';
 import { MCPServerStdio, type CallToolResult, type MCPCallToolOptions } from '@openai/agents';
 import type { Logger } from 'pino';
 import { CuaTaskEvidence } from './CuaTaskEvidence.js';
@@ -375,12 +379,32 @@ function includeCuaMetadata(
   result: CallToolResult,
   log: Logger,
   context: { toolName: string; callId: string | null },
+  projection: ModelObservationProjection,
 ): CallToolResult {
   if (result.structuredContent === undefined) {
     return result;
   }
   const startedAt = performance.now();
   const json = JSON.stringify(result.structuredContent);
+  if (projection === ModelObservationProjection.LEGACY_JSON) {
+    log.debug(
+      {
+        ...context,
+        projection,
+        format: ModelObservationEncoding.JSON,
+        jsonCharacters: json.length,
+        outputCharacters: json.length,
+        jsonTokens: null,
+        outputTokens: null,
+        elapsedMs: Math.round(performance.now() - startedAt),
+        duplicateCopyAvoided: false,
+      },
+      'cua.model_projection',
+    );
+    /* Preserve the pre-TOON behavior exactly, including its unconditional append.
+     * The internal paired benchmark must not silently improve its control. */
+    return { ...result, content: [...result.content, { type: 'text', text: json }] };
+  }
   const formatted = formatModelObservation(json);
   const duplicateIndex = result.content.findIndex(
     (item) => item.type === 'text' && item.text === json,
@@ -396,6 +420,7 @@ function includeCuaMetadata(
   log.debug(
     {
       ...context,
+      projection,
       format: formatted.format,
       jsonCharacters: formatted.jsonCharacters,
       outputCharacters: formatted.outputCharacters,
@@ -664,6 +689,7 @@ export class LoggedCuaServer extends MCPServerStdio {
   constructor(
     options: ConstructorParameters<typeof MCPServerStdio>[0],
     private readonly log: Logger,
+    private readonly modelOptions: { observationProjection?: ModelObservationProjection } = {},
   ) {
     super(options);
   }
@@ -915,9 +941,19 @@ export class LoggedCuaServer extends MCPServerStdio {
         'cua.response',
       );
       if (recorded.observations.length === 0) {
-        return includeCuaMetadata(result, this.log, { toolName, callId: call.id });
+        return includeCuaMetadata(
+          result,
+          this.log,
+          { toolName, callId: call.id },
+          this.modelOptions.observationProjection ?? ModelObservationProjection.ADAPTIVE_TOON,
+        );
       }
-      const modelResult = includeCuaMetadata(result, this.log, { toolName, callId: call.id });
+      const modelResult = includeCuaMetadata(
+        result,
+        this.log,
+        { toolName, callId: call.id },
+        this.modelOptions.observationProjection ?? ModelObservationProjection.ADAPTIVE_TOON,
+      );
       return {
         ...modelResult,
         content: [
@@ -999,7 +1035,12 @@ export class LoggedCuaServer extends MCPServerStdio {
         this.taskEvidence.failGuidance(GuidanceReason.INVALID_REQUEST);
         this.onTeachingTerminal?.();
       }
-      return includeCuaMetadata(result, this.log, { toolName, callId: null });
+      return includeCuaMetadata(
+        result,
+        this.log,
+        { toolName, callId: null },
+        this.modelOptions.observationProjection ?? ModelObservationProjection.ADAPTIVE_TOON,
+      );
     }
     if (toolName === CursorCompanionTool.PRESENT_GUIDANCE) {
       const parsed = CursorGuidanceRequestHeaderSchema.safeParse(args);
@@ -1138,7 +1179,12 @@ export class LoggedCuaServer extends MCPServerStdio {
         output: result,
         ...(result.isError ? { error: describeCuaResult(result) } : {}),
       });
-      return includeCuaMetadata(result, this.log, { toolName, callId: null });
+      return includeCuaMetadata(
+        result,
+        this.log,
+        { toolName, callId: null },
+        this.modelOptions.observationProjection ?? ModelObservationProjection.ADAPTIVE_TOON,
+      );
     } catch (error) {
       logAgentExchange(this.log, {
         operation: 'native.tool',

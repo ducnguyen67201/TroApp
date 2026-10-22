@@ -714,6 +714,25 @@ contents. The internal `eval:encoding` comparison invokes this same formatter
 and exact decode checks without native or provider calls; it does not establish
 model comprehension or full-request savings.
 
+The checkout-only live encoding comparison supplies an explicit
+`ModelObservationProjection` to each evaluation worker's `LoggedCuaServer`.
+Normal desktop tasks retain the adaptive default. The legacy control reproduces
+the original unconditional JSON append; it is not an environment or product
+setting. The signed-in development menu launches the fixed comparison script
+with its scoped credential on stdin. Two normal Python trials reset the same
+reviewed missing-`break` exercise and use the same real model, context settings
+and independent grader. Their report aggregates observed usage, pricing coverage,
+timing, repair results and bounded projection diagnostics without retaining
+native contents. Fresh model histories do not reset the provider's shared cache;
+a single pair cannot establish a stable causal performance improvement.
+Coverage explicitly distinguishes an exercised TOON projection from JSON-only
+fallback or missing measurements; JSON-only runs cannot establish a TOON benefit.
+The internal native-readiness preflight runs the same owned VS Code window probe
+without a credential or agent dispatch. Terminal readiness diagnostics contain
+only stage, counts, timing and safe error classifications. Evaluation workers
+retain existing allowlisted gateway failure diagnostics separately from model
+outputs, so infrastructure failures stay distinguishable from task outcomes.
+
 ## Teaching
 
 Show me keeps the student's original goal and lets the student control the real
@@ -1899,6 +1918,10 @@ bundle identity so OS grants survive disposable run profiles. Its bootstrap take
 only the local entry and run directory; credentials remain on stdin. Host bundle
 preparation refuses to replace a running evaluation host. Guest OS permissions
 belong to the guest when running in a VM.
+When the signed-in launcher runs the preparation CLI in Electron's Node mode,
+bundle copying and staging cleanup use physical archive files rather than
+Electron's virtual ASAR filesystem. Preparation restores the prior process
+setting after all awaited cleanup; ordinary Node startup is unchanged.
 
 Context-on trials inject authored history through the task's in-memory context
 port. This is a context-use comparison, not an evaluation of capture coverage,

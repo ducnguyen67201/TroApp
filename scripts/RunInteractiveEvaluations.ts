@@ -351,7 +351,10 @@ export async function runInteractiveEvaluations(
     await buildInteractiveHost(root);
     stage = InteractiveLaunchStage.HOST;
     await saveLaunchStatus(InteractiveLaunchStatus.RUNNING);
-    const host = await prepareInteractiveExecutable(root, live);
+    const host = await prepareInteractiveExecutable(
+      root,
+      live || options.config.nativeReadinessOnly,
+    );
     const bootstrap = JSON.stringify({
       config: options.config,
       outputDirectory,

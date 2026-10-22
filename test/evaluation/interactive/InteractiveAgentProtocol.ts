@@ -5,6 +5,21 @@ import { AgentTaskMode, AgentTaskModeSchema } from '../../../src/contracts/Curso
 import { DesktopDriverConnectionSchema } from '../../../src/contracts/DesktopDriver.js';
 import { AgentRequestOutputSchema } from './AgentRequestOutput.js';
 import { DesktopLocale, DesktopLocaleSchema } from '../../../src/contracts/DesktopLocale.js';
+import { ModelObservationProjection } from '../../../src/desktop/worker/agent/ModelObservationProjection.js';
+import { ModelGatewayDiagnosticsSchema } from '../../../src/contracts/ModelGatewayError.js';
+
+/** Content-free measurements only; no native arguments, text or screenshot bytes. */
+export const InteractiveObservationProjectionSchema = z.strictObject({
+  toolName: z.string().min(1).max(256),
+  callId: z.string().max(256).nullable(),
+  format: z.enum(['json', 'toon']),
+  jsonCharacters: z.number().int().nonnegative(),
+  outputCharacters: z.number().int().nonnegative(),
+  jsonTokens: z.number().int().nonnegative().nullable(),
+  outputTokens: z.number().int().nonnegative().nullable(),
+  elapsedMs: z.number().nonnegative(),
+  duplicateCopyAvoided: z.boolean(),
+});
 
 export const InteractiveAgentMessageKind = {
   RUN: 'run',
@@ -66,6 +81,9 @@ export const InteractiveAgentRunSchema = z.strictObject({
   request: z.string().trim().min(1).max(8000),
   historyText: z.string().max(32_000),
   contextEnabled: z.boolean(),
+  observationProjection: z
+    .enum(ModelObservationProjection)
+    .default(ModelObservationProjection.ADAPTIVE_TOON),
   taskMode: AgentTaskModeSchema.default(AgentTaskMode.EXECUTE),
   locale: DesktopLocaleSchema.default(DesktopLocale.ENGLISH),
 });
@@ -92,6 +110,10 @@ export const InteractiveAgentSettledSchema = z.strictObject({
   mutationCalls: z.number().int().nonnegative(),
   studentInputCalls: z.number().int().nonnegative().nullable().default(null),
   outputCount: z.number().int().nonnegative().default(0),
+  observationProjections: z.array(InteractiveObservationProjectionSchema).max(1000).optional(),
+  observationProjectionOverflow: z.boolean().optional(),
+  /** Existing gateway allowlist only; raw SDK errors and provider messages stay local. */
+  gatewayFailure: ModelGatewayDiagnosticsSchema.nullable().optional(),
 });
 
 export const InteractiveAgentOutputSchema = z.strictObject({
@@ -126,3 +148,7 @@ export type InteractiveAgentOutput = z.infer<typeof InteractiveAgentOutputSchema
 export type InteractiveAgentResponse = z.infer<typeof InteractiveAgentResponseSchema>;
 
 export type InteractiveModelRequest = z.infer<typeof InteractiveModelRequestSchema>;
+
+export type InteractiveObservationProjection = z.infer<
+  typeof InteractiveObservationProjectionSchema
+>;

@@ -7,6 +7,7 @@ import { InteractiveGatewayUrlSchema } from './InteractiveAgentProtocol.js';
 import { EvaluationApplication } from './EvaluationApplication.js';
 import { EvaluationScenarioSchema, type EvaluationScenario } from './EvaluationScenario.js';
 import { EvaluationPriceCardSchema } from '../accounting/EvaluationUsage.js';
+import { ModelObservationProjection } from '../../../src/desktop/worker/agent/ModelObservationProjection.js';
 import {
   getDefaultEvaluationScenario,
   getEvaluationTaskId,
@@ -41,15 +42,31 @@ export const InteractiveEvaluationConfigSchema = z
     application: z.enum(EvaluationApplication).default(EvaluationApplication.CONTROLLED),
     evaluationScenario: EvaluationScenarioSchema.nullable().default(null),
     singleRequest: z.boolean().default(false),
+    nativeReadinessOnly: z.boolean().default(false),
     request: z.string().trim().min(1).max(1200).nullable().default(null),
     repetitions: z.number().int().min(1).max(5),
     tasks: z.array(z.enum(InteractiveTaskId)).min(1).max(8),
     variants: z.array(z.enum(InteractiveVariant)).min(1).max(2),
     gatewayBaseUrl: InteractiveGatewayUrlSchema,
     dedicatedDesktopDeclared: z.boolean(),
+    observationProjection: z
+      .enum(ModelObservationProjection)
+      .default(ModelObservationProjection.ADAPTIVE_TOON),
     pricing: EvaluationPriceCardSchema.optional(),
   })
   .superRefine((config, context) => {
+    if (
+      config.nativeReadinessOnly &&
+      (config.runMode !== InteractiveRunMode.PREFLIGHT ||
+        config.application !== EvaluationApplication.VSCODE ||
+        !config.dedicatedDesktopDeclared)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Native readiness requires VS Code preflight on a declared dedicated desktop and cannot run the agent.',
+      });
+    }
     if (config.evaluationScenario && config.evaluationScenario.application !== config.application) {
       context.addIssue({
         code: 'custom',
@@ -122,10 +139,12 @@ export function parseInteractiveEvaluationOptions(args: string[]): InteractiveEv
       teach: { type: 'boolean', default: false },
       execute: { type: 'boolean', default: false },
       single: { type: 'boolean', default: false },
+      'native-readiness-only': { type: 'boolean', default: false },
       request: { type: 'string' },
       application: { type: 'string', default: EvaluationApplication.CONTROLLED },
       'scenario-file': { type: 'string' },
       'pricing-file': { type: 'string' },
+      'observation-projection': { type: 'string' },
       'dedicated-desktop': { type: 'boolean', default: false },
       'credential-stdin': { type: 'boolean', default: false },
       repetitions: { type: 'string' },
@@ -156,6 +175,7 @@ export function parseInteractiveEvaluationOptions(args: string[]): InteractiveEv
         ? AgentTaskMode.TEACH
         : AgentTaskMode.EXECUTE,
     singleRequest,
+    nativeReadinessOnly: values['native-readiness-only'],
     request: values.request ?? null,
     repetitions: Number(values.repetitions ?? (singleRequest ? '1' : '3')),
     tasks: values.task
@@ -176,6 +196,7 @@ export function parseInteractiveEvaluationOptions(args: string[]): InteractiveEv
         : [variant === VariantSelection.ON ? InteractiveVariant.ON : InteractiveVariant.OFF],
     gatewayBaseUrl: values.gateway,
     dedicatedDesktopDeclared: values['dedicated-desktop'],
+    observationProjection: values['observation-projection'],
   });
   if (config.runMode === InteractiveRunMode.LIVE && !values['credential-stdin']) {
     throw new Error('A live run requires a short-lived gateway credential on stdin.');

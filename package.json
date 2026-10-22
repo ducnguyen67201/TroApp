@@ -63,7 +63,8 @@
     "eval:generate": "tsx scripts/GenerateEvaluationScenarios.ts",
     "eval:validate": "tsx scripts/ValidateEvaluationScenarios.ts",
     "eval:context": "node --conditions=development --import tsx scripts/BenchmarkQuestionContext.ts",
-    "eval:encoding": "node --conditions=development --import tsx scripts/BenchmarkObservationEncoding.ts"
+    "eval:encoding": "node --conditions=development --import tsx scripts/BenchmarkObservationEncoding.ts",
+    "eval:encoding:live": "node --conditions=development --import tsx scripts/CompareObservationEncoding.ts"
   },
   "dependencies": {
     "@better-auth/electron": "1.7.6",

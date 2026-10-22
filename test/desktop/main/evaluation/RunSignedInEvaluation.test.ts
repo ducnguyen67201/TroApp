@@ -77,6 +77,32 @@ afterEach(() => {
 });
 
 describe('signed-in development evaluation', () => {
+  it('launches the paired Python encoding comparison with one scoped credential on stdin', async () => {
+    const fixture = createFixture();
+    const running = runSignedInEvaluation({
+      ...fixture.options,
+      application: SignedInEvaluationApplication.VSCODE,
+      taskMode: AgentTaskMode.EXECUTE,
+      compareObservationEncoding: true,
+    });
+    await waitForLaunch(fixture);
+    expect(fixture.launch.mock.calls[0]?.[1]).toEqual(
+      expect.arrayContaining(['/synthetic/Tro/scripts/CompareObservationEncoding.ts', '--execute']),
+    );
+    expect(fixture.child.endInput).toHaveBeenCalledWith(JSON.stringify(fixture.credential));
+    expect(fixture.launch.mock.calls[0]?.[1]).not.toContain(fixture.credential.token);
+    fixture.child.emit('exit', 0);
+    await expect(running).resolves.toMatchObject({ exitCode: 0 });
+  });
+
+  it('rejects encoding comparisons outside the automatic Python scenario', async () => {
+    const fixture = createFixture();
+    await expect(
+      runSignedInEvaluation({ ...fixture.options, compareObservationEncoding: true }),
+    ).rejects.toThrow();
+    expect(fixture.fetchModelCredential).not.toHaveBeenCalled();
+    expect(fixture.launch).not.toHaveBeenCalled();
+  });
   it('selects an automatic execute trial while keeping credentials on stdin', async () => {
     const fixture = createFixture();
     const running = runSignedInEvaluation({

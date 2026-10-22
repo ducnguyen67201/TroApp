@@ -15,7 +15,42 @@ import { describe, expect, it, vi } from 'vitest';
 import { TaskContext } from '../../../../src/desktop/worker/execution/TaskContext.js';
 import { LoggedCuaServer } from '../../../../src/desktop/worker/cua/LoggedCuaServer.js';
 import { DesktopLocale } from '#contracts/DesktopLocale.js';
+import { ModelObservationProjection } from '../../../../src/desktop/worker/agent/ModelObservationProjection.js';
 import { enableAgentExchangeLog } from '../../../../src/desktop/worker/agent/AgentExchangeLog.js';
+
+it('reproduces the original unconditional JSON append only for the internal legacy control', async () => {
+  const metadata = { pid: 7, window_id: 12, label: 'Synthetic window' };
+  const json = JSON.stringify(metadata);
+  const native: CallToolResult = {
+    content: [{ type: 'text', text: json }],
+    structuredContent: metadata,
+  };
+  const before = structuredClone(native);
+  const driver = vi.spyOn(MCPServerStdio.prototype, 'callToolResult').mockResolvedValue(native);
+  const server = new LoggedCuaServer(
+    { name: 'Legacy JSON benchmark control', command: 'unused' },
+    pino({ level: 'silent' }),
+    { observationProjection: ModelObservationProjection.LEGACY_JSON },
+  );
+  try {
+    const result = await server.callToolResult('get_window_state', { pid: 7, window_id: 12 });
+    expect(native).toEqual(before);
+    expect(result.structuredContent).toBe(metadata);
+    expect(result.content.slice(0, 2)).toEqual([
+      { type: 'text', text: json },
+      { type: 'text', text: json },
+    ]);
+    const references = result.content.slice(2);
+    expect(references).toHaveLength(1);
+    const reference = references[0];
+    if (reference?.type !== 'text' || typeof reference.text !== 'string') {
+      throw new Error('Expected the original observation reference.');
+    }
+    expect(reference.text).toContain('Tro observation references:');
+  } finally {
+    driver.mockRestore();
+  }
+});
 
 it('projects repeated native metadata once as TOON while retaining original host evidence and images', async () => {
   const metadata = {

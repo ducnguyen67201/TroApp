@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { expect, it } from 'vitest';
 import { AgentTaskMode } from '../../../src/contracts/CursorCompanion.js';
 import { DesktopLocale } from '../../../src/contracts/DesktopLocale.js';
+import { ModelObservationProjection } from '../../../src/desktop/worker/agent/ModelObservationProjection.js';
+import { readModelGatewayDiagnostics } from '../../../src/contracts/ModelGatewayError.js';
 import {
   InteractiveAgentRunSchema,
   InteractiveAgentResponseSchema,
@@ -25,6 +27,13 @@ it('validates the private run contract and defaults to production execution mode
   });
   expect(parsed.taskMode).toBe(AgentTaskMode.EXECUTE);
   expect(parsed.locale).toBe(DesktopLocale.ENGLISH);
+  expect(parsed.observationProjection).toBe(ModelObservationProjection.ADAPTIVE_TOON);
+  expect(
+    InteractiveAgentRunSchema.parse({
+      ...parsed,
+      observationProjection: ModelObservationProjection.LEGACY_JSON,
+    }).observationProjection,
+  ).toBe(ModelObservationProjection.LEGACY_JSON);
   expect(
     InteractiveAgentRunSchema.parse({ ...parsed, locale: DesktopLocale.VIETNAMESE }).locale,
   ).toBe(DesktopLocale.VIETNAMESE);
@@ -93,6 +102,60 @@ it('keeps a cue-installed acknowledgment distinct from a settled task', () => {
     InteractiveAgentResponseSchema.safeParse({ kind: 'cue-installed', trialId, elapsedMs: -1 })
       .success,
   ).toBe(false);
+});
+
+it('retains only validated gateway failure diagnostics in a failed settled response', () => {
+  const error: unknown = {
+    message: 'PRIVATE_SDK_ERROR',
+    error: {
+      message: 'PRIVATE_PROVIDER_BODY',
+      diagnostics: {
+        gatewayRequestId: 'req-synthetic-gateway',
+        modelRequestId: randomUUID(),
+        reason: 'provider_rejected',
+        attemptNumber: 1,
+        durationMs: 470,
+        providerStatus: 400,
+        providerErrorCode: 'invalid_value',
+        providerErrorType: 'invalid_request_error',
+        providerParameter: 'tools[0].parameters',
+        rawResponse: 'PRIVATE_PROVIDER_BODY',
+        credential: 'PRIVATE_MODEL_CREDENTIAL',
+      },
+    },
+  };
+  const response = InteractiveAgentResponseSchema.parse({
+    kind: 'settled',
+    trialId: randomUUID(),
+    result: null,
+    failed: true,
+    durationMs: 500,
+    contextPreparationMs: null,
+    modelRequests: [],
+    toolCalls: 0,
+    mutationCalls: 0,
+    gatewayFailure: readModelGatewayDiagnostics(error),
+  });
+  expect(response).toMatchObject({
+    gatewayFailure: {
+      reason: 'provider_rejected',
+      providerStatus: 400,
+      providerParameter: 'tools[0].parameters',
+    },
+  });
+  expect(JSON.stringify(response)).not.toContain('PRIVATE_');
+  expect(readModelGatewayDiagnostics(new Error('PRIVATE_SDK_ERROR'))).toBeNull();
+  expect(
+    readModelGatewayDiagnostics({
+      diagnostics: {
+        gatewayRequestId: 'req-synthetic-gateway',
+        reason: 'provider_rejected',
+        attemptNumber: 1,
+        durationMs: 470,
+        providerParameter: 'PRIVATE_PARAMETER_CONTENT',
+      },
+    }),
+  ).toBeNull();
 });
 
 it('rejects native arguments, raw SDK history and unbounded public outputs at the recording boundary', () => {

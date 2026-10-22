@@ -61,6 +61,67 @@ export interface EvaluationWindowPorts {
   now(): number;
 }
 
+export const EvaluationWindowOperation = {
+  CONNECT: 'connect',
+  LIST: 'list_windows',
+  STATE: 'get_window_state',
+  CLOSE: 'close',
+} as const;
+
+type EvaluationWindowOperation =
+  (typeof EvaluationWindowOperation)[keyof typeof EvaluationWindowOperation];
+
+export interface EvaluationWindowDiagnostic {
+  schemaVersion: 1;
+  operation: EvaluationWindowOperation;
+  failedOperation: EvaluationWindowOperation | null;
+  failureCode: string | null;
+  errorType: string | null;
+  errorCode: string | number | null;
+  attemptedLists: number;
+  completedLists: number;
+  attemptedStates: number;
+  candidateWindowObserved: boolean;
+  contentObserved: boolean;
+  cleanupConfirmed: boolean;
+  elapsedMs: number;
+}
+
+const KnownProbeErrorCodes = new Set([
+  'ENOENT',
+  'EACCES',
+  'EPERM',
+  'ESRCH',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'EPIPE',
+  'ABORT_ERR',
+  'ERR_ABORTED',
+  'ERR_STREAM_DESTROYED',
+]);
+
+function describeProbeFailure(error: unknown): {
+  errorType: string;
+  errorCode: string | number | null;
+} {
+  return {
+    errorType:
+      error instanceof Error &&
+      ['Error', 'TypeError', 'McpError', 'AbortError'].includes(error.name)
+        ? error.name
+        : 'unknown',
+    errorCode:
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      ((typeof error.code === 'number' && Number.isSafeInteger(error.code)) ||
+        (typeof error.code === 'string' && KnownProbeErrorCodes.has(error.code)))
+        ? error.code
+        : null,
+  };
+}
+
 const ResultSchema = z.object({
   isError: z.boolean().optional(),
   structuredContent: z.unknown().optional(),
@@ -242,6 +303,7 @@ export async function waitForEvaluationWindow(
   targetInput: EvaluationWindowTarget,
   signal?: AbortSignal,
   ports: EvaluationWindowPorts = createPorts(),
+  recordDiagnostic?: (event: EvaluationWindowDiagnostic) => Promise<void>,
 ): Promise<EvaluationWindowReadiness> {
   const connection = DesktopDriverConnectionSchema.parse(connectionInput);
   const target = TargetSchema.parse(targetInput);
@@ -255,6 +317,13 @@ export async function waitForEvaluationWindow(
     throw new Error(EvaluationWindowFailure.PROBE_FAILED);
   }
   const startedAt = ports.now();
+  let operation: EvaluationWindowOperation = EvaluationWindowOperation.CONNECT;
+  let failedOperation: EvaluationWindowOperation | null = null;
+  let probeFailure: ReturnType<typeof describeProbeFailure> | null = null;
+  let attemptedLists = 0;
+  let completedLists = 0;
+  let attemptedStates = 0;
+  let candidateWindowObserved = false;
   const cancellation = new AbortController();
   const cancel = (): void => {
     cancellation.abort(new Error(EvaluationWindowFailure.CANCELLED));
@@ -291,6 +360,8 @@ export async function waitForEvaluationWindow(
   try {
     await runOperation(server.connect());
     while (!cancellation.signal.aborted) {
+      operation = EvaluationWindowOperation.LIST;
+      attemptedLists += 1;
       const windows = await runOperation(
         server.callTool(
           EvaluationWindowTool.LIST,
@@ -298,8 +369,12 @@ export async function waitForEvaluationWindow(
           cancellation.signal,
         ),
       );
+      completedLists += 1;
       const windowId = readCandidateWindow(windows, target);
       if (windowId !== null) {
+        candidateWindowObserved = true;
+        operation = EvaluationWindowOperation.STATE;
+        attemptedStates += 1;
         const content = await runOperation(
           server.callTool(
             EvaluationWindowTool.STATE,
@@ -333,7 +408,9 @@ export async function waitForEvaluationWindow(
     if (!readiness) {
       throw readAbortFailure(cancellation.signal);
     }
-  } catch {
+  } catch (error: unknown) {
+    failedOperation = operation;
+    probeFailure = describeProbeFailure(error);
     if (cancellation.signal.aborted) {
       failure = signal?.aborted
         ? EvaluationWindowFailure.CANCELLED
@@ -347,6 +424,8 @@ export async function waitForEvaluationWindow(
     cancellation.abort(new Error(EvaluationWindowFailure.CANCELLED));
   }
   const cleanup = new AbortController();
+  operation = EvaluationWindowOperation.CLOSE;
+  let cleanupConfirmed = false;
   const cleanupTimeout = setTimeout(() => {
     cleanup.abort(new Error(EvaluationWindowFailure.CLEANUP_UNCONFIRMED));
   }, EvaluationWindowLimits.CLEANUP_MS);
@@ -358,7 +437,10 @@ export async function waitForEvaluationWindow(
       })(),
       cleanup.signal,
     );
-  } catch {
+    cleanupConfirmed = true;
+  } catch (error: unknown) {
+    failedOperation = operation;
+    probeFailure = describeProbeFailure(error);
     failure = EvaluationWindowFailure.CLEANUP_UNCONFIRMED;
   } finally {
     clearTimeout(cleanupTimeout);
@@ -366,6 +448,21 @@ export async function waitForEvaluationWindow(
   if (signal?.aborted && failure !== EvaluationWindowFailure.CLEANUP_UNCONFIRMED) {
     failure = EvaluationWindowFailure.CANCELLED;
   }
+  await recordDiagnostic?.({
+    schemaVersion: 1,
+    operation,
+    failedOperation,
+    failureCode: failure,
+    errorType: probeFailure?.errorType ?? null,
+    errorCode: probeFailure?.errorCode ?? null,
+    attemptedLists,
+    completedLists,
+    attemptedStates,
+    candidateWindowObserved,
+    contentObserved: readiness !== null,
+    cleanupConfirmed,
+    elapsedMs: Math.max(0, ports.now() - startedAt),
+  }).catch(() => undefined);
   if (failure) {
     throw new Error(failure);
   }
